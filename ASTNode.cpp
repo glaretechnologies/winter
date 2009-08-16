@@ -3,6 +3,8 @@ ASTNode.cpp
 -----------
 File created by ClassTemplate on Wed Jun 11 03:55:25 2008
 Code By Nicholas Chapman.
+
+Copyright 2009 Nicholas Chapman
 =====================================================================*/
 #include "ASTNode.h"
 
@@ -246,9 +248,44 @@ Value* FunctionExpression::exec(VMState& vmstate)
 }
 
 
-void FunctionExpression::linkFunctions(Linker& linker)
+void FunctionExpression::linkFunctions(Linker& linker, std::vector<ASTNode*>& stack)
 {
 	// We want to find a function that matches our argument expression types, and the function name
+
+	// First, walk up tree, and see if such a target function has been given a name with a let.
+	/*for(int i = (int)stack.size() - 1; i >= 0; --i)
+	{
+		{
+			FunctionDefinition* def = dynamic_cast<FunctionDefinition*>(stack[i]);
+			if(def != NULL)
+			{
+				for(unsigned int i=0; i<def->lets.size(); ++i)
+					if(def->lets[i]->type() == this->name)
+					{
+						this->argument_index = i;
+						this->argument_offset = (int)def->lets.size() - i;
+						this->referenced_var_type = def->args[i].type;
+						this->vartype = LetVariable;
+						this->parent_function = def;
+						return;
+					}
+
+				for(unsigned int i=0; i<def->args.size(); ++i)
+					if(def->args[i].name == this->name)
+					{
+						this->argument_index = i;
+						this->argument_offset = (int)def->args.size() - i;
+						this->referenced_var_type = def->args[i].type;
+						this->vartype = ArgumentVariable;
+						this->parent_function = def;
+						return;
+					}
+
+				if(this->argument_offset == -1)
+					throw BaseException("No such function argument '" + this->name + "'");
+			}
+		}
+*/
 
 	vector<TypeRef> argtypes;
 	for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
@@ -278,7 +315,7 @@ void FunctionExpression::linkFunctions(Linker& linker)
 void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
 	if(payload.linker)
-		linkFunctions(*payload.linker);
+		linkFunctions(*payload.linker, stack);
 
 	stack.push_back(this);
 
@@ -340,7 +377,8 @@ Variable::Variable(ASTNode* parent, const std::string& name_)
 	name(name_),
 	argument_offset(-1),
 	argument_index(-1),
-	parent_function(NULL)
+	parent_function(NULL),
+	parent_anon_function(NULL)
 {
 /*	ASTNode* c = parent;
 	while(c)
@@ -383,36 +421,69 @@ void Variable::bindVariables(const std::vector<ASTNode*>& stack)
 {
 	for(int i = (int)stack.size() - 1; i >= 0; --i)
 	{
-		FunctionDefinition* def = dynamic_cast<FunctionDefinition*>(stack[i]);
-		if(def != NULL)
 		{
-			for(unsigned int i=0; i<def->lets.size(); ++i)
-				if(def->lets[i]->variable_name == this->name)
-				{
-					this->argument_index = i;
-					this->argument_offset = (int)def->lets.size() - i;
-					this->referenced_var_type = def->args[i].type;
-					this->vartype = LetVariable;
-					this->parent_function = def;
-					return;
-				}
+			FunctionDefinition* def = dynamic_cast<FunctionDefinition*>(stack[i]);
+			if(def != NULL)
+			{
+				for(unsigned int i=0; i<def->lets.size(); ++i)
+					if(def->lets[i]->variable_name == this->name)
+					{
+						this->argument_index = i;
+						this->argument_offset = (int)def->lets.size() - i;
+						this->referenced_var_type = def->args[i].type;
+						this->vartype = LetVariable;
+						this->parent_function = def;
+						return;
+					}
 
-			for(unsigned int i=0; i<def->args.size(); ++i)
-				if(def->args[i].name == this->name)
-				{
-					this->argument_index = i;
-					this->argument_offset = (int)def->args.size() - i;
-					this->referenced_var_type = def->args[i].type;
-					this->vartype = ArgumentVariable;
-					this->parent_function = def;
-					return;
-				}
+				for(unsigned int i=0; i<def->args.size(); ++i)
+					if(def->args[i].name == this->name)
+					{
+						this->argument_index = i;
+						this->argument_offset = (int)def->args.size() - i;
+						this->referenced_var_type = def->args[i].type;
+						this->vartype = ArgumentVariable;
+						this->parent_function = def;
+						return;
+					}
 
-			if(this->argument_offset == -1)
-				throw BaseException("No such function argument '" + this->name + "'");
+				if(this->argument_offset == -1)
+					throw BaseException("No such function argument '" + this->name + "'");
+			}
+		}
+
+		{
+			AnonFunction* def = dynamic_cast<AnonFunction*>(stack[i]);
+			if(def != NULL)
+			{
+				/*for(unsigned int i=0; i<def->lets.size(); ++i)
+					if(def->lets[i]->variable_name == this->name)
+					{
+						this->argument_index = i;
+						this->argument_offset = (int)def->lets.size() - i;
+						this->referenced_var_type = def->args[i].type;
+						this->vartype = LetVariable;
+						this->parent_function = def;
+						return;
+					}*/
+
+				for(unsigned int i=0; i<def->args.size(); ++i)
+					if(def->args[i].name == this->name)
+					{
+						this->argument_index = i;
+						this->argument_offset = (int)def->args.size() - i;
+						this->referenced_var_type = def->args[i].type;
+						this->vartype = ArgumentVariable;
+						this->parent_anon_function = def;
+						return;
+					}
+
+				if(this->argument_offset == -1)
+					throw BaseException("No such function argument '" + this->name + "'");
+			}
 		}
 	}
-	throw BaseException("No such function argument '" + this->name + "'");
+	throw BaseException("Variable::bindVariables(): No such function argument '" + this->name + "'");
 }
 
 
@@ -492,6 +563,8 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params) const
 	}
 	else
 	{
+		assert(this->parent_function);
+
 		if(shouldPassByValue(*this->type()))
 		{
 			return getNthArg(params.currently_building_func, this->argument_index);
@@ -533,7 +606,7 @@ void FloatLiteral::print(int depth, std::ostream& s) const
 
 llvm::Value* FloatLiteral::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
-	return llvm::ConstantFP::get(llvm::APFloat(this->value));
+	return llvm::ConstantFP::get(*params.context, llvm::APFloat(this->value));
 }
 
 
@@ -555,7 +628,7 @@ void IntLiteral::print(int depth, std::ostream& s) const
 
 llvm::Value* IntLiteral::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
-	return llvm::ConstantInt::get(llvm::APInt(
+	return llvm::ConstantInt::get(*params.context, llvm::APInt(
 		32, // num bits
 		this->value, // value
 		true // signed
@@ -915,6 +988,44 @@ llvm::Value* LetASTNode::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 
 //---------------------------------------------------------------------------------
+
+
+Value* AnonFunction::exec(VMState& vmstate)
+{
+	// Evaluate let clauses, which will each push the result onto the let stack
+	//for(unsigned int i=0; i<lets.size(); ++i)
+	//	vmstate.let_stack.push_back(lets[i]->exec(vmstate));
+
+	Value* ret = body->exec(vmstate);
+
+	// Pop things off let stack
+	//for(unsigned int i=0; i<lets.size(); ++i)
+	//	vmstate.let_stack.pop_back();
+
+	return ret;
+}
+
+
+void AnonFunction::print(int depth, std::ostream& s) const
+{
+	printMargin(depth, s);
+	s << "AnonFunction\n";
+	this->body->print(depth+1, s);
+}
+
+
+void AnonFunction::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
+{
+	stack.push_back(this);
+	body->traverse(payload, stack);
+	stack.pop_back();
+}
+
+
+llvm::Value* AnonFunction::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	return NULL;
+}
 
 
 } //end namespace Lang

@@ -3,12 +3,14 @@ TokenBase.h
 -----------
 File created by ClassTemplate on Wed Oct 22 14:51:44 2008
 Code By Nicholas Chapman.
+
+Copyright 2009 Nicholas Chapman
 =====================================================================*/
 #ifndef __TOKENBASE_H_666_
 #define __TOKENBASE_H_666_
 
 
-#include "../indigo/trunk/utils/refcounted.h"
+#include "../../indigosvn/trunk/utils/refcounted.h"
 #include <string>
 //#include "Type.h"
 

@@ -3,11 +3,13 @@ FunctionSignature.cpp
 ---------------------
 File created by ClassTemplate on Tue Jun 17 05:29:02 2008
 Code By Nicholas Chapman.
+
+Copyright 2009 Nicholas Chapman
 =====================================================================*/
 #include "FunctionSignature.h"
 
 
-#include "../indigo/trunk/utils/stringutils.h"
+#include "../../indigosvn/trunk/utils/stringutils.h"
 
 
 namespace Winter

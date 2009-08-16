@@ -3,13 +3,15 @@ Lexer.cpp
 ---------
 File created by ClassTemplate on Wed Jun 11 01:53:25 2008
 Code By Nicholas Chapman.
+
+Copyright 2009 Nicholas Chapman
 =====================================================================*/
 #include "Lexer.h"
 
 
-#include "../indigo/trunk/utils/Parser.h"
-#include "../indigo/trunk/indigo/TestUtils.h"
-#include "../indigo/trunk/maths/mathstypes.h"
+#include "../../indigosvn/trunk/utils/Parser.h"
+#include "../../indigosvn/trunk/indigo/TestUtils.h"
+#include "../../indigosvn/trunk/maths/mathstypes.h"
 
 
 namespace Winter
@@ -221,6 +223,11 @@ void Lexer::process(const std::string& buffer, std::vector<Reference<TokenBase> 
 		else if(parser.current() == '*')
 		{
 			tokens_out.push_back(Reference<TokenBase>(new ASTERISK_Token(parser.currentPos())));
+			parser.advance();
+		}
+		else if(parser.current() == '\\')
+		{
+			tokens_out.push_back(Reference<TokenBase>(new BACK_SLASH_Token(parser.currentPos())));
 			parser.advance();
 		}
 		else if(parser.current() == '=')

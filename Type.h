@@ -1,10 +1,11 @@
+//Copyright 2009 Nicholas Chapman
 #pragma once
 
 
 #include <vector>
 #include <string>
-#include "../indigo/trunk/utils/reference.h"
-#include "../indigo/trunk/utils/refcounted.h"
+#include "../../indigosvn/trunk/utils/reference.h"
+#include "../../indigosvn/trunk/utils/refcounted.h"
 #include "llvm/Type.h"
 #include "llvm/DerivedTypes.h"
 
@@ -24,7 +25,8 @@ public:
 		IntType,
 		StringType,
 		BoolType,
-		MapType
+		MapType,
+		FunctionType
 	};
 
 	virtual TypeType getType() const = 0;
@@ -87,13 +89,57 @@ public:
 	virtual const llvm::Type* LLVMType() const { return NULL; }
 };
 
+
 class Function : public Type
 {
 public:
+	Function(const std::vector<TypeRef>& arg_types_, TypeRef return_type_) : arg_types(arg_types_), return_type(return_type_) {}
+
 	TypeRef return_type;
 	std::vector<TypeRef> arg_types;
+
+	virtual TypeType getType() const { return FunctionType; }
+	virtual const std::string toString() const { return "function"; }
 	virtual const llvm::Type* LLVMType() const { return NULL; }
+	virtual bool lessThan(const Type& b) const
+	{
+		if(getType() < b.getType())
+			return true;
+		else if(b.getType() < getType())
+			return false;
+		else
+		{
+			// Else b is a function as well.
+
+			const Function& b_func = dynamic_cast<const Function&>(b);
+			
+			if(return_type->lessThan(*b_func.return_type))
+				return true;
+			else if(b_func.return_type->lessThan(*return_type))
+				return false;
+			else
+			{
+				if(arg_types.size() < b_func.arg_types.size())
+					return true;
+				else if(arg_types.size() > b_func.arg_types.size())
+					return false;
+				else
+				{
+					for(unsigned int i=0; i<arg_types.size(); ++i)
+					{
+						if(arg_types[i]->lessThan(*b_func.arg_types[i]))
+							return true;
+						else if(b_func.arg_types[i]->lessThan(*arg_types[i]))
+							return false;
+					}
+
+					return false; // Both types are the same.
+				}
+			}
+		}
+	}
 };
+
 
 class Map : public Type
 {

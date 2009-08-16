@@ -1,9 +1,9 @@
-
+// Copyright 2009 Nicholas Chapman
 
 #include <iostream>
 #include <cassert>
 #include <fstream>
-#include "../indigo/trunk/utils/FileUtils.h"
+#include "../../indigosvn/trunk/utils/FileUtils.h"
 #include "Lexer.h"
 #include "TokenBase.h"
 #include "LangParser.h"
@@ -83,7 +83,7 @@ int main(int argc, char** argv)
 			throw BaseException("main must return int.");
 
 		//TEMP:
-		{
+		/*{
 		llvm::Module* module = new llvm::Module("WinterModule");
 		llvm::ExistingModuleProvider* MP = new llvm::ExistingModuleProvider(module);
 
@@ -110,7 +110,7 @@ int main(int argc, char** argv)
 		}
 
 
-		}
+		}*/
 		
 
 		VMState vmstate;

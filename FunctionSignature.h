@@ -3,6 +3,8 @@ FunctionSignature.h
 -------------------
 File created by ClassTemplate on Tue Jun 17 05:29:02 2008
 Code By Nicholas Chapman.
+
+Copyright 2009 Nicholas Chapman
 =====================================================================*/
 #ifndef __FUNCTIONSIGNATURE_H_666_
 #define __FUNCTIONSIGNATURE_H_666_

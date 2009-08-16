@@ -3,6 +3,8 @@ Lexer.h
 -------
 File created by ClassTemplate on Wed Jun 11 01:53:25 2008
 Code By Nicholas Chapman.
+
+Copyright 2009 Nicholas Chapman
 =====================================================================*/
 #ifndef __LEXER_H_666_
 #define __LEXER_H_666_
@@ -11,7 +13,7 @@ Code By Nicholas Chapman.
 #include <string>
 #include <vector>
 #include "TokenBase.h"
-#include "../indigo/trunk/utils/reference.h"
+#include "../../indigosvn/trunk/utils/reference.h"
 class Parser;
 
 

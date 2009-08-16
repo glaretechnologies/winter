@@ -3,6 +3,8 @@ LangParser.h
 ------------
 File created by ClassTemplate on Wed Jun 11 02:56:20 2008
 Code By Nicholas Chapman.
+
+Copyright 2009 Nicholas Chapman
 =====================================================================*/
 #ifndef __LANGPARSER_H_666_
 #define __LANGPARSER_H_666_
@@ -13,7 +15,7 @@ Code By Nicholas Chapman.
 #include <map>
 #include "TokenBase.h"
 #include "ASTNode.h"
-#include "../indigo/trunk/utils/reference.h"
+#include "../../indigosvn/trunk/utils/reference.h"
 #include "Type.h"
 
 
@@ -63,6 +65,7 @@ private:
 	const std::string errorPosition(const std::string& buffer, unsigned int pos);
 
 	const std::string parseIdentifier(const std::string& id_type, const ParseInfo& parseinfo);
+	ASTNodeRef parseLiteral(const ParseInfo& parseinfo);
 
 	Reference<FunctionDefinition> parseFunctionDefinition(ASTNode* parent, const ParseInfo& parseinfo);
 	//Reference<ASTNode> parseFunctionDeclaration(const std::vector<Reference<TokenBase> >& tokens, const char* text_buffer, unsigned int& i);

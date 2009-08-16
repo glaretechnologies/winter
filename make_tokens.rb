@@ -1,4 +1,4 @@
-
+# Copyright 2009 Nicholas Chapman
 
 tokens = [
 
@@ -75,7 +75,7 @@ tokens.each do |t|
 	$i += 1
 end
 
-file.puts "const std::string tokenName(unsigned int t)"
+file.puts "\n\ninline const std::string tokenName(unsigned int t)"
 file.puts '{'
 file.puts "\tswitch(t) {"
 $i = 10

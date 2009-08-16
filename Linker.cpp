@@ -1,3 +1,4 @@
+//Copyright 2009 Nicholas Chapman
 #include "Linker.h"
 
 

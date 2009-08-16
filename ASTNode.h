@@ -3,6 +3,8 @@ ASTNode.h
 ---------
 File created by ClassTemplate on Wed Jun 11 03:55:25 2008
 Code By Nicholas Chapman.
+
+Copyright 2009 Nicholas Chapman
 =====================================================================*/
 #ifndef __ASTNODE_H_666_
 #define __ASTNODE_H_666_
@@ -12,8 +14,8 @@ Code By Nicholas Chapman.
 #include <vector>
 using std::string;
 using std::vector;
-#include "../indigo/trunk/utils/refcounted.h"
-#include "../indigo/trunk/utils/reference.h"
+#include "../../indigosvn/trunk/utils/refcounted.h"
+#include "../../indigosvn/trunk/utils/reference.h"
 #include "Type.h"
 #include "FunctionSignature.h"
 #include "BaseException.h"
@@ -22,6 +24,7 @@ using std::vector;
 //#include <llvm/Intrinsics.h>
 namespace llvm { class Value; };
 namespace llvm { class Module; };
+namespace llvm { class LLVMContext; };
 
 
 namespace Winter
@@ -30,6 +33,7 @@ namespace Winter
 class VMState;
 class Linker;
 class LetASTNode;
+class AnonFunction;
 class Value;
 class TraversalPayload
 {
@@ -43,6 +47,7 @@ public:
 	llvm::IRBuilder<>* builder;
 	llvm::Module* module;
 	llvm::Function* currently_building_func;
+	llvm::LLVMContext* context;
 };
 
 
@@ -73,7 +78,8 @@ public:
 		AdditionExpressionType,
 		SubtractionExpressionType,
 		MulExpressionType,
-		LetType
+		LetType,
+		AnonFunctionType
 	};
 
 	virtual ASTNodeType nodeType() const = 0;
@@ -190,7 +196,7 @@ public:
 	virtual ASTNodeType nodeType() const { return FunctionExpressionType; }
 	virtual TypeRef type() const;
 
-	virtual void linkFunctions(Linker& linker);
+	virtual void linkFunctions(Linker& linker, std::vector<ASTNode*>& stack);
 	//virtual void bindVariables(const std::vector<ASTNode*>& stack);
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual void print(int depth, std::ostream& s) const;
@@ -220,6 +226,7 @@ public:
 
 
 	FunctionDefinition* parent_function; // Function for which the variable is an argument of.
+	AnonFunction* parent_anon_function;
 	//ASTNode* referenced_var;
 	TypeRef referenced_var_type;
 	VariableType vartype;
@@ -380,6 +387,26 @@ public:
 
 	std::string variable_name;
 	ASTNodeRef expr;
+};
+
+
+class AnonFunction : public ASTNode
+{
+public:
+	AnonFunction() {}
+
+	virtual Value* exec(VMState& vmstate);
+	virtual ASTNodeType nodeType() const { return AnonFunctionType; }
+	virtual TypeRef type() const { return thetype; }
+	virtual void print(int depth, std::ostream& s) const;
+	//virtual void linkFunctions(Linker& linker);
+	//virtual void bindVariables(const std::vector<ASTNode*>& stack);
+	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+
+	vector<FunctionDefinition::FunctionArg> args;
+	ASTNodeRef body;
+	TypeRef thetype;
 };
 
 
