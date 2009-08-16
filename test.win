@@ -1,0 +1,34 @@
+
+
+#def operator_add(complex x, complex y) complex : complex(re(x) + re(y), im(x) + im(y))
+
+
+
+#c + d
+
+
+
+
+#def e() map<int, int> : { g(1, 3) : e() , 666:777}
+
+def f(int x) int : 3 * x
+
+#def g(int x, int y) int : x + x * x
+#def h(int x, int y) int : (x + x) * x
+#def i(int x, int y) int : x - x * x
+
+#def g(float x, float y) float : x + y
+
+
+def square(int x) int : 
+	let y = f(x)
+	x*y
+
+
+def main() int : square(2)
+
+
+
+#1 + 1 == 3 # comment
+#dsfg
+

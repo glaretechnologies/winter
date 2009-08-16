@@ -1,0 +1,372 @@
+Runtime system
+--------------
+
+
+Build up LLVM code structure
+compile whole thing using LLVM
+Start worker threads
+Make first work unit
+Assign it to a worker thread work queue
+wait until all worker threads are finished.
+done.
+
+
+Stages:
+
+Lexing Stage
+------------
+Read text buffers, convert to token lists.
+
+Parsing Stage
+-------------
+Convert token lists to abstract syntax trees
+
+
+Type checking stage
+-------------------
+
+
+Object Layout stage
+------------------------
+Generate memory layouts for all structures
+
+LLVM tree consturction stage
+-------------------
+Generate LLVM tree structure corresponding to AST
+
+
+LLVM codegen stage
+------------------
+Get LLVM to JIT compile all its stuff in tree structures
+
+
+Create VM
+------------
+Get the VM ready to run, i.e. create worker threads
+
+Get entry point function
+------------------------
+Get pointer to entry point function, e.g. main() or some other function
+
+Make a call into that from client code
+Control tranfers to VM.
+VM creates work unit, puts on queue of worker thread
+worker thread executes
+worker thread sends done message back to VM
+Vm returns control back to client code.
+
+
+
+
+
+
+
+Type Memory Layout
+------------------
+Directly embedded types:  must have fixed size known at compile time
+byte, ubyte, int, uint, float, double, 
+tuple<T0, T1, .. TN> (as long as types Ti are all directly embedded types)
+tuple<T, N> (as long as type T is directly embedded)
+
+Otherwise, alloc in heap and store pointer to the object,
+e.g. for tuple<string, string>:
+
+{
+	String* a;
+	String* b;
+}
+
+
+class TypeLayout
+{
+}
+
+class BasicTypeLayout
+{
+	Type* value;
+}
+
+class FieldPosition
+{
+	int offset; // in bytes
+	bool pointer;
+	Type* value;
+}
+
+class CompositeTypeLayout : TypeLayout
+{
+	std::vector<FieldPosition> contents;
+}
+
+
+
+
+class Value
+{
+	
+
+
+
+
+
+Primitive Types			Description											Literal Syntax example
+----------------------------------------------------------------------------------------------------
+
+byte					8 bit signed integer								8b
+ubyte					8 bit unsigned integer								8ub
+int						32 bit signed integer								8	
+uint					32 bit unsigned integer								8u
+float					32 bit float										8.0f
+double					64 bit float										8.0
+string					Unicode string (utf-8?)								"bleh"
+tuple<T0, T1, .. TN>	Ordered pair of types T0, T1, .. , TN	(struct?)	[8, "hello"]t
+tuple<T, n>				Where n is an integer literal.						[1, 2, 3, 4]t
+map<T0, T1>				Map from T0 to T1									{8, "bleh"}
+list<T>					Variable length list of 0 or more T's (std::vector)	[1, 2, 3, 4]
+flist<T, n>				List of known length: n								[1, 2, 3, 4]f
+function<T0, T1, ..., TN, R>	Function from T0, T1, T2, .. , TN to R		\(int a, int b)(a + 4*b)
+
+Miscellaneous syntax
+-----------------------------
+Function Application			f(a, b)
+
+Function Definition				def f(int a, int b) int : a + b
+
+Let								let z = f(1, 2)
+
+Structure Type Definition			
+----------------------------
+struct Complex
+{
+	float re,
+	float im
+}
+
+Constructing a Structure value
+------------------------------
+z = Complex(1.0, 2.0)
+
+Accessing Structure Members
+---------------------------
+
+z = Complex(1.0, 2.0)
+zr = z.re
+
+def + (Complex a, Complex b) Complex : Complex(a.re + b.re, a.im + b.im)
+
+def norm(Complex a) Real : a.re*a.re + a.im*a.im
+
+
+Syntactic sugar for method calls on structures:
+------------------------------------------------
+z = Complex(1.0, 2.0)
+
+z.norm() is equivalent to norm(z)
+
+
+Operators
+*
+/
++
+-
+
+
+
+
+module AModule
+import AModule
+
+
+
+
+
+
+Examples:
+
+tuple(int, byte)
+
+list<int>
+
+list<function<int, string>>
+
+
+Special Types
+------------
+tuple<float, float, float, float> : treated as SIMD 4-vector
+tuple<double, double> : treated as SIMD 2-vector
+
+
+
+
+Primitive Functions
+-------------------
+These are elementary functions that will be provided by the lanuage runtime / are part of the lanuage core.
+
+Higher order primitive functions
+--------------------------------
+map(function<T, R>, list<T>) -> list<R>
+fold(function<I, T, I> func, list<T>, I initial_val) -> I
+zip(function<A, B, R>, list<A>, list<B>) -> list<R>
+
+
+intToFloat(int i) -> float
+intToDouble(int i) -> double
+
+
+
+
+
+
+Examples
+--------
+
+
+Apply sqrt to each element in an array of 100 elements
+
+# Type declaration
+sqrtArray<tuple<float, 100>, tuple<float, 100>>
+
+# Function definition
+def sqrtArray(list<T> a) -> list<T>
+	map(Maths.sqrt, a)
+
+
+sqrtArray(Tuple<T, n> a) -> Tuple<T, n>
+	map(a, Maths.sqrt))
+	
+	
+Gets mapped to something like
+	result = alloc Tuple<float, 100> from program runtime heap
+	for(0 to 99)
+		result[i] = sqrt(a[i]);
+		
+		
+		
+List Literal
+------------
+[1, 2, 3]
+
+Makes a list of type list<int>
+
+Struct Literal
+--------------
+{ 1, "hello", true }
+
+Makes a list of type struct<int, string, bool>
+
+Nested struct literal:
+{ 1, "hello", { "something, true} }
+
+Map Literal
+-----------
+{ 1:"hello", 2 : "goodbye" }
+
+Makes a map of type map<int, string>		
+
+
+Anonymous function literals:
+----------------------------
+
+def doSomethingCoolToArray(list<T> a) -> list<T>
+	map(a, lambda(T a) { a * Maths.sqrt(a) })
+
+
+
+
+let add3 = lambda(int x) -> x
+
+def addN(int n) -> int :
+	lambda(int x) { x + n }
+
+
+
+Classes
+---------		
+
+
+Type
+
+
+
+
+ByteCode
+--------
+def add3(int x) -> int : x + 3
+
+copy 0th arg from argument stack to working stack
+push 3 onto the working stack
+call operator +
+pop result from working stack into return register
+
+
+
+
+
+NodeIterator
+{
+	parentstack
+	current
+	vector<int> current_child_index
+	
+	stack to_process
+}
+
+NodeIterator::advance()
+{
+	if(to_process.empty())
+		done = true
+	else
+	{
+		current = to_process.back().node
+		parentstack.resize(to_process.back().depth)
+		to_process.pop_back()
+		
+		for each child of current
+			to_process.push_back(child, depth+1)
+	}
+}
+
+
+for(NodeIterator it(buffer_root); it.valid(); it.advance())
+{
+	it.current()->link(linker);
+}
+
+
+	// We have finished with current.
+	
+	// Process any children of current
+	children = current.children
+	if(children.size() > 0)
+	{
+		// Traverse to first child of current
+		current_child_index.push_back(0)
+		current = current.children[0]
+	}
+	
+	// Else no children for current node.
+	
+	// Walk up to parent
+	while(1)
+	{
+		current = parentstack.back()
+		parentstack.pop_back()
+	
+		// are there any more children of the parent?
+		if 
+	
+}
+
+
+
+
+vector<ASTNode*> stack(1, bufferroot);
+
+while(1)
+{
+	children = getChildren(n)
+	
+	add n to parent stack
+	
+	for each child in children:
+
