@@ -99,7 +99,7 @@ public:
 	std::vector<TypeRef> arg_types;
 
 	virtual TypeType getType() const { return FunctionType; }
-	virtual const std::string toString() const { return "function"; }
+	virtual const std::string toString() const; // { return "function"; }
 	virtual const llvm::Type* LLVMType() const { return NULL; }
 	virtual bool lessThan(const Type& b) const
 	{

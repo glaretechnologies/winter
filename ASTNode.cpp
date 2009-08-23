@@ -29,6 +29,9 @@ Copyright 2009 Nicholas Chapman
 #include <llvm/Intrinsics.h>
 
 
+//#define NEW_LLVM 1
+
+
 static void printMargin(int depth, std::ostream& s)
 {
 	for(int i=0; i<depth; ++i)
@@ -109,10 +112,18 @@ FunctionDefinition::FunctionDefinition(/*ASTNode* parent, */const std::string& n
 	sig.name = name;
 	for(unsigned int i=0; i<args_.size(); ++i)
 		sig.param_types.push_back(args_[i].type);
+
+	function_type = TypeRef(new Function(sig.param_types, rettype));
 }
 
 
 Value* FunctionDefinition::exec(VMState& vmstate)
+{
+	return new FunctionValue(this);
+}
+
+
+Value* FunctionDefinition::invoke(VMState& vmstate)
 {
 	// Evaluate let clauses, which will each push the result onto the let stack
 	for(unsigned int i=0; i<lets.size(); ++i)
@@ -122,7 +133,10 @@ Value* FunctionDefinition::exec(VMState& vmstate)
 
 	// Pop things off let stack
 	for(unsigned int i=0; i<lets.size(); ++i)
+	{
+		delete vmstate.let_stack.back();
 		vmstate.let_stack.pop_back();
+	}
 
 	return ret;
 }
@@ -230,75 +244,135 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 //--------------------------------------------------------------------------------
 
 
+FunctionDefinition* FunctionExpression::runtimeBind(VMState& vmstate)
+{
+	FunctionDefinition* use_target_function = NULL;
+	if(target_function)
+		use_target_function = target_function;
+	else if(this->binding_type == Arg)
+	{
+		Value* arg = vmstate.argument_stack[vmstate.argument_stack.size() - this->argument_offset];
+		assert(dynamic_cast<FunctionValue*>(arg));
+		FunctionValue* function_value = dynamic_cast<FunctionValue*>(arg);
+		use_target_function = function_value->func_def;
+	}
+	else
+	{
+		Value* arg = vmstate.let_stack[vmstate.let_stack.size() - this->argument_offset];
+		assert(dynamic_cast<FunctionValue*>(arg));
+		FunctionValue* function_value = dynamic_cast<FunctionValue*>(arg);
+		use_target_function = function_value->func_def;
+	}
+
+	assert(use_target_function);
+	return use_target_function;
+}
+
+
 Value* FunctionExpression::exec(VMState& vmstate)
 {
-	assert(target_function);
+	//assert(target_function);
+	// Get target function
+	FunctionDefinition* use_target_func = runtimeBind(vmstate);
 
 	// Push arguments onto argument stack
 	for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
 		vmstate.argument_stack.push_back(this->argument_expressions[i]->exec(vmstate));
 
 	// Execute target function
-	Value* ret = target_function->exec(vmstate);
+	Value* ret = use_target_func->invoke(vmstate);
 
 	// Remove arguments from stack
-	vmstate.argument_stack.resize(vmstate.argument_stack.size() - argument_expressions.size());
+	for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
+	{
+		delete vmstate.argument_stack.back();
+		vmstate.argument_stack.pop_back();
+	}
+	//vmstate.argument_stack.resize(vmstate.argument_stack.size() - argument_expressions.size());
 
 	return ret;
 }
 
 
+bool FunctionExpression::doesFunctionTypeMatch(TypeRef& type)
+{
+	if(type->getType() != Type::FunctionType)
+		return false;
+
+	Function* func = dynamic_cast<Function*>(type.getPointer());
+	assert(func);
+
+	std::vector<TypeRef> arg_types(this->argument_expressions.size());
+	for(unsigned int i=0; i<arg_types.size(); ++i)
+		arg_types[i] = this->argument_expressions[i]->type();
+
+	if(arg_types.size() != func->arg_types.size())
+		return false;
+
+	for(unsigned int i=0; i<arg_types.size(); ++i)
+		if(!(*(arg_types[i]) == *(func->arg_types[i])))
+			return false;
+	return true;
+}
+
+
 void FunctionExpression::linkFunctions(Linker& linker, std::vector<ASTNode*>& stack)
 {
+	bool found_binding = false;
 	// We want to find a function that matches our argument expression types, and the function name
 
+
+
 	// First, walk up tree, and see if such a target function has been given a name with a let.
-	/*for(int i = (int)stack.size() - 1; i >= 0; --i)
+	for(int i = (int)stack.size() - 1; i >= 0 && !found_binding; --i)
 	{
 		{
 			FunctionDefinition* def = dynamic_cast<FunctionDefinition*>(stack[i]);
 			if(def != NULL)
 			{
 				for(unsigned int i=0; i<def->lets.size(); ++i)
-					if(def->lets[i]->type() == this->name)
+					if(def->lets[i]->variable_name == this->function_name && doesFunctionTypeMatch(def->lets[i]->type()))
 					{
 						this->argument_index = i;
 						this->argument_offset = (int)def->lets.size() - i;
-						this->referenced_var_type = def->args[i].type;
-						this->vartype = LetVariable;
-						this->parent_function = def;
-						return;
+						this->binding_type = Let;
+						this->target_function_return_type = def->return_type;
+						found_binding = true;
 					}
 
 				for(unsigned int i=0; i<def->args.size(); ++i)
-					if(def->args[i].name == this->name)
+					if(def->args[i].name == this->function_name && doesFunctionTypeMatch(def->args[i].type))
 					{
 						this->argument_index = i;
 						this->argument_offset = (int)def->args.size() - i;
-						this->referenced_var_type = def->args[i].type;
-						this->vartype = ArgumentVariable;
-						this->parent_function = def;
-						return;
+						this->binding_type = Arg;
+						this->target_function_return_type = def->return_type;
+						found_binding = true;
 					}
 
-				if(this->argument_offset == -1)
-					throw BaseException("No such function argument '" + this->name + "'");
+				//if(this->argument_offset == -1)
+				//	throw BaseException("No such function argument '" + this->name + "'");
 			}
 		}
-*/
+	}
 
-	vector<TypeRef> argtypes;
-	for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
-		argtypes.push_back(this->argument_expressions[i]->type());
+	if(!found_binding)
+	{
+		vector<TypeRef> argtypes;
+		for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
+			argtypes.push_back(this->argument_expressions[i]->type());
 
 
-	FunctionSignature sig(this->function_name, argtypes);
+		FunctionSignature sig(this->function_name, argtypes);
 
-	Linker::FuncMapType::iterator res = linker.functions.find(sig);
-	if(res == linker.functions.end())
-		throw BaseException("Failed to find function with signature " + sig.toString());
-	
-	this->target_function = (*res).second.getPointer();
+		Linker::FuncMapType::iterator res = linker.functions.find(sig);
+		if(res == linker.functions.end())
+			throw BaseException("Failed to find function with signature " + sig.toString());
+		
+		this->target_function = (*res).second.getPointer();
+		this->binding_type = Bound;
+		this->target_function_return_type = (*res).second->return_type;
+	}
 }
 
 
@@ -314,8 +388,8 @@ void FunctionExpression::linkFunctions(Linker& linker, std::vector<ASTNode*>& st
 
 void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
-	if(payload.linker)
-		linkFunctions(*payload.linker, stack);
+	// NOTE: we want to do a post-order traversal here.
+	// Thhis is because we want our argument expressions to be linked first.
 
 	stack.push_back(this);
 
@@ -323,6 +397,10 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 		this->argument_expressions[i]->traverse(payload, stack);
 
 	stack.pop_back();
+
+	if(payload.linker)
+		linkFunctions(*payload.linker, stack);
+
 }
 
 
@@ -332,6 +410,10 @@ void FunctionExpression::print(int depth, std::ostream& s) const
 	s << "FunctionExpr";
 	if(this->target_function)
 		s << "; target: " << this->target_function->sig.toString();
+	else if(this->binding_type == Arg)
+		s << "; runtime bound to arg offset " << this->argument_offset;
+	else if(this->binding_type == Let)
+		s << "; runtime bound to let offset " << this->argument_offset;
 	s << "\n";
 	for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
 		this->argument_expressions[i]->print(depth + 1, s);
@@ -340,12 +422,16 @@ void FunctionExpression::print(int depth, std::ostream& s) const
 
 TypeRef FunctionExpression::type() const
 {
+	assert(target_function_return_type.nonNull());
+
+	return target_function_return_type; //runtimeBind(vmstate)->type();
+/*
 	if(!target_function)
 	{
 		assert(0);
 		throw BaseException("Tried to get type from an unlinked function expression.");
 	}
-	return this->target_function->type();
+	return this->target_function->type();*/
 }
 
 
@@ -430,7 +516,7 @@ void Variable::bindVariables(const std::vector<ASTNode*>& stack)
 					{
 						this->argument_index = i;
 						this->argument_offset = (int)def->lets.size() - i;
-						this->referenced_var_type = def->args[i].type;
+						this->referenced_var_type = def->lets[i]->type();
 						this->vartype = LetVariable;
 						this->parent_function = def;
 						return;
@@ -499,11 +585,11 @@ Value* Variable::exec(VMState& vmstate)
 
 	if(this->vartype == ArgumentVariable)
 	{
-		return vmstate.argument_stack[vmstate.argument_stack.size() - argument_offset];
+		return vmstate.argument_stack[vmstate.argument_stack.size() - argument_offset]->clone();
 	}
 	else
 	{
-		return vmstate.let_stack[vmstate.let_stack.size() - argument_offset];
+		return vmstate.let_stack[vmstate.let_stack.size() - argument_offset]->clone();
 	}
 }
 
@@ -606,7 +692,11 @@ void FloatLiteral::print(int depth, std::ostream& s) const
 
 llvm::Value* FloatLiteral::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
-	return llvm::ConstantFP::get(*params.context, llvm::APFloat(this->value));
+	return llvm::ConstantFP::get(
+#if NEW_LLVM
+	*params.context, 
+#endif
+	llvm::APFloat(this->value));
 }
 
 
@@ -628,10 +718,14 @@ void IntLiteral::print(int depth, std::ostream& s) const
 
 llvm::Value* IntLiteral::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
-	return llvm::ConstantInt::get(*params.context, llvm::APInt(
-		32, // num bits
-		this->value, // value
-		true // signed
+	return llvm::ConstantInt::get(
+#if NEW_LLVM
+		*params.context, 
+#endif
+		llvm::APInt(
+			32, // num bits
+			this->value, // value
+			true // signed
 	));
 }
 
@@ -757,15 +851,20 @@ Value* AdditionExpression::exec(VMState& vmstate)
 	Value* aval = a->exec(vmstate);
 	Value* bval = b->exec(vmstate);
 
+	Value* retval = NULL;
+
 	if(this->type()->getType() == Type::FloatType)
 	{
-		return new FloatValue(static_cast<FloatValue*>(aval)->value + static_cast<FloatValue*>(bval)->value);
+		retval = new FloatValue(static_cast<FloatValue*>(aval)->value + static_cast<FloatValue*>(bval)->value);
 	}
 	else if(this->type()->getType() == Type::IntType)
 	{
-		return new IntValue(static_cast<IntValue*>(aval)->value + static_cast<IntValue*>(bval)->value);
+		retval = new IntValue(static_cast<IntValue*>(aval)->value + static_cast<IntValue*>(bval)->value);
 	}
-	return NULL;
+	delete aval;
+	delete bval;
+
+	return retval;
 }
 
 
@@ -820,16 +919,18 @@ Value* SubtractionExpression::exec(VMState& vmstate)
 {
 	Value* aval = a->exec(vmstate);
 	Value* bval = b->exec(vmstate);
-
+	Value* retval = NULL;
 	if(this->type()->getType() == Type::FloatType)
 	{
-		return new FloatValue(static_cast<FloatValue*>(aval)->value - static_cast<FloatValue*>(bval)->value);
+		retval = new FloatValue(static_cast<FloatValue*>(aval)->value - static_cast<FloatValue*>(bval)->value);
 	}
 	else if(this->type()->getType() == Type::IntType)
 	{
-		return new IntValue(static_cast<IntValue*>(aval)->value - static_cast<IntValue*>(bval)->value);
+		retval = new IntValue(static_cast<IntValue*>(aval)->value - static_cast<IntValue*>(bval)->value);
 	}
-	return NULL;
+	delete aval;
+	delete bval;
+	return retval;
 }
 
 
@@ -884,16 +985,19 @@ Value* MulExpression::exec(VMState& vmstate)
 {
 	Value* aval = a->exec(vmstate);
 	Value* bval = b->exec(vmstate);
+	Value* retval = NULL;
 
 	if(this->type()->getType() == Type::FloatType)
 	{
-		return new FloatValue(static_cast<FloatValue*>(aval)->value * static_cast<FloatValue*>(bval)->value);
+		retval = new FloatValue(static_cast<FloatValue*>(aval)->value * static_cast<FloatValue*>(bval)->value);
 	}
 	else if(this->type()->getType() == Type::IntType)
 	{
-		return new IntValue(static_cast<IntValue*>(aval)->value * static_cast<IntValue*>(bval)->value);
+		retval = new IntValue(static_cast<IntValue*>(aval)->value * static_cast<IntValue*>(bval)->value);
 	}
-	return NULL;
+	delete aval;
+	delete bval;
+	return retval;
 }
 
 
@@ -992,6 +1096,8 @@ llvm::Value* LetASTNode::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 Value* AnonFunction::exec(VMState& vmstate)
 {
+	assert(0);
+
 	// Evaluate let clauses, which will each push the result onto the let stack
 	//for(unsigned int i=0; i<lets.size(); ++i)
 	//	vmstate.let_stack.push_back(lets[i]->exec(vmstate));
@@ -1003,6 +1109,7 @@ Value* AnonFunction::exec(VMState& vmstate)
 	//	vmstate.let_stack.pop_back();
 
 	return ret;
+	
 }
 
 

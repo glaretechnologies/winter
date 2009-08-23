@@ -12,6 +12,7 @@
 #include "Linker.h"
 #include "Value.h"
 
+#if USE_LLVM
 #include "llvm/Module.h"
 #include "llvm/ModuleProvider.h"
 #include "llvm/Analysis/Verifier.h"
@@ -25,6 +26,7 @@
 #include "llvm/Support/IRBuilder.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/Target/TargetSelect.h"
+#endif
 using namespace Winter;
 
 
@@ -48,7 +50,8 @@ int main(int argc, char** argv)
 
 
 		BufferRoot* root = dynamic_cast<BufferRoot*>(rootref.getPointer());
-		
+
+		// Bind variables
 		//root->bindVariables(std::vector<ASTNode*>());
 		{
 			std::vector<ASTNode*> stack;
@@ -58,6 +61,7 @@ int main(int argc, char** argv)
 			assert(stack.size() == 0);
 		}
 
+		// Link functions
 		Linker linker;
 		linker.addFunctions(*root);
 		//linker.linkFunctions(*root);
@@ -79,7 +83,7 @@ int main(int argc, char** argv)
 		if(res == linker.functions.end())
 			throw BaseException("Could not find " + mainsig.toString());
 		Reference<FunctionDefinition> maindef = (*res).second;
-		if(!(*maindef->type() == *TypeRef(new Int())))
+		if(!(*maindef->return_type == *TypeRef(new Int())))
 			throw BaseException("main must return int.");
 
 		//TEMP:
@@ -115,15 +119,20 @@ int main(int argc, char** argv)
 
 		VMState vmstate;
 
-		Value* retval = maindef->exec(vmstate);
+		Value* retval = maindef->invoke(vmstate);
 
 		//Value* retval = vmstate.return_register;
 		IntValue* intval = dynamic_cast<IntValue*>(retval);
+		assert(intval);
 
 		std::cout << "Program returned " << intval->value << std::endl;
 
+		delete intval;
+
 		assert(vmstate.argument_stack.empty());
+		assert(vmstate.let_stack.empty());
 		assert(vmstate.working_stack.empty());
+		
 
 		/*for(unsigned int i=0; i<root->children.size(); ++i)
 		{

@@ -110,37 +110,45 @@ Reference<FunctionDefinition> LangParser::parseFunctionDefinition(ASTNode* paren
 
 	const std::string function_name = parseIdentifier("function name", p);
 
-	// Parse parameter list
-	std::vector<FunctionDefinition::FunctionArg> args;
-	parseParameterList(p, args);
-	
-	//parseToken(tokens, text_buffer, Token::RIGHT_ARROW, i);
-
-	// Parse return type
-	TypeRef return_type = parseType(p);
-
-	parseToken(COLON_TOKEN, p);
-	
-	Reference<FunctionDefinition> def(new FunctionDefinition(
-		//parent,
-		function_name,
-		args,
-		//body,
-		return_type
-		));
-
-	// Parse any 'lets'
-	if(p.i < p.tokens.size() && p.tokens[p.i]->isIdentifier() && p.tokens[p.i]->getIdentifierValue() == "let")
+	try
 	{
-		Reference<LetASTNode> let = parseLet(def.getPointer(), p);
-		def->lets.push_back(let);
+
+		// Parse parameter list
+		std::vector<FunctionDefinition::FunctionArg> args;
+		parseParameterList(p, args);
+		
+		//parseToken(tokens, text_buffer, Token::RIGHT_ARROW, i);
+
+		// Parse return type
+		TypeRef return_type = parseType(p);
+
+		parseToken(COLON_TOKEN, p);
+		
+		Reference<FunctionDefinition> def(new FunctionDefinition(
+			//parent,
+			function_name,
+			args,
+			//body,
+			return_type
+			));
+
+		// Parse any 'lets'
+		while(p.i < p.tokens.size() && p.tokens[p.i]->isIdentifier() && p.tokens[p.i]->getIdentifierValue() == "let")
+		{
+			Reference<LetASTNode> let = parseLet(def.getPointer(), p);
+			def->lets.push_back(let);
+		}
+
+		// Parse function body
+		ASTNodeRef body = parseExpression(def.getPointer(), p);
+
+		def->body = body;
+		return def;
 	}
-
-	// Parse function body
-	ASTNodeRef body = parseExpression(def.getPointer(), p);
-
-	def->body = body;
-	return def;
+	catch(LangParserExcep& e)
+	{
+		throw LangParserExcep("Error occurred while parsing function '" + function_name + "': " + e.what());
+	}
 }
 
 
@@ -280,6 +288,9 @@ ASTNodeRef LangParser::parseExpression(ASTNode* parent, const ParseInfo& p)
 
 ASTNodeRef LangParser::parseBasicExpression(ASTNode* parent, const ParseInfo& p)
 {
+	if(p.i >= p.tokens.size())
+		throw LangParserExcep("End of buffer while parsing basic expression.");
+
 	if(p.tokens[p.i]->isLiteral())
 	{
 		return parseLiteral(p);
@@ -338,6 +349,31 @@ TypeRef LangParser::parseMapType(const ParseInfo& p)
 	parseToken(RIGHT_ANGLE_BRACKET_TOKEN, p);
 
 	return TypeRef(new Map(from, to));
+}
+
+
+TypeRef LangParser::parseFunctionType(const ParseInfo& p)
+{
+	parseToken(LEFT_ANGLE_BRACKET_TOKEN, p);
+
+	std::vector<TypeRef> types;
+
+	types.push_back(parseType(p));
+
+	while(isTokenCurrent(COMMA_TOKEN, p))
+	{
+		parseToken(COMMA_TOKEN, p);
+
+		types.push_back(parseType(p));
+	}
+
+	parseToken(RIGHT_ANGLE_BRACKET_TOKEN, p);
+
+	std::vector<TypeRef> arg_types;
+	for(int i=0; i<(int)types.size() - 1; ++i)
+		arg_types.push_back(types[i]);
+
+	return TypeRef(new Function(arg_types, types.back()));
 }
 
 
@@ -477,19 +513,25 @@ ASTNodeRef LangParser::parseAnonFunction(ASTNode* parent, const ParseInfo& p)
 
 	//parseToken(CLOSE_PARENTHESIS_TOKEN, p);
 
-	AnonFunction* func = new AnonFunction();
-	func->args = args;
+	FunctionDefinition* func = new FunctionDefinition(
+		"anon",
+		args,
+		return_type
+	);
 	func->body = body_expr;
+	//AnonFunction* func = new AnonFunction();
+	//func->args = args;
+	//func->body = body_expr;
 
 
-	vector<TypeRef> argtypes;
+	/*vector<TypeRef> argtypes;
 	for(unsigned int i=0; i<args.size(); ++i)
 		argtypes.push_back(args[i].type);
 
 	func->thetype = TypeRef(new Function(
 		argtypes,
 		return_type
-	));
+	));*/
 
 	return ASTNodeRef(func);
 }

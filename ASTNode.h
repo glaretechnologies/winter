@@ -114,7 +114,6 @@ class BufferRoot : public ASTNode
 public:
 	BufferRoot()// : ASTNode(NULL) 
 	{}
-	string function_name;
 	vector<Reference<FunctionDefinition> > func_defs;
 
 	virtual Value* exec(VMState& vmstate){ return NULL; }
@@ -157,13 +156,15 @@ public:
 	vector<FunctionArg> args;
 	Reference<ASTNode> body;
 	TypeRef return_type;
+	TypeRef function_type;
 	vector<Reference<LetASTNode> > lets;
 
 	FunctionSignature sig;
 
+	virtual Value* invoke(VMState& vmstate);
 	virtual Value* exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return FunctionDefinitionType; }
-	virtual TypeRef type() const { return return_type; }
+	virtual TypeRef type() const { return function_type; }
 
 	//virtual void linkFunctions(Linker& linker);
 	//virtual void bindVariables(const std::vector<ASTNode*>& stack);
@@ -184,13 +185,28 @@ e.g.   f(a, 1)
 class FunctionExpression : public ASTNode
 {
 public:
-	FunctionExpression(/*ASTNode* p*/) : /*ASTNode(p),*/ target_function(NULL) {}
+	FunctionExpression(/*ASTNode* p*/) : /*ASTNode(p),*/ target_function(NULL),argument_index(-1),argument_offset(-1) {}
 	string function_name;
 	vector<Reference<ASTNode> > argument_expressions;
 
 	//Reference<ASTNode> target_function;
 	//ASTNode* target_function;
 	FunctionDefinition* target_function;
+	int argument_index;
+	int argument_offset; // Currently, a variable must be an argument to the enclosing function
+	enum BindingType
+	{
+		Let,
+		Arg,
+		Bound
+	};
+	BindingType binding_type;
+
+	TypeRef target_function_return_type;
+
+	FunctionDefinition* runtimeBind(VMState& vmstate);
+
+	bool doesFunctionTypeMatch(TypeRef& type);
 
 	virtual Value* exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return FunctionExpressionType; }

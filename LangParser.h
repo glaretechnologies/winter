@@ -83,6 +83,7 @@ private:
 
 	TypeRef parseType(const ParseInfo& parseinfo);
 	TypeRef parseMapType(const ParseInfo& parseinfo);
+	TypeRef parseFunctionType(const ParseInfo& p);
 
 	ASTNodeRef parseAddSubExpression(ASTNode* parent, const ParseInfo& parseinfo);
 	ASTNodeRef parseMulDivExpression(ASTNode* parent, const ParseInfo& parseinfo);
