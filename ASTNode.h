@@ -20,8 +20,11 @@ using std::vector;
 #include "FunctionSignature.h"
 #include "BaseException.h"
 //#include <llvm/ExecutionEngine/JIT.h>
+#if USE_LLVM
 #include <llvm/Support/IRBuilder.h>
+#endif
 //#include <llvm/Intrinsics.h>
+namespace llvm { class Function; };
 namespace llvm { class Value; };
 namespace llvm { class Module; };
 namespace llvm { class LLVMContext; };
@@ -44,10 +47,12 @@ public:
 class EmitLLVMCodeParams
 {
 public:
+#if USE_LLVM
 	llvm::IRBuilder<>* builder;
 	llvm::Module* module;
 	llvm::Function* currently_building_func;
 	llvm::LLVMContext* context;
+#endif
 };
 
 
@@ -147,14 +152,13 @@ public:
 		string name;
 	};
 
-	FunctionDefinition(/*ASTNode* parent, */const std::string& name, const std::vector<FunctionArg>& args, 
-		//ASTNodeRef& body, 
-		TypeRef& rettype);
-
-	//string function_name;
+	FunctionDefinition(const std::string& name, const std::vector<FunctionArg>& args, 
+		const vector<Reference<LetASTNode> >& lets,
+		const ASTNodeRef& body, 
+		const TypeRef& rettype);
 
 	vector<FunctionArg> args;
-	Reference<ASTNode> body;
+	ASTNodeRef body;
 	TypeRef return_type;
 	TypeRef function_type;
 	vector<Reference<LetASTNode> > lets;
@@ -229,7 +233,7 @@ public:
 		ArgumentVariable
 	};
 
-	Variable(ASTNode* parent, const std::string& name);
+	Variable(const std::string& name);
 	string name;
 
 	virtual Value* exec(VMState& vmstate);

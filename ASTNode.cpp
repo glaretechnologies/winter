@@ -12,7 +12,7 @@ Copyright 2009 Nicholas Chapman
 #include "VMState.h"
 #include "Value.h"
 #include "Linker.h"
-
+#if USE_LLVM
 #include "llvm/Type.h"
 #include "llvm/Module.h"
 #include "llvm/DerivedTypes.h"
@@ -27,7 +27,7 @@ Copyright 2009 Nicholas Chapman
 #include <llvm/CallingConv.h>
 #include <llvm/Support/IRBuilder.h>
 #include <llvm/Intrinsics.h>
-
+#endif
 
 //#define NEW_LLVM 1
 
@@ -102,11 +102,12 @@ llvm::Value* BufferRoot::emitLLVMCode(EmitLLVMCodeParams& params) const
 //----------------------------------------------------------------------------------
 
 
-FunctionDefinition::FunctionDefinition(/*ASTNode* parent, */const std::string& name, const std::vector<FunctionArg>& args_, 
-									   /*ASTNodeRef& body_, */TypeRef& rettype)
-:	//ASTNode(parent), 
-	args(args_),
-	//body(body_),
+FunctionDefinition::FunctionDefinition(const std::string& name, const std::vector<FunctionArg>& args_, 
+									   const vector<Reference<LetASTNode> >& lets_,
+									   const ASTNodeRef& body_, const TypeRef& rettype)
+:	args(args_),
+	lets(lets_),
+	body(body_),
 	return_type(rettype)
 {
 	sig.name = name;
@@ -213,6 +214,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	//std::map<Lang::FunctionSignature, llvm::Function*>& external_functions
 	) const
 {
+#if USE_LLVM
 	llvm::FunctionType* functype = llvmInternalFunctionType(this->sig.param_types, *this->return_type);
 
 	llvm::Function *internal_llvm_func = static_cast<llvm::Function*>(module->getOrInsertFunction(
@@ -238,6 +240,9 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	builder.CreateRet(body_code);
 
 	return internal_llvm_func;
+#else
+	return NULL;
+#endif
 }
 
 
@@ -437,6 +442,7 @@ TypeRef FunctionExpression::type() const
 
 llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
+#if USE_LLVM
 	// Lookup LLVM function, which should already be created and added to the module.
 	llvm::Function* target_llvm_func = params.module->getFunction(
 		this->target_function->sig.toString() //internalFuncName(call_target_sig)
@@ -451,13 +457,16 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 		args.push_back(argument_expressions[i]->emitLLVMCode(params));
 
 	return params.builder->CreateCall(target_llvm_func, args.begin(), args.end());
+#else
+	return NULL;
+#endif
 }
 
 
 //-----------------------------------------------------------------------------------
 
 
-Variable::Variable(ASTNode* parent, const std::string& name_)
+Variable::Variable(const std::string& name_)
 :	//ASTNode(parent),
 	//referenced_var(NULL),
 	name(name_),
@@ -618,7 +627,7 @@ void Variable::print(int depth, std::ostream& s) const
 	s << "Variable, name=" << this->name << ", " + varType(this->vartype) + ", argument_offset=" << argument_offset << "\n";
 }
 
-
+#if USE_LLVM
 static llvm::Value* getNthArg(llvm::Function *func, int n)
 {
 	llvm::Function::arg_iterator args = func->arg_begin();
@@ -626,6 +635,7 @@ static llvm::Value* getNthArg(llvm::Function *func, int n)
 		args++;
 	return args;
 }
+#endif
 
 
 static bool shouldPassByValue(const Type& type)
@@ -636,6 +646,7 @@ static bool shouldPassByValue(const Type& type)
 
 llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
+#if USE_LLVM
 	// Emit a call to constructStringOnHeap(this->value);
 	//return emitExternalLinkageCall(
 	//	//true, // implicit void arg?
@@ -671,6 +682,9 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params) const
 					));*/
 		}
 	}
+#else
+	return NULL;
+#endif
 }
 
 
@@ -692,11 +706,15 @@ void FloatLiteral::print(int depth, std::ostream& s) const
 
 llvm::Value* FloatLiteral::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
+#if USE_LLVM
 	return llvm::ConstantFP::get(
 #if NEW_LLVM
 	*params.context, 
 #endif
 	llvm::APFloat(this->value));
+#else
+	return NULL;
+#endif
 }
 
 
@@ -718,6 +736,7 @@ void IntLiteral::print(int depth, std::ostream& s) const
 
 llvm::Value* IntLiteral::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
+#if USE_LLVM
 	return llvm::ConstantInt::get(
 #if NEW_LLVM
 		*params.context, 
@@ -727,6 +746,9 @@ llvm::Value* IntLiteral::emitLLVMCode(EmitLLVMCodeParams& params) const
 			this->value, // value
 			true // signed
 	));
+#else
+	return NULL;
+#endif
 }
 
 
@@ -904,11 +926,15 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 
 llvm::Value* AdditionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
+#if USE_LLVM
 	return params.builder->CreateBinOp(
 		llvm::Instruction::Add, 
 		a->emitLLVMCode(params), 
 		b->emitLLVMCode(params)
 	);
+#else
+	return NULL;
+#endif
 }
 
 
@@ -970,11 +996,15 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 
 llvm::Value* SubtractionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
+#if USE_LLVM
 	return params.builder->CreateBinOp(
 		llvm::Instruction::Sub, 
 		a->emitLLVMCode(params), 
 		b->emitLLVMCode(params)
 	);
+#else
+	return NULL;
+#endif
 }
 
 
@@ -1038,11 +1068,15 @@ void MulExpression::print(int depth, std::ostream& s) const
 
 llvm::Value* MulExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
+#if USE_LLVM
 	return params.builder->CreateBinOp(
 		llvm::Instruction::Mul, 
 		a->emitLLVMCode(params), 
 		b->emitLLVMCode(params)
 	);
+#else
+	return NULL;
+#endif
 }
 
 

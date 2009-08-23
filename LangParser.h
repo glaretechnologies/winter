@@ -67,30 +67,30 @@ private:
 	const std::string parseIdentifier(const std::string& id_type, const ParseInfo& parseinfo);
 	ASTNodeRef parseLiteral(const ParseInfo& parseinfo);
 
-	Reference<FunctionDefinition> parseFunctionDefinition(ASTNode* parent, const ParseInfo& parseinfo);
+	Reference<FunctionDefinition> parseFunctionDefinition(const ParseInfo& parseinfo);
 	//Reference<ASTNode> parseFunctionDeclaration(const std::vector<Reference<TokenBase> >& tokens, const char* text_buffer, unsigned int& i);
 
-	Reference<ASTNode> parseFunctionExpression(ASTNode* parent, const ParseInfo& parseinfo);
+	Reference<ASTNode> parseFunctionExpression(const ParseInfo& parseinfo);
 
-	Reference<ASTNode> parseExpression(ASTNode* parent, const ParseInfo& parseinfo);
-	ASTNodeRef parseBasicExpression(ASTNode* parent, const ParseInfo& parseinfo);
+	Reference<ASTNode> parseExpression(const ParseInfo& parseinfo);
+	ASTNodeRef parseBasicExpression(const ParseInfo& parseinfo);
 
 	//void parseToken(const std::vector<Reference<TokenBase> >& tokens, const char* text_buffer, unsigned int token_type, const std::string& type_name, unsigned int& i);
 	void parseToken(unsigned int token_type, const ParseInfo& parseinfo);
 	bool isTokenCurrent(unsigned int token_type, const ParseInfo& parseinfo);
 
-	ASTNodeRef parseVariableExpression(ASTNode* parent, const ParseInfo& parseinfo);
+	ASTNodeRef parseVariableExpression(const ParseInfo& parseinfo);
 
 	TypeRef parseType(const ParseInfo& parseinfo);
 	TypeRef parseMapType(const ParseInfo& parseinfo);
 	TypeRef parseFunctionType(const ParseInfo& p);
 
-	ASTNodeRef parseAddSubExpression(ASTNode* parent, const ParseInfo& parseinfo);
-	ASTNodeRef parseMulDivExpression(ASTNode* parent, const ParseInfo& parseinfo);
-	ASTNodeRef parseParenExpression(ASTNode* parent, const ParseInfo& parseinfo);
-	ASTNodeRef parseMapLiteralExpression(ASTNode* parent, const ParseInfo& parseinfo);
-	Reference<LetASTNode> parseLet(ASTNode* parent, const ParseInfo& parseinfo);
-	ASTNodeRef parseAnonFunction(ASTNode* parent, const ParseInfo& parseinfo);
+	ASTNodeRef parseAddSubExpression(const ParseInfo& parseinfo);
+	ASTNodeRef parseMulDivExpression(const ParseInfo& parseinfo);
+	ASTNodeRef parseParenExpression(const ParseInfo& parseinfo);
+	ASTNodeRef parseMapLiteralExpression(const ParseInfo& parseinfo);
+	Reference<LetASTNode> parseLet(const ParseInfo& parseinfo);
+	ASTNodeRef parseAnonFunction(const ParseInfo& parseinfo);
 	void parseParameterList(const ParseInfo& parseinfo, std::vector<FunctionDefinition::FunctionArg>& args_out);
 };
 
