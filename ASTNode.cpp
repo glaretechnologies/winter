@@ -12,6 +12,7 @@ Copyright 2009 Nicholas Chapman
 #include "VMState.h"
 #include "Value.h"
 #include "Linker.h"
+#include "BuiltInFunctionImpl.h"
 #if USE_LLVM
 #include "llvm/Type.h"
 #include "llvm/Module.h"
@@ -30,6 +31,7 @@ Copyright 2009 Nicholas Chapman
 #endif
 
 //#define NEW_LLVM 1
+const bool VERBOSE_EXEC = true;
 
 
 static void printMargin(int depth, std::ostream& s)
@@ -104,11 +106,13 @@ llvm::Value* BufferRoot::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 FunctionDefinition::FunctionDefinition(const std::string& name, const std::vector<FunctionArg>& args_, 
 									   const vector<Reference<LetASTNode> >& lets_,
-									   const ASTNodeRef& body_, const TypeRef& rettype)
+									   const ASTNodeRef& body_, const TypeRef& rettype, 
+									   BuiltInFunctionImpl* impl)
 :	args(args_),
 	lets(lets_),
 	body(body_),
-	return_type(rettype)
+	return_type(rettype),
+	built_in_func_impl(impl)
 {
 	sig.name = name;
 	for(unsigned int i=0; i<args_.size(); ++i)
@@ -118,14 +122,47 @@ FunctionDefinition::FunctionDefinition(const std::string& name, const std::vecto
 }
 
 
+FunctionDefinition::~FunctionDefinition()
+{
+	delete built_in_func_impl;
+}
+
+
 Value* FunctionDefinition::exec(VMState& vmstate)
 {
 	return new FunctionValue(this);
 }
 
 
+static const std::string indent(VMState& vmstate)
+{
+	std::string s;
+	for(unsigned int i=0; i<vmstate.func_args_start.size(); ++i)
+		s += "  ";
+	return s;
+}
+static void printStack(VMState& vmstate)
+{
+	std::cout << indent(vmstate) << "arg Stack: [";
+	for(unsigned int i=0; i<vmstate.argument_stack.size(); ++i)
+		std::cout << vmstate.argument_stack[i]->toString() + ", ";
+	std::cout << "]\n";
+}
+
+
+
 Value* FunctionDefinition::invoke(VMState& vmstate)
 {
+	if(VERBOSE_EXEC) 
+	{
+		std::cout << indent(vmstate) << "FunctionDefinition, name=" << this->sig.name << "\n";
+		printStack(vmstate);
+	}
+
+	if(this->built_in_func_impl)
+		return this->built_in_func_impl->invoke(vmstate);
+
+	
 	// Evaluate let clauses, which will each push the result onto the let stack
 	for(unsigned int i=0; i<lets.size(); ++i)
 		vmstate.let_stack.push_back(lets[i]->exec(vmstate));
@@ -166,12 +203,26 @@ void FunctionDefinition::bindVariables(const std::vector<ASTNode*>& stack)
 
 void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
+	if(payload.operation == TraversalPayload::TypeCheck)
+	{
+		if(!this->built_in_func_impl)
+		{
+			// Check that the return type of the body expression is equal to the declared return type
+			// of this function.
+			if(*this->body->type() != *this->return_type)
+				throw BaseException("Type error for function '" + this->sig.toString() + "': Computed return type '" + this->body->type()->toString() + 
+					"' is not equal to the declared return type '" + this->return_type->toString() + "'.");
+		}
+	}
+
+
 	stack.push_back(this);
 
 	for(unsigned int i=0; i<lets.size(); ++i)
 		lets[i]->traverse(payload, stack);
 
-	this->body->traverse(payload, stack);
+	if(!this->built_in_func_impl)
+		this->body->traverse(payload, stack);
 
 	stack.pop_back();
 }
@@ -183,7 +234,14 @@ void FunctionDefinition::print(int depth, std::ostream& s) const
 	s << "FunctionDef: " << this->sig.toString() << " " << this->return_type->toString() << "\n";
 	for(unsigned int i=0; i<this->lets.size(); ++i)
 		lets[i]->print(depth + 1, s);
-	body->print(depth+1, s);
+
+	if(this->built_in_func_impl)
+	{
+		printMargin(depth+1, s);
+		s << "Built in Implementation.";
+	}
+	else
+		body->print(depth+1, s);
 }
 
 
@@ -193,7 +251,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params) const
 	return body->emitLLVMCode(params);
 }
 
-
+#if LLVM
 static llvm::FunctionType* llvmInternalFunctionType(const vector<TypeRef>& arg_types, const Type& return_type)
 {
 	std::vector<const llvm::Type*> the_types;
@@ -207,6 +265,7 @@ static llvm::FunctionType* llvmInternalFunctionType(const vector<TypeRef>& arg_t
 		false // varargs
 		);
 }
+#endif
 
 
 llvm::Function* FunctionDefinition::buildLLVMFunction(
@@ -276,16 +335,34 @@ FunctionDefinition* FunctionExpression::runtimeBind(VMState& vmstate)
 
 Value* FunctionExpression::exec(VMState& vmstate)
 {
+	if(VERBOSE_EXEC) std::cout << indent(vmstate) << "FunctionExpression, target_name=" << this->function_name << "\n";
+	
 	//assert(target_function);
 	// Get target function
 	FunctionDefinition* use_target_func = runtimeBind(vmstate);
 
 	// Push arguments onto argument stack
+	const unsigned int initial_arg_stack_size = vmstate.argument_stack.size();
+
 	for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
+	{
 		vmstate.argument_stack.push_back(this->argument_expressions[i]->exec(vmstate));
+		if(VERBOSE_EXEC) 
+		{
+			//std::cout << indent(vmstate) << "Pushed arg " << vmstate.argument_stack.back()->toString() << "\n";
+			//printStack(vmstate);
+		}
+	}
+
+	assert(vmstate.argument_stack.size() == initial_arg_stack_size + this->argument_expressions.size());
+
+	if(VERBOSE_EXEC)
+		std::cout << indent(vmstate) << "Calling " << this->function_name << ", func_args_start: " << vmstate.func_args_start.back() << "\n";
 
 	// Execute target function
+	vmstate.func_args_start.push_back(initial_arg_stack_size);
 	Value* ret = use_target_func->invoke(vmstate);
+	vmstate.func_args_start.pop_back();
 
 	// Remove arguments from stack
 	for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
@@ -293,7 +370,7 @@ Value* FunctionExpression::exec(VMState& vmstate)
 		delete vmstate.argument_stack.back();
 		vmstate.argument_stack.pop_back();
 	}
-	//vmstate.argument_stack.resize(vmstate.argument_stack.size() - argument_expressions.size());
+	assert(vmstate.argument_stack.size() == initial_arg_stack_size);
 
 	return ret;
 }
@@ -403,7 +480,7 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 
 	stack.pop_back();
 
-	if(payload.linker)
+	if(payload.operation == TraversalPayload::LinkFunctions)
 		linkFunctions(*payload.linker, stack);
 
 }
@@ -470,7 +547,7 @@ Variable::Variable(const std::string& name_)
 :	//ASTNode(parent),
 	//referenced_var(NULL),
 	name(name_),
-	argument_offset(-1),
+	//argument_offset(-1),
 	argument_index(-1),
 	parent_function(NULL),
 	parent_anon_function(NULL)
@@ -524,7 +601,7 @@ void Variable::bindVariables(const std::vector<ASTNode*>& stack)
 					if(def->lets[i]->variable_name == this->name)
 					{
 						this->argument_index = i;
-						this->argument_offset = (int)def->lets.size() - i;
+						//this->argument_offset = (int)def->lets.size() - i;
 						this->referenced_var_type = def->lets[i]->type();
 						this->vartype = LetVariable;
 						this->parent_function = def;
@@ -535,14 +612,14 @@ void Variable::bindVariables(const std::vector<ASTNode*>& stack)
 					if(def->args[i].name == this->name)
 					{
 						this->argument_index = i;
-						this->argument_offset = (int)def->args.size() - i;
+						//this->argument_offset = (int)def->args.size() - i;
 						this->referenced_var_type = def->args[i].type;
 						this->vartype = ArgumentVariable;
 						this->parent_function = def;
 						return;
 					}
 
-				if(this->argument_offset == -1)
+				if(this->argument_index == -1)
 					throw BaseException("No such function argument '" + this->name + "'");
 			}
 		}
@@ -566,14 +643,14 @@ void Variable::bindVariables(const std::vector<ASTNode*>& stack)
 					if(def->args[i].name == this->name)
 					{
 						this->argument_index = i;
-						this->argument_offset = (int)def->args.size() - i;
+						//this->argument_offset = (int)def->args.size() - i;
 						this->referenced_var_type = def->args[i].type;
 						this->vartype = ArgumentVariable;
 						this->parent_anon_function = def;
 						return;
 					}
 
-				if(this->argument_offset == -1)
+				if(this->argument_index == -1)
 					throw BaseException("No such function argument '" + this->name + "'");
 			}
 		}
@@ -584,28 +661,31 @@ void Variable::bindVariables(const std::vector<ASTNode*>& stack)
 
 void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
-	this->bindVariables(stack);
+	if(payload.operation == TraversalPayload::BindVariables)
+		this->bindVariables(stack);
 }
 
 
 Value* Variable::exec(VMState& vmstate)
 {
-	assert(this->argument_offset >= 0);
+	assert(this->argument_index >= 0);
 
 	if(this->vartype == ArgumentVariable)
 	{
-		return vmstate.argument_stack[vmstate.argument_stack.size() - argument_offset]->clone();
+		//return vmstate.argument_stack[vmstate.argument_stack.size() - argument_offset]->clone();
+		return vmstate.argument_stack[vmstate.func_args_start.back() + argument_index]->clone();
 	}
 	else
 	{
-		return vmstate.let_stack[vmstate.let_stack.size() - argument_offset]->clone();
+		//return vmstate.let_stack[vmstate.let_stack.size() - argument_offset]->clone();
+		return vmstate.let_stack[vmstate.func_args_start.back() + argument_index]->clone();
 	}
 }
 
 
 TypeRef Variable::type() const
 {
-	assert(this->argument_offset >= 0);
+	assert(this->argument_index >= 0);
 	assert(referenced_var_type.nonNull());
 
 	//if(!this->referenced_var)
@@ -624,7 +704,7 @@ inline static const std::string varType(Variable::VariableType t)
 void Variable::print(int depth, std::ostream& s) const
 {
 	printMargin(depth, s);
-	s << "Variable, name=" << this->name << ", " + varType(this->vartype) + ", argument_offset=" << argument_offset << "\n";
+	s << "Variable, name=" << this->name << ", " + varType(this->vartype) + ", argument_index=" << argument_index << "\n";
 }
 
 #if USE_LLVM
@@ -779,7 +859,7 @@ llvm::Value* BoolLiteral::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 Value* MapLiteral::exec(VMState& vmstate)
 {
-	std::map<Value*, Value*> m;
+/*	std::map<Value*, Value*> m;
 	for(unsigned int i=0; i<this->items.size(); ++i)
 	{
 		this->items[i].first->exec(vmstate);
@@ -794,6 +874,9 @@ Value* MapLiteral::exec(VMState& vmstate)
 	}
 
 	return new MapValue(m);
+	*/
+	assert(0);
+	return NULL;
 }
 
 

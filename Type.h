@@ -6,9 +6,12 @@
 #include <string>
 #include "../../indigosvn/trunk/utils/reference.h"
 #include "../../indigosvn/trunk/utils/refcounted.h"
+
+namespace llvm { class Type; }
+#if USE_LLVM
 #include "llvm/Type.h"
 #include "llvm/DerivedTypes.h"
-
+#endif
 
 namespace Winter
 {
@@ -26,13 +29,16 @@ public:
 		StringType,
 		BoolType,
 		MapType,
-		FunctionType
+		FunctionType,
+		StructureTypeType,
 	};
 
 	virtual TypeType getType() const = 0;
 	virtual const std::string toString() const = 0;
 	virtual bool lessThan(const Type& b) const = 0;
+#if LLVM
 	virtual const llvm::Type* LLVMType() const = 0;
+#endif
 };
 
 
@@ -45,7 +51,9 @@ public:
 	virtual TypeType getType() const { return FloatType; }
 	virtual const std::string toString() const { return "float"; }
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
+#if LLVM
 	virtual const llvm::Type* LLVMType() const { return llvm::Type::FloatTy; }
+#endif
 };
 
 
@@ -55,7 +63,9 @@ public:
 	virtual TypeType getType() const { return IntType; }
 	virtual const std::string toString() const { return "int"; }
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
+#if LLVM
 	virtual const llvm::Type* LLVMType() const { return llvm::Type::Int32Ty; }
+#endif
 };
 
 
@@ -65,7 +75,9 @@ public:
 	virtual TypeType getType() const { return BoolType; }
 	virtual const std::string toString() const { return "bool"; }
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
+#if LLVM
 	virtual const llvm::Type* LLVMType() const { return llvm::Type::Int1Ty; }
+#endif
 };
 
 
@@ -86,7 +98,9 @@ public:
 	virtual TypeType getType() const { return StringType; }
 	virtual const std::string toString() const { return "string"; }
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
+#if LLVM
 	virtual const llvm::Type* LLVMType() const { return NULL; }
+#endif
 };
 
 
@@ -100,7 +114,9 @@ public:
 
 	virtual TypeType getType() const { return FunctionType; }
 	virtual const std::string toString() const; // { return "function"; }
+#if LLVM
 	virtual const llvm::Type* LLVMType() const { return NULL; }
+#endif
 	virtual bool lessThan(const Type& b) const
 	{
 		if(getType() < b.getType())
@@ -170,10 +186,45 @@ public:
 			}
 		}
 	}
+#if LLVM
 	virtual const llvm::Type* LLVMType() const { return NULL; }
+#endif
 
 	TypeRef from_type;
 	TypeRef to_type;
+};
+
+
+class StructureType : public Type
+{
+public:
+	StructureType(const std::string& name_, std::vector<TypeRef> component_types_, std::vector<std::string> component_names_) 
+	: name(name_), component_types(component_types_), component_names(component_names_) {}
+
+	virtual TypeType getType() const { return StructureTypeType; }
+	virtual const std::string toString() const { return "struct " + name; }
+	virtual bool lessThan(const Type& b) const
+	{
+		if(getType() < b.getType())
+			return true;
+		else if(b.getType() < getType())
+			return false;
+		else
+		{
+			// else b is a structure as well
+			const StructureType& b_struct = dynamic_cast<const StructureType&>(b);
+
+			return this->name < b_struct.name;
+		}
+	}
+
+#if LLVM
+	virtual const llvm::Type* LLVMType() const { return NULL; }
+#endif
+
+	std::string name;
+	std::vector<TypeRef> component_types;
+	std::vector<std::string> component_names;
 };
 
 
@@ -185,6 +236,11 @@ inline bool operator < (const Type& a, const Type& b)
 inline bool operator == (const Type& a, const Type& b)
 {
 	return !a.lessThan(b) && !b.lessThan(a);
+}
+
+inline bool operator != (const Type& a, const Type& b)
+{
+	return a.lessThan(b) || b.lessThan(a);
 }
 
 }

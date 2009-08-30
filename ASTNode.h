@@ -38,10 +38,21 @@ class Linker;
 class LetASTNode;
 class AnonFunction;
 class Value;
+class BuiltInFunctionImpl;
+
+
 class TraversalPayload
 {
 public:
 	Linker* linker;
+
+	enum Operation
+	{
+		LinkFunctions,
+		BindVariables,
+		TypeCheck
+	};
+	Operation operation;
 };
 
 class EmitLLVMCodeParams
@@ -155,7 +166,10 @@ public:
 	FunctionDefinition(const std::string& name, const std::vector<FunctionArg>& args, 
 		const vector<Reference<LetASTNode> >& lets,
 		const ASTNodeRef& body, 
-		const TypeRef& rettype);
+		const TypeRef& rettype,
+		BuiltInFunctionImpl* impl);
+	
+	~FunctionDefinition();
 
 	vector<FunctionArg> args;
 	ASTNodeRef body;
@@ -164,6 +178,7 @@ public:
 	vector<Reference<LetASTNode> > lets;
 
 	FunctionSignature sig;
+	BuiltInFunctionImpl* built_in_func_impl;
 
 	virtual Value* invoke(VMState& vmstate);
 	virtual Value* exec(VMState& vmstate);
@@ -252,7 +267,7 @@ public:
 	VariableType vartype;
 
 	int argument_index;
-	int argument_offset; // Currently, a variable must be an argument to the enclosing function
+	//int argument_offset; // Currently, a variable must be an argument to the enclosing function
 };
 
 

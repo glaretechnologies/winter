@@ -57,6 +57,7 @@ int main(int argc, char** argv)
 			std::vector<ASTNode*> stack;
 			TraversalPayload payload;
 			payload.linker = NULL;
+			payload.operation = TraversalPayload::BindVariables;
 			root->traverse(payload, stack);
 			assert(stack.size() == 0);
 		}
@@ -68,7 +69,17 @@ int main(int argc, char** argv)
 		{
 			std::vector<ASTNode*> stack;
 			TraversalPayload payload;
+			payload.operation = TraversalPayload::LinkFunctions;
 			payload.linker = &linker;
+			root->traverse(payload, stack);
+			assert(stack.size() == 0);
+		}
+
+		{
+			std::vector<ASTNode*> stack;
+			TraversalPayload payload;
+			payload.linker = NULL;
+			payload.operation = TraversalPayload::TypeCheck;
 			root->traverse(payload, stack);
 			assert(stack.size() == 0);
 		}
@@ -83,8 +94,8 @@ int main(int argc, char** argv)
 		if(res == linker.functions.end())
 			throw BaseException("Could not find " + mainsig.toString());
 		Reference<FunctionDefinition> maindef = (*res).second;
-		if(!(*maindef->return_type == *TypeRef(new Int())))
-			throw BaseException("main must return int.");
+		//if(!(*maindef->return_type == *TypeRef(new String())))
+		//	throw BaseException("main must return string.");
 
 		//TEMP:
 		/*{
@@ -118,20 +129,26 @@ int main(int argc, char** argv)
 		
 
 		VMState vmstate;
+		vmstate.func_args_start.push_back(0);
 
 		Value* retval = maindef->invoke(vmstate);
 
-		//Value* retval = vmstate.return_register;
-		IntValue* intval = dynamic_cast<IntValue*>(retval);
-		assert(intval);
+		vmstate.func_args_start.pop_back();
 
-		std::cout << "Program returned " << intval->value << std::endl;
+		//IntValue* intval = dynamic_cast<IntValue*>(retval);
+		//StringValue* intval = dynamic_cast<StringValue*>(retval);
+		//StructureValue* val = dynamic_cast<StructureValue*>(retval);
+		FloatValue* val = dynamic_cast<FloatValue*>(retval);
+		assert(val);
 
-		delete intval;
+		std::cout << "Program returned " << val->value << std::endl;
+
+		delete val;
 
 		assert(vmstate.argument_stack.empty());
 		assert(vmstate.let_stack.empty());
-		assert(vmstate.working_stack.empty());
+		assert(vmstate.func_args_start.empty());
+		//assert(vmstate.working_stack.empty());
 		
 
 		/*for(unsigned int i=0; i<root->children.size(); ++i)

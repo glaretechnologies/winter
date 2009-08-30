@@ -4,13 +4,17 @@
 
 #include "Type.h"
 #include <string>
+#include <vector>
 #include <map>
 #include <iostream>
+
 using std::string;
+using std::vector;
 
 
 namespace Winter
 {
+class FunctionDefinition;
 
 
 class Value
@@ -21,6 +25,8 @@ public:
 	//TypeRef type;
 	//int refcount;
 	virtual Value* clone() const = 0;
+	
+	virtual const std::string toString() const { return "Value"; }
 };
 
 
@@ -39,6 +45,7 @@ class FloatValue : public Value
 public:
 	FloatValue(float v) : value(v) {}
 	virtual Value* clone() const { return new FloatValue(value); }
+	virtual const std::string toString() const;
 	float value;
 };
 
@@ -78,6 +85,18 @@ public:
 	virtual Value* clone() const { return new FunctionValue(func_def); }
 
 	FunctionDefinition* func_def;
+};
+
+
+class StructureValue : public Value
+{
+public:
+	StructureValue(const vector<Value*>& fields_) : fields(fields_) {}
+	~StructureValue();
+	virtual Value* clone() const;
+	virtual const std::string toString() const { return "struct"; }
+
+	vector<Value*> fields;
 };
 
 

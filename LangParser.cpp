@@ -11,6 +11,7 @@ Copyright 2009 Nicholas Chapman
 
 #include "Lexer.h"
 #include "ASTNode.h"
+#include "BuiltInFunctionImpl.h"
 #include "../../indigosvn/trunk/indigo/TestUtils.h"
 #include "../../indigosvn/trunk/indigo/globals.h"
 #include "../../indigosvn/trunk/utils/stringutils.h"
@@ -36,20 +37,64 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 {
 	try
 	{
+
+		std::map<std::string, TypeRef> named_types;
+
+
+
 		BufferRoot* root = new BufferRoot();
 		//Reference<ASTNode> root( new BufferRoot() );
 
 		unsigned int i = 0;
 
-		ParseInfo parseinfo(i, tokens);
+		ParseInfo parseinfo(i, tokens, named_types);
 		parseinfo.text_buffer = text_buffer;
 
 		while(i < tokens.size())
 		{
 			if(tokens[i]->isIdentifier() && tokens[i]->getIdentifierValue() == "def")
 				root->func_defs.push_back(parseFunctionDefinition(parseinfo));
-			//else if(tokens[i]->isIdentifier() && tokens[i]->getIdentifierValue() == "declare")
-			//	root->children.push_back(parseFunctionDeclaration(tokens, text_buffer, i));
+			else if(tokens[i]->isIdentifier() && tokens[i]->getIdentifierValue() == "struct")
+			{
+				Reference<StructureType> t = parseStructType(parseinfo);
+				// TODO: check to see if it has already been defined.
+				named_types[t->name] = TypeRef(t.getPointer()); 
+
+				// Make constructor function for this structure
+				vector<FunctionDefinition::FunctionArg> args(t->component_types.size());
+				for(unsigned int i=0; i<args.size(); ++i)
+				{
+					args[i].name = t->component_names[i];
+					args[i].type = t->component_types[i];
+				}
+
+				FunctionDefinition* cons = new FunctionDefinition(
+					t->name, // name
+					args,
+					vector<Reference<LetASTNode> >(),
+					ASTNodeRef(NULL), // body expr
+					TypeRef(t.getPointer()), // return type
+					new Constructor(t) // constructor
+				);
+				root->func_defs.push_back(Reference<FunctionDefinition>(cons));
+
+				// Make field access functions
+				vector<FunctionDefinition::FunctionArg> getfield_args(1);
+				getfield_args[0].name = "s";
+				getfield_args[0].type = TypeRef(t.getPointer());
+
+				for(unsigned int i=0; i<t->component_types.size(); ++i)
+				{
+					root->func_defs.push_back(Reference<FunctionDefinition>(new FunctionDefinition(
+						t->component_names[i], // name
+						getfield_args, // args
+						vector<Reference<LetASTNode> >(), // lets
+						ASTNodeRef(NULL), // body expr
+						t->component_types[i], // return type
+						new GetField(t, i) // impl
+					)));
+				}
+			}
 			else
 				throw LangParserExcep("Expected 'def'." + errorPosition(text_buffer, tokens[i]->char_index));
 		}
@@ -143,7 +188,8 @@ Reference<FunctionDefinition> LangParser::parseFunctionDefinition(const ParseInf
 			args,
 			lets,
 			body,
-			return_type
+			return_type,
+			false // constructor
 			));
 
 		return def;
@@ -335,7 +381,21 @@ TypeRef LangParser::parseType(const ParseInfo& p)
 	else if(t == "function")
 		return parseFunctionType(p);
 	else
-		throw LangParserExcep("Unknown type '" + t + "'.");
+	{
+		// Then this might be the name of a named type.
+		// So look up the named type map
+		std::map<std::string, TypeRef>::const_iterator res = p.named_types.find(t);
+		if(res == p.named_types.end())
+		{
+			throw LangParserExcep("Unknown type '" + t + "'.");
+		}
+		else
+		{
+			// Type found, return it
+			return (*res).second;
+		}
+	}
+
 }
 
 
@@ -377,6 +437,35 @@ TypeRef LangParser::parseFunctionType(const ParseInfo& p)
 		arg_types.push_back(types[i]);
 
 	return TypeRef(new Function(arg_types, types.back()));
+}
+
+
+Reference<StructureType> LangParser::parseStructType(const ParseInfo& p)
+{
+	const std::string id = parseIdentifier("struct", p);
+	assert(id == "struct");
+
+	const std::string name = parseIdentifier("structure name", p);
+
+	parseToken(OPEN_BRACE_TOKEN, p);
+
+	std::vector<TypeRef> types;
+	std::vector<string> names;
+
+	types.push_back(parseType(p));
+	names.push_back(parseIdentifier("field name", p));
+
+	while(isTokenCurrent(COMMA_TOKEN, p))
+	{
+		parseToken(COMMA_TOKEN, p);
+
+		types.push_back(parseType(p));
+		names.push_back(parseIdentifier("field name", p));
+	}
+
+	parseToken(CLOSE_BRACE_TOKEN, p);
+
+	return Reference<StructureType>(new StructureType(name, types, names));
 }
 
 
@@ -519,7 +608,8 @@ ASTNodeRef LangParser::parseAnonFunction(const ParseInfo& p)
 		args,
 		vector<Reference<LetASTNode> >(),
 		body_expr,
-		return_type
+		return_type,
+		false // constructor
 	);
 	//AnonFunction* func = new AnonFunction();
 	//func->args = args;

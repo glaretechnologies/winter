@@ -38,10 +38,12 @@ private:
 class ParseInfo
 {
 public:
-	ParseInfo(unsigned int& i_, const std::vector<Reference<TokenBase> >& t) : i(i_), tokens(t) {}
+	ParseInfo(unsigned int& i_, const std::vector<Reference<TokenBase> >& t, std::map<std::string, TypeRef>& named_types_) 
+		: i(i_), tokens(t), named_types(named_types_) {}
 	const std::vector<Reference<TokenBase> >& tokens;
 	const char* text_buffer;
 	unsigned int& i;
+	std::map<std::string, TypeRef>& named_types;
 };
 
 
@@ -84,6 +86,7 @@ private:
 	TypeRef parseType(const ParseInfo& parseinfo);
 	TypeRef parseMapType(const ParseInfo& parseinfo);
 	TypeRef parseFunctionType(const ParseInfo& p);
+	Reference<StructureType> parseStructType(const ParseInfo& p);
 
 	ASTNodeRef parseAddSubExpression(const ParseInfo& parseinfo);
 	ASTNodeRef parseMulDivExpression(const ParseInfo& parseinfo);
@@ -92,6 +95,8 @@ private:
 	Reference<LetASTNode> parseLet(const ParseInfo& parseinfo);
 	ASTNodeRef parseAnonFunction(const ParseInfo& parseinfo);
 	void parseParameterList(const ParseInfo& parseinfo, std::vector<FunctionDefinition::FunctionArg>& args_out);
+
+
 };
 
 
