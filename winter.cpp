@@ -138,10 +138,15 @@ int main(int argc, char** argv)
 		//IntValue* intval = dynamic_cast<IntValue*>(retval);
 		//StringValue* intval = dynamic_cast<StringValue*>(retval);
 		//StructureValue* val = dynamic_cast<StructureValue*>(retval);
+		//ArrayValue* val = dynamic_cast<ArrayValue*>(retval);
 		FloatValue* val = dynamic_cast<FloatValue*>(retval);
+		if(!val)
+		{
+			std::cerr << "main() Return value was of unexpected type." << std::endl;
+		}
 		assert(val);
 
-		std::cout << "Program returned " << val->value << std::endl;
+		std::cout << "Program returned " << val->toString() << std::endl;
 
 		delete val;
 

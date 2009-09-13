@@ -84,6 +84,8 @@ public:
 	~FunctionValue() { std::cout << "~FunctionValue(), this=" << this << "\n"; }
 	virtual Value* clone() const { return new FunctionValue(func_def); }
 
+	virtual const std::string toString() const { return "Function"; }
+
 	FunctionDefinition* func_def;
 };
 
@@ -97,6 +99,19 @@ public:
 	virtual const std::string toString() const { return "struct"; }
 
 	vector<Value*> fields;
+};
+
+
+class ArrayValue : public Value
+{
+public:
+	ArrayValue(){}
+	ArrayValue(const vector<Value*>& e_) : e(e_) {}
+	~ArrayValue();
+	virtual Value* clone() const;
+	virtual const std::string toString() const;
+
+	vector<Value*> e;
 };
 
 

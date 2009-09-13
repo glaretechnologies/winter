@@ -85,6 +85,7 @@ private:
 
 	TypeRef parseType(const ParseInfo& parseinfo);
 	TypeRef parseMapType(const ParseInfo& parseinfo);
+	TypeRef parseArrayType(const ParseInfo& parseinfo);
 	TypeRef parseFunctionType(const ParseInfo& p);
 	Reference<StructureType> parseStructType(const ParseInfo& p);
 
@@ -92,6 +93,7 @@ private:
 	ASTNodeRef parseMulDivExpression(const ParseInfo& parseinfo);
 	ASTNodeRef parseParenExpression(const ParseInfo& parseinfo);
 	ASTNodeRef parseMapLiteralExpression(const ParseInfo& parseinfo);
+	ASTNodeRef parseArrayLiteralExpression(const ParseInfo& parseinfo);
 	Reference<LetASTNode> parseLet(const ParseInfo& parseinfo);
 	ASTNodeRef parseAnonFunction(const ParseInfo& parseinfo);
 	void parseParameterList(const ParseInfo& parseinfo, std::vector<FunctionDefinition::FunctionArg>& args_out);

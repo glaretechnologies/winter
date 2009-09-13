@@ -37,12 +37,59 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 {
 	try
 	{
+		BufferRoot* root = new BufferRoot();
+
+		//TEMP:
+		// Create float array map definition
+		{
+			vector<FunctionDefinition::FunctionArg> args(2);
+			args[0].type = TypeRef(new Function(vector<TypeRef>(1, TypeRef(new Float())), TypeRef(new Float())));
+			args[0].name = "f";
+			args[1].type = TypeRef(new ArrayType(TypeRef(new Float)));
+			args[1].name = "array";
+
+			FunctionDefinition* def = new FunctionDefinition(
+				"map",
+				args,
+				vector<Reference<LetASTNode> >(),
+				ASTNodeRef(NULL), // body expr
+				TypeRef(new ArrayType(TypeRef(new Float))), // return type
+				new ArrayMapBuiltInFunc(
+					TypeRef(new ArrayType(TypeRef(new Float))),
+					Reference<Function>(new Function(vector<TypeRef>(1, TypeRef(new Float())), TypeRef(new Float())))
+				)
+			);
+
+			root->func_defs.push_back(Reference<FunctionDefinition>(def));
+		}
+		// TEMP: Create float array fold definition
+		{
+			vector<FunctionDefinition::FunctionArg> args(3);
+			args[0].type = TypeRef(new Function(vector<TypeRef>(2, TypeRef(new Float())), TypeRef(new Float())));
+			args[0].name = "f";
+			args[1].type = TypeRef(new ArrayType(TypeRef(new Float)));
+			args[1].name = "array";
+			args[2].type = TypeRef(new Float);
+			args[2].name = "initial_val";
+
+			FunctionDefinition* def = new FunctionDefinition(
+				"fold",
+				args,
+				vector<Reference<LetASTNode> >(),
+				ASTNodeRef(NULL), // body expr
+				TypeRef(new Float), // return type
+				new ArrayFoldBuiltInFunc(
+					TypeRef(new Float)
+				)
+			);
+
+			root->func_defs.push_back(Reference<FunctionDefinition>(def));
+		}
+
+
 
 		std::map<std::string, TypeRef> named_types;
 
-
-
-		BufferRoot* root = new BufferRoot();
 		//Reference<ASTNode> root( new BufferRoot() );
 
 		unsigned int i = 0;
@@ -220,7 +267,7 @@ Reference<ASTNode> LangParser::parseFunctionExpression(const ParseInfo& p)
 		arg_expressions.push_back(parseExpression(p));
 	}
 
-	if(p.tokens[p.i]->getType() != CLOSE_PARENTHESIS_TOKEN)
+	while(p.i < p.tokens.size() && p.tokens[p.i]->getType() != CLOSE_PARENTHESIS_TOKEN)//isTokenCurrent(CLOSE_PARENTHESIS_TOKEN, p)) //p.tokens[p.i]->getType() != CLOSE_PARENTHESIS_TOKEN)
 	{
 		parseToken(COMMA_TOKEN, p);
 	
@@ -356,6 +403,10 @@ ASTNodeRef LangParser::parseBasicExpression(const ParseInfo& p)
 	{
 		return parseMapLiteralExpression(p);
 	}
+	else if(p.tokens[p.i]->getType() == OPEN_SQUARE_BRACKET_TOKEN)
+	{
+		return parseArrayLiteralExpression(p);
+	}
 	else if(p.tokens[p.i]->getType() == BACK_SLASH_TOKEN)
 	{
 		return parseAnonFunction(p);
@@ -378,6 +429,8 @@ TypeRef LangParser::parseType(const ParseInfo& p)
 		return TypeRef(new String());
 	else if(t == "map")
 		return parseMapType(p);
+	else if(t == "array")
+		return parseArrayType(p);
 	else if(t == "function")
 		return parseFunctionType(p);
 	else
@@ -412,6 +465,18 @@ TypeRef LangParser::parseMapType(const ParseInfo& p)
 	parseToken(RIGHT_ANGLE_BRACKET_TOKEN, p);
 
 	return TypeRef(new Map(from, to));
+}
+
+
+TypeRef LangParser::parseArrayType(const ParseInfo& p)
+{
+	parseToken(LEFT_ANGLE_BRACKET_TOKEN, p);
+
+	TypeRef t = parseType(p);
+
+	parseToken(RIGHT_ANGLE_BRACKET_TOKEN, p);
+
+	return TypeRef(new ArrayType(t));
 }
 
 
@@ -562,6 +627,35 @@ ASTNodeRef LangParser::parseMapLiteralExpression(const ParseInfo& p)
 	parseToken(CLOSE_BRACE_TOKEN, p);
 
 	return ASTNodeRef(m);
+}
+
+
+ASTNodeRef LangParser::parseArrayLiteralExpression(const ParseInfo& p)
+{
+	parseToken(OPEN_SQUARE_BRACKET_TOKEN, p);
+
+	//ArrayLiteral* m = new ArrayLiteral();
+	vector<ASTNodeRef> elems;
+
+	while(1)
+	{
+		if(isTokenCurrent(CLOSE_SQUARE_BRACKET_TOKEN, p)) // if(i < tokens.size() && tokens[i]->getType() == CLOSE_BRACE_TOKEN)
+			break;
+
+		// Parse element
+		ASTNodeRef elem = parseExpression(p);
+		
+		elems.push_back(elem);
+
+		if(isTokenCurrent(CLOSE_SQUARE_BRACKET_TOKEN, p))
+			break;
+
+		parseToken(COMMA_TOKEN, p);
+	}
+
+	parseToken(CLOSE_SQUARE_BRACKET_TOKEN, p);
+
+	return ASTNodeRef(new ArrayLiteral(elems));
 }
 
 

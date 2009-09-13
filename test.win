@@ -1,31 +1,52 @@
 
 
-struct Complex
-{
-	float re,
-	float im
-}
+#def square(T x) T : x * x
 
-def complexFunc() Complex :
-	Complex(1.0, 2.0)
+#decl map(function<T1, T2>, array<T1>) array<T2>
+
+
+
+def sum(array<float> x) float :
+	fold(\(float y, float s) float : y + s, x, 0.0)
+
+
+def addOneToElements(array<float> x) array<float> :
+	map(\(float y) float : (y + 1.0), x)
+
+
+
+
+
+def main() float :
+	sum([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0])
+
+
+#struct Complex
+#{
+#	float re,
+#	float im
+#}
+
+#def complexFunc() Complex :
+#	Complex(1.0, 2.0)
 	
 	
-def add (Complex a, Complex b) Complex : 
-	Complex(re(a) + re(b), im(a) + im(b))
+#def add (Complex a, Complex b) Complex : 
+#	Complex(re(a) + re(b), im(a) + im(b))
 
 
 #def funcWithLambdaArg(function<int, int> f, int x) int :
 #	f(f(x))
 	
 
-def stringFunc() string :
-	"bleh"
+#def stringFunc() string :
+#	"bleh"
 
-def funcThatReturnsLambda() function<int> :
-	\() int : 10
+#def funcThatReturnsLambda() function<int> :
+#	\() int : 10
 
-def main() float :
-	im(add(Complex(1.0, 4.0), Complex(10.0, 100.0)))
+#def main() float :
+#	im(add(Complex(1.0, 4.0), Complex(10.0, 100.0)))
 	
 	
 	

@@ -31,5 +31,35 @@ Value* StructureValue::clone() const
 	return new StructureValue(field_clones);
 }
 
+
+ArrayValue::~ArrayValue()
+{
+	for(unsigned int i=0; i<this->e.size(); ++i)
+		delete e[i];
 }
 
+
+Value* ArrayValue::clone() const
+{
+	ArrayValue* ret = new ArrayValue();
+	ret->e.resize(this->e.size());
+
+	for(unsigned int i=0; i<this->e.size(); ++i)
+		ret->e[i] = this->e[i]->clone();
+
+	return ret;
+}
+
+
+const std::string ArrayValue::toString() const
+{
+	std::string s = "array[";
+	for(unsigned int i=0; i<this->e.size(); ++i)
+	{
+		s += this->e[i]->toString() + (i + 1 < e.size() ? ", " : "");
+	}
+	return s + "]";
+}
+
+
+}

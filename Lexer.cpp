@@ -186,6 +186,16 @@ void Lexer::process(const std::string& buffer, std::vector<Reference<TokenBase> 
 			tokens_out.push_back(Reference<TokenBase>(new CLOSE_PARENTHESIS_Token(parser.currentPos())));
 			parser.advance();
 		}
+		else if(parser.current() == '[')
+		{
+			tokens_out.push_back(Reference<TokenBase>(new OPEN_SQUARE_BRACKET_Token(parser.currentPos())));
+			parser.advance();
+		}
+		else if(parser.current() == ']')
+		{
+			tokens_out.push_back(Reference<TokenBase>(new CLOSE_SQUARE_BRACKET_Token(parser.currentPos())));
+			parser.advance();
+		}
 		else if(parser.current() == '{')
 		{
 			tokens_out.push_back(Reference<TokenBase>(new OPEN_BRACE_Token(parser.currentPos())));

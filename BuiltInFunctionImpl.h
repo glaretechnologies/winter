@@ -47,4 +47,34 @@ private:
 };
 
 
+class ArrayMapBuiltInFunc : public BuiltInFunctionImpl
+{
+public:
+	ArrayMapBuiltInFunc(TypeRef& from_type_, Reference<Function>& func_type_) : from_type(from_type_), func_type(func_type_) {}
+	virtual ~ArrayMapBuiltInFunc(){}
+
+	virtual Value* invoke(VMState& vmstate);
+private:
+	TypeRef from_type;
+	Reference<Function> func_type;
+};
+
+
+class ArrayFoldBuiltInFunc : public BuiltInFunctionImpl
+{
+public:
+	/*
+		suppose T = array_elem_type
+		then fold is
+		fold(function<T, T, T> func, array<T> array, T initial val) T
+
+	*/
+	ArrayFoldBuiltInFunc(TypeRef& T_) : T(T_) {}
+	virtual ~ArrayFoldBuiltInFunc(){}
+
+	virtual Value* invoke(VMState& vmstate);
+private:
+	TypeRef T;
+};
+
 }

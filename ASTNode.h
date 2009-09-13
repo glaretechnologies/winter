@@ -91,6 +91,7 @@ public:
 		BoolLiteralType,
 		StringLiteralType,
 		MapLiteralType,
+		ArrayLiteralType,
 		AdditionExpressionType,
 		SubtractionExpressionType,
 		MulExpressionType,
@@ -345,6 +346,26 @@ public:
 
 	TypeRef maptype;
 	std::vector<std::pair<ASTNodeRef, ASTNodeRef> > items;
+};
+
+
+class ArrayLiteral : public ASTNode
+{
+public:
+	ArrayLiteral(const std::vector<ASTNodeRef>& elems);
+
+	virtual Value* exec(VMState& vmstate);
+	virtual ASTNodeType nodeType() const { return ArrayLiteralType; }
+	virtual TypeRef type() const;// { return array_type; }
+	virtual void print(int depth, std::ostream& s) const;
+	//virtual void linkFunctions(Linker& linker);
+	//virtual void bindVariables(const std::vector<ASTNode*>& stack);
+	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+
+private:
+	//TypeRef array_type;
+	std::vector<ASTNodeRef> elements;
 };
 
 

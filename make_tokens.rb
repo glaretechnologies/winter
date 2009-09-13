@@ -13,6 +13,8 @@ tokens = [
 [ "CLOSE_PARENTHESIS",	:paranthesis,	nil,			nil			],	
 [ "OPEN_BRACE",			:nil,			nil,			nil			],	
 [ "CLOSE_BRACE",		:nil,			nil,			nil			],	
+[ "OPEN_SQUARE_BRACKET",:nil,			nil,			nil			],	
+[ "CLOSE_SQUARE_BRACKET",:nil,			nil,			nil			],	
 
 [ "COLON",				:nil,			nil,			nil			],	
 [ "RIGHT_ARROW",		:nil,			nil,			nil			],	

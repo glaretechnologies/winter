@@ -29,6 +29,7 @@ public:
 		StringType,
 		BoolType,
 		MapType,
+		ArrayTypeType,
 		FunctionType,
 		StructureTypeType,
 	};
@@ -192,6 +193,31 @@ public:
 
 	TypeRef from_type;
 	TypeRef to_type;
+};
+
+
+class ArrayType : public Type
+{
+public:
+	ArrayType(const TypeRef& t_) : t(t_) {}
+	virtual TypeType getType() const { return ArrayTypeType; }
+	virtual const std::string toString() const { return "array<" + t->toString() + ">"; }
+	virtual bool lessThan(const Type& b) const
+	{
+		if(getType() < b.getType())
+			return true;
+		else if(b.getType() < getType())
+			return false;
+		else
+		{
+			// else b is a structure as well
+			const ArrayType& b_array = dynamic_cast<const ArrayType&>(b);
+
+			return this->t->lessThan(*b_array.t);
+		}
+	}
+
+	TypeRef t;
 };
 
 

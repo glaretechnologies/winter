@@ -13,6 +13,7 @@ Copyright 2009 Nicholas Chapman
 #include "Value.h"
 #include "Linker.h"
 #include "BuiltInFunctionImpl.h"
+#include "../../indigosvn/trunk/utils/stringutils.h"
 #if USE_LLVM
 #include "llvm/Type.h"
 #include "llvm/Module.h"
@@ -342,7 +343,7 @@ Value* FunctionExpression::exec(VMState& vmstate)
 	FunctionDefinition* use_target_func = runtimeBind(vmstate);
 
 	// Push arguments onto argument stack
-	const unsigned int initial_arg_stack_size = vmstate.argument_stack.size();
+	const unsigned int initial_arg_stack_size = (unsigned int)vmstate.argument_stack.size();
 
 	for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
 	{
@@ -911,6 +912,74 @@ void MapLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 
 
 llvm::Value* MapLiteral::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	return NULL;
+}
+
+
+//----------------------------------------------------------------------------------------------
+ArrayLiteral::ArrayLiteral(const std::vector<ASTNodeRef>& elems)
+:	elements(elems)
+{
+	//this->t
+	if(elems.empty())
+		throw BaseException("Array literal can't be empty.");
+}
+
+
+TypeRef ArrayLiteral::type() const// { return array_type; }
+{
+	return TypeRef(new ArrayType(elements[0]->type()));
+}
+
+
+Value* ArrayLiteral::exec(VMState& vmstate)
+{
+	std::vector<Value*> elem_values(elements.size());
+
+	for(unsigned int i=0; i<this->elements.size(); ++i)
+	{
+		elem_values[i] = this->elements[i]->exec(vmstate);
+	}
+
+	return new ArrayValue(elem_values);
+}
+
+
+void ArrayLiteral::print(int depth, std::ostream& s) const
+{
+	printMargin(depth, s);
+	s << "Array literal\n";
+
+	for(unsigned int i=0; i<this->elements.size(); ++i)
+	{
+		printMargin(depth+1, s);
+		this->elements[i]->print(depth+2, s);
+	}
+}
+
+
+void ArrayLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
+{
+	stack.push_back(this);
+	for(unsigned int i=0; i<this->elements.size(); ++i)
+	{
+		this->elements[i]->traverse(payload, stack);
+	}
+	stack.pop_back();
+
+	if(payload.operation == TraversalPayload::TypeCheck)
+	{
+		// Check all the element expression types match the computed element type.
+		const TypeRef elem_type = this->elements[0]->type();
+		for(unsigned int i=0; i<this->elements.size(); ++i)
+			if(*elem_type != *this->elements[i]->type())
+				throw BaseException("Array element " + ::toString(i) + " did not have required type " + elem_type->toString() + ".");
+	}
+}
+
+
+llvm::Value* ArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
 	return NULL;
 }
