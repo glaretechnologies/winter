@@ -44,15 +44,21 @@ class BuiltInFunctionImpl;
 class TraversalPayload
 {
 public:
-	Linker* linker;
-
 	enum Operation
 	{
 		LinkFunctions,
 		BindVariables,
-		TypeCheck
+		TypeCheck,
+		SubstituteType // for making concrete types out of generic types.
 	};
+
+	TraversalPayload(Operation e) : operation(e) {}
+
+	Linker* linker;
+
 	Operation operation;
+
+	std::vector<TypeRef> type_mappings; // for substitute type operation.
 };
 
 class EmitLLVMCodeParams
@@ -108,6 +114,7 @@ public:
 	virtual void bindVariables(const std::vector<ASTNode*>& stack){}
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack) {}
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const = 0;
+	virtual Reference<ASTNode> clone() = 0;
 	
 	virtual void print(int depth, std::ostream& s) const = 0;
 
@@ -142,6 +149,8 @@ public:
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual void print(int depth, std::ostream& s) const;
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+	virtual Reference<ASTNode> clone();
+
 };
 
 
@@ -160,21 +169,31 @@ public:
 	class FunctionArg
 	{
 	public:
+		/*enum TypeKind
+		{
+			GENERIC_TYPE,
+			CONCRETE_TYPE
+		};
+
+		TypeKind type_kind;*/
 		TypeRef type;
+		//int generic_type_param_index;
 		string name;
 	};
 
 	FunctionDefinition(const std::string& name, const std::vector<FunctionArg>& args, 
 		const vector<Reference<LetASTNode> >& lets,
 		const ASTNodeRef& body, 
-		const TypeRef& rettype,
+		const TypeRef& declared_rettype, // May be null, if return type is to be inferred.
 		BuiltInFunctionImpl* impl);
 	
 	~FunctionDefinition();
 
+	TypeRef returnType() const;
+
 	vector<FunctionArg> args;
 	ASTNodeRef body;
-	TypeRef return_type;
+	TypeRef declared_return_type;
 	TypeRef function_type;
 	vector<Reference<LetASTNode> > lets;
 
@@ -191,12 +210,17 @@ public:
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual void print(int depth, std::ostream& s) const;
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+	virtual Reference<ASTNode> clone();
+
+	bool isGenericFunction() const; // true if it is parameterised by type.
 
 	llvm::Function* buildLLVMFunction(
 		llvm::Module* module//, 
 		//std::map<Lang::FunctionSignature, llvm::Function*>& external_functions
 	) const;
 };
+
+typedef Reference<FunctionDefinition> FunctionDefinitionRef;
 
 
 /*
@@ -205,26 +229,7 @@ e.g.   f(a, 1)
 class FunctionExpression : public ASTNode
 {
 public:
-	FunctionExpression(/*ASTNode* p*/) : /*ASTNode(p),*/ target_function(NULL),argument_index(-1),argument_offset(-1) {}
-	string function_name;
-	vector<Reference<ASTNode> > argument_expressions;
-
-	//Reference<ASTNode> target_function;
-	//ASTNode* target_function;
-	FunctionDefinition* target_function;
-	int argument_index;
-	int argument_offset; // Currently, a variable must be an argument to the enclosing function
-	enum BindingType
-	{
-		Let,
-		Arg,
-		Bound
-	};
-	BindingType binding_type;
-
-	TypeRef target_function_return_type;
-
-	FunctionDefinition* runtimeBind(VMState& vmstate);
+	FunctionExpression(/*ASTNode* p*/) : /*ASTNode(p),*/ target_function(NULL),argument_index(-1) {}
 
 	bool doesFunctionTypeMatch(TypeRef& type);
 
@@ -237,6 +242,29 @@ public:
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual void print(int depth, std::ostream& s) const;
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+	virtual Reference<ASTNode> clone();
+	FunctionDefinition* runtimeBind(VMState& vmstate);
+
+	///////
+
+	string function_name;
+	vector<Reference<ASTNode> > argument_expressions;
+
+	//Reference<ASTNode> target_function;
+	//ASTNode* target_function;
+	FunctionDefinition* target_function;
+	int argument_index;
+	//int argument_offset; // Currently, a variable must be an argument to the enclosing function
+	enum BindingType
+	{
+		Let,
+		Arg,
+		Bound
+	};
+	BindingType binding_type;
+
+	TypeRef target_function_return_type;
+
 };
 
 
@@ -250,7 +278,6 @@ public:
 	};
 
 	Variable(const std::string& name);
-	string name;
 
 	virtual Value* exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return VariableASTNodeType; }
@@ -259,16 +286,19 @@ public:
 	void bindVariables(const std::vector<ASTNode*>& stack);
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+	virtual Reference<ASTNode> clone();
 
 
-	FunctionDefinition* parent_function; // Function for which the variable is an argument of.
-	AnonFunction* parent_anon_function;
+	FunctionDefinition* parent_function; // Function for which the variable is an argument of,
+	// or for what it is a let of.
+	//AnonFunction* parent_anon_function;
 	//ASTNode* referenced_var;
-	TypeRef referenced_var_type;
-	VariableType vartype;
+	//TypeRef referenced_var_type; // Type of the variable.
+	VariableType vartype; // let or arg.
 
-	int argument_index;
+	int argument_index; // index in parent function definition argument list.
 	//int argument_offset; // Currently, a variable must be an argument to the enclosing function
+	string name; // variable name.
 };
 
 
@@ -276,13 +306,15 @@ class FloatLiteral : public ASTNode
 {
 public:
 	FloatLiteral(/*ASTNode* parent, */float v) : /*ASTNode(parent), */ value(v) {}
-	float value;
 
 	virtual Value* exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return FloatLiteralType; }
 	virtual TypeRef type() const { return TypeRef(new Float()); }
 	virtual void print(int depth, std::ostream& s) const;
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+	virtual Reference<ASTNode> clone();
+
+	float value;
 };
 
 
@@ -297,6 +329,7 @@ public:
 	virtual TypeRef type() const { return TypeRef(new Int()); }
 	virtual void print(int depth, std::ostream& s) const;
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+	virtual Reference<ASTNode> clone();
 };
 
 
@@ -311,6 +344,7 @@ public:
 	virtual TypeRef type() const { return TypeRef(new String()); }
 	virtual void print(int depth, std::ostream& s) const;
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+	virtual Reference<ASTNode> clone();
 };
 
 
@@ -325,6 +359,7 @@ public:
 	virtual TypeRef type() const { return TypeRef(new Bool()); }
 	virtual void print(int depth, std::ostream& s) const;
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+	virtual Reference<ASTNode> clone();
 };
 
 
@@ -341,6 +376,7 @@ public:
 	//virtual void bindVariables(const std::vector<ASTNode*>& stack);
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+	virtual Reference<ASTNode> clone();
 
 
 
@@ -362,6 +398,7 @@ public:
 	//virtual void bindVariables(const std::vector<ASTNode*>& stack);
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+	virtual Reference<ASTNode> clone();
 
 private:
 	//TypeRef array_type;
@@ -382,6 +419,7 @@ public:
 	//virtual void bindVariables(const std::vector<ASTNode*>& stack);
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+	virtual Reference<ASTNode> clone();
 
 	ASTNodeRef a;
 	ASTNodeRef b;
@@ -401,6 +439,7 @@ public:
 	//virtual void bindVariables(const std::vector<ASTNode*>& stack);
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+	virtual Reference<ASTNode> clone();
 
 	ASTNodeRef a;
 	ASTNodeRef b;
@@ -420,6 +459,7 @@ public:
 	//virtual void bindVariables(const std::vector<ASTNode*>& stack);
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+	virtual Reference<ASTNode> clone();
 
 	ASTNodeRef a;
 	ASTNodeRef b;
@@ -440,13 +480,14 @@ public:
 	//virtual void bindVariables(const std::vector<ASTNode*>& stack);
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+	virtual Reference<ASTNode> clone();
 
 	std::string variable_name;
 	ASTNodeRef expr;
 };
 
 
-class AnonFunction : public ASTNode
+/*class AnonFunction : public ASTNode
 {
 public:
 	AnonFunction() {}
@@ -463,7 +504,7 @@ public:
 	vector<FunctionDefinition::FunctionArg> args;
 	ASTNodeRef body;
 	TypeRef thetype;
-};
+};*/
 
 
 } //end namespace Lang

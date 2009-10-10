@@ -39,9 +39,11 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 	{
 		BufferRoot* root = new BufferRoot();
 
+		
+
 		//TEMP:
 		// Create float array map definition
-		{
+		/*{
 			vector<FunctionDefinition::FunctionArg> args(2);
 			args[0].type = TypeRef(new Function(vector<TypeRef>(1, TypeRef(new Float())), TypeRef(new Float())));
 			args[0].name = "f";
@@ -61,15 +63,20 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 			);
 
 			root->func_defs.push_back(Reference<FunctionDefinition>(def));
-		}
+		}*/
 		// TEMP: Create float array fold definition
+		// #decl fold<T>(function<T, T, T>, array<T>, T) T
 		{
 			vector<FunctionDefinition::FunctionArg> args(3);
-			args[0].type = TypeRef(new Function(vector<TypeRef>(2, TypeRef(new Float())), TypeRef(new Float())));
+			TypeRef T(new GenericType(0));
+			args[0].type = TypeRef(new Function(
+				vector<TypeRef>(2, T), // arg types
+				T // return type
+			));
 			args[0].name = "f";
-			args[1].type = TypeRef(new ArrayType(TypeRef(new Float)));
+			args[1].type = TypeRef(new ArrayType(T));
 			args[1].name = "array";
-			args[2].type = TypeRef(new Float);
+			args[2].type = T;
 			args[2].name = "initial_val";
 
 			FunctionDefinition* def = new FunctionDefinition(
@@ -77,10 +84,11 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 				args,
 				vector<Reference<LetASTNode> >(),
 				ASTNodeRef(NULL), // body expr
-				TypeRef(new Float), // return type
-				new ArrayFoldBuiltInFunc(
-					TypeRef(new Float)
-				)
+				T, // return type
+				//new ArrayFoldBuiltInFunc(
+				//	TypeRef(new Float)
+				//)
+				NULL // built in impl.
 			);
 
 			root->func_defs.push_back(Reference<FunctionDefinition>(def));
@@ -103,7 +111,7 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 				root->func_defs.push_back(parseFunctionDefinition(parseinfo));
 			else if(tokens[i]->isIdentifier() && tokens[i]->getIdentifierValue() == "struct")
 			{
-				Reference<StructureType> t = parseStructType(parseinfo);
+				Reference<StructureType> t = parseStructType(parseinfo, vector<string>());
 				// TODO: check to see if it has already been defined.
 				named_types[t->name] = TypeRef(t.getPointer()); 
 
@@ -195,25 +203,54 @@ ASTNodeRef LangParser::parseVariableExpression(const ParseInfo& p)
 
 Reference<FunctionDefinition> LangParser::parseFunctionDefinition(const ParseInfo& p)
 {
-	//Reference<ASTNode> node( new ASTNode(ASTNode::FUNCTION_DEFINITION) );
-	//FunctionDefinition* node = new FunctionDefinition();
-
 	parseIdentifier("def", p);
 
 	const std::string function_name = parseIdentifier("function name", p);
 
+	return parseFunctionDefinitionGivenName(function_name, p);
+}
+
+
+FunctionDefinitionRef LangParser::parseFunctionDefinitionGivenName(const std::string& func_name, const ParseInfo& p)
+{
 	try
 	{
+		// Parse generic parameters, if present
+		vector<string> generic_type_params;
+		if(isTokenCurrent(LEFT_ANGLE_BRACKET_TOKEN, p))
+		{
+			parseToken(LEFT_ANGLE_BRACKET_TOKEN, p);
+
+			generic_type_params.push_back(parseIdentifier("type parameter", p));
+
+			while(isTokenCurrent(COMMA_TOKEN, p))
+			{
+				parseToken(COMMA_TOKEN, p);
+				generic_type_params.push_back(parseIdentifier("type parameter", p));
+			}
+
+			parseToken(RIGHT_ANGLE_BRACKET_TOKEN, p);
+		}
+
 
 		// Parse parameter list
 		std::vector<FunctionDefinition::FunctionArg> args;
-		parseParameterList(p, args);
+		parseParameterList(p, generic_type_params, args);
+
+		// Fill in generic_type_param_index for all generic types
+		//for(unsigned int i=0; i<args.size(); ++i)
+		//	for(unsigned int z=0; z<generic_type_params.size(); ++z)
+		//		if(generic_type_params[z] == args[i].
 		
 		//parseToken(tokens, text_buffer, Token::RIGHT_ARROW, i);
 
-		// Parse return type
-		TypeRef return_type = parseType(p);
-
+		// Parse optional return type
+		TypeRef return_type(NULL);
+		if(!isTokenCurrent(COLON_TOKEN, p))
+		{
+			return_type = parseType(p, generic_type_params);
+		}
+		
 		parseToken(COLON_TOKEN, p);
 		
 		
@@ -230,21 +267,21 @@ Reference<FunctionDefinition> LangParser::parseFunctionDefinition(const ParseInf
 		ASTNodeRef body = parseExpression(p);
 
 		Reference<FunctionDefinition> def(new FunctionDefinition(
-			//parent,
-			function_name,
+			func_name,
 			args,
 			lets,
 			body,
-			return_type,
-			false // constructor
+			return_type, // declared return type
+			NULL // built in func impl
 			));
 
 		return def;
 	}
 	catch(LangParserExcep& e)
 	{
-		throw LangParserExcep("Error occurred while parsing function '" + function_name + "': " + e.what());
+		throw LangParserExcep("Error occurred while parsing function '" + func_name + "': " + e.what());
 	}
+
 }
 
 
@@ -409,7 +446,7 @@ ASTNodeRef LangParser::parseBasicExpression(const ParseInfo& p)
 	}
 	else if(p.tokens[p.i]->getType() == BACK_SLASH_TOKEN)
 	{
-		return parseAnonFunction(p);
+		return ASTNodeRef(parseAnonFunction(p).getPointer());
 	}
 	else
 	{
@@ -418,7 +455,7 @@ ASTNodeRef LangParser::parseBasicExpression(const ParseInfo& p)
 }
 
 
-TypeRef LangParser::parseType(const ParseInfo& p)
+TypeRef LangParser::parseType(const ParseInfo& p, const std::vector<std::string>& generic_type_params)
 {
 	const std::string t = parseIdentifier("type", p);
 	if(t == "float")
@@ -428,11 +465,11 @@ TypeRef LangParser::parseType(const ParseInfo& p)
 	else if(t == "string")
 		return TypeRef(new String());
 	else if(t == "map")
-		return parseMapType(p);
+		return parseMapType(p, generic_type_params);
 	else if(t == "array")
-		return parseArrayType(p);
+		return parseArrayType(p, generic_type_params);
 	else if(t == "function")
-		return parseFunctionType(p);
+		return parseFunctionType(p, generic_type_params);
 	else
 	{
 		// Then this might be the name of a named type.
@@ -440,6 +477,12 @@ TypeRef LangParser::parseType(const ParseInfo& p)
 		std::map<std::string, TypeRef>::const_iterator res = p.named_types.find(t);
 		if(res == p.named_types.end())
 		{
+			// Not a named type, maybe it is a type parameter
+			for(unsigned int i=0; i<generic_type_params.size(); ++i)
+				if(t == generic_type_params[i])
+					return TypeRef(new GenericType(i));
+
+			// If it wasn't a generic type, then it's completely unknown, like a rolling stone.
 			throw LangParserExcep("Unknown type '" + t + "'.");
 		}
 		else
@@ -448,19 +491,18 @@ TypeRef LangParser::parseType(const ParseInfo& p)
 			return (*res).second;
 		}
 	}
-
 }
 
 
-TypeRef LangParser::parseMapType(const ParseInfo& p)
+TypeRef LangParser::parseMapType(const ParseInfo& p, const std::vector<std::string>& generic_type_params)
 {
 	parseToken(LEFT_ANGLE_BRACKET_TOKEN, p);
 
-	TypeRef from = parseType(p);
+	TypeRef from = parseType(p, generic_type_params);
 
 	parseToken(COMMA_TOKEN, p);
 
-	TypeRef to = parseType(p);
+	TypeRef to = parseType(p, generic_type_params);
 
 	parseToken(RIGHT_ANGLE_BRACKET_TOKEN, p);
 
@@ -468,11 +510,11 @@ TypeRef LangParser::parseMapType(const ParseInfo& p)
 }
 
 
-TypeRef LangParser::parseArrayType(const ParseInfo& p)
+TypeRef LangParser::parseArrayType(const ParseInfo& p, const std::vector<std::string>& generic_type_params)
 {
 	parseToken(LEFT_ANGLE_BRACKET_TOKEN, p);
 
-	TypeRef t = parseType(p);
+	TypeRef t = parseType(p, generic_type_params);
 
 	parseToken(RIGHT_ANGLE_BRACKET_TOKEN, p);
 
@@ -480,19 +522,19 @@ TypeRef LangParser::parseArrayType(const ParseInfo& p)
 }
 
 
-TypeRef LangParser::parseFunctionType(const ParseInfo& p)
+TypeRef LangParser::parseFunctionType(const ParseInfo& p, const std::vector<std::string>& generic_type_params)
 {
 	parseToken(LEFT_ANGLE_BRACKET_TOKEN, p);
 
 	std::vector<TypeRef> types;
 
-	types.push_back(parseType(p));
+	types.push_back(parseType(p, generic_type_params));
 
 	while(isTokenCurrent(COMMA_TOKEN, p))
 	{
 		parseToken(COMMA_TOKEN, p);
 
-		types.push_back(parseType(p));
+		types.push_back(parseType(p, generic_type_params));
 	}
 
 	parseToken(RIGHT_ANGLE_BRACKET_TOKEN, p);
@@ -505,7 +547,7 @@ TypeRef LangParser::parseFunctionType(const ParseInfo& p)
 }
 
 
-Reference<StructureType> LangParser::parseStructType(const ParseInfo& p)
+Reference<StructureType> LangParser::parseStructType(const ParseInfo& p, const std::vector<std::string>& generic_type_params)
 {
 	const std::string id = parseIdentifier("struct", p);
 	assert(id == "struct");
@@ -517,14 +559,14 @@ Reference<StructureType> LangParser::parseStructType(const ParseInfo& p)
 	std::vector<TypeRef> types;
 	std::vector<string> names;
 
-	types.push_back(parseType(p));
+	types.push_back(parseType(p, generic_type_params));
 	names.push_back(parseIdentifier("field name", p));
 
 	while(isTokenCurrent(COMMA_TOKEN, p))
 	{
 		parseToken(COMMA_TOKEN, p);
 
-		types.push_back(parseType(p));
+		types.push_back(parseType(p, generic_type_params));
 		names.push_back(parseIdentifier("field name", p));
 	}
 
@@ -677,16 +719,21 @@ Reference<LetASTNode> LangParser::parseLet(const ParseInfo& p)
 }
 
 
-ASTNodeRef LangParser::parseAnonFunction(const ParseInfo& p)
+FunctionDefinitionRef LangParser::parseAnonFunction(const ParseInfo& p)
 {
 	parseToken(BACK_SLASH_TOKEN, p);
 
+	const std::string func_name = "anon_func_" + ::toString(p.i);
+
+	return parseFunctionDefinitionGivenName(func_name, p);
+
+	/*
 	// Parse parameter list
-	std::vector<FunctionDefinition::FunctionArg> args;
-	parseParameterList(p, args);
+	vector<FunctionDefinition::FunctionArg> args;
+	parseParameterList(p, vector<string>(), args);
 
 	// Parse return type
-	TypeRef return_type = parseType(p);
+	TypeRef return_type = parseType(p, vector<string>());
 
 	parseToken(COLON_TOKEN, p);
 
@@ -710,20 +757,22 @@ ASTNodeRef LangParser::parseAnonFunction(const ParseInfo& p)
 	//func->body = body_expr;
 
 
-	/*vector<TypeRef> argtypes;
-	for(unsigned int i=0; i<args.size(); ++i)
-		argtypes.push_back(args[i].type);
+	
+	//vector<TypeRef> argtypes;
+	//for(unsigned int i=0; i<args.size(); ++i)
+	//	argtypes.push_back(args[i].type);
 
-	func->thetype = TypeRef(new Function(
-		argtypes,
-		return_type
-	));*/
+	//func->thetype = TypeRef(new Function(
+	//	argtypes,
+	//	return_type
+	//));
+	//
 
-	return ASTNodeRef(func);
+	return ASTNodeRef(func);*/
 }
 
 
-void LangParser::parseParameterList(const ParseInfo& p, std::vector<FunctionDefinition::FunctionArg>& args_out)
+void LangParser::parseParameterList(const ParseInfo& p, const std::vector<std::string>& generic_type_params, std::vector<FunctionDefinition::FunctionArg>& args_out)
 {
 	args_out.resize(0);
 
@@ -739,7 +788,7 @@ void LangParser::parseParameterList(const ParseInfo& p, std::vector<FunctionDefi
 			break;
 		}
 
-		TypeRef param_type = parseType(p);
+		TypeRef param_type = parseType(p, generic_type_params);
 		const std::string param_name = parseIdentifier("parameter name", p);
 
 		args_out.push_back(FunctionDefinition::FunctionArg());

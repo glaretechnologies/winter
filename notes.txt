@@ -1,5 +1,30 @@
 Copyright 2009 Nicholas Chapman
 
+
+
+
+Expression type depends on:
+
+Return type of function expressions:
+
+e.g.  f(1) depends on return type of f.
+
+But that in turn depends on what f is bound to.
+
+
+Binding of variables is by name only and so has no dependencies.
+
+Binding of function expressions depends on type of argument subtrees, also on type of variable
+expressions.
+
+
+
+
+
+
+
+
+
 LLVMAnalysis.lib LLVMArchive.lib LLVMAsmParser.lib LLVMAsmPrinter.lib LLVMBitReader.lib LLVMBitWriter.lib LLVMCodeGen.lib LLVMCore.lib LLVMDebugger.lib LLVMExecutionEngine.lib LLVMHello.lib LLVMInstrumentation.lib LLVMInterpreter.lib LLVMipa.lib LLVMipo.lib LLVMJIT.lib LLVMLinker.lib LLVMScalarOpts.lib LLVMSelectionDAG.lib LLVMSupport.lib LLVMSystem.lib LLVMTarget.lib LLVMTransformUtils.lib LLVMX86AsmPrinter.lib LLVMX86CodeGen.lib
 
 Runtime system

@@ -49,6 +49,7 @@
 				WarningLevel="3"
 				Detect64BitPortabilityProblems="true"
 				DebugInformationFormat="4"
+				ShowIncludes="false"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -214,6 +215,14 @@
 			</File>
 			<File
 				RelativePath="..\LangParser.h"
+				>
+			</File>
+			<File
+				RelativePath="..\LanuageTests.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\LanuageTests.h"
 				>
 			</File>
 			<File

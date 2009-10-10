@@ -11,6 +11,7 @@
 #include "VMState.h"
 #include "Linker.h"
 #include "Value.h"
+#include "LanuageTests.h"
 
 #if USE_LLVM
 #include "llvm/Module.h"
@@ -37,6 +38,12 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
+	if(std::string(argv[1]) == "--test")
+	{
+		LanuageTests::run();
+		return 0;
+	}
+
 	try
 	{
 		std::string filecontents;
@@ -55,9 +62,7 @@ int main(int argc, char** argv)
 		//root->bindVariables(std::vector<ASTNode*>());
 		{
 			std::vector<ASTNode*> stack;
-			TraversalPayload payload;
-			payload.linker = NULL;
-			payload.operation = TraversalPayload::BindVariables;
+			TraversalPayload payload(TraversalPayload::BindVariables);
 			root->traverse(payload, stack);
 			assert(stack.size() == 0);
 		}
@@ -68,18 +73,16 @@ int main(int argc, char** argv)
 		//linker.linkFunctions(*root);
 		{
 			std::vector<ASTNode*> stack;
-			TraversalPayload payload;
-			payload.operation = TraversalPayload::LinkFunctions;
+			TraversalPayload payload(TraversalPayload::LinkFunctions);
 			payload.linker = &linker;
 			root->traverse(payload, stack);
 			assert(stack.size() == 0);
 		}
 
+		// TypeCheck
 		{
 			std::vector<ASTNode*> stack;
-			TraversalPayload payload;
-			payload.linker = NULL;
-			payload.operation = TraversalPayload::TypeCheck;
+			TraversalPayload payload(TraversalPayload::TypeCheck);
 			root->traverse(payload, stack);
 			assert(stack.size() == 0);
 		}
@@ -90,10 +93,11 @@ int main(int argc, char** argv)
 
 		// Get main function
 		FunctionSignature mainsig("main", std::vector<TypeRef>());
-		Linker::FuncMapType::iterator res = linker.functions.find(mainsig);
-		if(res == linker.functions.end())
-			throw BaseException("Could not find " + mainsig.toString());
-		Reference<FunctionDefinition> maindef = (*res).second;
+		Reference<FunctionDefinition> maindef = linker.findMatchingFunction(mainsig);
+		//Linker::FuncMapType::iterator res = linker.functions.find(mainsig);
+		//if(res == linker.functions.end())
+		//	throw BaseException("Could not find " + mainsig.toString());
+		//Reference<FunctionDefinition> maindef = (*res).second;
 		//if(!(*maindef->return_type == *TypeRef(new String())))
 		//	throw BaseException("main must return string.");
 
@@ -139,20 +143,21 @@ int main(int argc, char** argv)
 		//StringValue* intval = dynamic_cast<StringValue*>(retval);
 		//StructureValue* val = dynamic_cast<StructureValue*>(retval);
 		//ArrayValue* val = dynamic_cast<ArrayValue*>(retval);
-		FloatValue* val = dynamic_cast<FloatValue*>(retval);
+		/*FloatValue* val = dynamic_cast<FloatValue*>(retval);
 		if(!val)
 		{
 			std::cerr << "main() Return value was of unexpected type." << std::endl;
 		}
-		assert(val);
+		assert(val);*/
 
-		std::cout << "Program returned " << val->toString() << std::endl;
+		std::cout << "Program returned " << retval->toString() << std::endl;
 
-		delete val;
+		delete retval;
 
 		assert(vmstate.argument_stack.empty());
 		assert(vmstate.let_stack.empty());
 		assert(vmstate.func_args_start.empty());
+		assert(vmstate.let_stack_start.empty());
 		//assert(vmstate.working_stack.empty());
 		
 

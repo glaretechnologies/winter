@@ -11,7 +11,7 @@
 			<DebugSettings
 				Command="$(TargetPath)"
 				WorkingDirectory=""
-				CommandArguments="..\test.win"
+				CommandArguments="--test"
 				Attach="false"
 				DebuggerType="3"
 				Remote="1"

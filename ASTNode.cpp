@@ -87,6 +87,7 @@ void BufferRoot::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 
 void BufferRoot::print(int depth, std::ostream& s) const
 {
+	//s << "========================================================\n";
 	for(unsigned int i=0; i<func_defs.size(); ++i)
 	{
 		func_defs[i]->print(depth+1, s);
@@ -102,30 +103,43 @@ llvm::Value* BufferRoot::emitLLVMCode(EmitLLVMCodeParams& params) const
 }
 
 
+Reference<ASTNode> BufferRoot::clone()
+{
+	throw BaseException("BufferRoot::clone()");
+}
+
+
 //----------------------------------------------------------------------------------
 
 
 FunctionDefinition::FunctionDefinition(const std::string& name, const std::vector<FunctionArg>& args_, 
 									   const vector<Reference<LetASTNode> >& lets_,
-									   const ASTNodeRef& body_, const TypeRef& rettype, 
+									   const ASTNodeRef& body_, const TypeRef& declared_rettype, 
 									   BuiltInFunctionImpl* impl)
 :	args(args_),
 	lets(lets_),
 	body(body_),
-	return_type(rettype),
+	declared_return_type(declared_rettype),
 	built_in_func_impl(impl)
 {
 	sig.name = name;
 	for(unsigned int i=0; i<args_.size(); ++i)
 		sig.param_types.push_back(args_[i].type);
 
-	function_type = TypeRef(new Function(sig.param_types, rettype));
+	// TODO: fix this, make into method
+	function_type = TypeRef(new Function(sig.param_types, declared_rettype));
 }
 
 
 FunctionDefinition::~FunctionDefinition()
 {
 	delete built_in_func_impl;
+}
+
+
+TypeRef FunctionDefinition::returnType() const
+{
+	return this->body.nonNull() ? this->body->type() : TypeRef(NULL);
 }
 
 
@@ -142,6 +156,8 @@ static const std::string indent(VMState& vmstate)
 		s += "  ";
 	return s;
 }
+
+
 static void printStack(VMState& vmstate)
 {
 	std::cout << indent(vmstate) << "arg Stack: [";
@@ -165,9 +181,11 @@ Value* FunctionDefinition::invoke(VMState& vmstate)
 
 	
 	// Evaluate let clauses, which will each push the result onto the let stack
+	vmstate.let_stack_start.push_back(vmstate.let_stack.size()); // Push let frame index
 	for(unsigned int i=0; i<lets.size(); ++i)
 		vmstate.let_stack.push_back(lets[i]->exec(vmstate));
 
+	// Execute body of function
 	Value* ret = body->exec(vmstate);
 
 	// Pop things off let stack
@@ -176,6 +194,8 @@ Value* FunctionDefinition::invoke(VMState& vmstate)
 		delete vmstate.let_stack.back();
 		vmstate.let_stack.pop_back();
 	}
+	// Pop let frame index
+	vmstate.let_stack_start.pop_back();
 
 	return ret;
 }
@@ -206,14 +226,31 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 {
 	if(payload.operation == TraversalPayload::TypeCheck)
 	{
-		if(!this->built_in_func_impl)
+		if(this->isGenericFunction())
+			return; // Don't type check this.  Conrete versions of this func will be type check individually.
+
+		if(this->body.nonNull())
 		{
-			// Check that the return type of the body expression is equal to the declared return type
-			// of this function.
-			if(*this->body->type() != *this->return_type)
-				throw BaseException("Type error for function '" + this->sig.toString() + "': Computed return type '" + this->body->type()->toString() + 
-					"' is not equal to the declared return type '" + this->return_type->toString() + "'.");
+			if(this->declared_return_type.nonNull())
+			{
+				// Check that the return type of the body expression is equal to the declared return type
+				// of this function.
+				if(*this->body->type() != *this->declared_return_type)
+					throw BaseException("Type error for function '" + this->sig.toString() + "': Computed return type '" + this->body->type()->toString() + 
+						"' is not equal to the declared return type '" + this->declared_return_type->toString() + "'.");
+			}
+			else
+			{
+				// Else return type is NULL, so infer it
+				//this->return_type = this->body->type();
+			}
 		}
+	}
+
+	if(payload.operation == TraversalPayload::LinkFunctions)
+	{
+		if(this->isGenericFunction())
+			return; // Don't try and bind functions yet.
 	}
 
 
@@ -222,7 +259,7 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 	for(unsigned int i=0; i<lets.size(); ++i)
 		lets[i]->traverse(payload, stack);
 
-	if(!this->built_in_func_impl)
+	if(this->body.nonNull()) // !this->built_in_func_impl)
 		this->body->traverse(payload, stack);
 
 	stack.pop_back();
@@ -232,7 +269,11 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 void FunctionDefinition::print(int depth, std::ostream& s) const
 {
 	printMargin(depth, s);
-	s << "FunctionDef: " << this->sig.toString() << " " << this->return_type->toString() << "\n";
+	s << "FunctionDef: " << this->sig.toString() << " " << 
+		(this->returnType().nonNull() ? this->returnType()->toString() : "[Unknown ret type]");
+	if(this->declared_return_type.nonNull())
+		s << " (Declared ret type: " + this->declared_return_type->toString() << ")";
+	s << "\n";
 	for(unsigned int i=0; i<this->lets.size(); ++i)
 		lets[i]->print(depth + 1, s);
 
@@ -241,8 +282,15 @@ void FunctionDefinition::print(int depth, std::ostream& s) const
 		printMargin(depth+1, s);
 		s << "Built in Implementation.";
 	}
-	else
+	else if(body.nonNull())
+	{
 		body->print(depth+1, s);
+	}
+	else
+	{
+		printMargin(depth+1, s);
+		s << "Null body.";
+	}
 }
 
 
@@ -306,6 +354,21 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 }
 
 
+Reference<ASTNode> FunctionDefinition::clone()
+{
+	throw BaseException("FunctionDefinition::clone()");
+}
+
+
+bool FunctionDefinition::isGenericFunction() const // true if it is parameterised by type.
+{
+	for(size_t i=0; i<this->args.size(); ++i)
+		if(this->args[i].type->getType() == Type::GenericTypeType)
+			return true;
+	return false;
+}
+
+
 //--------------------------------------------------------------------------------
 
 
@@ -316,14 +379,14 @@ FunctionDefinition* FunctionExpression::runtimeBind(VMState& vmstate)
 		use_target_function = target_function;
 	else if(this->binding_type == Arg)
 	{
-		Value* arg = vmstate.argument_stack[vmstate.argument_stack.size() - this->argument_offset];
+		Value* arg = vmstate.argument_stack[vmstate.func_args_start.back() + this->argument_index];
 		assert(dynamic_cast<FunctionValue*>(arg));
 		FunctionValue* function_value = dynamic_cast<FunctionValue*>(arg);
 		use_target_function = function_value->func_def;
 	}
 	else
 	{
-		Value* arg = vmstate.let_stack[vmstate.let_stack.size() - this->argument_offset];
+		Value* arg = vmstate.let_stack[vmstate.let_stack_start.back() + this->argument_index];
 		assert(dynamic_cast<FunctionValue*>(arg));
 		FunctionValue* function_value = dynamic_cast<FunctionValue*>(arg);
 		use_target_function = function_value->func_def;
@@ -417,9 +480,14 @@ void FunctionExpression::linkFunctions(Linker& linker, std::vector<ASTNode*>& st
 					if(def->lets[i]->variable_name == this->function_name && doesFunctionTypeMatch(def->lets[i]->type()))
 					{
 						this->argument_index = i;
-						this->argument_offset = (int)def->lets.size() - i;
+						//this->argument_offset = (int)def->lets.size() - i;
 						this->binding_type = Let;
-						this->target_function_return_type = def->return_type;
+						// We know this lets_i body is a FunctionDefinition.
+						FunctionDefinition* let_def = dynamic_cast<FunctionDefinition*>(def->lets[i]->expr.getPointer());
+						//Function* let_func_type = dynamic_cast<Function*>(def->lets[i]->type().getPointer());
+						//if(!let_func_type)
+						//	throw BaseException(this->function_name + " used in function expression is not a function.");
+						this->target_function_return_type = let_def->returnType();
 						found_binding = true;
 					}
 
@@ -427,9 +495,9 @@ void FunctionExpression::linkFunctions(Linker& linker, std::vector<ASTNode*>& st
 					if(def->args[i].name == this->function_name && doesFunctionTypeMatch(def->args[i].type))
 					{
 						this->argument_index = i;
-						this->argument_offset = (int)def->args.size() - i;
+						//this->argument_offset = (int)def->args.size() - i;
 						this->binding_type = Arg;
-						this->target_function_return_type = def->return_type;
+						//this->target_function_return_type = def->args[i].//def->returnType();
 						found_binding = true;
 					}
 
@@ -448,13 +516,13 @@ void FunctionExpression::linkFunctions(Linker& linker, std::vector<ASTNode*>& st
 
 		FunctionSignature sig(this->function_name, argtypes);
 
-		Linker::FuncMapType::iterator res = linker.functions.find(sig);
-		if(res == linker.functions.end())
-			throw BaseException("Failed to find function with signature " + sig.toString());
+		//Linker::FuncMapType::iterator res = linker.functions.find(sig);
+		//if(res == linker.functions.end())
+		//	throw BaseException("Failed to find function with signature " + sig.toString());
 		
-		this->target_function = (*res).second.getPointer();
+		this->target_function = linker.findMatchingFunction(sig).getPointer();
 		this->binding_type = Bound;
-		this->target_function_return_type = (*res).second->return_type;
+		this->target_function_return_type = this->target_function->returnType();
 	}
 }
 
@@ -494,9 +562,9 @@ void FunctionExpression::print(int depth, std::ostream& s) const
 	if(this->target_function)
 		s << "; target: " << this->target_function->sig.toString();
 	else if(this->binding_type == Arg)
-		s << "; runtime bound to arg offset " << this->argument_offset;
+		s << "; runtime bound to arg index " << this->argument_index;
 	else if(this->binding_type == Let)
-		s << "; runtime bound to let offset " << this->argument_offset;
+		s << "; runtime bound to let index " << this->argument_index;
 	s << "\n";
 	for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
 		this->argument_expressions[i]->print(depth + 1, s);
@@ -505,9 +573,12 @@ void FunctionExpression::print(int depth, std::ostream& s) const
 
 TypeRef FunctionExpression::type() const
 {
-	assert(target_function_return_type.nonNull());
-
-	return target_function_return_type; //runtimeBind(vmstate)->type();
+	if(target_function_return_type.nonNull())
+		return target_function_return_type;
+	else
+	{
+		return this->target_function ? this->target_function->type() : TypeRef(NULL);
+	}
 /*
 	if(!target_function)
 	{
@@ -541,6 +612,22 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 }
 
 
+Reference<ASTNode> FunctionExpression::clone()
+{
+	FunctionExpression* e = new FunctionExpression();
+	e->function_name = this->function_name;
+
+	for(unsigned int i=0; i<argument_expressions.size(); ++i)
+		e->argument_expressions.push_back(argument_expressions[i]->clone());
+	
+	e->target_function = this->target_function;
+	e->argument_index = this->argument_index;
+	e->binding_type = this->binding_type;
+
+	return ASTNodeRef(e);
+}
+
+
 //-----------------------------------------------------------------------------------
 
 
@@ -550,8 +637,8 @@ Variable::Variable(const std::string& name_)
 	name(name_),
 	//argument_offset(-1),
 	argument_index(-1),
-	parent_function(NULL),
-	parent_anon_function(NULL)
+	parent_function(NULL)
+	//parent_anon_function(NULL)
 {
 /*	ASTNode* c = parent;
 	while(c)
@@ -603,7 +690,7 @@ void Variable::bindVariables(const std::vector<ASTNode*>& stack)
 					{
 						this->argument_index = i;
 						//this->argument_offset = (int)def->lets.size() - i;
-						this->referenced_var_type = def->lets[i]->type();
+						//this->referenced_var_type = def->lets[i]->type();
 						this->vartype = LetVariable;
 						this->parent_function = def;
 						return;
@@ -614,7 +701,7 @@ void Variable::bindVariables(const std::vector<ASTNode*>& stack)
 					{
 						this->argument_index = i;
 						//this->argument_offset = (int)def->args.size() - i;
-						this->referenced_var_type = def->args[i].type;
+						//is->referenced_var_type = def->args[i].type;
 						this->vartype = ArgumentVariable;
 						this->parent_function = def;
 						return;
@@ -625,6 +712,7 @@ void Variable::bindVariables(const std::vector<ASTNode*>& stack)
 			}
 		}
 
+#if 0
 		{
 			AnonFunction* def = dynamic_cast<AnonFunction*>(stack[i]);
 			if(def != NULL)
@@ -655,6 +743,7 @@ void Variable::bindVariables(const std::vector<ASTNode*>& stack)
 					throw BaseException("No such function argument '" + this->name + "'");
 			}
 		}
+#endif
 	}
 	throw BaseException("Variable::bindVariables(): No such function argument '" + this->name + "'");
 }
@@ -673,13 +762,11 @@ Value* Variable::exec(VMState& vmstate)
 
 	if(this->vartype == ArgumentVariable)
 	{
-		//return vmstate.argument_stack[vmstate.argument_stack.size() - argument_offset]->clone();
 		return vmstate.argument_stack[vmstate.func_args_start.back() + argument_index]->clone();
 	}
 	else
 	{
-		//return vmstate.let_stack[vmstate.let_stack.size() - argument_offset]->clone();
-		return vmstate.let_stack[vmstate.func_args_start.back() + argument_index]->clone();
+		return vmstate.let_stack[vmstate.let_stack_start.back() + argument_index]->clone();
 	}
 }
 
@@ -687,12 +774,22 @@ Value* Variable::exec(VMState& vmstate)
 TypeRef Variable::type() const
 {
 	assert(this->argument_index >= 0);
-	assert(referenced_var_type.nonNull());
+	//assert(referenced_var_type.nonNull());
 
 	//if(!this->referenced_var)
 	//	throw BaseException("referenced_var == NULL");
 	//return this->referenced_var->type();
-	return this->referenced_var_type;
+	//return this->referenced_var_type;
+
+	if(this->vartype == LetVariable)
+		return this->parent_function->lets[this->argument_index]->type();
+	else if(this->vartype == ArgumentVariable)
+		return this->parent_function->args[this->argument_index].type;
+	else
+	{
+		assert(!"invalid vartype.");
+		return TypeRef(NULL);
+	}
 }
 
 
@@ -769,6 +866,12 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params) const
 }
 
 
+Reference<ASTNode> Variable::clone()
+{
+	return ASTNodeRef(new Variable(*this));
+}
+
+
 //------------------------------------------------------------------------------------
 
 
@@ -796,6 +899,12 @@ llvm::Value* FloatLiteral::emitLLVMCode(EmitLLVMCodeParams& params) const
 #else
 	return NULL;
 #endif
+}
+
+
+Reference<ASTNode> FloatLiteral::clone()
+{
+	return ASTNodeRef(new FloatLiteral(*this));
 }
 
 
@@ -833,6 +942,12 @@ llvm::Value* IntLiteral::emitLLVMCode(EmitLLVMCodeParams& params) const
 }
 
 
+Reference<ASTNode> IntLiteral::clone()
+{
+	return ASTNodeRef(new IntLiteral(*this));
+}
+
+
 //-------------------------------------------------------------------------------------
 
 
@@ -852,6 +967,12 @@ void BoolLiteral::print(int depth, std::ostream& s) const
 llvm::Value* BoolLiteral::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
 	return NULL;
+}
+
+
+Reference<ASTNode> BoolLiteral::clone()
+{
+	return ASTNodeRef(new BoolLiteral(*this));
 }
 
 
@@ -914,6 +1035,16 @@ void MapLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 llvm::Value* MapLiteral::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
 	return NULL;
+}
+
+
+Reference<ASTNode> MapLiteral::clone()
+{
+	MapLiteral* m = new MapLiteral();
+	m->maptype = this->maptype;
+	for(size_t i=0; i<items.size(); ++i)
+		m->items.push_back(std::make_pair(items[0].first->clone(), items[0].second->clone()));
+	return ASTNodeRef(m);
 }
 
 
@@ -985,6 +1116,15 @@ llvm::Value* ArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params) const
 }
 
 
+Reference<ASTNode> ArrayLiteral::clone()
+{
+	std::vector<ASTNodeRef> elems(this->elements.size());
+	for(size_t i=0; i<elements.size(); ++i)
+		elems[i] = this->elements[i]->clone();
+	return ASTNodeRef(new ArrayLiteral(elems));
+}
+
+
 //------------------------------------------------------------------------------------------
 
 
@@ -1017,6 +1157,11 @@ llvm::Value* StringLiteral::emitLLVMCode(EmitLLVMCodeParams& params) const
 }
 
 
+Reference<ASTNode> StringLiteral::clone()
+{
+	return ASTNodeRef(new StringLiteral(*this));
+}
+
 //-----------------------------------------------------------------------------------------------
 
 
@@ -1034,6 +1179,10 @@ Value* AdditionExpression::exec(VMState& vmstate)
 	else if(this->type()->getType() == Type::IntType)
 	{
 		retval = new IntValue(static_cast<IntValue*>(aval)->value + static_cast<IntValue*>(bval)->value);
+	}
+	else
+	{
+		assert(!"additionexpression type invalid!");
 	}
 	delete aval;
 	delete bval;
@@ -1090,6 +1239,15 @@ llvm::Value* AdditionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 }
 
 
+Reference<ASTNode> AdditionExpression::clone()
+{
+	AdditionExpression* e = new AdditionExpression();
+	e->a = this->a->clone();
+	e->b = this->b->clone();
+	return ASTNodeRef(e);
+}
+
+
 //-------------------------------------------------------------------------------------------------
 
 
@@ -1105,6 +1263,10 @@ Value* SubtractionExpression::exec(VMState& vmstate)
 	else if(this->type()->getType() == Type::IntType)
 	{
 		retval = new IntValue(static_cast<IntValue*>(aval)->value - static_cast<IntValue*>(bval)->value);
+	}
+	else
+	{
+		assert(!"subtractionexpression type invalid!");
 	}
 	delete aval;
 	delete bval;
@@ -1160,6 +1322,15 @@ llvm::Value* SubtractionExpression::emitLLVMCode(EmitLLVMCodeParams& params) con
 }
 
 
+Reference<ASTNode> SubtractionExpression::clone()
+{
+	SubtractionExpression* e = new SubtractionExpression();
+	e->a = this->a->clone();
+	e->b = this->b->clone();
+	return ASTNodeRef(e);
+}
+
+
 //-------------------------------------------------------------------------------------------------------
 
 
@@ -1176,6 +1347,10 @@ Value* MulExpression::exec(VMState& vmstate)
 	else if(this->type()->getType() == Type::IntType)
 	{
 		retval = new IntValue(static_cast<IntValue*>(aval)->value * static_cast<IntValue*>(bval)->value);
+	}
+	else
+	{
+		assert(!"mulexpression type invalid!");
 	}
 	delete aval;
 	delete bval;
@@ -1198,6 +1373,14 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	a->traverse(payload, stack);
 	b->traverse(payload, stack);
 	stack.pop_back();
+
+	if(payload.operation == TraversalPayload::TypeCheck)
+		if(this->type()->getType() == Type::GenericTypeType || *this->type() == Int() || *this->type() == Float())
+		{}
+		else
+		{
+			throw BaseException("Child type '" + this->type()->toString() + "' does not define binary operator '*'.");
+		}
 }
 
 
@@ -1229,6 +1412,15 @@ llvm::Value* MulExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 #else
 	return NULL;
 #endif
+}
+
+
+Reference<ASTNode> MulExpression::clone()
+{
+	MulExpression* e = new MulExpression();
+	e->a = this->a->clone();
+	e->b = this->b->clone();
+	return ASTNodeRef(e);
 }
 
 
@@ -1277,9 +1469,17 @@ llvm::Value* LetASTNode::emitLLVMCode(EmitLLVMCodeParams& params) const
 }
 
 
+Reference<ASTNode> LetASTNode::clone()
+{
+	LetASTNode* e = new LetASTNode(this->variable_name);
+	e->expr = this->expr->clone();
+	return ASTNodeRef(e);
+}
+
+
 //---------------------------------------------------------------------------------
 
-
+#if 0
 Value* AnonFunction::exec(VMState& vmstate)
 {
 	assert(0);
@@ -1319,6 +1519,8 @@ llvm::Value* AnonFunction::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
 	return NULL;
 }
+
+#endif
 
 
 } //end namespace Lang

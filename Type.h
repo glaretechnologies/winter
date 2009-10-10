@@ -24,6 +24,7 @@ public:
 
 	enum TypeType
 	{
+		GenericTypeType,
 		FloatType,
 		IntType,
 		StringType,
@@ -37,6 +38,7 @@ public:
 	virtual TypeType getType() const = 0;
 	virtual const std::string toString() const = 0;
 	virtual bool lessThan(const Type& b) const = 0;
+	virtual bool matchTypes(const Type& b, std::vector<Reference<Type> >& type_mapping) const = 0;
 #if LLVM
 	virtual const llvm::Type* LLVMType() const = 0;
 #endif
@@ -52,9 +54,27 @@ public:
 	virtual TypeType getType() const { return FloatType; }
 	virtual const std::string toString() const { return "float"; }
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
+	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 #if LLVM
 	virtual const llvm::Type* LLVMType() const { return llvm::Type::FloatTy; }
 #endif
+};
+
+
+class GenericType : public Type
+{
+public:
+	GenericType(int generic_type_param_index_) : generic_type_param_index(generic_type_param_index_) {}
+	virtual TypeType getType() const { return GenericTypeType; }
+	virtual const std::string toString() const { return "generic"; }
+	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
+	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
+#if LLVM
+	virtual const llvm::Type* LLVMType() const { return NULL; }
+#endif
+	const int genericTypeParamIndex() const { return generic_type_param_index; }
+private:
+	int generic_type_param_index;
 };
 
 
@@ -64,6 +84,7 @@ public:
 	virtual TypeType getType() const { return IntType; }
 	virtual const std::string toString() const { return "int"; }
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
+	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 #if LLVM
 	virtual const llvm::Type* LLVMType() const { return llvm::Type::Int32Ty; }
 #endif
@@ -76,6 +97,7 @@ public:
 	virtual TypeType getType() const { return BoolType; }
 	virtual const std::string toString() const { return "bool"; }
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
+	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 #if LLVM
 	virtual const llvm::Type* LLVMType() const { return llvm::Type::Int1Ty; }
 #endif
@@ -99,6 +121,7 @@ public:
 	virtual TypeType getType() const { return StringType; }
 	virtual const std::string toString() const { return "string"; }
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
+	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 #if LLVM
 	virtual const llvm::Type* LLVMType() const { return NULL; }
 #endif
@@ -115,6 +138,7 @@ public:
 
 	virtual TypeType getType() const { return FunctionType; }
 	virtual const std::string toString() const; // { return "function"; }
+	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 #if LLVM
 	virtual const llvm::Type* LLVMType() const { return NULL; }
 #endif
@@ -187,6 +211,7 @@ public:
 			}
 		}
 	}
+	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 #if LLVM
 	virtual const llvm::Type* LLVMType() const { return NULL; }
 #endif
@@ -216,6 +241,7 @@ public:
 			return this->t->lessThan(*b_array.t);
 		}
 	}
+	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 
 	TypeRef t;
 };
@@ -243,6 +269,7 @@ public:
 			return this->name < b_struct.name;
 		}
 	}
+	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 
 #if LLVM
 	virtual const llvm::Type* LLVMType() const { return NULL; }
