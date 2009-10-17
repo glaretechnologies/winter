@@ -125,13 +125,13 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 
 				FunctionDefinition* cons = new FunctionDefinition(
 					t->name, // name
-					args,
-					vector<Reference<LetASTNode> >(),
+					args, // arguments
+					vector<Reference<LetASTNode> >(), // lets
 					ASTNodeRef(NULL), // body expr
-					TypeRef(t.getPointer()), // return type
-					new Constructor(t) // constructor
+					TypeRef(t.getPointer()), // declard return type
+					new Constructor(t) // built in func impl.
 				);
-				root->func_defs.push_back(Reference<FunctionDefinition>(cons));
+				root->func_defs.push_back(FunctionDefinitionRef(cons));
 
 				// Make field access functions
 				vector<FunctionDefinition::FunctionArg> getfield_args(1);

@@ -139,7 +139,13 @@ FunctionDefinition::~FunctionDefinition()
 
 TypeRef FunctionDefinition::returnType() const
 {
-	return this->body.nonNull() ? this->body->type() : TypeRef(NULL);
+	if(this->declared_return_type.nonNull())
+		return this->declared_return_type;
+
+	assert(this->body.nonNull());
+	assert(this->body->type().nonNull());
+	return this->body->type();
+	//return this->body.nonNull() ? this->body->type() : TypeRef(NULL);
 }
 
 
@@ -577,7 +583,7 @@ TypeRef FunctionExpression::type() const
 		return target_function_return_type;
 	else
 	{
-		return this->target_function ? this->target_function->type() : TypeRef(NULL);
+		return this->target_function ? this->target_function->returnType() : TypeRef(NULL);
 	}
 /*
 	if(!target_function)
