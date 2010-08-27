@@ -13,7 +13,7 @@ Copyright 2009 Nicholas Chapman
 #include "Value.h"
 #include "Linker.h"
 #include "BuiltInFunctionImpl.h"
-#include "../../indigosvn/trunk/utils/stringutils.h"
+#include "utils/stringutils.h"
 #if USE_LLVM
 #include "llvm/Type.h"
 #include "llvm/Module.h"

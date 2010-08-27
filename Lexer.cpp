@@ -9,9 +9,9 @@ Copyright 2009 Nicholas Chapman
 #include "Lexer.h"
 
 
-#include "../../indigosvn/trunk/utils/Parser.h"
-#include "../../indigosvn/trunk/indigo/TestUtils.h"
-#include "../../indigosvn/trunk/maths/mathstypes.h"
+#include "utils/Parser.h"
+#include "indigo/TestUtils.h"
+#include "maths/mathstypes.h"
 
 
 namespace Winter

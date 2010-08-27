@@ -9,11 +9,11 @@ namespace Winter
 {
 
 
-class LanuageTests
+class LanguageTests
 {
 public:
-	LanuageTests();
-	~LanuageTests();
+	LanguageTests();
+	~LanguageTests();
 	
 	static void run();
 private:

@@ -3,7 +3,7 @@
 #include <iostream>
 #include <cassert>
 #include <fstream>
-#include "../../indigosvn/trunk/utils/FileUtils.h"
+#include "utils/FileUtils.h"
 #include "Lexer.h"
 #include "TokenBase.h"
 #include "LangParser.h"
@@ -11,7 +11,7 @@
 #include "VMState.h"
 #include "Linker.h"
 #include "Value.h"
-#include "LanuageTests.h"
+#include "LanguageTests.h"
 
 #if USE_LLVM
 #include "llvm/Module.h"
@@ -40,7 +40,7 @@ int main(int argc, char** argv)
 
 	if(std::string(argv[1]) == "--test")
 	{
-		LanuageTests::run();
+		LanguageTests::run();
 		return 0;
 	}
 

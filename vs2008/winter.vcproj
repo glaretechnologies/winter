@@ -41,7 +41,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="C:\programming\zlib123;C:\programming\llvm_install_32_debug\include"
+				AdditionalIncludeDirectories="C:\programming\zlib123;C:\programming\llvm_install_32_debug\include;C:\programming\indigo\trunk"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -61,7 +61,6 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="LLVMAnalysis.lib LLVMArchive.lib LLVMAsmParser.lib LLVMAsmPrinter.lib LLVMBitReader.lib LLVMBitWriter.lib LLVMCodeGen.lib LLVMCore.lib LLVMDebugger.lib LLVMExecutionEngine.lib LLVMHello.lib LLVMInstrumentation.lib LLVMInterpreter.lib LLVMipa.lib LLVMipo.lib LLVMJIT.lib LLVMLinker.lib LLVMMC.lib LLVMScalarOpts.lib LLVMSelectionDAG.lib LLVMSupport.lib LLVMSystem.lib LLVMTarget.lib LLVMTransformUtils.lib LLVMX86AsmParser.lib LLVMX86AsmPrinter.lib LLVMX86CodeGen.lib LLVMX86Info.lib"
 				LinkIncremental="2"
 				AdditionalLibraryDirectories="C:\programming\llvm_install_32_debug\lib"
 				GenerateDebugInformation="true"
@@ -171,123 +170,35 @@
 		<Filter
 			Name="external"
 			>
-			<File
-				RelativePath="..\..\..\indigosvn\trunk\utils\fileutils.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\..\..\indigosvn\trunk\utils\fileutils.h"
-				>
-			</File>
-			<File
-				RelativePath="..\..\..\indigosvn\trunk\utils\Parser.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\..\..\indigosvn\trunk\utils\Parser.h"
-				>
-			</File>
-			<File
-				RelativePath="..\..\..\indigosvn\trunk\utils\stringutils.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\..\..\indigosvn\trunk\utils\stringutils.h"
-				>
-			</File>
 			<Filter
 				Name="zlib"
 				>
+			</Filter>
+			<Filter
+				Name="Indigo"
+				>
 				<File
-					RelativePath="..\..\..\zlib123\adler32.c"
+					RelativePath="..\..\indigo\trunk\utils\fileutils.cpp"
 					>
 				</File>
 				<File
-					RelativePath="..\..\..\zlib123\compress.c"
+					RelativePath="..\..\indigo\trunk\utils\fileutils.h"
 					>
 				</File>
 				<File
-					RelativePath="..\..\..\zlib123\crc32.c"
+					RelativePath="..\..\indigo\trunk\utils\Parser.cpp"
 					>
 				</File>
 				<File
-					RelativePath="..\..\..\zlib123\crc32.h"
+					RelativePath="..\..\indigo\trunk\utils\Parser.h"
 					>
 				</File>
 				<File
-					RelativePath="..\..\..\zlib123\deflate.c"
+					RelativePath="..\..\indigo\trunk\utils\stringutils.cpp"
 					>
 				</File>
 				<File
-					RelativePath="..\..\..\zlib123\deflate.h"
-					>
-				</File>
-				<File
-					RelativePath="..\..\..\zlib123\gzio.c"
-					>
-				</File>
-				<File
-					RelativePath="..\..\..\zlib123\infback.c"
-					>
-				</File>
-				<File
-					RelativePath="..\..\..\zlib123\inffast.c"
-					>
-				</File>
-				<File
-					RelativePath="..\..\..\zlib123\inffast.h"
-					>
-				</File>
-				<File
-					RelativePath="..\..\..\zlib123\inffixed.h"
-					>
-				</File>
-				<File
-					RelativePath="..\..\..\zlib123\inflate.c"
-					>
-				</File>
-				<File
-					RelativePath="..\..\..\zlib123\inflate.h"
-					>
-				</File>
-				<File
-					RelativePath="..\..\..\zlib123\inftrees.c"
-					>
-				</File>
-				<File
-					RelativePath="..\..\..\zlib123\inftrees.h"
-					>
-				</File>
-				<File
-					RelativePath="..\..\..\zlib123\trees.c"
-					>
-				</File>
-				<File
-					RelativePath="..\..\..\zlib123\trees.h"
-					>
-				</File>
-				<File
-					RelativePath="..\..\..\zlib123\uncompr.c"
-					>
-				</File>
-				<File
-					RelativePath="..\..\..\zlib123\zconf.h"
-					>
-				</File>
-				<File
-					RelativePath="..\..\..\zlib123\zconf.in.h"
-					>
-				</File>
-				<File
-					RelativePath="..\..\..\zlib123\zlib.h"
-					>
-				</File>
-				<File
-					RelativePath="..\..\..\zlib123\zutil.c"
-					>
-				</File>
-				<File
-					RelativePath="..\..\..\zlib123\zutil.h"
+					RelativePath="..\..\indigo\trunk\utils\stringutils.h"
 					>
 				</File>
 			</Filter>
@@ -302,6 +213,18 @@
 		</File>
 		<File
 			RelativePath="..\BaseException.h"
+			>
+		</File>
+		<File
+			RelativePath="..\BuiltInFunctionImp.h"
+			>
+		</File>
+		<File
+			RelativePath="..\BuiltInFunctionImpl.cpp"
+			>
+		</File>
+		<File
+			RelativePath="..\BuiltInFunctionImpl.h"
 			>
 		</File>
 		<File
@@ -322,6 +245,14 @@
 		</File>
 		<File
 			RelativePath="..\LangParser.h"
+			>
+		</File>
+		<File
+			RelativePath="..\LanguageTests.cpp"
+			>
+		</File>
+		<File
+			RelativePath="..\LanguageTests.h"
 			>
 		</File>
 		<File
@@ -366,6 +297,10 @@
 		</File>
 		<File
 			RelativePath="..\Type.h"
+			>
+		</File>
+		<File
+			RelativePath="..\Value.cpp"
 			>
 		</File>
 		<File

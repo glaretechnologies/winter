@@ -9,7 +9,7 @@ Copyright 2009 Nicholas Chapman
 #include "FunctionSignature.h"
 
 
-#include "../../indigosvn/trunk/utils/stringutils.h"
+#include "utils/stringutils.h"
 
 
 namespace Winter

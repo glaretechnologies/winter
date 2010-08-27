@@ -1,7 +1,7 @@
 #include "Type.h"
 
 
-#include "../../indigosvn/trunk/utils/stringutils.h"
+#include "utils/stringutils.h"
 #include "BaseException.h"
 
 

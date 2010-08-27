@@ -15,7 +15,7 @@ Copyright 2009 Nicholas Chapman
 #include <map>
 #include "TokenBase.h"
 #include "ASTNode.h"
-#include "../../indigosvn/trunk/utils/reference.h"
+#include "utils/reference.h"
 #include "Type.h"
 
 

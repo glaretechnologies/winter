@@ -10,7 +10,7 @@ Copyright 2009 Nicholas Chapman
 #define __TOKENBASE_H_666_
 
 
-#include "../../indigosvn/trunk/utils/refcounted.h"
+#include "utils/refcounted.h"
 #include <string>
 //#include "Type.h"
 

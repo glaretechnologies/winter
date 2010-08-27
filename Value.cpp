@@ -1,7 +1,7 @@
 #include "Value.h"
 
 
-#include "../../indigosvn/trunk/utils/stringutils.h"
+#include "utils/stringutils.h"
 
 
 namespace Winter

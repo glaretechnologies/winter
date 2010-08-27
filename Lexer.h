@@ -13,7 +13,7 @@ Copyright 2009 Nicholas Chapman
 #include <string>
 #include <vector>
 #include "TokenBase.h"
-#include "../../indigosvn/trunk/utils/reference.h"
+#include "utils/reference.h"
 class Parser;
 
 

@@ -14,8 +14,8 @@ Copyright 2009 Nicholas Chapman
 #include <vector>
 using std::string;
 using std::vector;
-#include "../../indigosvn/trunk/utils/refcounted.h"
-#include "../../indigosvn/trunk/utils/reference.h"
+#include "utils/refcounted.h"
+#include "utils/reference.h"
 #include "Type.h"
 #include "FunctionSignature.h"
 #include "BaseException.h"

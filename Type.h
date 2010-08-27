@@ -4,8 +4,8 @@
 
 #include <vector>
 #include <string>
-#include "../../indigosvn/trunk/utils/reference.h"
-#include "../../indigosvn/trunk/utils/refcounted.h"
+#include "utils/reference.h"
+#include "utils/refcounted.h"
 
 namespace llvm { class Type; }
 #if USE_LLVM

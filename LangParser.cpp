@@ -12,9 +12,9 @@ Copyright 2009 Nicholas Chapman
 #include "Lexer.h"
 #include "ASTNode.h"
 #include "BuiltInFunctionImpl.h"
-#include "../../indigosvn/trunk/indigo/TestUtils.h"
-#include "../../indigosvn/trunk/indigo/globals.h"
-#include "../../indigosvn/trunk/utils/stringutils.h"
+#include "indigo/TestUtils.h"
+#include "indigo/globals.h"
+#include "utils/stringutils.h"
 #include <assert.h>
 #include <map>
 
