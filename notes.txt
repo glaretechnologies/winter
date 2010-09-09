@@ -149,12 +149,14 @@ float					32 bit float										8.0f
 double					64 bit float										8.0
 string					Unicode string (utf-8?)								"bleh"
 tuple<T0, T1, .. TN>	Ordered pair of types T0, T1, .. , TN	(struct?)	[8, "hello"]t
-tuple<T, n>				Where n is an integer literal.						[1, 2, 3, 4]t
+ntuple<T, n>			Where n is an integer literal.						[1, 2, 3, 4]t
 map<T0, T1>				Map from T0 to T1									{8, "bleh"}
 list<T>					Variable length list of 0 or more T's (std::vector)	[1, 2, 3, 4]
 flist<T, n>				List of known length: n								[1, 2, 3, 4]f
 array<T>				Variable length list of 0 or more T's (std::vector)	[1, 2, 3, 4]
 function<T0, T1, ..., TN, R>	Function from T0, T1, T2, .. , TN to R		\(int a, int b)(a + 4*b)
+
+vector<T, n>																[1, 2, 3, 4]v
 
 Miscellaneous syntax
 -----------------------------

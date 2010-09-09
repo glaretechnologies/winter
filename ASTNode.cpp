@@ -20,7 +20,7 @@ Copyright 2009 Nicholas Chapman
 #include "llvm/DerivedTypes.h"
 #include "llvm/Constants.h"
 #include "llvm/Instructions.h"
-#include "llvm/ModuleProvider.h"
+//#include "llvm/ModuleProvider.h"
 #include "llvm/Analysis/Verifier.h"
 #include "llvm/ExecutionEngine/JIT.h"
 #include "llvm/ExecutionEngine/Interpreter.h"
@@ -31,7 +31,7 @@ Copyright 2009 Nicholas Chapman
 #include <llvm/Intrinsics.h>
 #endif
 
-//#define NEW_LLVM 1
+
 const bool VERBOSE_EXEC = true;
 
 
@@ -44,6 +44,25 @@ static void printMargin(int depth, std::ostream& s)
 
 namespace Winter
 {
+
+
+static llvm::FunctionType* llvmInternalFunctionType(
+	const vector<TypeRef>& arg_types, TypeRef return_type, llvm::LLVMContext& context)
+{
+	vector<const llvm::Type*> llvm_arg_types;
+
+	// Insert implicit void* argument
+	llvm_arg_types.push_back(llvm::PointerType::get(llvm::Type::getInt32Ty(context), 0)); // use pointer to int32 instead, LLVM doesn't like pointer to void
+
+	for(unsigned int i=0; i<arg_types.size(); ++i)
+		llvm_arg_types.push_back(arg_types[i]->LLVMType());
+
+	return llvm::FunctionType::get(
+		return_type->LLVMType(),
+		llvm_types,
+		false // varargs
+	);
+}
 
 /*
 ASTNode::ASTNode()
@@ -329,7 +348,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	) const
 {
 #if USE_LLVM
-	llvm::FunctionType* functype = llvmInternalFunctionType(this->sig.param_types, *this->return_type);
+	llvm::FunctionType* functype = llvmInternalFunctionType(this->sig.param_types, returnType());
 
 	llvm::Function *internal_llvm_func = static_cast<llvm::Function*>(module->getOrInsertFunction(
 		this->sig.toString(), // internalFuncName(this->getSig()), // Name
@@ -337,7 +356,11 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 		));
 
 
-	llvm::BasicBlock* block = llvm::BasicBlock::Create("entry", internal_llvm_func);
+	llvm::BasicBlock* block = llvm::BasicBlock::Create(
+		module->getContext(), 
+		"entry", 
+		internal_llvm_func
+	);
 	llvm::IRBuilder<> builder(block);
 
 	// Build body LLVM code
@@ -898,10 +921,9 @@ llvm::Value* FloatLiteral::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
 #if USE_LLVM
 	return llvm::ConstantFP::get(
-#if NEW_LLVM
-	*params.context, 
-#endif
-	llvm::APFloat(this->value));
+		*params.context, 
+		llvm::APFloat(this->value)
+	);
 #else
 	return NULL;
 #endif
@@ -934,9 +956,7 @@ llvm::Value* IntLiteral::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
 #if USE_LLVM
 	return llvm::ConstantInt::get(
-#if NEW_LLVM
 		*params.context, 
-#endif
 		llvm::APInt(
 			32, // num bits
 			this->value, // value

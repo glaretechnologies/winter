@@ -145,4 +145,22 @@ bool StructureType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping
 }*/
 
 
+const std::string VectorType::toString() const
+{
+	return "vector<" + this->t->toString() + ", " + ::toString(this->num) + ">";
+}
+
+
+bool VectorType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
+{
+	if(this->getType() != b.getType())
+		return false;
+
+	// So b is a VectorType as well.
+	const VectorType* b_ = dynamic_cast<const VectorType*>(&b);
+
+	return this->num == b_->num && this->t->matchTypes(*b_->t, type_mapping);
+}
+
+
 } // end namespace Winter

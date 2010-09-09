@@ -62,4 +62,37 @@ const std::string ArrayValue::toString() const
 }
 
 
+//=====================================================================
+
+
+VectorValue::~VectorValue()
+{
+	for(unsigned int i=0; i<this->e.size(); ++i)
+		delete e[i];
+}
+
+
+Value* VectorValue::clone() const
+{
+	VectorValue* ret = new VectorValue();
+	ret->e.resize(this->e.size());
+
+	for(unsigned int i=0; i<this->e.size(); ++i)
+		ret->e[i] = this->e[i]->clone();
+
+	return ret;
+}
+
+
+const std::string VectorValue::toString() const
+{
+	std::string s = "vector[";
+	for(unsigned int i=0; i<this->e.size(); ++i)
+	{
+		s += this->e[i]->toString() + (i + 1 < e.size() ? ", " : "");
+	}
+	return s + "]";
+}
+
+
 }

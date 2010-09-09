@@ -115,4 +115,16 @@ public:
 };
 
 
+class VectorValue : public Value
+{
+public:
+	VectorValue(){}
+	VectorValue(const vector<Value*>& e_) : e(e_) {}
+	~VectorValue();
+	virtual Value* clone() const;
+	virtual const std::string toString() const;
+
+	vector<Value*> e;
+};
+
 }

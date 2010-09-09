@@ -41,8 +41,8 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="C:\programming\zlib123;C:\programming\llvm_install_32_debug\include;C:\programming\indigo\trunk"
-				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE"
+				AdditionalIncludeDirectories="C:\programming\zlib123;C:\programming\indigo\trunk;C:\programming\llvm\llvm_27_cmake_install_32\include"
+				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;USE_LLVM=1;_CRT_SECURE_NO_WARNINGS"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -178,27 +178,27 @@
 				Name="Indigo"
 				>
 				<File
-					RelativePath="..\..\indigo\trunk\utils\fileutils.cpp"
+					RelativePath="..\..\..\indigo\trunk\utils\fileutils.cpp"
 					>
 				</File>
 				<File
-					RelativePath="..\..\indigo\trunk\utils\fileutils.h"
+					RelativePath="..\..\..\indigo\trunk\utils\fileutils.h"
 					>
 				</File>
 				<File
-					RelativePath="..\..\indigo\trunk\utils\Parser.cpp"
+					RelativePath="..\..\..\indigo\trunk\utils\Parser.cpp"
 					>
 				</File>
 				<File
-					RelativePath="..\..\indigo\trunk\utils\Parser.h"
+					RelativePath="..\..\..\indigo\trunk\utils\Parser.h"
 					>
 				</File>
 				<File
-					RelativePath="..\..\indigo\trunk\utils\stringutils.cpp"
+					RelativePath="..\..\..\indigo\trunk\utils\stringutils.cpp"
 					>
 				</File>
 				<File
-					RelativePath="..\..\indigo\trunk\utils\stringutils.h"
+					RelativePath="..\..\..\indigo\trunk\utils\stringutils.h"
 					>
 				</File>
 			</Filter>

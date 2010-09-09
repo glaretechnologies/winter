@@ -15,11 +15,10 @@
 
 #if USE_LLVM
 #include "llvm/Module.h"
-#include "llvm/ModuleProvider.h"
+//#include "llvm/ModuleProvider.h"
 #include "llvm/Analysis/Verifier.h"
 #include "llvm/PassManager.h"
 #include "llvm/Module.h"
-#include "llvm/ModuleProvider.h"
 #include "llvm/PassManager.h"
 #include "llvm/Target/TargetData.h"
 #include "llvm/Transforms/Scalar.h"
