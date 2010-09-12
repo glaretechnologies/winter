@@ -5,8 +5,13 @@
 
 #def identity(int x) int : x
 
-def square<T>(T x) T : x * x
+#def square<T>(T x) T : x * x
 
+def f()
+
+def main() float : 
+	let z = [0.0, 1.0, 2.0, 3.0]v
+	(e0(z) + e1(z)) + (e2(z) + e3(z))
 
 
 #decl map<T1, T2>(function<T1, T2>, array<T1>) array<T2>
@@ -15,21 +20,21 @@ def square<T>(T x) T : x * x
 #def addAnInt<T>(int a, T b, T c) T : a + b
 
 
-def sum(array<float> x) float :
-	fold(\(float y, float s) float : y + s, x, 0.0)
+#def sum(array<float> x) float :
+#	fold(\(float y, float s) float : y + s, x, 0.0)
 
 #def mul(array<float> x) float :
 #	fold(\(float y, float s) float : y * s, x, 1.0)
 
-def addOneToElements(array<float> x) array<float> :
-	map(\(float y) float : (y + 1.0), x)
+#def addOneToElements(array<float> x) array<float> :
+#	map(\(float y) float : (y + 1.0), x)
 
 
 
 
 
-def main() float :
-	fold(\(float y, float s) float : y + s, [1.0,2.0,3.0,4.0,5.0], 0.0)
+#def main() float :
+#	fold(\(float y, float s) float : y + s, [1.0,2.0,3.0,4.0,5.0], 0.0)
 
 
 #struct Complex

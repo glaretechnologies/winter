@@ -20,7 +20,6 @@ Copyright 2009 Nicholas Chapman
 #include "llvm/DerivedTypes.h"
 #include "llvm/Constants.h"
 #include "llvm/Instructions.h"
-//#include "llvm/ModuleProvider.h"
 #include "llvm/Analysis/Verifier.h"
 #include "llvm/ExecutionEngine/JIT.h"
 #include "llvm/ExecutionEngine/Interpreter.h"
@@ -52,14 +51,14 @@ static llvm::FunctionType* llvmInternalFunctionType(
 	vector<const llvm::Type*> llvm_arg_types;
 
 	// Insert implicit void* argument
-	llvm_arg_types.push_back(llvm::PointerType::get(llvm::Type::getInt32Ty(context), 0)); // use pointer to int32 instead, LLVM doesn't like pointer to void
+	//llvm_arg_types.push_back(llvm::PointerType::get(llvm::Type::getInt32Ty(context), 0)); // use pointer to int32 instead, LLVM doesn't like pointer to void
 
 	for(unsigned int i=0; i<arg_types.size(); ++i)
-		llvm_arg_types.push_back(arg_types[i]->LLVMType());
+		llvm_arg_types.push_back(arg_types[i]->LLVMType(context));
 
 	return llvm::FunctionType::get(
-		return_type->LLVMType(),
-		llvm_types,
+		return_type->LLVMType(context), // return type
+		llvm_arg_types,
 		false // varargs
 	);
 }
@@ -321,25 +320,13 @@ void FunctionDefinition::print(int depth, std::ostream& s) const
 
 llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
-	//params.currently_building_func = this;
-	return body->emitLLVMCode(params);
+	assert(0);
+	return NULL;
+	/*if(this->built_in_func_impl)
+		return this->built_in_func_impl->emitLLVMCode(params);
+	else
+		return body->emitLLVMCode(params);*/
 }
-
-#if LLVM
-static llvm::FunctionType* llvmInternalFunctionType(const vector<TypeRef>& arg_types, const Type& return_type)
-{
-	std::vector<const llvm::Type*> the_types;
-
-	for(unsigned int i=0; i<arg_types.size(); ++i)
-		the_types.push_back(arg_types[i]->LLVMType());
-
-	return llvm::FunctionType::get(
-		return_type.LLVMType(),
-		the_types,
-		false // varargs
-		);
-}
-#endif
 
 
 llvm::Function* FunctionDefinition::buildLLVMFunction(
@@ -348,7 +335,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	) const
 {
 #if USE_LLVM
-	llvm::FunctionType* functype = llvmInternalFunctionType(this->sig.param_types, returnType());
+	llvm::FunctionType* functype = llvmInternalFunctionType(this->sig.param_types, returnType(), module->getContext());
 
 	llvm::Function *internal_llvm_func = static_cast<llvm::Function*>(module->getOrInsertFunction(
 		this->sig.toString(), // internalFuncName(this->getSig()), // Name
@@ -368,14 +355,17 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	params.builder = &builder;
 	params.module = module;
 	params.currently_building_func = internal_llvm_func;
-	//params.external_functions = &external_functions;
-	//params.compiling_function = this;
-	//params.compiling_internal_function = true;
+	params.context = &module->getContext();
 
-	llvm::Value* body_code = this->body->emitLLVMCode(params);
+	llvm::Value* body_code = NULL;
+	if(this->built_in_func_impl)
+		body_code = this->built_in_func_impl->emitLLVMCode(params);
+	else
+		body_code = this->body->emitLLVMCode(params);
 
 	builder.CreateRet(body_code);
 
+	this->built_llvm_function = internal_llvm_func;
 	return internal_llvm_func;
 #else
 	return NULL;
@@ -961,7 +951,8 @@ llvm::Value* IntLiteral::emitLLVMCode(EmitLLVMCodeParams& params) const
 			32, // num bits
 			this->value, // value
 			true // signed
-	));
+		)
+	);
 #else
 	return NULL;
 #endif
@@ -992,7 +983,14 @@ void BoolLiteral::print(int depth, std::ostream& s) const
 
 llvm::Value* BoolLiteral::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
-	return NULL;
+	return llvm::ConstantInt::get(
+		*params.context, 
+		llvm::APInt(
+			1, // num bits
+			this->value ? 1 : 0, // value
+			false // signed
+		)
+	);
 }
 
 
@@ -1148,6 +1146,115 @@ Reference<ASTNode> ArrayLiteral::clone()
 	for(size_t i=0; i<elements.size(); ++i)
 		elems[i] = this->elements[i]->clone();
 	return ASTNodeRef(new ArrayLiteral(elems));
+}
+
+
+//------------------------------------------------------------------------------------------
+
+
+VectorLiteral::VectorLiteral(const std::vector<ASTNodeRef>& elems)
+:	elements(elems)
+{
+	if(elems.empty())
+		throw BaseException("Array literal can't be empty.");
+}
+
+
+TypeRef VectorLiteral::type() const
+{
+	return TypeRef(new VectorType(elements[0]->type(), (int)elements.size()));
+}
+
+
+Value* VectorLiteral::exec(VMState& vmstate)
+{
+	std::vector<Value*> elem_values(elements.size());
+
+	for(unsigned int i=0; i<this->elements.size(); ++i)
+	{
+		elem_values[i] = this->elements[i]->exec(vmstate);
+	}
+
+	return new VectorValue(elem_values);
+}
+
+
+void VectorLiteral::print(int depth, std::ostream& s) const
+{
+	printMargin(depth, s);
+	s << "Vector literal\n";
+
+	for(unsigned int i=0; i<this->elements.size(); ++i)
+	{
+		printMargin(depth+1, s);
+		this->elements[i]->print(depth+2, s);
+	}
+}
+
+
+void VectorLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
+{
+	stack.push_back(this);
+	for(unsigned int i=0; i<this->elements.size(); ++i)
+	{
+		this->elements[i]->traverse(payload, stack);
+	}
+	stack.pop_back();
+
+	if(payload.operation == TraversalPayload::TypeCheck)
+	{
+		// Check all the element expression types match the computed element type.
+		const TypeRef elem_type = this->elements[0]->type();
+		for(unsigned int i=0; i<this->elements.size(); ++i)
+			if(*elem_type != *this->elements[i]->type())
+				throw BaseException("Vector element " + ::toString(i) + " did not have required type " + elem_type->toString() + ".");
+	}
+}
+
+
+llvm::Value* VectorLiteral::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	// Get LLVM vector type
+	//const llvm::VectorType* llvm_vec_type = llvm::VectorType::get(
+	//	this->elements[0]->type()->LLVMType(*params.context),
+	//	this->elements.size()
+	//);
+
+	const llvm::VectorType* llvm_vec_type = (const llvm::VectorType*)this->type()->LLVMType(*params.context);
+
+	//Value* default_val = this->elements[0]->type()->getDefaultValue();
+
+	// Create an initial constant vector with default values.
+	llvm::Value* v = llvm::ConstantVector::get(
+		llvm_vec_type, 
+		std::vector<llvm::Constant*>(
+			this->elements.size(),
+			this->elements[0]->type()->defaultLLVMValue(*params.context)
+			//llvm::ConstantFP::get(*params.context, llvm::APFloat(0.0))
+		)
+	);
+
+	llvm::Value* vec = v;
+	for(unsigned int i=0; i<this->elements.size(); ++i)
+	{
+		llvm::Value* elem_llvm_code = this->elements[i]->emitLLVMCode(params);
+
+		vec = params.builder->CreateInsertElement(
+			vec, // vec
+			elem_llvm_code, // new element
+			llvm::ConstantInt::get(*params.context, llvm::APInt(32, i)) // index
+		);
+	}
+	return vec;
+}
+
+
+Reference<ASTNode> VectorLiteral::clone()
+{
+	std::vector<ASTNodeRef> elems(this->elements.size());
+	for(size_t i=0; i<elements.size(); ++i)
+		elems[i] = this->elements[i]->clone();
+	return ASTNodeRef(new VectorLiteral(elems));
 }
 
 

@@ -7,7 +7,7 @@
 #include "utils/reference.h"
 #include "utils/refcounted.h"
 
-namespace llvm { class Type; }
+namespace llvm { class Type; class Constant; }
 #if USE_LLVM
 #include "llvm/Type.h"
 #include "llvm/DerivedTypes.h"
@@ -15,6 +15,9 @@ namespace llvm { class Type; }
 
 namespace Winter
 {
+
+
+class Value;
 
 
 class Type : public RefCounted
@@ -42,7 +45,9 @@ public:
 	virtual bool matchTypes(const Type& b, std::vector<Reference<Type> >& type_mapping) const = 0;
 #if USE_LLVM
 	virtual const llvm::Type* LLVMType(llvm::LLVMContext& context) const = 0;
+	virtual llvm::Constant* defaultLLVMValue(llvm::LLVMContext& context);
 #endif
+	//virtual Reference<Value> getDefaultValue();
 };
 
 
@@ -57,7 +62,8 @@ public:
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 #if USE_LLVM
-	virtual const llvm::Type* LLVMType(llvm::LLVMContext& context) const { return llvm::Type::FloatTy; }
+	virtual const llvm::Type* LLVMType(llvm::LLVMContext& context) const { return llvm::Type::getFloatTy(context); }
+	virtual llvm::Constant* defaultLLVMValue(llvm::LLVMContext& context);
 #endif
 };
 
@@ -71,7 +77,7 @@ public:
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 #if USE_LLVM
-	virtual const llvm::Type* LLVMType() const { return NULL; }
+	virtual const llvm::Type* LLVMType(llvm::LLVMContext& context) const;
 #endif
 	const int genericTypeParamIndex() const { return generic_type_param_index; }
 private:
@@ -100,12 +106,12 @@ public:
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 #if USE_LLVM
-	virtual const llvm::Type* LLVMType() const { return llvm::Type::Int1Ty; }
+	virtual const llvm::Type* LLVMType(llvm::LLVMContext& context) const { return llvm::Type::getInt1Ty(context); }
 #endif
 };
 
 
-class Tuple : public Type
+/*class Tuple : public Type
 {
 	std::vector<TypeRef> types;
 };
@@ -114,7 +120,8 @@ class TupleN : public Type
 {
 	TypeRef t;
 	int n;
-};
+};*/
+
 
 class String : public Type
 {
@@ -124,7 +131,7 @@ public:
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 #if USE_LLVM
-	virtual const llvm::Type* LLVMType() const { return NULL; }
+	virtual const llvm::Type* LLVMType(llvm::LLVMContext& context) const;
 #endif
 };
 
@@ -141,7 +148,7 @@ public:
 	virtual const std::string toString() const; // { return "function"; }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 #if USE_LLVM
-	virtual const llvm::Type* LLVMType() const { return NULL; }
+	virtual const llvm::Type* LLVMType(llvm::LLVMContext& context) const;
 #endif
 	virtual bool lessThan(const Type& b) const
 	{
@@ -214,7 +221,7 @@ public:
 	}
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 #if USE_LLVM
-	virtual const llvm::Type* LLVMType() const { return NULL; }
+	virtual const llvm::Type* LLVMType(llvm::LLVMContext& context) const;
 #endif
 
 	TypeRef from_type;
@@ -243,6 +250,11 @@ public:
 		}
 	}
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
+
+#if USE_LLVM
+	virtual const llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+#endif
+
 
 	TypeRef t;
 };
@@ -273,7 +285,7 @@ public:
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 
 #if USE_LLVM
-	virtual const llvm::Type* LLVMType() const { return NULL; }
+	virtual const llvm::Type* LLVMType(llvm::LLVMContext& context) const;
 #endif
 
 	std::string name;
@@ -312,7 +324,7 @@ public:
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 
 #if USE_LLVM
-	virtual const llvm::Type* LLVMType() const { return ; }
+	virtual const llvm::Type* LLVMType(llvm::LLVMContext& context) const;
 #endif
 
 	TypeRef t;

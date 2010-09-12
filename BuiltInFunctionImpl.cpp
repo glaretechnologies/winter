@@ -5,6 +5,22 @@
 #include "Value.h"
 #include "ASTNode.h"
 #include <vector>
+#if USE_LLVM
+#include "llvm/Type.h"
+#include "llvm/Module.h"
+#include "llvm/DerivedTypes.h"
+#include "llvm/Constants.h"
+#include "llvm/Instructions.h"
+#include "llvm/Analysis/Verifier.h"
+#include "llvm/ExecutionEngine/JIT.h"
+#include "llvm/ExecutionEngine/Interpreter.h"
+#include "llvm/ExecutionEngine/GenericValue.h"
+#include "llvm/Support/raw_ostream.h"
+#include <llvm/CallingConv.h>
+#include <llvm/Support/IRBuilder.h>
+#include <llvm/Intrinsics.h>
+#endif
+
 using std::vector;
 
 
@@ -29,6 +45,13 @@ Value* Constructor::invoke(VMState& vmstate)
 }
 
 
+llvm::Value* Constructor::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	assert(0);
+	return NULL;
+}
+
+
 Value* GetField::invoke(VMState& vmstate)
 {
 	// Top param on arg stack should be a structure
@@ -38,6 +61,61 @@ Value* GetField::invoke(VMState& vmstate)
 	assert(this->index < s->fields.size());
 
 	return s->fields[this->index]->clone();
+}
+
+
+llvm::Value* GetField::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	assert(0);
+	return NULL;
+}
+
+
+Value* GetVectorElement::invoke(VMState& vmstate)
+{
+	// Top param on arg stack should be a vector
+	const VectorValue* vec = dynamic_cast<const VectorValue*>(vmstate.argument_stack.back());
+
+	assert(vec);
+	assert(this->index < vec->e.size());
+
+	return vec->e[this->index]->clone();
+}
+
+
+// TEMP HACK copied
+static llvm::Value* getNthArg(llvm::Function *func, int n)
+{
+	llvm::Function::arg_iterator args = func->arg_begin();
+	for(int i=0; i<n; ++i)
+		args++;
+	return args;
+}
+
+
+llvm::Value* GetVectorElement::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	llvm::Value* vec_value = NULL;
+	if(true) // TEMP shouldPassByValue(*this->type()))
+	{
+		vec_value = getNthArg(
+			params.currently_building_func, 
+			0
+		);
+	}
+	else
+	{
+		vec_value = params.builder->CreateLoad(
+			getNthArg(params.currently_building_func, 0),
+			false, // true,// TEMP: volatile = true to pick up returned vector);
+			"argument" // name
+		);
+	}
+
+	return params.builder->CreateExtractElement(
+		vec_value, // vec
+		llvm::ConstantInt::get(*params.context, llvm::APInt(32, this->index))
+	);
 }
 
 
@@ -65,6 +143,13 @@ Value* ArrayMapBuiltInFunc::invoke(VMState& vmstate)
 	}
 
 	return retval;
+}
+
+
+llvm::Value* ArrayMapBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	assert(0);
+	return NULL;
 }
 
 //------------------------------------------------------------------------------------
@@ -98,6 +183,13 @@ Value* ArrayFoldBuiltInFunc::invoke(VMState& vmstate)
 	}
 
 	return running_val;
+}
+
+
+llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	assert(0);
+	return NULL;
 }
 
 

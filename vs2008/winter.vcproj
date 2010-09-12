@@ -49,6 +49,7 @@
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				DebugInformationFormat="4"
+				DisableSpecificWarnings="4146"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -61,8 +62,9 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
+				AdditionalDependencies="LLVMAnalysis.lib LLVMArchive.lib LLVMAsmParser.lib LLVMAsmPrinter.lib LLVMBitReader.lib LLVMBitWriter.lib LLVMCodeGen.lib LLVMCore.lib LLVMExecutionEngine.lib LLVMInstCombine.lib LLVMInstrumentation.lib LLVMInterpreter.lib LLVMipa.lib LLVMipo.lib LLVMJIT.lib LLVMLinker.lib LLVMMC.lib LLVMMCParser.lib LLVMScalarOpts.lib LLVMSelectionDAG.lib LLVMSupport.lib LLVMSystem.lib LLVMTarget.lib LLVMTransformUtils.lib LLVMX86AsmParser.lib LLVMX86AsmPrinter.lib LLVMX86CodeGen.lib LLVMX86Disassembler.lib LLVMX86Info.lib"
 				LinkIncremental="2"
-				AdditionalLibraryDirectories="C:\programming\llvm_install_32_debug\lib"
+				AdditionalLibraryDirectories="C:\programming\llvm\llvm_27_cmake_install_32\lib"
 				GenerateDebugInformation="true"
 				SubSystem="1"
 				TargetMachine="1"

@@ -3,16 +3,48 @@
 
 #include "utils/stringutils.h"
 #include "BaseException.h"
+#include "llvm/Constants.h"
 
 
 namespace Winter
 {
 
 
+//==========================================================================
+
+
+static llvm::Type* pointerToVoidLLVMType(llvm::LLVMContext& context)
+{
+	return llvm::PointerType::get(llvm::Type::getInt32Ty(context), 0);
+}
+
+
+
+//==========================================================================
+
+
+llvm::Constant* Type::defaultLLVMValue(llvm::LLVMContext& context)
+{
+	assert(0);
+	return NULL;
+}
+
+
+//==========================================================================
+
+
 bool Float::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
 {
 	return this->getType() == b.getType();
 }
+
+
+llvm::Constant* Float::defaultLLVMValue(llvm::LLVMContext& context)
+{
+	return llvm::ConstantFP::get(context, llvm::APFloat(0.0f));
+}
+
+//==========================================================================
 
 
 bool GenericType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
@@ -33,10 +65,23 @@ bool GenericType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) 
 }
 
 
+const llvm::Type* GenericType::LLVMType(llvm::LLVMContext& context) const
+{
+	assert(0);
+	return NULL;
+}
+
+
+//==========================================================================
+
+
 bool Int::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
 {
 	return this->getType() == b.getType();
 }
+
+
+//==========================================================================
 
 
 bool Bool::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
@@ -45,10 +90,22 @@ bool Bool::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
 }
 
 
+//==========================================================================
+
+
 bool String::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
 {
 	return this->getType() == b.getType();
 }
+
+
+const llvm::Type* String::LLVMType(llvm::LLVMContext& context) const
+{
+	return pointerToVoidLLVMType(context);
+}
+
+
+//==========================================================================
 
 
 bool Function::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
@@ -87,6 +144,15 @@ const std::string Function::toString() const // { return "function";
 }
 
 
+const llvm::Type* Function::LLVMType(llvm::LLVMContext& context) const
+{
+	return pointerToVoidLLVMType(context);
+}
+
+
+//==========================================================================
+
+
 bool ArrayType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
 {
 	if(this->getType() != b.getType())
@@ -98,10 +164,28 @@ bool ArrayType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) co
 }
 
 
+const llvm::Type* ArrayType::LLVMType(llvm::LLVMContext& context) const
+{
+	return pointerToVoidLLVMType(context);
+}
+
+
+//==========================================================================
+
+
 bool Map::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
 {
 	throw BaseException("Map::matchTypes: unimplemented.");
 }
+
+
+const llvm::Type* Map::LLVMType(llvm::LLVMContext& context) const
+{
+	return pointerToVoidLLVMType(context);
+}
+
+
+//==========================================================================
 
 
 bool StructureType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
@@ -128,6 +212,13 @@ bool StructureType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping
 }
 
 
+const llvm::Type* StructureType::LLVMType(llvm::LLVMContext& context) const
+{
+	return pointerToVoidLLVMType(context);
+}
+
+
+
 /*const std::string StructureType::toString() const 
 { 
 	std::string s = "struct<";
@@ -145,6 +236,9 @@ bool StructureType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping
 }*/
 
 
+//==========================================================================
+
+
 const std::string VectorType::toString() const
 {
 	return "vector<" + this->t->toString() + ", " + ::toString(this->num) + ">";
@@ -160,6 +254,15 @@ bool VectorType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) c
 	const VectorType* b_ = dynamic_cast<const VectorType*>(&b);
 
 	return this->num == b_->num && this->t->matchTypes(*b_->t, type_mapping);
+}
+
+
+const llvm::Type* VectorType::LLVMType(llvm::LLVMContext& context) const
+{
+	return llvm::VectorType::get(
+		this->t->LLVMType(context),
+		this->num
+	);
 }
 
 

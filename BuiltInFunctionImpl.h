@@ -10,6 +10,7 @@ namespace Winter
 
 class Value;
 class VMState;
+class EmitLLVMCodeParams;
 
 
 class BuiltInFunctionImpl
@@ -18,6 +19,7 @@ public:
 	virtual ~BuiltInFunctionImpl(){}
 
 	virtual Value* invoke(VMState& vmstate) = 0;
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const = 0;
 };
 
 
@@ -28,6 +30,7 @@ public:
 	virtual ~Constructor(){}
 
 	virtual Value* invoke(VMState& vmstate);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 
 private:
 	Reference<StructureType> struct_type;
@@ -41,8 +44,23 @@ public:
 	virtual ~GetField(){}
 
 	virtual Value* invoke(VMState& vmstate);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
 	Reference<StructureType> struct_type;
+	unsigned int index;
+};
+
+
+class GetVectorElement : public BuiltInFunctionImpl
+{
+public:
+	GetVectorElement(Reference<VectorType>& vector_type_, unsigned int index_) : vector_type(vector_type_), index(index_) {}
+	virtual ~GetVectorElement(){}
+
+	virtual Value* invoke(VMState& vmstate);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+private:
+	Reference<VectorType> vector_type;
 	unsigned int index;
 };
 
@@ -54,6 +72,7 @@ public:
 	virtual ~ArrayMapBuiltInFunc(){}
 
 	virtual Value* invoke(VMState& vmstate);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
 	TypeRef from_type;
 	Reference<Function> func_type;
@@ -73,6 +92,7 @@ public:
 	virtual ~ArrayFoldBuiltInFunc(){}
 
 	virtual Value* invoke(VMState& vmstate);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
 	TypeRef T;
 };

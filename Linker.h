@@ -5,6 +5,7 @@
 #include "FunctionSignature.h"
 #include "ASTNode.h"
 #include <map>
+namespace llvm { class Module; }
 
 
 namespace Winter
@@ -23,6 +24,8 @@ public:
 	//void linkFunctions(BufferRoot& root);
 
 	FunctionDefinitionRef findMatchingFunction(const FunctionSignature& sig);
+
+	void buildLLVMCode(llvm::Module* module);
 
 	vector<FunctionDefinitionRef> concrete_funcs;
 private:

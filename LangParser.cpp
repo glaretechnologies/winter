@@ -17,6 +17,7 @@ Copyright 2009 Nicholas Chapman
 #include "utils/stringutils.h"
 #include <assert.h>
 #include <map>
+#include "maths/mathstypes.h"
 
 
 namespace Winter
@@ -393,6 +394,20 @@ ASTNodeRef LangParser::parseLiteral(const ParseInfo& p)
 }
 
 
+Reference<IntLiteral> LangParser::parseIntLiteral(const ParseInfo& p)
+{
+	if(p.tokens[p.i]->getType() == INT_LITERAL_TOKEN)
+	{
+		return Reference<IntLiteral>( new IntLiteral(p.tokens[p.i++]->getIntLiteralValue()) );
+	}
+	else
+	{
+		throw LangParserExcep("token is not an integer literal");
+	}
+}
+
+
+
 ASTNodeRef LangParser::parseExpression(const ParseInfo& p)
 {
 	/*if(tokens[i]->isLiteral())
@@ -442,7 +457,7 @@ ASTNodeRef LangParser::parseBasicExpression(const ParseInfo& p)
 	}
 	else if(p.tokens[p.i]->getType() == OPEN_SQUARE_BRACKET_TOKEN)
 	{
-		return parseArrayLiteralExpression(p);
+		return parseArrayOrVectorLiteralExpression(p);
 	}
 	else if(p.tokens[p.i]->getType() == BACK_SLASH_TOKEN)
 	{
@@ -470,6 +485,8 @@ TypeRef LangParser::parseType(const ParseInfo& p, const std::vector<std::string>
 		return parseArrayType(p, generic_type_params);
 	else if(t == "function")
 		return parseFunctionType(p, generic_type_params);
+	else if(t == "vector")
+		return parseVectorType(p, generic_type_params);
 	else
 	{
 		// Then this might be the name of a named type.
@@ -576,6 +593,26 @@ Reference<StructureType> LangParser::parseStructType(const ParseInfo& p, const s
 }
 
 
+TypeRef LangParser::parseVectorType(const ParseInfo& p, const std::vector<std::string>& generic_type_params)
+{
+	parseToken(LEFT_ANGLE_BRACKET_TOKEN, p);
+
+	TypeRef t = parseType(p, generic_type_params);
+
+	parseToken(COMMA_TOKEN, p);
+
+	Reference<IntLiteral> int_literal = parseIntLiteral(p);
+	int num = int_literal->value;
+
+	if(num <= 0 || num >= 128 || !Maths::isPowerOfTwo(num))
+		throw LangParserExcep("num must be > 0, < 128, and a power of two.");
+
+	parseToken(RIGHT_ANGLE_BRACKET_TOKEN, p);
+
+	return TypeRef(new VectorType(t, num));
+}
+
+
 ASTNodeRef LangParser::parseAddSubExpression(const ParseInfo& p)
 {
 	ASTNodeRef left = parseMulDivExpression(p);
@@ -672,7 +709,7 @@ ASTNodeRef LangParser::parseMapLiteralExpression(const ParseInfo& p)
 }
 
 
-ASTNodeRef LangParser::parseArrayLiteralExpression(const ParseInfo& p)
+ASTNodeRef LangParser::parseArrayOrVectorLiteralExpression(const ParseInfo& p)
 {
 	parseToken(OPEN_SQUARE_BRACKET_TOKEN, p);
 
@@ -697,7 +734,14 @@ ASTNodeRef LangParser::parseArrayLiteralExpression(const ParseInfo& p)
 
 	parseToken(CLOSE_SQUARE_BRACKET_TOKEN, p);
 
-	return ASTNodeRef(new ArrayLiteral(elems));
+	//if(isTokenCurrent(IDENTIFIER_TOKEN, p))
+	const std::string id = parseIdentifier("square bracket literal suffix", p);
+	if(id == "a")
+		return ASTNodeRef(new ArrayLiteral(elems));
+	else if(id == "v")
+		return ASTNodeRef(new VectorLiteral(elems));
+	else
+		throw LangParserExcep("Unknown square bracket literal suffix '" + id + "'.");
 }
 
 

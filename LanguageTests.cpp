@@ -216,6 +216,20 @@ void LanguageTests::run()
 	testMainFloat("struct Complex { float re, float im } \
 				  def main() float : re(Complex(2.0, 3.0))", 2.0f);
 
+
+	// Test vector
+	testMainFloat("	def main() float : \
+					let x = [1.0, 2.0, 3.0, 4.0]v \
+					e0(x)", 1.0f);
+	testMainFloat("	def main() float : \
+					let x = [1.0, 2.0, 3.0, 4.0]v \
+					e1(x)", 2.0f);
+
+	// Test vector being returned from a function
+	testMainFloat("	def f() vector<float, 4> : [1.0, 2.0, 3.0, 4.0]v \
+					def main() float : e2(f())", 3.0f);
+
+
 	std::cout << "===================All LanguageTests passed.=============================" << std::endl;
 }
 

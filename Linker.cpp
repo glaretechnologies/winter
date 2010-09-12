@@ -4,6 +4,8 @@
 
 #include "BuiltInFunctionImpl.h"
 #include <iostream>
+#include "utils/stringutils.h"
+
 
 using std::vector;
 
@@ -30,6 +32,29 @@ void Linker::addFunctions(BufferRoot& root)
 	}
 }
 
+
+void Linker::buildLLVMCode(llvm::Module* module)
+{
+	for(Linker::FuncMapType::iterator it = this->functions.begin(); it != functions.end(); ++it)
+	{
+		FunctionDefinition& f = *(*it).second;
+
+		if(!f.isGenericFunction())
+		{
+			f.buildLLVMFunction(module);
+		}
+	}
+
+	// Build concrete funcs
+	for(unsigned int i=0; i<concrete_funcs.size(); ++i)
+	{
+		assert(!concrete_funcs[i]->isGenericFunction());
+
+		concrete_funcs[i]->buildLLVMFunction(module);
+	}
+}
+
+
 /*
 void Linker::linkFunctions(BufferRoot& root)
 {
@@ -39,6 +64,8 @@ void Linker::linkFunctions(BufferRoot& root)
 Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignature& sig)
 {
 	/*
+	if sig.name matches eN
+		create or insert eN function
 	For each function f
 		If f.name == sig.name
 			If it takes the correct number of args
@@ -52,8 +79,61 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 						if T_i associated_type != sig.T_i, fail match
 						if T_i has children, then, for each child C_i
 							if sig.T_i is concrete type
-	*/					
-						
+	*/	
+
+	if(sig.name[0] == 'e')
+	{
+		bool numeric = true;
+		for(unsigned int i=1; i<sig.name.size(); ++i)
+			if(!::isNumeric(sig.name[i]))
+				numeric = false;
+		if(numeric)
+		{
+			const int index = ::stringToInt(::eatPrefix(sig.name, "e"));
+
+			if(sig.param_types.size() != 1)
+				throw BaseException("eN() functions must take one argument.");
+
+			if(sig.param_types[0]->getType() != Type::VectorTypeType)
+				throw BaseException("eN() functions must take a vector as their argument");
+
+
+			Reference<VectorType> vec_type(
+				(VectorType*)(sig.param_types[0].getPointer()) // NOTE: dirty cast
+				);
+
+			if(index >= (int)vec_type->num)
+				throw BaseException("eN function has N >= vector size.");
+
+
+			vector<FunctionDefinition::FunctionArg> args(1,
+				FunctionDefinition::FunctionArg(
+					sig.param_types[0], //TypeRef(new Int()), // type
+					"vec" // name
+				)
+			);
+			
+			FunctionDefinitionRef new_func_def(new FunctionDefinition(
+				sig.name, // name
+				args,
+				vector<Reference<LetASTNode> >(), // lets
+				ASTNodeRef(NULL), // body expr
+				vec_type->t, // declared return type
+				new GetVectorElement(
+					vec_type,
+					index
+				)// built in func impl
+			));
+
+			if(functions.find(sig) == functions.end())
+			{
+				functions.insert(std::make_pair(
+					sig,
+					new_func_def
+				));
+			}
+		}
+	}
 
 	for(Linker::FuncMapType::iterator it = this->functions.begin(); it != functions.end(); ++it)
 	{

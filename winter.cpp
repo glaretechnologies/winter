@@ -26,6 +26,8 @@
 #include "llvm/Support/IRBuilder.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/Target/TargetSelect.h"
+#include "llvm/LLVMContext.h"
+#include "llvm/Support/raw_ostream.h"
 #endif
 using namespace Winter;
 
@@ -101,21 +103,27 @@ int main(int argc, char** argv)
 		//	throw BaseException("main must return string.");
 
 		//TEMP:
-		/*{
-		llvm::Module* module = new llvm::Module("WinterModule");
-		llvm::ExistingModuleProvider* MP = new llvm::ExistingModuleProvider(module);
+		llvm::LLVMContext context;
+		llvm::Module* module = new llvm::Module("WinterModule", context);
 
 		llvm::InitializeNativeTarget();
 
 		std::string error_str;
-		llvm::ExecutionEngine* EE = llvm::ExecutionEngine::createJIT(MP, &error_str);
+		llvm::ExecutionEngine* EE = llvm::ExecutionEngine::createJIT(
+			module, 
+			&error_str
+		);
 
 
 
-		for(unsigned int i = 0; i<root->func_defs.size(); ++i)
+		/*for(unsigned int i = 0; i<root->func_defs.size(); ++i)
 		{
-			llvm::Function* func = root->func_defs[i]->buildLLVMFunction(module);
-		}
+			if(!root->func_defs[i]->isGenericFunction())
+			{
+				llvm::Function* func = root->func_defs[i]->buildLLVMFunction(module);
+			}
+		}*/
+		linker.buildLLVMCode(module);
 
 		error_str;
 		const bool ver_errors = llvm::verifyModule(*module, llvm::ReturnStatusAction, &error_str);
@@ -123,13 +131,19 @@ int main(int argc, char** argv)
 
 		{
 			module->dump();
-			std::ofstream f("module.txt");
+			//std::ofstream f("module.txt");
+			std::string errorinfo;
+			llvm::raw_fd_ostream f(
+				"module.txt",
+				errorinfo
+			);
 			module->print(f, NULL);
 		}
 
+		assert(maindef->built_llvm_function);
+		void* f = EE->getPointerToFunction(maindef->built_llvm_function);
 
-		}*/
-		
+
 
 		VMState vmstate;
 		vmstate.func_args_start.push_back(0);

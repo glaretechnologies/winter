@@ -19,11 +19,9 @@ using std::vector;
 #include "Type.h"
 #include "FunctionSignature.h"
 #include "BaseException.h"
-//#include <llvm/ExecutionEngine/JIT.h>
 #if USE_LLVM
 #include <llvm/Support/IRBuilder.h>
 #endif
-//#include <llvm/Intrinsics.h>
 namespace llvm { class Function; };
 namespace llvm { class Value; };
 namespace llvm { class Module; };
@@ -98,6 +96,7 @@ public:
 		StringLiteralType,
 		MapLiteralType,
 		ArrayLiteralType,
+		VectorLiteralType,
 		AdditionExpressionType,
 		SubtractionExpressionType,
 		MulExpressionType,
@@ -169,6 +168,8 @@ public:
 	class FunctionArg
 	{
 	public:
+		FunctionArg(){}
+		FunctionArg(TypeRef type_, const string& n) : type(type_), name(n) {}
 		/*enum TypeKind
 		{
 			GENERIC_TYPE,
@@ -218,6 +219,8 @@ public:
 		llvm::Module* module//, 
 		//std::map<Lang::FunctionSignature, llvm::Function*>& external_functions
 	) const;
+
+	llvm::Function* built_llvm_function;
 };
 
 typedef Reference<FunctionDefinition> FunctionDefinitionRef;
@@ -402,6 +405,24 @@ public:
 
 private:
 	//TypeRef array_type;
+	std::vector<ASTNodeRef> elements;
+};
+
+
+class VectorLiteral : public ASTNode
+{
+public:
+	VectorLiteral(const std::vector<ASTNodeRef>& elems);
+
+	virtual Value* exec(VMState& vmstate);
+	virtual ASTNodeType nodeType() const { return VectorLiteralType; }
+	virtual TypeRef type() const;
+	virtual void print(int depth, std::ostream& s) const;
+	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+	virtual Reference<ASTNode> clone();
+
+private:
 	std::vector<ASTNodeRef> elements;
 };
 

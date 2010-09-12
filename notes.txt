@@ -196,6 +196,25 @@ z = Complex(1.0, 2.0)
 z.norm() is equivalent to norm(z)
 
 
+Vectors
+--------------------------
+type: vector<T, n>				[n must be even]
+
+Constructing a vector
+--------------------------
+[1.0, 2.0, 3.0, 4.0]v   constructs a vector<float, 4>
+
+Accessing a vector element
+---------------------------
+let x = [1.0, 2.0, 3.0, 4.0]v
+e0(x) returns the 0th element
+e1(x) returns the 1st element
+etc...
+
+
+
+
+
 Operators
 *
 /
