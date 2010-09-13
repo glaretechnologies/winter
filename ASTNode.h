@@ -218,9 +218,10 @@ public:
 	llvm::Function* buildLLVMFunction(
 		llvm::Module* module//, 
 		//std::map<Lang::FunctionSignature, llvm::Function*>& external_functions
-	) const;
+	);
 
 	llvm::Function* built_llvm_function;
+	void* jitted_function;
 };
 
 typedef Reference<FunctionDefinition> FunctionDefinitionRef;

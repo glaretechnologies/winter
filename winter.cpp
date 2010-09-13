@@ -12,10 +12,9 @@
 #include "Linker.h"
 #include "Value.h"
 #include "LanguageTests.h"
-
+#include "VirtualMachine.h"
 #if USE_LLVM
 #include "llvm/Module.h"
-//#include "llvm/ModuleProvider.h"
 #include "llvm/Analysis/Verifier.h"
 #include "llvm/PassManager.h"
 #include "llvm/Module.h"
@@ -31,6 +30,7 @@
 #endif
 using namespace Winter;
 
+typedef float(*float_void_func)();
 
 int main(int argc, char** argv)
 {
@@ -50,104 +50,30 @@ int main(int argc, char** argv)
 		std::string filecontents;
 		FileUtils::readEntireFile(argv[1], filecontents);
 
-		std::vector<Reference<TokenBase> > tokens;
-		Lexer::process(filecontents, tokens);
-
-		LangParser parser;
-		ASTNodeRef rootref = parser.parseBuffer(tokens, filecontents.c_str());
-
-
-		BufferRoot* root = dynamic_cast<BufferRoot*>(rootref.getPointer());
-
-		// Bind variables
-		//root->bindVariables(std::vector<ASTNode*>());
-		{
-			std::vector<ASTNode*> stack;
-			TraversalPayload payload(TraversalPayload::BindVariables);
-			root->traverse(payload, stack);
-			assert(stack.size() == 0);
-		}
-
-		// Link functions
-		Linker linker;
-		linker.addFunctions(*root);
-		//linker.linkFunctions(*root);
-		{
-			std::vector<ASTNode*> stack;
-			TraversalPayload payload(TraversalPayload::LinkFunctions);
-			payload.linker = &linker;
-			root->traverse(payload, stack);
-			assert(stack.size() == 0);
-		}
-
-		// TypeCheck
-		{
-			std::vector<ASTNode*> stack;
-			TraversalPayload payload(TraversalPayload::TypeCheck);
-			root->traverse(payload, stack);
-			assert(stack.size() == 0);
-		}
-
-
-		rootref->print(0, std::cout);
+		VirtualMachine vm;
+		vm.loadSource(filecontents);
 
 
 		// Get main function
 		FunctionSignature mainsig("main", std::vector<TypeRef>());
-		Reference<FunctionDefinition> maindef = linker.findMatchingFunction(mainsig);
-		//Linker::FuncMapType::iterator res = linker.functions.find(mainsig);
-		//if(res == linker.functions.end())
-		//	throw BaseException("Could not find " + mainsig.toString());
-		//Reference<FunctionDefinition> maindef = (*res).second;
-		//if(!(*maindef->return_type == *TypeRef(new String())))
-		//	throw BaseException("main must return string.");
-
-		//TEMP:
-		llvm::LLVMContext context;
-		llvm::Module* module = new llvm::Module("WinterModule", context);
-
-		llvm::InitializeNativeTarget();
-
-		std::string error_str;
-		llvm::ExecutionEngine* EE = llvm::ExecutionEngine::createJIT(
-			module, 
-			&error_str
-		);
+		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
 
 
+		void* f = vm.getJittedFunction(mainsig);
 
-		/*for(unsigned int i = 0; i<root->func_defs.size(); ++i)
-		{
-			if(!root->func_defs[i]->isGenericFunction())
-			{
-				llvm::Function* func = root->func_defs[i]->buildLLVMFunction(module);
-			}
-		}*/
-		linker.buildLLVMCode(module);
+		// cast to correct type
+		float_void_func mainf = (float_void_func)f;
 
-		error_str;
-		const bool ver_errors = llvm::verifyModule(*module, llvm::ReturnStatusAction, &error_str);
-		assert(!ver_errors);
+		// Call the JIT'd function
+		const float result = mainf();
 
-		{
-			module->dump();
-			//std::ofstream f("module.txt");
-			std::string errorinfo;
-			llvm::raw_fd_ostream f(
-				"module.txt",
-				errorinfo
-			);
-			module->print(f, NULL);
-		}
-
-		assert(maindef->built_llvm_function);
-		void* f = EE->getPointerToFunction(maindef->built_llvm_function);
-
+		std::cout << "JIT'd function returned " << result << std::endl;
 
 
 		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
 
+		assert(maindef->built_llvm_function);
 		Value* retval = maindef->invoke(vmstate);
 
 		vmstate.func_args_start.pop_back();

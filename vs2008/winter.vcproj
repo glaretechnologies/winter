@@ -310,6 +310,14 @@
 			>
 		</File>
 		<File
+			RelativePath="..\VirtualMachine.cpp"
+			>
+		</File>
+		<File
+			RelativePath="..\VirtualMachine.h"
+			>
+		</File>
+		<File
 			RelativePath="..\VMState.h"
 			>
 		</File>

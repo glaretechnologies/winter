@@ -332,10 +332,14 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params) const
 llvm::Function* FunctionDefinition::buildLLVMFunction(
 	llvm::Module* module
 	//std::map<Lang::FunctionSignature, llvm::Function*>& external_functions
-	) const
+	)
 {
 #if USE_LLVM
-	llvm::FunctionType* functype = llvmInternalFunctionType(this->sig.param_types, returnType(), module->getContext());
+	llvm::FunctionType* functype = llvmInternalFunctionType(
+		this->sig.param_types, 
+		returnType(), 
+		module->getContext()
+	);
 
 	llvm::Function *internal_llvm_func = static_cast<llvm::Function*>(module->getOrInsertFunction(
 		this->sig.toString(), // internalFuncName(this->getSig()), // Name
