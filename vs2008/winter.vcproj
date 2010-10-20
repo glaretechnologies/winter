@@ -41,8 +41,8 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="C:\programming\zlib123;C:\programming\indigo\trunk;C:\programming\llvm\llvm_27_cmake_install_32\include"
-				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;USE_LLVM=1;_CRT_SECURE_NO_WARNINGS"
+				AdditionalIncludeDirectories="C:\programming\zlib123;C:\programming\indigo\trunk;C:\programming\llvm\llvm_27_cmake_install_32_debug\include"
+				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;USE_LLVM=1;_CRT_SECURE_NO_WARNINGS;_SECURE_SCL=0"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
@@ -64,7 +64,7 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="LLVMAnalysis.lib LLVMArchive.lib LLVMAsmParser.lib LLVMAsmPrinter.lib LLVMBitReader.lib LLVMBitWriter.lib LLVMCodeGen.lib LLVMCore.lib LLVMExecutionEngine.lib LLVMInstCombine.lib LLVMInstrumentation.lib LLVMInterpreter.lib LLVMipa.lib LLVMipo.lib LLVMJIT.lib LLVMLinker.lib LLVMMC.lib LLVMMCParser.lib LLVMScalarOpts.lib LLVMSelectionDAG.lib LLVMSupport.lib LLVMSystem.lib LLVMTarget.lib LLVMTransformUtils.lib LLVMX86AsmParser.lib LLVMX86AsmPrinter.lib LLVMX86CodeGen.lib LLVMX86Disassembler.lib LLVMX86Info.lib"
 				LinkIncremental="2"
-				AdditionalLibraryDirectories="C:\programming\llvm\llvm_27_cmake_install_32\lib"
+				AdditionalLibraryDirectories="C:\programming\llvm\llvm_27_cmake_install_32_debug\lib"
 				GenerateDebugInformation="true"
 				SubSystem="1"
 				TargetMachine="1"
@@ -118,7 +118,8 @@
 				Name="VCCLCompilerTool"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
-				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE"
+				AdditionalIncludeDirectories="C:\programming\zlib123;C:\programming\indigo\trunk;C:\programming\llvm\llvm_27_cmake_install_32\include"
+				PreprocessorDefinitions="WIN32;NDEBUG;_CONSOLE;USE_LLVM=1;_CRT_SECURE_NO_WARNINGS;_SECURE_SCL=0"
 				RuntimeLibrary="2"
 				EnableFunctionLevelLinking="true"
 				UsePrecompiledHeader="0"
@@ -136,7 +137,9 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
+				AdditionalDependencies="LLVMAnalysis.lib LLVMArchive.lib LLVMAsmParser.lib LLVMAsmPrinter.lib LLVMBitReader.lib LLVMBitWriter.lib LLVMCodeGen.lib LLVMCore.lib LLVMExecutionEngine.lib LLVMInstCombine.lib LLVMInstrumentation.lib LLVMInterpreter.lib LLVMipa.lib LLVMipo.lib LLVMJIT.lib LLVMLinker.lib LLVMMC.lib LLVMMCParser.lib LLVMScalarOpts.lib LLVMSelectionDAG.lib LLVMSupport.lib LLVMSystem.lib LLVMTarget.lib LLVMTransformUtils.lib LLVMX86AsmParser.lib LLVMX86AsmPrinter.lib LLVMX86CodeGen.lib LLVMX86Disassembler.lib LLVMX86Info.lib"
 				LinkIncremental="1"
+				AdditionalLibraryDirectories="C:\programming\llvm\llvm_27_cmake_install_32\lib"
 				GenerateDebugInformation="true"
 				SubSystem="1"
 				OptimizeReferences="2"
@@ -271,6 +274,14 @@
 		</File>
 		<File
 			RelativePath="..\Linker.h"
+			>
+		</File>
+		<File
+			RelativePath="..\LLVMTypeUtils.cpp"
+			>
+		</File>
+		<File
+			RelativePath="..\LLVMTypeUtils.h"
 			>
 		</File>
 		<File

@@ -4,6 +4,10 @@
 #include "utils/stringutils.h"
 #include "BaseException.h"
 #include "llvm/Constants.h"
+#include <vector>
+
+
+using namespace std;
 
 
 namespace Winter
@@ -214,7 +218,18 @@ bool StructureType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping
 
 const llvm::Type* StructureType::LLVMType(llvm::LLVMContext& context) const
 {
-	return pointerToVoidLLVMType(context);
+	//return pointerToVoidLLVMType(context);
+	vector<const llvm::Type*> field_types(this->component_types.size());
+	for(size_t i=0; i<this->component_types.size(); ++i)
+	{
+		field_types[i] = this->component_types[i]->LLVMType(context);
+	}
+
+	return llvm::StructType::get(
+		context,
+		field_types
+		// NOTE: is_packed is default = false.
+	);
 }
 
 

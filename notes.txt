@@ -59,7 +59,7 @@ Object Layout stage
 ------------------------
 Generate memory layouts for all structures
 
-LLVM tree consturction stage
+LLVM tree construction stage
 -------------------
 Generate LLVM tree structure corresponding to AST
 
@@ -260,8 +260,17 @@ fold(function<I, T, I> func, list<T>, I initial_val) -> I
 zip(function<A, B, R>, list<A>, list<B>) -> list<R>
 
 
+
 intToFloat(int i) -> float
 intToDouble(int i) -> double
+
+
+dot(vec<float, n>, vec<float, n>) -> float
+
+add(vec<float, n>, vec<float, n>) -> vec<float, n>   [ Use LLVM IR op ]
+sub(vec<float, n>, vec<float, n>) -> vec<float, n>   [ Use LLVM IR op ]
+
+mul(vec<float, n>, float) -> vec<float, n>
 
 
 

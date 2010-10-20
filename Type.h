@@ -46,6 +46,7 @@ public:
 #if USE_LLVM
 	virtual const llvm::Type* LLVMType(llvm::LLVMContext& context) const = 0;
 	virtual llvm::Constant* defaultLLVMValue(llvm::LLVMContext& context);
+	virtual bool passByValue() const { return true; }
 #endif
 	//virtual Reference<Value> getDefaultValue();
 };
@@ -132,6 +133,7 @@ public:
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 #if USE_LLVM
 	virtual const llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+	virtual bool passByValue() const { return false; }
 #endif
 };
 
@@ -222,6 +224,7 @@ public:
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 #if USE_LLVM
 	virtual const llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+	virtual bool passByValue() const { return false; }
 #endif
 
 	TypeRef from_type;
@@ -253,6 +256,7 @@ public:
 
 #if USE_LLVM
 	virtual const llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+	virtual bool passByValue() const { return false; }
 #endif
 
 
@@ -286,6 +290,7 @@ public:
 
 #if USE_LLVM
 	virtual const llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+	virtual bool passByValue() const { return false; }
 #endif
 
 	std::string name;

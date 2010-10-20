@@ -5,6 +5,7 @@
 #include "Value.h"
 #include "ASTNode.h"
 #include <vector>
+#include "LLVMTypeUtils.h"
 #if USE_LLVM
 #include "llvm/Type.h"
 #include "llvm/Module.h"
@@ -47,8 +48,47 @@ Value* Constructor::invoke(VMState& vmstate)
 
 llvm::Value* Constructor::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
-	assert(0);
-	return NULL;
+	// Pointer to structure will be in 0th argument.
+	llvm::Value* struct_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+
+	// actual_struct_ptr = &arg_0[0]
+	/*llvm::Value* actual_struct_ptr = params.builder->CreateGEP(
+		struct_ptr, // ptr
+		llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true)) // index
+		);*/
+
+	// For each field in the structure
+	for(unsigned int i=0; i<this->struct_type->component_types.size(); ++i)
+	{
+		// Get the argument to the constructor
+
+		llvm::Value* arg_value = LLVMTypeUtils::getNthArg(params.currently_building_func, i + 1);
+
+		vector<llvm::Value*> indices;
+		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true)));
+		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, i, true)));
+		
+		llvm::Value* field_ptr = params.builder->CreateGEP(
+			struct_ptr, // ptr
+			indices.begin(),
+			indices.end()
+		);
+
+		// Store it in the appropriate field in the structure.
+		// field_ptr = &actual_struct_ptr.index_i
+		/*llvm::Value* field_ptr = params.builder->CreateGEP(
+			actual_struct_ptr, // ptr
+			llvm::ConstantInt::get(*params.context, llvm::APInt(32, i, true)) // index
+		);*/
+
+		params.builder->CreateStore(
+			arg_value, // value
+			field_ptr // ptr
+		);
+	}
+
+	//assert(0);
+	return struct_ptr;
 }
 
 
@@ -66,8 +106,22 @@ Value* GetField::invoke(VMState& vmstate)
 
 llvm::Value* GetField::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
-	assert(0);
-	return NULL;
+	// Pointer to structure will be in 0th argument.
+	llvm::Value* struct_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+
+	vector<llvm::Value*> indices;
+	indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true)));
+	indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, this->index, true)));
+
+	llvm::Value* field_ptr = params.builder->CreateGEP(
+		struct_ptr, // ptr
+		indices.begin(),
+		indices.end()
+		);
+
+	return params.builder->CreateLoad(
+		field_ptr
+	);
 }
 
 
@@ -83,22 +137,12 @@ Value* GetVectorElement::invoke(VMState& vmstate)
 }
 
 
-// TEMP HACK copied
-static llvm::Value* getNthArg(llvm::Function *func, int n)
-{
-	llvm::Function::arg_iterator args = func->arg_begin();
-	for(int i=0; i<n; ++i)
-		args++;
-	return args;
-}
-
-
 llvm::Value* GetVectorElement::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
 	llvm::Value* vec_value = NULL;
 	if(true) // TEMP shouldPassByValue(*this->type()))
 	{
-		vec_value = getNthArg(
+		vec_value = LLVMTypeUtils::getNthArg(
 			params.currently_building_func, 
 			0
 		);
@@ -106,7 +150,7 @@ llvm::Value* GetVectorElement::emitLLVMCode(EmitLLVMCodeParams& params) const
 	else
 	{
 		vec_value = params.builder->CreateLoad(
-			getNthArg(params.currently_building_func, 0),
+			LLVMTypeUtils::getNthArg(params.currently_building_func, 0),
 			false, // true,// TEMP: volatile = true to pick up returned vector);
 			"argument" // name
 		);

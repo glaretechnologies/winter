@@ -13,6 +13,7 @@ Copyright 2009 Nicholas Chapman
 #include "Value.h"
 #include "Linker.h"
 #include "BuiltInFunctionImpl.h"
+#include "LLVMTypeUtils.h"
 #include "utils/stringutils.h"
 #if USE_LLVM
 #include "llvm/Type.h"
@@ -48,19 +49,36 @@ namespace Winter
 static llvm::FunctionType* llvmInternalFunctionType(
 	const vector<TypeRef>& arg_types, TypeRef return_type, llvm::LLVMContext& context)
 {
-	vector<const llvm::Type*> llvm_arg_types;
+	if(return_type->passByValue())
+	{
+		vector<const llvm::Type*> llvm_arg_types;
 
-	// Insert implicit void* argument
-	//llvm_arg_types.push_back(llvm::PointerType::get(llvm::Type::getInt32Ty(context), 0)); // use pointer to int32 instead, LLVM doesn't like pointer to void
+		for(unsigned int i=0; i<arg_types.size(); ++i)
+			llvm_arg_types.push_back(arg_types[i]->passByValue() ? arg_types[i]->LLVMType(context) : LLVMTypeUtils::pointerType(*arg_types[i]->LLVMType(context)));
 
-	for(unsigned int i=0; i<arg_types.size(); ++i)
-		llvm_arg_types.push_back(arg_types[i]->LLVMType(context));
+		return llvm::FunctionType::get(
+			return_type->LLVMType(context), // return type
+			llvm_arg_types,
+			false // varargs
+		);
+	}
+	else
+	{
+		// The return value is passed by reference, so that means the zero-th argument will be a pointer to memory where the return value will be placed.
 
-	return llvm::FunctionType::get(
-		return_type->LLVMType(context), // return type
-		llvm_arg_types,
-		false // varargs
-	);
+		vector<const llvm::Type*> llvm_arg_types;
+		llvm_arg_types.push_back(LLVMTypeUtils::pointerType(*return_type->LLVMType(context)));
+
+		// Append normal arguments
+		for(unsigned int i=0; i<arg_types.size(); ++i)
+			llvm_arg_types.push_back(arg_types[i]->passByValue() ? arg_types[i]->LLVMType(context) : LLVMTypeUtils::pointerType(*arg_types[i]->LLVMType(context)));
+
+		return llvm::FunctionType::get(
+			LLVMTypeUtils::pointerType(*return_type->LLVMType(context)), //llvm::Type::getVoidTy(context), // return type - void as return value will be written to mem via zero-th arg.
+			llvm_arg_types,
+			false // varargs
+		);
+	}
 }
 
 /*
@@ -616,19 +634,54 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
 #if USE_LLVM
 	// Lookup LLVM function, which should already be created and added to the module.
-	llvm::Function* target_llvm_func = params.module->getFunction(
+	/*llvm::Function* target_llvm_func = params.module->getFunction(
 		this->target_function->sig.toString() //internalFuncName(call_target_sig)
 		);
+	assert(target_llvm_func);*/
+
+	llvm::FunctionType* target_func_type = llvmInternalFunctionType(
+		this->target_function->sig.param_types, 
+		this->target_function->returnType(), 
+		*params.context
+	);
+
+	llvm::Function* target_llvm_func = static_cast<llvm::Function*>(params.module->getOrInsertFunction(
+		this->target_function->sig.toString(), // Name
+		target_func_type // Type
+	));
+
 	assert(target_llvm_func);
+
 
 	//------------------
 	// Build args list
-	std::vector<llvm::Value*> args;
 
-	for(unsigned int i=0; i<argument_expressions.size(); ++i)
-		args.push_back(argument_expressions[i]->emitLLVMCode(params));
+	if(target_function->returnType()->passByValue())
+	{
+		vector<llvm::Value*> args;
 
-	return params.builder->CreateCall(target_llvm_func, args.begin(), args.end());
+		for(unsigned int i=0; i<argument_expressions.size(); ++i)
+			args.push_back(argument_expressions[i]->emitLLVMCode(params));
+
+		return params.builder->CreateCall(target_llvm_func, args.begin(), args.end());
+	}
+	else
+	{
+		// Allocate return value on stack
+		llvm::Value* return_val_addr = params.builder->Insert(new llvm::AllocaInst(
+			target_function->returnType()->LLVMType(*params.context), // type
+			NULL, // ArraySize
+			16, // alignment
+			this->target_function->sig.toString() + " return_val_addr"
+		));
+
+		vector<llvm::Value*> args(1, return_val_addr);
+
+		for(unsigned int i=0; i<argument_expressions.size(); ++i)
+			args.push_back(argument_expressions[i]->emitLLVMCode(params));
+
+		return params.builder->CreateCall(target_llvm_func, args.begin(), args.end());
+	}
 #else
 	return NULL;
 #endif
@@ -828,16 +881,6 @@ void Variable::print(int depth, std::ostream& s) const
 	s << "Variable, name=" << this->name << ", " + varType(this->vartype) + ", argument_index=" << argument_index << "\n";
 }
 
-#if USE_LLVM
-static llvm::Value* getNthArg(llvm::Function *func, int n)
-{
-	llvm::Function::arg_iterator args = func->arg_begin();
-	for(int i=0; i<n; ++i)
-		args++;
-	return args;
-}
-#endif
-
 
 static bool shouldPassByValue(const Type& type)
 {
@@ -865,12 +908,12 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 		if(shouldPassByValue(*this->type()))
 		{
-			return getNthArg(params.currently_building_func, this->argument_index);
+			return LLVMTypeUtils::getNthArg(params.currently_building_func, this->argument_index);
 		}
 		else
 		{
 			return params.builder->CreateLoad(
-				getNthArg(params.currently_building_func, this->argument_index),
+				LLVMTypeUtils::getNthArg(params.currently_building_func, this->argument_index),
 				false, // true,// TEMP: volatile = true to pick up returned vector);
 				"argument" // name
 			);
