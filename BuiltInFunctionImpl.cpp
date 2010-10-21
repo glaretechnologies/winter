@@ -48,6 +48,10 @@ Value* Constructor::invoke(VMState& vmstate)
 
 llvm::Value* Constructor::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
+
+	//TEMP: add type alias for structure type to the module while we're at it.
+	params.module->addTypeName(this->struct_type->name, this->struct_type->LLVMType(*params.context));
+
 	// Pointer to structure will be in 0th argument.
 	llvm::Value* struct_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
 
@@ -88,7 +92,9 @@ llvm::Value* Constructor::emitLLVMCode(EmitLLVMCodeParams& params) const
 	}
 
 	//assert(0);
-	return struct_ptr;
+	//return struct_ptr;
+	//params.builder->
+	return NULL;
 }
 
 

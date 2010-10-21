@@ -5,6 +5,8 @@
 #include "LanguageTests.h"
 
 
+#include <maths/sse.h>
+
 #include <iostream>
 #include <cassert>
 #include <fstream>
@@ -39,62 +41,6 @@ static void testMainFloat(const std::string& src, float target_return_val)
 	std::cout << "============================== testMainFloat() ============================" << std::endl;
 	try
 	{
-		/*std::vector<Reference<TokenBase> > tokens;
-		Lexer::process(src, tokens);
-
-		LangParser parser;
-		ASTNodeRef rootref = parser.parseBuffer(tokens, src.c_str());
-
-
-		BufferRoot* root = dynamic_cast<BufferRoot*>(rootref.getPointer());
-
-		// Bind variables
-		{
-			std::vector<ASTNode*> stack;
-			TraversalPayload payload(TraversalPayload::BindVariables);
-			root->traverse(payload, stack);
-			assert(stack.size() == 0);
-		}
-
-		// Link functions
-		Linker linker;
-		linker.addFunctions(*root);
-		{
-			std::vector<ASTNode*> stack;
-			TraversalPayload payload(TraversalPayload::LinkFunctions);
-			payload.linker = &linker;
-			root->traverse(payload, stack);
-			assert(stack.size() == 0);
-		}
-
-		// TypeCheck.
-		// At this point, all variables and function expressions should be bound.
-		{
-			std::vector<ASTNode*> stack;
-			TraversalPayload payload(TraversalPayload::TypeCheck);
-			root->traverse(payload, stack);
-			assert(stack.size() == 0);
-		}
-
-
-		std::cout << "------------------------\n";
-		rootref->print(0, std::cout);
-		std::cout << "----Concrete funcs:----\n";
-		for(size_t i=0; i<linker.concrete_funcs.size(); ++i)
-			linker.concrete_funcs[i]->print(0, std::cout);
-		std::cout << "------------------------\n";
-
-
-		// Get main function
-		FunctionSignature mainsig("main", std::vector<TypeRef>());
-		Reference<FunctionDefinition> maindef = linker.findMatchingFunction(mainsig);
-
-		if(maindef.isNull())
-		{
-			std::cerr << "Failed to find main()" << std::endl;
-			exit(1);
-		}*/
-
 		VirtualMachine vm;
 		vm.loadSource(src);
 
@@ -118,8 +64,6 @@ static void testMainFloat(const std::string& src, float target_return_val)
 			exit(1);
 		}
 
-
-
 		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
 
@@ -140,6 +84,181 @@ static void testMainFloat(const std::string& src, float target_return_val)
 		}
 
 		delete retval;
+
+	}
+	catch(Winter::BaseException& e)
+	{
+		std::cerr << e.what() << std::endl;
+		exit(1);
+	}
+	catch(Winter::LexerExcep& e)
+	{
+		std::cerr << e.what() << std::endl;
+		exit(1);
+	}
+	catch(Winter::LangParserExcep& e)
+	{
+		std::cerr << e.what() << std::endl;
+		exit(1);
+	}
+}
+
+
+//typedef float(*float_void_func)();
+
+
+
+#define WINTER_JIT_CALLING_CONV __cdecl
+
+
+template <class StructType>
+static void bleh(StructType* s)
+{
+	s->a = 1;
+}
+
+
+template <class StructType>
+static void testMainStruct(const std::string& src, const StructType& target_return_val)
+{
+	std::cout << "============================== testMainStruct() ============================" << std::endl;
+	try
+	{
+		VirtualMachine vm;
+		vm.loadSource(src);
+
+		// Get main function
+		FunctionSignature mainsig("main", std::vector<TypeRef>());
+		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
+
+		
+		// __cdecl
+		void (WINTER_JIT_CALLING_CONV *f)(StructType*) = (void (WINTER_JIT_CALLING_CONV *)(StructType*))vm.getJittedFunction(mainsig);
+
+		// Call the JIT'd function
+		SSE_ALIGN StructType jitted_result;
+
+		bleh(&jitted_result);
+
+		f(&jitted_result);
+
+		/*std::cout << "============================" << std::endl;
+		std::cout << jitted_result.a << std::endl;
+		std::cout << jitted_result.b << std::endl;
+		std::cout << jitted_result.c << std::endl;
+		std::cout << jitted_result.d << std::endl;*/
+
+		// Check JIT'd result.
+		if(!(jitted_result == target_return_val))
+		{
+			std::cerr << "Test failed: jitted_result != target_return_val  " << std::endl;
+			exit(1);
+		}
+
+		/*VMState vmstate;
+		vmstate.func_args_start.push_back(0);
+
+		Value* retval = maindef->invoke(vmstate);
+
+		vmstate.func_args_start.pop_back();
+		StructureValue* val = dynamic_cast<StructureValue*>(retval);
+		if(!val)
+		{
+			std::cerr << "main() Return value was of unexpected type." << std::endl;
+			exit(1);
+		}*/
+
+
+		/*if(val->value != target_return_val)
+		{
+			std::cerr << "Test failed: main returned " << val->value << ", target was " << target_return_val << std::endl;
+			exit(1);
+		}*/
+
+		//delete retval;
+
+	}
+	catch(Winter::BaseException& e)
+	{
+		std::cerr << e.what() << std::endl;
+		exit(1);
+	}
+	catch(Winter::LexerExcep& e)
+	{
+		std::cerr << e.what() << std::endl;
+		exit(1);
+	}
+	catch(Winter::LangParserExcep& e)
+	{
+		std::cerr << e.what() << std::endl;
+		exit(1);
+	}
+}
+
+
+template <class InStructType, class OutStructType>
+static void testMainStructInputAndOutput(const std::string& src, const InStructType& struct_in, const OutStructType& target_return_val)
+{
+	std::cout << "============================== testMainStructInputAndOutput() ============================" << std::endl;
+	try
+	{
+		VirtualMachine vm;
+		vm.loadSource(src);
+
+		vector<string> field_names;
+		field_names.push_back("x");
+		field_names.push_back("y");
+
+		// Get main function
+		FunctionSignature mainsig(
+			"main", 
+			std::vector<TypeRef>(1, TypeRef(new StructureType(
+				"TestStructIn", 
+				std::vector<TypeRef>(2, TypeRef(new Float)), 
+				field_names
+			)))
+		);
+		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
+
+
+		// __cdecl
+		void (WINTER_JIT_CALLING_CONV *f)(OutStructType*, InStructType*) = (void (WINTER_JIT_CALLING_CONV *)(OutStructType*, InStructType*))vm.getJittedFunction(mainsig);
+
+		// Call the JIT'd function
+		SSE_ALIGN OutStructType jitted_result;
+
+		SSE_ALIGN InStructType aligned_struct_in = struct_in;
+
+		f(&jitted_result, &aligned_struct_in);
+
+		// Check JIT'd result.
+		if(!(jitted_result == target_return_val))
+		{
+			std::cerr << "Test failed: jitted_result != target_return_val  " << std::endl;
+			exit(1);
+		}
+
+		/*VMState vmstate;
+		vmstate.func_args_start.push_back(0);
+
+		Value* retval = maindef->invoke(vmstate);
+
+		vmstate.func_args_start.pop_back();
+		StructureValue* val = dynamic_cast<StructureValue*>(retval);
+		if(!val)
+		{
+		std::cerr << "main() Return value was of unexpected type." << std::endl;
+		exit(1);
+		}*/
+
+
+		/*if(val->value != target_return_val)
+		{
+		std::cerr << "Test failed: main returned " << val->value << ", target was " << target_return_val << std::endl;
+		exit(1);
+		}*/
+
+		//delete retval;
 
 	}
 	catch(Winter::BaseException& e)
@@ -251,6 +370,9 @@ void LanguageTests::run()
 	// Test struct
 	testMainFloat("struct Complex { float re, float im } \
 				  def main() float : re(Complex(2.0, 3.0))", 2.0f);
+	
+	testMainFloat("struct Complex { float re, float im } \
+ 				  def main() float : im(Complex(2.0, 3.0))", 3.0f);
 
 
 	// Test vector
@@ -264,6 +386,63 @@ void LanguageTests::run()
 	// Test vector being returned from a function
 	testMainFloat("	def f() vector<float, 4> : [1.0, 2.0, 3.0, 4.0]v \
 					def main() float : e2(f())", 3.0f);
+
+
+	// Test structures
+	{
+		struct TestStruct
+		{
+			float a;
+			float b;
+			float c;
+			float d;
+
+			bool operator == (const TestStruct& other) const { return (a == other.a) && (b == other.b); }
+		};
+
+		TestStruct target_result;
+		target_result.a = 1;
+		target_result.b = 2;
+		target_result.c = 3;
+		target_result.d = 4;
+		testMainStruct<TestStruct>("struct TestStruct { float a, float b, float c, float d } \
+								   def main() TestStruct : TestStruct(1.0, 2.0, 3.0, 4.0)", target_result);
+
+		testMainStruct<TestStruct>("struct TestStruct { float a, float b, float c, float d } \
+								   def main() TestStruct : TestStruct(1.0, 2.0, 3.0, 4.0)", target_result);
+
+	}
+	{
+		struct TestStruct
+		{
+			float a;
+			float b;
+			float c;
+			float d;
+
+			bool operator == (const TestStruct& other) const { return (a == other.a) && (b == other.b); }
+		};
+
+		TestStruct target_result;
+		target_result.a = 5;
+		target_result.b = 6;
+		target_result.c = 3;
+		target_result.d = 4;
+
+		struct TestStructIn
+		{
+			float x;
+			float y;
+		};
+
+		TestStructIn in;
+		in.x = 5;
+		in.y = 6;
+
+		testMainStructInputAndOutput("struct TestStruct { float a, float b, float c, float d } \
+									 struct TestStructIn { float x, float y } \
+									 def main(TestStructIn in) TestStruct : TestStruct(x(in), y(in), 3.0, 4.0)", in, target_result);
+	}
 
 
 	std::cout << "===================All LanguageTests passed.=============================" << std::endl;

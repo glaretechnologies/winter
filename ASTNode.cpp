@@ -32,7 +32,7 @@ Copyright 2009 Nicholas Chapman
 #endif
 
 
-const bool VERBOSE_EXEC = true;
+const bool VERBOSE_EXEC = false;
 
 
 static void printMargin(int depth, std::ostream& s)
@@ -74,7 +74,8 @@ static llvm::FunctionType* llvmInternalFunctionType(
 			llvm_arg_types.push_back(arg_types[i]->passByValue() ? arg_types[i]->LLVMType(context) : LLVMTypeUtils::pointerType(*arg_types[i]->LLVMType(context)));
 
 		return llvm::FunctionType::get(
-			LLVMTypeUtils::pointerType(*return_type->LLVMType(context)), //llvm::Type::getVoidTy(context), // return type - void as return value will be written to mem via zero-th arg.
+			//LLVMTypeUtils::pointerType(*return_type->LLVMType(context)), 
+			llvm::Type::getVoidTy(context), // return type - void as return value will be written to mem via zero-th arg.
 			llvm_arg_types,
 			false // varargs
 		);
@@ -359,10 +360,46 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 		module->getContext()
 	);
 
+	// Make attribute list
+	llvm::AttrListPtr attribute_list;
+	/*if(!this->returnType()->passByValue())
+	{
+		// Add sret attribute to zeroth argument
+		attribute_list = attribute_list.addAttr(
+			1, // index (NOTE: starts at one)
+			llvm::Attribute::StructRet
+		);
+	}*/
+
+
+	
 	llvm::Function *internal_llvm_func = static_cast<llvm::Function*>(module->getOrInsertFunction(
 		this->sig.toString(), // internalFuncName(this->getSig()), // Name
-		functype // Type
+		functype, // Type
+		attribute_list // attribute_list
 		));
+
+	// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
+	internal_llvm_func->setCallingConv(llvm::CallingConv::C);
+
+	internal_llvm_func->setAttributes(
+
+	// Set names for all arguments.
+	int i = 0;
+	for(llvm::Function::arg_iterator AI = internal_llvm_func->arg_begin(); AI != internal_llvm_func->arg_end(); ++AI, ++i)
+	{
+		if(this->returnType()->passByValue())
+		{
+			AI->setName(this->args[i].name);
+		}
+		else
+		{
+			if(i == 0)
+				AI->setName("ret");
+			else
+				AI->setName(this->args[i-1].name);
+		}
+	}
 
 
 	llvm::BasicBlock* block = llvm::BasicBlock::Create(
@@ -374,18 +411,80 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 
 	// Build body LLVM code
 	EmitLLVMCodeParams params;
+	params.currently_building_func_def = this;
 	params.builder = &builder;
 	params.module = module;
 	params.currently_building_func = internal_llvm_func;
 	params.context = &module->getContext();
 
-	llvm::Value* body_code = NULL;
+	//llvm::Value* body_code = NULL;
 	if(this->built_in_func_impl)
-		body_code = this->built_in_func_impl->emitLLVMCode(params);
+	{
+		llvm::Value* body_code = this->built_in_func_impl->emitLLVMCode(params);
+		if(this->returnType()->passByValue())
+			builder.CreateRet(body_code);
+		else
+			builder.CreateRetVoid();
+	}
 	else
-		body_code = this->body->emitLLVMCode(params);
+	{
+		llvm::Value* body_code = this->body->emitLLVMCode(params);
 
-	builder.CreateRet(body_code);
+		if(this->returnType()->passByValue())
+		{
+			builder.CreateRet(body_code);
+		}
+		else
+		{
+			// body code will return a pointer to the result of the body expression, allocated on the stack.
+			// So load from the stack, and save to the return pointer which will have been passed in as arg zero.
+			llvm::Value* return_val_ptr = LLVMTypeUtils::getNthArg(internal_llvm_func, 0);
+
+			//if(*this->returnType() == 
+			if(this->returnType()->getType() == Type::StructureTypeType)
+			{
+				StructureType* struct_type = static_cast<StructureType*>(this->returnType().getPointer());
+
+				for(unsigned int i=0; i<struct_type->component_types.size(); ++i)
+				{
+					// Load the field
+					vector<llvm::Value*> indices;
+					indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true)));
+					indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, i, true)));
+
+					llvm::Value* field_ptr = params.builder->CreateGEP(
+						body_code, // ptr
+						indices.begin(),
+						indices.end()
+						);
+
+					llvm::Value* field = params.builder->CreateLoad(
+						field_ptr
+						);
+
+					// Store the field.
+					llvm::Value* store_field_ptr = params.builder->CreateGEP(
+						return_val_ptr, // ptr
+						indices.begin(),
+						indices.end()
+					);
+
+					params.builder->CreateStore(
+						field, // value
+						store_field_ptr // ptr
+					);
+				}
+			}
+			else
+			{
+				assert(0);
+			}
+
+			//builder.CreateRet(return_val_ptr);
+			builder.CreateRetVoid();
+		}
+	}
+
 
 	this->built_llvm_function = internal_llvm_func;
 	return internal_llvm_func;
@@ -663,10 +762,19 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 		for(unsigned int i=0; i<argument_expressions.size(); ++i)
 			args.push_back(argument_expressions[i]->emitLLVMCode(params));
 
-		return params.builder->CreateCall(target_llvm_func, args.begin(), args.end());
+		llvm::CallInst* call_inst = params.builder->CreateCall(target_llvm_func, args.begin(), args.end());
+
+		// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
+		call_inst->setCallingConv(llvm::CallingConv::C);
+
+		return call_inst;
 	}
 	else
 	{
+		//llvm::Value* return_val_addr = NULL;
+		//if(parent->passByValue())
+		//{
+
 		// Allocate return value on stack
 		llvm::Value* return_val_addr = params.builder->Insert(new llvm::AllocaInst(
 			target_function->returnType()->LLVMType(*params.context), // type
@@ -680,7 +788,12 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 		for(unsigned int i=0; i<argument_expressions.size(); ++i)
 			args.push_back(argument_expressions[i]->emitLLVMCode(params));
 
-		return params.builder->CreateCall(target_llvm_func, args.begin(), args.end());
+		llvm::CallInst* call_inst = params.builder->CreateCall(target_llvm_func, args.begin(), args.end());
+		
+		// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
+		call_inst->setCallingConv(llvm::CallingConv::C);
+
+		return return_val_addr;
 	}
 #else
 	return NULL;
@@ -882,10 +995,10 @@ void Variable::print(int depth, std::ostream& s) const
 }
 
 
-static bool shouldPassByValue(const Type& type)
+/*static bool shouldPassByValue(const Type& type)
 {
 	return true;
-}
+}*/
 
 
 llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params) const
@@ -900,16 +1013,21 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 	if(vartype == LetVariable)
 	{
+		// TODO: only compute once, then refer to let value.
 		return this->parent_function->lets[this->argument_index]->emitLLVMCode(params);
 	}
 	else
 	{
 		assert(this->parent_function);
 
-		if(shouldPassByValue(*this->type()))
-		{
-			return LLVMTypeUtils::getNthArg(params.currently_building_func, this->argument_index);
-		}
+		//if(shouldPassByValue(*this->type()))
+		//{
+			// If the current function returns its result via pointer, then all args are offset by one.
+			if(params.currently_building_func_def->returnType()->passByValue())
+				return LLVMTypeUtils::getNthArg(params.currently_building_func, this->argument_index);
+			else
+				return LLVMTypeUtils::getNthArg(params.currently_building_func, this->argument_index + 1);
+		/*}
 		else
 		{
 			return params.builder->CreateLoad(
@@ -918,13 +1036,7 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params) const
 				"argument" // name
 			);
 
-				/*return params.builder->Insert(new llvm::LoadInst(
-					getNthArg(params.func, actual_arg_index),
-					"arg_" + toString(actual_arg_index),
-					VOLATILE, //isVolatile
-					16 // Align
-					));*/
-		}
+		}*/
 	}
 #else
 	return NULL;

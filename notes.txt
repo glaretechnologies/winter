@@ -1,3 +1,11 @@
+ESP = 0018FCB0
+
+Debug:
+ESP = 0018F730
+
+
+
+
 Copyright 2009 Nicholas Chapman
 
 

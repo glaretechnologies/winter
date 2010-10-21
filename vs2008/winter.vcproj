@@ -67,6 +67,7 @@
 				AdditionalLibraryDirectories="C:\programming\llvm\llvm_27_cmake_install_32_debug\lib"
 				GenerateDebugInformation="true"
 				SubSystem="1"
+				RandomizedBaseAddress="1"
 				TargetMachine="1"
 			/>
 			<Tool
@@ -144,6 +145,7 @@
 				SubSystem="1"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
+				RandomizedBaseAddress="1"
 				TargetMachine="1"
 			/>
 			<Tool

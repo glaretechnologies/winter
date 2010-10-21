@@ -208,7 +208,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDefinition> generic_func, 
 		std::vector<TypeRef> type_mappings)
 {
-	std::cout << "Making concrete function from " << generic_func->sig.toString() << "\n";
+	//std::cout << "Making concrete function from " << generic_func->sig.toString() << "\n";
 	vector<FunctionDefinition::FunctionArg> args = generic_func->args;
 	for(size_t i=0; i<generic_func->args.size(); ++i)
 	{

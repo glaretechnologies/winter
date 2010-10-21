@@ -33,8 +33,8 @@ public:
 class IntValue : public Value
 {
 public:
-	IntValue(int v) : value(v) { std::cout << "IntValue(), this=" << this << ", value = " << value << "\n"; }
-	~IntValue() { std::cout << "~IntValue(), this=" << this << ", value = " << value << "\n"; }
+	IntValue(int v) : value(v) { /*std::cout << "IntValue(), this=" << this << ", value = " << value << "\n";*/ }
+	~IntValue() { /*std::cout << "~IntValue(), this=" << this << ", value = " << value << "\n";*/ }
 	virtual Value* clone() const { return new IntValue(value); }
 	int value;
 };

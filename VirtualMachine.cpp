@@ -124,7 +124,7 @@ void VirtualMachine::loadSource(const std::string& source)
 	}
 
 
-	rootref->print(0, std::cout);
+	//rootref->print(0, std::cout);
 
 
 
@@ -136,11 +136,15 @@ void VirtualMachine::loadSource(const std::string& source)
 		llvm::ReturnStatusAction, // Action to take
 		&error_str
 	);
+	if(ver_errors)
+	{
+		std::cout << "Module verification errors: " << error_str << std::endl;
+	}
 	assert(!ver_errors);
 
 
-	const bool optimise = true;
-	const bool verbose = true;
+	const bool optimise = false;
+	const bool verbose = false;
 
 	// Do LLVM optimisatons
 	if(optimise)
@@ -211,12 +215,12 @@ void VirtualMachine::loadSource(const std::string& source)
 		// Dump to stdout
 		this->llvm_module->dump();
 
-		std::string errorinfo;
+		/*std::string errorinfo;
 		llvm::raw_fd_ostream f(
 			"module.txt",
 			errorinfo
 		);
-		this->llvm_module->print(f, NULL);
+		this->llvm_module->print(f, NULL);*/
 	}
 
 

@@ -37,6 +37,7 @@ class LetASTNode;
 class AnonFunction;
 class Value;
 class BuiltInFunctionImpl;
+class FunctionDefinition;
 
 
 class TraversalPayload
@@ -62,6 +63,7 @@ public:
 class EmitLLVMCodeParams
 {
 public:
+	FunctionDefinition* currently_building_func_def;
 #if USE_LLVM
 	llvm::IRBuilder<>* builder;
 	llvm::Module* module;
