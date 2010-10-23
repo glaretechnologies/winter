@@ -371,18 +371,50 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 		);
 	}*/
 
+	llvm::Attributes function_attr = llvm::Attribute::NoUnwind; // Does not throw exceptions
+	if(this->returnType()->passByValue())
+	{
+		//function_attr |= llvm::Attribute::ReadNone
+
+		bool has_ptr_arg = false;
+		for(int i=0; i<this->args.size(); ++i)
+		{
+			if(!this->args[i].type->passByValue())
+				has_ptr_arg = true;
+		}
+
+		if(has_ptr_arg)
+			function_attr |= llvm::Attribute::ReadOnly; // This attribute indicates that the function does not write through any pointer arguments etc..
+		else
+			function_attr |= llvm::Attribute::ReadNone; // Function computes its result based strictly on its arguments, without dereferencing any pointer arguments etc..
+	}
+
+
+	attribute_list = attribute_list.addAttr(4294967295U, function_attr);
+	/*{
+		SmallVector<AttributeWithIndex, 4> Attrs;
+		AttributeWithIndex PAWI;
+		PAWI.Index = 4294967295U; PAWI.Attrs = 0  | Attribute::NoUnwind | Attribute::ReadNone;
+		Attrs.push_back(PAWI);
+		func_f_PAL = AttrListPtr::get(Attrs.begin(), Attrs.end());
+
+	}*/
+
+
 
 	
 	llvm::Function *internal_llvm_func = static_cast<llvm::Function*>(module->getOrInsertFunction(
 		this->sig.toString(), // internalFuncName(this->getSig()), // Name
-		functype, // Type
-		attribute_list // attribute_list
+		functype//, // Type
+		//attribute_list // attribute_list
 		));
+
+	internal_llvm_func->setAttributes(attribute_list);
 
 	// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
 	internal_llvm_func->setCallingConv(llvm::CallingConv::C);
 
-	internal_llvm_func->setAttributes(
+	//internal_llvm_func->setAttributes(
 
 	// Set names for all arguments.
 	int i = 0;
@@ -445,7 +477,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 			{
 				StructureType* struct_type = static_cast<StructureType*>(this->returnType().getPointer());
 
-				for(unsigned int i=0; i<struct_type->component_types.size(); ++i)
+				/*for(unsigned int i=0; i<struct_type->component_types.size(); ++i)
 				{
 					// Load the field
 					vector<llvm::Value*> indices;
@@ -473,7 +505,16 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 						field, // value
 						store_field_ptr // ptr
 					);
-				}
+				}*/
+
+				llvm::Value* struct_val = params.builder->CreateLoad(
+					body_code
+				);
+
+				params.builder->CreateStore(
+					struct_val, // value
+					return_val_ptr // ptr
+				);
 			}
 			else
 			{

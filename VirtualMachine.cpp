@@ -35,6 +35,7 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "llvm/Target/TargetSelect.h"
 #include "llvm/LLVMContext.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/StandardPasses.h"
 #endif
 
 
@@ -74,6 +75,8 @@ VirtualMachine::~VirtualMachine()
 
 static void optimiseFunctions(llvm::FunctionPassManager& fpm, llvm::Module* module, bool verbose)
 {
+	fpm.doInitialization();
+
 	for(llvm::Module::iterator i = module->begin(); i != module->end(); ++i)
 	{
 		if(!i->isIntrinsic())
@@ -81,6 +84,8 @@ static void optimiseFunctions(llvm::FunctionPassManager& fpm, llvm::Module* modu
 			fpm.run(*i);
 		}
 	}
+
+	fpm.doFinalization();
 }
 
 
@@ -130,23 +135,26 @@ void VirtualMachine::loadSource(const std::string& source)
 
 	linker.buildLLVMCode(this->llvm_module);
 
-	string error_str;
-	const bool ver_errors = llvm::verifyModule(
-		*this->llvm_module, 
-		llvm::ReturnStatusAction, // Action to take
-		&error_str
-	);
-	if(ver_errors)
+	// Verify module
 	{
-		std::cout << "Module verification errors: " << error_str << std::endl;
+		string error_str;
+		const bool ver_errors = llvm::verifyModule(
+			*this->llvm_module, 
+			llvm::ReturnStatusAction, // Action to take
+			&error_str
+		);
+		if(ver_errors)
+		{
+			std::cout << "Module verification errors: " << error_str << std::endl;
+		}
+		assert(!ver_errors);
 	}
-	assert(!ver_errors);
 
 
-	const bool optimise = false;
+	const bool optimise = true;
 	const bool verbose = false;
 
-	// Do LLVM optimisatons
+	// Do LLVM optimisations
 	if(optimise)
 	{
 		llvm::FunctionPassManager fpm(this->llvm_module);
@@ -155,20 +163,27 @@ void VirtualMachine::loadSource(const std::string& source)
 		// target lays out data structures.
 		fpm.add(new llvm::TargetData(*this->llvm_exec_engine->getTargetData()));
 
-		// Do simple "peephole" optimizations and bit-twiddling optzns.
-		//TEMP fpm.add(llvm::createInstructionCombiningPass());
-		// Reassociate expressions.
-		fpm.add(llvm::createReassociatePass());
-		// Eliminate Common SubExpressions.
-		fpm.add(llvm::createGVNPass());
-		// Simplify the control flow graph (deleting unreachable blocks, etc).
-		fpm.add(llvm::createCFGSimplificationPass());
 
-		fpm.add(llvm::createPromoteMemoryToRegisterPass());
+		llvm::createStandardFunctionPasses(
+			&fpm,
+			2
+		);
+		
 
 		llvm::PassManager pm;
-		pm.add(new llvm::TargetData(*this->llvm_exec_engine->getTargetData()));
-		pm.add(llvm::createFunctionInliningPass());
+		
+		llvm::Pass* inlining_pass = llvm::createFunctionInliningPass();
+
+		llvm::createStandardModulePasses(
+			&pm,
+			2, // optimisation level
+			false, // optimise Size
+			true, // unit at a time
+			false, // unroll loops
+			true, // simplify lib calls
+			false, // have exceptions
+			inlining_pass // inlining pass
+		);
 
 
 
@@ -211,6 +226,25 @@ void VirtualMachine::loadSource(const std::string& source)
 	}
 
 
+
+	// Verify module again.
+	{
+
+	
+	string error_str;
+	const bool ver_errors = llvm::verifyModule(
+		*this->llvm_module, 
+		llvm::ReturnStatusAction, // Action to take
+		&error_str
+		);
+	if(ver_errors)
+	{
+		std::cout << "Module verification errors: " << error_str << std::endl;
+	}
+	assert(!ver_errors);
+	}
+
+
 	{
 		// Dump to stdout
 		this->llvm_module->dump();
@@ -222,8 +256,6 @@ void VirtualMachine::loadSource(const std::string& source)
 		);
 		this->llvm_module->print(f, NULL);*/
 	}
-
-
 }
 
 
@@ -242,7 +274,6 @@ void* VirtualMachine::getJittedFunction(const FunctionSignature& sig)
 		func->built_llvm_function
 	);
 }
-
 
 
 } // end namespace Winter
