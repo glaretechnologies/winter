@@ -263,7 +263,7 @@ Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDef
 		{
 			GenericType* gt = dynamic_cast<GenericType*>(generic_func->declared_return_type.getPointer());
 
-			//TOPO: check mapping exists
+			//TODO: check mapping exists
 			concrete_declared_ret_type = type_mappings[gt->genericTypeParamIndex()];
 		}
 		else // Else ret type is already concrete.

@@ -1,12 +1,17 @@
-ESP = 0018FCB0
-
-Debug:
-ESP = 0018F730
+Copyright 2009- Nicholas Chapman
 
 
 
+Passing structures by value
+===========================
+"It's a frontend task to lower the code to follow the vendor ABI."
+...
+"The calling convention can be complex 
+enough and operate with the language-dependent definitions (e.g. "C" 
+structs, etc.), thus frontend should lower such constructs as needed."
+-Anton
 
-Copyright 2009 Nicholas Chapman
+From http://old.nabble.com/Passing-structures-by-value-on-Windows-td28766193.html
 
 
 
@@ -174,6 +179,12 @@ Function Definition				def f(int a, int b) int : a + b
 
 Let								let z = f(1, 2)
 
+
+
+
+Structures
+=================================================================
+
 Structure Type Definition			
 ----------------------------
 struct Complex
@@ -182,20 +193,33 @@ struct Complex
 	float im
 }
 
+Implicitly defines functions
+Complex(float re, float im) Complex
+re(Complex c) float
+im(Complex c) float
+
+
 Constructing a Structure value
 ------------------------------
 z = Complex(1.0, 2.0)
 
 Accessing Structure Members
 ---------------------------
-
 z = Complex(1.0, 2.0)
+zr = re(z)
+
+With syntactic sugar:
 zr = z.re
 
+Operator overloading:
 def + (Complex a, Complex b) Complex : Complex(a.re + b.re, a.im + b.im)
+or
+def add(Complex a, Complex b) Complex : Complex(a.re + b.re, a.im + b.im)
+?
 
+Using the structure type
+------------------------
 def norm(Complex a) Real : a.re*a.re + a.im*a.im
-
 
 Syntactic sugar for method calls on structures:
 ------------------------------------------------
@@ -203,12 +227,14 @@ z = Complex(1.0, 2.0)
 
 z.norm() is equivalent to norm(z)
 
+? Have z.norm as syntactic sugar for z.norm() ?
+
 
 Vectors
 --------------------------
 type: vector<T, n>				[n must be even]
 
-Constructing a vector
+Constructing a vector with vector literals
 --------------------------
 [1.0, 2.0, 3.0, 4.0]v   constructs a vector<float, 4>
 

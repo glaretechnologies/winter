@@ -102,6 +102,7 @@ public:
 		AdditionExpressionType,
 		SubtractionExpressionType,
 		MulExpressionType,
+		UnaryMinusExpressionType,
 		LetType,
 		AnonFunctionType
 	};
@@ -487,6 +488,23 @@ public:
 
 	ASTNodeRef a;
 	ASTNodeRef b;
+};
+
+
+class UnaryMinusExpression : public ASTNode
+{
+public:
+	UnaryMinusExpression() {}
+
+	virtual Value* exec(VMState& vmstate);
+	virtual ASTNodeType nodeType() const { return UnaryMinusExpressionType; }
+	virtual TypeRef type() const { return expr->type(); }
+	virtual void print(int depth, std::ostream& s) const;
+	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+	virtual Reference<ASTNode> clone();
+
+	ASTNodeRef expr;
 };
 
 

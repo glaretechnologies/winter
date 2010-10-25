@@ -13,21 +13,6 @@
 #include "Value.h"
 #include "LanguageTests.h"
 #include "VirtualMachine.h"
-#if USE_LLVM
-#include "llvm/Module.h"
-#include "llvm/Analysis/Verifier.h"
-#include "llvm/PassManager.h"
-#include "llvm/Module.h"
-#include "llvm/PassManager.h"
-#include "llvm/Target/TargetData.h"
-#include "llvm/Transforms/Scalar.h"
-#include "llvm/Transforms/IPO.h"
-#include "llvm/Support/IRBuilder.h"
-#include "llvm/ExecutionEngine/ExecutionEngine.h"
-#include "llvm/Target/TargetSelect.h"
-#include "llvm/LLVMContext.h"
-#include "llvm/Support/raw_ostream.h"
-#endif
 using namespace Winter;
 
 typedef float(*float_void_func)();
@@ -36,6 +21,7 @@ int main(int argc, char** argv)
 {
 	if(argc < 2)
 	{
+		std::cerr << "Usage: winter program.win" << std::endl;
 		return 1;
 	}
 
@@ -64,6 +50,8 @@ int main(int argc, char** argv)
 		// cast to correct type
 		float_void_func mainf = (float_void_func)f;
 
+		std::cout << "Calling JIT'd function..." << std::endl;
+
 		// Call the JIT'd function
 		const float result = mainf();
 
@@ -91,7 +79,7 @@ int main(int argc, char** argv)
 
 		std::cout << "Program returned " << retval->toString() << std::endl;
 
-		delete retval;
+		//TEMPdelete retval;
 
 		assert(vmstate.argument_stack.empty());
 		assert(vmstate.let_stack.empty());
@@ -109,6 +97,9 @@ int main(int argc, char** argv)
 				def->exec(vmstate);
 			}
 		}*/
+
+		// TEMP:
+		//new char[666];
 	}
 	catch(Winter::BaseException& e)
 	{

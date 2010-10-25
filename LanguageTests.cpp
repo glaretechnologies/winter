@@ -5,7 +5,12 @@
 #include "LanguageTests.h"
 
 
-#include <maths/sse.h>
+//#include <maths/sse.h>
+extern "C"
+{
+#include <xmmintrin.h> //SSE header file
+};
+
 
 #include <iostream>
 #include <cassert>
@@ -104,11 +109,75 @@ static void testMainFloat(const std::string& src, float target_return_val)
 }
 
 
+static void testMainInteger(const std::string& src, float target_return_val)
+{
+	std::cout << "============================== testMainInteger() ============================" << std::endl;
+	try
+	{
+		VirtualMachine vm;
+		vm.loadSource(src);
+
+		// Get main function
+		FunctionSignature mainsig("main", std::vector<TypeRef>());
+		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
+
+		int (WINTER_JIT_CALLING_CONV *f)() = (int (WINTER_JIT_CALLING_CONV *)()) vm.getJittedFunction(mainsig);
+
+		// Call the JIT'd function
+		const int jitted_result = f();
+
+
+		// Check JIT'd result.
+		if(jitted_result != target_return_val)
+		{
+			std::cerr << "Test failed: JIT'd main returned " << jitted_result << ", target was " << target_return_val << std::endl;
+			exit(1);
+		}
+
+		VMState vmstate;
+		vmstate.func_args_start.push_back(0);
+
+		Value* retval = maindef->invoke(vmstate);
+
+		vmstate.func_args_start.pop_back();
+		IntValue* val = dynamic_cast<IntValue*>(retval);
+		if(!val)
+		{
+			std::cerr << "main() Return value was of unexpected type." << std::endl;
+			exit(1);
+		}
+
+		if(val->value != target_return_val)
+		{
+			std::cerr << "Test failed: main returned " << val->value << ", target was " << target_return_val << std::endl;
+			exit(1);
+		}
+
+		delete retval;
+
+	}
+	catch(Winter::BaseException& e)
+	{
+		std::cerr << e.what() << std::endl;
+		exit(1);
+	}
+	catch(Winter::LexerExcep& e)
+	{
+		std::cerr << e.what() << std::endl;
+		exit(1);
+	}
+	catch(Winter::LangParserExcep& e)
+	{
+		std::cerr << e.what() << std::endl;
+		exit(1);
+	}
+}
+
+
 //typedef float(*float_void_func)();
 
 
 
-#define WINTER_JIT_CALLING_CONV __cdecl
 
 
 template <class StructType>
@@ -116,6 +185,20 @@ static void bleh(StructType* s)
 {
 	s->a = 1;
 }
+
+
+
+#if defined(WIN32) || defined(WIN64)
+#define SSE_ALIGN _MM_ALIGN16
+#define SSE_CLASS_ALIGN _MM_ALIGN16 class
+#else
+#define SSE_ALIGN __attribute__ ((aligned (16)))
+#define SSE_CLASS_ALIGN class __attribute__ ((aligned (16)))
+#endif
+
+
+
+
 
 
 template <class StructType>
@@ -131,16 +214,15 @@ static void testMainStruct(const std::string& src, const StructType& target_retu
 		FunctionSignature mainsig("main", std::vector<TypeRef>());
 		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
 
+		SSE_ALIGN StructType jitted_result;
 		
-		// __cdecl
 		void (WINTER_JIT_CALLING_CONV *f)(StructType*) = (void (WINTER_JIT_CALLING_CONV *)(StructType*))vm.getJittedFunction(mainsig);
+		//StructType (WINTER_JIT_CALLING_CONV *f)() = (StructType (WINTER_JIT_CALLING_CONV *)())vm.getJittedFunction(mainsig);
+
 
 		// Call the JIT'd function
-		SSE_ALIGN StructType jitted_result;
-
-		bleh(&jitted_result);
-
 		f(&jitted_result);
+		//jitted_result = f();
 
 		/*std::cout << "============================" << std::endl;
 		std::cout << jitted_result.a << std::endl;
@@ -279,16 +361,169 @@ static void testMainStructInputAndOutput(const std::string& src, const InStructT
 }
 
 
+SSE_CLASS_ALIGN float4
+{
+public:
+	float e[4];
+
+	inline bool operator == (const float4& other) const
+	{
+		return 
+			(e[0] == other.e[0]) &&
+			(e[1] == other.e[1]) &&
+			(e[2] == other.e[2]) &&
+			(e[3] == other.e[3]);
+	}
+};
+
+
+struct StructWithVec
+{
+	//int data;
+	float4 a;
+	float4 b;
+	float data2;
+
+	inline bool operator == (const StructWithVec& other)
+	{
+		return (a == other.a) && (b == other.b) && (data2 == other.data2);
+	}
+};
+
+
+static void testVectorInStruct(const std::string& src, const StructWithVec& struct_in, const StructWithVec& target_return_val)
+{
+	std::cout << "============================== testVectorInStruct() ============================" << std::endl;
+	try
+	{
+		VirtualMachine vm;
+		vm.loadSource(src);
+
+		vector<string> field_names;
+		field_names.push_back("a");
+		field_names.push_back("b");
+		field_names.push_back("data2");
+
+		vector<TypeRef> field_types;
+		field_types.push_back(TypeRef(new VectorType(TypeRef(new Float), 4)));
+		field_types.push_back(TypeRef(new VectorType(TypeRef(new Float), 4)));
+		field_types.push_back(TypeRef(new Float));
+
+
+		// Get main function
+		FunctionSignature mainsig(
+			"main", 
+			std::vector<TypeRef>(1, TypeRef(new StructureType(
+				"StructWithVec", 
+				field_types, 
+				field_names
+			)))
+		);
+		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
+
+
+		// __cdecl
+		void (WINTER_JIT_CALLING_CONV *f)(StructWithVec*, StructWithVec*) = (void (WINTER_JIT_CALLING_CONV *)(StructWithVec*, StructWithVec*))vm.getJittedFunction(mainsig);
+
+		// Call the JIT'd function
+		SSE_ALIGN StructWithVec jitted_result;
+
+		SSE_ALIGN StructWithVec aligned_struct_in = struct_in;
+
+		f(&jitted_result, &aligned_struct_in);
+
+		// Check JIT'd result.
+		if(!(jitted_result == target_return_val))
+		{
+			std::cerr << "Test failed: jitted_result != target_return_val  " << std::endl;
+			exit(1);
+		}
+
+		/*VMState vmstate;
+		vmstate.func_args_start.push_back(0);
+
+		Value* retval = maindef->invoke(vmstate);
+
+		vmstate.func_args_start.pop_back();
+		StructureValue* val = dynamic_cast<StructureValue*>(retval);
+		if(!val)
+		{
+		std::cerr << "main() Return value was of unexpected type." << std::endl;
+		exit(1);
+		}*/
+
+
+		/*if(val->value != target_return_val)
+		{
+		std::cerr << "Test failed: main returned " << val->value << ", target was " << target_return_val << std::endl;
+		exit(1);
+		}*/
+
+		//delete retval;
+
+	}
+	catch(Winter::BaseException& e)
+	{
+		std::cerr << e.what() << std::endl;
+		exit(1);
+	}
+	catch(Winter::LexerExcep& e)
+	{
+		std::cerr << e.what() << std::endl;
+		exit(1);
+	}
+	catch(Winter::LangParserExcep& e)
+	{
+		std::cerr << e.what() << std::endl;
+		exit(1);
+	}
+}
+
+
 void LanguageTests::run()
 {
+	/*
 	// Simple test
 	testMainFloat("def main() float : 1.0", 1.0);
 
 	// Test addition expression
 	testMainFloat("def main() float : 1.0 + 2.0", 3.0);
 
+	// Test integer addition
+	testMainInteger("def main() int : 1 + 2", 3);
+
 	// Test multiplication expression
 	testMainFloat("def main() float : 3.0 * 2.0", 6.0);
+
+	// Test integer multiplication
+	testMainInteger("def main() int : 2 * 3", 6);
+
+	// Test float subtraction
+	testMainFloat("def main() float : 3.0 - 2.0", 1.0);
+
+	// Test integer subtraction
+	testMainInteger("def main() int : 2 - 3", -1);
+
+	// Test precedence
+	testMainInteger("def main() int : 2 + 3 * 4", 14);
+	testMainInteger("def main() int : 2 * 3 + 4", 10);
+
+	// Test parentheses controlling order of operation
+	testMainInteger("def main() int : (2 + 3) * 4", 20);
+	testMainInteger("def main() int : 2 * (3 + 4)", 14);
+*/
+
+	// Test unary minus in front of paranthesis
+	testMainInteger("def main() int : -(1 + 2)", -3);
+
+	// Test floating point unary minus
+	testMainFloat("def main() float : -(1.0 + 2.0)", -3.0);
+
+	// Test unart minus in front of var
+	testMainInteger("def f(int x) int : -x        def main() int : f(3)", -3);
+
+
+
 
 	// Test simple function call
 	testMainFloat("def f(float x) float : x        def main() float : f(3.0)", 3.0);
@@ -367,6 +602,7 @@ void LanguageTests::run()
 					z \
 					def main() float : f(2.0)", 3.0);
 
+
 	// Test struct
 	testMainFloat("struct Complex { float re, float im } \
 				  def main() float : re(Complex(2.0, 3.0))", 2.0f);
@@ -387,8 +623,20 @@ void LanguageTests::run()
 	testMainFloat("	def f() vector<float, 4> : [1.0, 2.0, 3.0, 4.0]v \
 					def main() float : e2(f())", 3.0f);
 
+	// Test vector addition
+	testMainFloat("	def main() float : \
+					let x = [1.0, 2.0, 3.0, 4.0]v \
+					let y = [10.0, 20.0, 30.0, 40.0]v \
+					e1(x + y)", 22.0f);
 
-	// Test structures
+	// Test vector subtraction
+	testMainFloat("	def main() float : \
+					let x = [1.0, 2.0, 3.0, 4.0]v \
+					let y = [10.0, 20.0, 30.0, 40.0]v \
+					e1(x - y)", -18.0f);
+
+
+	// Test structure being returned from main function
 	{
 		struct TestStruct
 		{
@@ -442,6 +690,48 @@ void LanguageTests::run()
 		testMainStructInputAndOutput("struct TestStruct { float a, float b, float c, float d } \
 									 struct TestStructIn { float x, float y } \
 									 def main(TestStructIn in) TestStruct : TestStruct(x(in), y(in), 3.0, 4.0)", in, target_result);
+	}
+
+	
+
+	// Test vector in structure
+	{
+
+
+		StructWithVec in;
+		in.a.e[0] = 1;
+		in.a.e[1] = 2;
+		in.a.e[2] = 3;
+		in.a.e[3] = 4;
+
+		in.b.e[0] = 4;
+		in.b.e[1] = 5;
+		in.b.e[2] = 6;
+		in.b.e[3] = 7;
+
+		in.data2 = 10;
+
+		StructWithVec target_result;
+		target_result.a.e[0] = 5;
+		target_result.a.e[1] = 7;
+		target_result.a.e[2] = 9;
+		target_result.a.e[3] = 11;
+
+		target_result.b.e[0] = 1;
+		target_result.b.e[1] = 2;
+		target_result.b.e[2] = 3;
+		target_result.b.e[3] = 4;
+
+		target_result.data2 = 10;
+
+		testVectorInStruct(
+							"struct StructWithVec { vector<float, 4> a, vector<float, 4> b, float data2 } \n\
+							def main(StructWithVec in) StructWithVec : \n\
+								StructWithVec(  \n\
+								a(in) + b(in), #[e0(a(in)) + e0(b(in)), e1(a(in)) + e1(b(in)), e2(a(in)) + e2(b(in)), e3(a(in)) + e3(b(in))]v, \n\
+								a(in), \n\
+								data2(in))", 
+							in, target_result);
 	}
 
 

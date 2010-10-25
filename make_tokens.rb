@@ -32,6 +32,7 @@ tokens = [
 [ "NOT_EQUALS",			:bin_infix,		"neq",			50			],	
 [ "AND",				:bin_infix,		"and",			40			],	
 [ "OR",					:bin_infix,		"or",			30			],	
+[ "EXCLAMATION_MARK",	:nil,			nil,			nil			],	
 
 ]
 

@@ -1505,16 +1505,39 @@ Value* AdditionExpression::exec(VMState& vmstate)
 
 	Value* retval = NULL;
 
-	if(this->type()->getType() == Type::FloatType)
+	switch(this->type()->getType())
 	{
+	case Type::FloatType:
 		retval = new FloatValue(static_cast<FloatValue*>(aval)->value + static_cast<FloatValue*>(bval)->value);
-	}
-	else if(this->type()->getType() == Type::IntType)
-	{
+		break;
+	case Type::IntType:
 		retval = new IntValue(static_cast<IntValue*>(aval)->value + static_cast<IntValue*>(bval)->value);
-	}
-	else
-	{
+		break;
+	case Type::VectorTypeType:
+		{
+		TypeRef this_type = this->type();
+		VectorType* vectype = static_cast<VectorType*>(this_type.getPointer());
+
+		VectorValue* aval_vec = static_cast<VectorValue*>(aval);
+		VectorValue* bval_vec = static_cast<VectorValue*>(bval);
+		vector<Value*> elem_values(aval_vec->e.size());
+		switch(vectype->t->getType())
+		{
+		case Type::FloatType:
+			for(int i=0; i<elem_values.size(); ++i)
+				elem_values[i] = new FloatValue(static_cast<FloatValue*>(aval_vec->e[i])->value + static_cast<FloatValue*>(bval_vec->e[i])->value);
+			break;
+		case Type::IntType:
+			for(int i=0; i<elem_values.size(); ++i)
+				elem_values[i] = new IntValue(static_cast<IntValue*>(aval_vec->e[i])->value + static_cast<IntValue*>(bval_vec->e[i])->value);
+			break;
+		default:
+			assert(!"additionexpression vector field type invalid!");
+		};
+		retval = new VectorValue(elem_values);
+		break;
+		}
+	default:
 		assert(!"additionexpression type invalid!");
 	}
 	delete aval;
@@ -1588,21 +1611,47 @@ Value* SubtractionExpression::exec(VMState& vmstate)
 {
 	Value* aval = a->exec(vmstate);
 	Value* bval = b->exec(vmstate);
+
 	Value* retval = NULL;
-	if(this->type()->getType() == Type::FloatType)
+
+	switch(this->type()->getType())
 	{
+	case Type::FloatType:
 		retval = new FloatValue(static_cast<FloatValue*>(aval)->value - static_cast<FloatValue*>(bval)->value);
-	}
-	else if(this->type()->getType() == Type::IntType)
-	{
+		break;
+	case Type::IntType:
 		retval = new IntValue(static_cast<IntValue*>(aval)->value - static_cast<IntValue*>(bval)->value);
-	}
-	else
-	{
-		assert(!"subtractionexpression type invalid!");
+		break;
+	case Type::VectorTypeType:
+		{
+		TypeRef this_type = this->type();
+		VectorType* vectype = static_cast<VectorType*>(this_type.getPointer());
+
+		VectorValue* aval_vec = static_cast<VectorValue*>(aval);
+		VectorValue* bval_vec = static_cast<VectorValue*>(bval);
+		vector<Value*> elem_values(aval_vec->e.size());
+		switch(vectype->t->getType())
+		{
+		case Type::FloatType:
+			for(int i=0; i<elem_values.size(); ++i)
+				elem_values[i] = new FloatValue(static_cast<FloatValue*>(aval_vec->e[i])->value - static_cast<FloatValue*>(bval_vec->e[i])->value);
+			break;
+		case Type::IntType:
+			for(int i=0; i<elem_values.size(); ++i)
+				elem_values[i] = new IntValue(static_cast<IntValue*>(aval_vec->e[i])->value - static_cast<IntValue*>(bval_vec->e[i])->value);
+			break;
+		default:
+			assert(!"SubtractionExpression vector field type invalid!");
+		};
+		retval = new VectorValue(elem_values);
+		break;
+		}
+	default:
+		assert(!"SubtractionExpression type invalid!");
 	}
 	delete aval;
 	delete bval;
+
 	return retval;
 }
 
@@ -1753,6 +1802,106 @@ Reference<ASTNode> MulExpression::clone()
 	MulExpression* e = new MulExpression();
 	e->a = this->a->clone();
 	e->b = this->b->clone();
+	return ASTNodeRef(e);
+}
+
+
+//----------------------------------------------------------------------------------------
+
+
+Value* UnaryMinusExpression::exec(VMState& vmstate)
+{
+	Value* aval = expr->exec(vmstate);
+	Value* retval = NULL;
+
+	if(this->type()->getType() == Type::FloatType)
+	{
+		retval = new FloatValue(-static_cast<FloatValue*>(aval)->value);
+	}
+	else if(this->type()->getType() == Type::IntType)
+	{
+		retval = new IntValue(-static_cast<IntValue*>(aval)->value);
+	}
+	else
+	{
+		assert(!"UnaryMinusExpression type invalid!");
+	}
+	delete aval;
+	return retval;
+}
+
+
+/*void MulExpression::bindVariables(const std::vector<ASTNode*>& stack)
+{
+	std::vector<ASTNode*> s(stack);
+	s.push_back(this);
+	this->a->bindVariables(s);
+	this->b->bindVariables(s);
+}*/
+
+
+void UnaryMinusExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
+{
+	stack.push_back(this);
+	expr->traverse(payload, stack);
+	stack.pop_back();
+
+	/*if(payload.operation == TraversalPayload::TypeCheck)
+		if(this->type()->getType() == Type::GenericTypeType || *this->type() == Int() || *this->type() == Float())
+		{}
+		else
+		{
+			throw BaseException("Child type '" + this->type()->toString() + "' does not define binary operator '*'.");
+		}
+	*/
+}
+
+
+
+void UnaryMinusExpression::print(int depth, std::ostream& s) const
+{
+	printMargin(depth, s);
+	s << "Unary Minus Expression\n";
+	this->expr->print(depth+1, s);
+}
+
+
+/*void MulExpression::linkFunctions(Linker& linker)
+{
+	a->linkFunctions(linker);
+	b->linkFunctions(linker);
+}*/
+
+
+llvm::Value* UnaryMinusExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+#if USE_LLVM
+	if(this->type()->getType() == Type::FloatType)
+	{
+		return params.builder->CreateFNeg(
+			expr->emitLLVMCode(params)
+		);
+	}
+	else if(this->type()->getType() == Type::IntType)
+	{
+		return params.builder->CreateNeg(
+			expr->emitLLVMCode(params)
+		);
+	}
+	else
+	{
+		assert(!"UnaryMinusExpression type invalid!");
+	}
+#else
+	return NULL;
+#endif
+}
+
+
+Reference<ASTNode> UnaryMinusExpression::clone()
+{
+	UnaryMinusExpression* e = new UnaryMinusExpression();
+	e->expr = this->expr->clone();
 	return ASTNodeRef(e);
 }
 

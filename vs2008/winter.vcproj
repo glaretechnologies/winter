@@ -41,7 +41,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="C:\programming\zlib123;C:\programming\indigo\trunk;C:\programming\llvm\llvm_27_cmake_install_32_debug\include"
+				AdditionalIncludeDirectories=".;C:\programming\zlib123;C:\programming\indigo\trunk;C:\programming\llvm\llvm_27_cmake_install_32_debug\include"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;USE_LLVM=1;_CRT_SECURE_NO_WARNINGS;_SECURE_SCL=0"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -185,27 +185,63 @@
 				Name="Indigo"
 				>
 				<File
-					RelativePath="..\..\..\indigo\trunk\utils\fileutils.cpp"
+					RelativePath="..\utils\clock.cpp"
 					>
 				</File>
 				<File
-					RelativePath="..\..\..\indigo\trunk\utils\fileutils.h"
+					RelativePath="..\utils\clock.h"
 					>
 				</File>
 				<File
-					RelativePath="..\..\..\indigo\trunk\utils\Parser.cpp"
+					RelativePath="..\utils\fileutils.cpp"
 					>
 				</File>
 				<File
-					RelativePath="..\..\..\indigo\trunk\utils\Parser.h"
+					RelativePath="..\utils\fileutils.h"
 					>
 				</File>
 				<File
-					RelativePath="..\..\..\indigo\trunk\utils\stringutils.cpp"
+					RelativePath="..\utils\Parser.cpp"
 					>
 				</File>
 				<File
-					RelativePath="..\..\..\indigo\trunk\utils\stringutils.h"
+					RelativePath="..\utils\Parser.h"
+					>
+				</File>
+				<File
+					RelativePath="..\utils\platform.h"
+					>
+				</File>
+				<File
+					RelativePath="..\utils\refcounted.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\utils\refcounted.h"
+					>
+				</File>
+				<File
+					RelativePath="..\utils\reference.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\utils\reference.h"
+					>
+				</File>
+				<File
+					RelativePath="..\utils\stringutils.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\utils\stringutils.h"
+					>
+				</File>
+				<File
+					RelativePath="..\utils\timer.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\utils\timer.h"
 					>
 				</File>
 			</Filter>

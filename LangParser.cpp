@@ -182,8 +182,9 @@ void LangParser::parseToken(unsigned int token_type, const ParseInfo& p)
 		throw LangParserExcep("End of buffer before " + tokenName(token_type) + " token.");
 	
 	if(p.tokens[p.i]->getType() != token_type)
-		throw LangParserExcep("Expected " + tokenName(token_type) + "." + errorPosition(p.text_buffer, p.tokens[p.i]->char_index));
-
+	{
+		throw LangParserExcep("Expected " + tokenName(token_type) + ", found " + tokenName(p.tokens[p.i]->getType()) + errorPosition(p.text_buffer, p.tokens[p.i]->char_index));
+	}
 	p.i++;
 }
 
@@ -641,7 +642,7 @@ ASTNodeRef LangParser::parseAddSubExpression(const ParseInfo& p)
 
 ASTNodeRef LangParser::parseMulDivExpression(const ParseInfo& p)
 {
-	ASTNodeRef left = parseParenExpression(p);
+	ASTNodeRef left = parseUnaryExpression(p);
 	if(isTokenCurrent(ASTERISK_TOKEN, p))
 	{
 		parseToken(ASTERISK_TOKEN, p);
@@ -649,11 +650,29 @@ ASTNodeRef LangParser::parseMulDivExpression(const ParseInfo& p)
 		MulExpression* addexpr = new MulExpression();
 		addexpr->a = left;
 		//left->setParent(addexpr);
-		addexpr->b = parseParenExpression(p);
+		addexpr->b = parseUnaryExpression(p);
 		return ASTNodeRef(addexpr);
 	}
 	else
 		return left;
+}
+
+
+ASTNodeRef LangParser::parseUnaryExpression(const ParseInfo& p)
+{
+	if(isTokenCurrent(MINUS_TOKEN, p))
+	{
+		parseToken(MINUS_TOKEN, p);
+
+		UnaryMinusExpression* unary_expr = new UnaryMinusExpression();
+		unary_expr->expr = parseUnaryExpression(p);
+
+		return ASTNodeRef(unary_expr);
+	}
+	else
+	{
+		return parseParenExpression(p);
+	}
 }
 
 

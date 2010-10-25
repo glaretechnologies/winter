@@ -41,7 +41,7 @@ void Lexer::parseStringLiteral(Parser& parser, std::vector<Reference<TokenBase> 
 	while(1)
 	{
 		if(parser.eof())
-			throw LexerExcep("End of input while parsing string literal." + errorPosition(parser.getText(), parser.current()));
+			throw LexerExcep("End of input while parsing string literal." + errorPosition(parser.getText(), parser.currentPos()));
 
 		if(parser.current() == '"')
 		{
@@ -73,7 +73,7 @@ void Lexer::parseNumericLiteral(Parser& parser, std::vector<Reference<TokenBase>
 	{
 		double x;
 		if(!parser.parseDouble(x))
-			throw LexerExcep("Failed to parse real." + errorPosition(parser.getText(), parser.current()));
+			throw LexerExcep("Failed to parse real." + errorPosition(parser.getText(), parser.currentPos()));
 
 		tokens_out.push_back(Reference<TokenBase>(new FloatLiteralToken((float)x, char_index)));
 	}
@@ -81,7 +81,12 @@ void Lexer::parseNumericLiteral(Parser& parser, std::vector<Reference<TokenBase>
 	{
 		int x;
 		if(!parser.parseInt(x))
-			throw LexerExcep("Failed to parse int" + errorPosition(parser.getText(), parser.current()));
+		{
+			const unsigned int pos = parser.currentPos();
+			std::string next_token;
+			parser.parseNonWSToken(next_token);
+			throw LexerExcep("Failed to parse int.  (Next chars '" + next_token + "')" + errorPosition(parser.getText(), pos));
+		}
 
 		tokens_out.push_back(Reference<TokenBase>(new IntLiteralToken(x, char_index)));
 	}
@@ -130,7 +135,7 @@ void Lexer::process(const std::string& buffer, std::vector<Reference<TokenBase> 
 		{
 			parseStringLiteral(parser, tokens_out);
 		}
-		else if(parser.current() == '-' || parser.current() == '+' || parser.current() == '.' || ::isNumeric(parser.current()))
+		else if(parser.current() == '-' /*|| parser.current() == '+'*/ /*|| parser.current() == '.'*/ || ::isNumeric(parser.current()))
 		{
 			if(parser.parseString("->"))
 			{
@@ -138,7 +143,25 @@ void Lexer::process(const std::string& buffer, std::vector<Reference<TokenBase> 
 			}
 			else
 			{
-				if((parser.current() == '-' || parser.current() == '+') && 
+				if(parser.current() == '-')
+				{
+					if(::isNumeric(parser.next()))
+					{
+						// This is a negative numeric literal like '-3.0f'
+						parseNumericLiteral(parser, tokens_out);
+					}
+					else
+					{
+						tokens_out.push_back(Reference<TokenBase>(new MINUS_Token(parser.currentPos())));
+						parser.advance();
+					}
+				}
+				else
+				{
+					parseNumericLiteral(parser, tokens_out);
+				}
+
+				/*if((parser.current() == '-' || parser.current() == '+') && 
 					(parser.current() == '+' || 
 						(parser.currentPos() + 1 < parser.getTextSize() && isWhitespace(parser.getText()[parser.currentPos() + 1]))
 					)
@@ -161,6 +184,7 @@ void Lexer::process(const std::string& buffer, std::vector<Reference<TokenBase> 
 				{
 					parseNumericLiteral(parser, tokens_out);
 				}
+				*/
 			}
 		}
 		else if(::isWhitespace(parser.current()))

@@ -27,6 +27,9 @@ class FunctionSignature;
 class FunctionDefinition;
 
 
+#define WINTER_JIT_CALLING_CONV __cdecl
+
+
 /*=====================================================================
 VirtualMachine
 -------------------
