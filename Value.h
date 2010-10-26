@@ -2,7 +2,7 @@
 #pragma once
 
 
-#include "Type.h"
+#include "wnt_Type.h"
 #include <string>
 #include <vector>
 #include <map>

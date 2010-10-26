@@ -3,7 +3,7 @@
 
 #include "VMState.h"
 #include "Value.h"
-#include "ASTNode.h"
+#include "wnt_ASTNode.h"
 #include <vector>
 #include "LLVMTypeUtils.h"
 #if USE_LLVM

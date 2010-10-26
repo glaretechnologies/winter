@@ -6,7 +6,7 @@ Code By Nicholas Chapman.
 
 Copyright 2009 Nicholas Chapman
 =====================================================================*/
-#include "ASTNode.h"
+#include "wnt_ASTNode.h"
 
 
 #include "VMState.h"

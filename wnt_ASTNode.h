@@ -16,8 +16,8 @@ using std::string;
 using std::vector;
 #include "utils/refcounted.h"
 #include "utils/reference.h"
-#include "Type.h"
-#include "FunctionSignature.h"
+#include "wnt_Type.h"
+#include "wnt_FunctionSignature.h"
 #include "BaseException.h"
 #if USE_LLVM
 #include <llvm/Support/IRBuilder.h>

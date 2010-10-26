@@ -2,8 +2,8 @@
 #pragma once
 
 
-#include "FunctionSignature.h"
-#include "ASTNode.h"
+#include "wnt_FunctionSignature.h"
+#include "wnt_ASTNode.h"
 #include <map>
 namespace llvm { class Module; }
 

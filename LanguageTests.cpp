@@ -16,10 +16,10 @@ extern "C"
 #include <cassert>
 #include <fstream>
 #include "utils/FileUtils.h"
-#include "Lexer.h"
+#include "wnt_Lexer.h"
 #include "TokenBase.h"
-#include "LangParser.h"
-#include "ASTNode.h"
+#include "wnt_LangParser.h"
+#include "wnt_ASTNode.h"
 #include "VMState.h"
 #include "Linker.h"
 #include "Value.h"
@@ -491,6 +491,16 @@ void LanguageTests::run()
 
 	// Test integer addition
 	testMainInteger("def main() int : 1 + 2", 3);
+*/
+	// Test multiple integer additions
+	testMainInteger("def main() int : 1 + 2 + 3", 6);
+	testMainInteger("def main() int : 1 + 2 + 3 + 4", 10);
+
+	// Test left-to-right associativity
+	assert(2 - 3 + 4 == (2 - 3) + 4);
+	assert(2 - 3 + 4 == 3);
+	testMainInteger("def main() int : 2 - 3 + 4", 3);
+
 
 	// Test multiplication expression
 	testMainFloat("def main() float : 3.0 * 2.0", 6.0);
@@ -511,15 +521,15 @@ void LanguageTests::run()
 	// Test parentheses controlling order of operation
 	testMainInteger("def main() int : (2 + 3) * 4", 20);
 	testMainInteger("def main() int : 2 * (3 + 4)", 14);
-*/
 
-	// Test unary minus in front of paranthesis
+
+	// Test unary minus in front of parenthesis
 	testMainInteger("def main() int : -(1 + 2)", -3);
 
 	// Test floating point unary minus
 	testMainFloat("def main() float : -(1.0 + 2.0)", -3.0);
 
-	// Test unart minus in front of var
+	// Test unary minus in front of var
 	testMainInteger("def f(int x) int : -x        def main() int : f(3)", -3);
 
 

@@ -6,7 +6,7 @@ Code By Nicholas Chapman.
 
 Copyright 2009 Nicholas Chapman
 =====================================================================*/
-#include "Lexer.h"
+#include "wnt_Lexer.h"
 
 
 #include "utils/Parser.h"

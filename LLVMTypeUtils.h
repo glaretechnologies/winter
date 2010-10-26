@@ -7,7 +7,7 @@ Generated at Wed Oct 20 15:22:37 +1300 2010
 #pragma once
 
 
-#include "Type.h"
+#include "wnt_Type.h"
 namespace llvm { class Function; class Type; class LLVMContext; }
 
 

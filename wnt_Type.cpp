@@ -1,4 +1,4 @@
-#include "Type.h"
+#include "wnt_Type.h"
 
 
 #include "utils/stringutils.h"

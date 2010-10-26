@@ -12,10 +12,10 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include <fstream>
 #include "utils/FileUtils.h"
 #include "utils/stringutils.h"
-#include "Lexer.h"
+#include "wnt_Lexer.h"
 #include "TokenBase.h"
-#include "LangParser.h"
-#include "ASTNode.h"
+#include "wnt_LangParser.h"
+#include "wnt_ASTNode.h"
 #include "VMState.h"
 #include "Linker.h"
 #include "Value.h"

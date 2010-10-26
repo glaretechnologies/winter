@@ -8,7 +8,7 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 
 
 #include "utils/reference.h"
-#include "ASTNode.h"
+#include "wnt_ASTNode.h"
 #include "Linker.h"
 #include <string>
 namespace llvm
