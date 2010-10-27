@@ -11,6 +11,10 @@ Generated at Wed Oct 20 15:22:37 +1300 2010
 namespace llvm { class Function; class Type; class LLVMContext; }
 
 
+namespace Winter
+{
+
+
 /*=====================================================================
 LLVMTypeUtils
 -------------------
@@ -24,5 +28,10 @@ llvm::Value* getNthArg(llvm::Function *func, int n);
 
 const llvm::Type* pointerType(const llvm::Type& type);
 
+llvm::FunctionType* llvmInternalFunctionType(const std::vector<TypeRef>& arg_types, TypeRef return_type, llvm::LLVMContext& context);
+
 
 }; // end namespace LLVMTypeUtils
+
+
+}; // end namespace Winter

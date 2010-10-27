@@ -178,10 +178,6 @@
 			Name="external"
 			>
 			<Filter
-				Name="zlib"
-				>
-			</Filter>
-			<Filter
 				Name="Indigo"
 				>
 				<File
@@ -247,14 +243,6 @@
 			</Filter>
 		</Filter>
 		<File
-			RelativePath="..\ASTNode.cpp"
-			>
-		</File>
-		<File
-			RelativePath="..\ASTNode.h"
-			>
-		</File>
-		<File
 			RelativePath="..\BaseException.h"
 			>
 		</File>
@@ -271,23 +259,7 @@
 			>
 		</File>
 		<File
-			RelativePath="..\FunctionSignature.cpp"
-			>
-		</File>
-		<File
-			RelativePath="..\FunctionSignature.h"
-			>
-		</File>
-		<File
 			RelativePath="..\GeneratedTokens.h"
-			>
-		</File>
-		<File
-			RelativePath="..\LangParser.cpp"
-			>
-		</File>
-		<File
-			RelativePath="..\LangParser.h"
 			>
 		</File>
 		<File
@@ -296,14 +268,6 @@
 		</File>
 		<File
 			RelativePath="..\LanguageTests.h"
-			>
-		</File>
-		<File
-			RelativePath="..\Lexer.cpp"
-			>
-		</File>
-		<File
-			RelativePath="..\Lexer.h"
 			>
 		</File>
 		<File
@@ -343,14 +307,6 @@
 			>
 		</File>
 		<File
-			RelativePath="..\Type.cpp"
-			>
-		</File>
-		<File
-			RelativePath="..\Type.h"
-			>
-		</File>
-		<File
 			RelativePath="..\Value.cpp"
 			>
 		</File>
@@ -372,6 +328,54 @@
 		</File>
 		<File
 			RelativePath="..\winter.cpp"
+			>
+		</File>
+		<File
+			RelativePath="..\wnt_ASTNode.cpp"
+			>
+		</File>
+		<File
+			RelativePath="..\wnt_ASTNode.h"
+			>
+		</File>
+		<File
+			RelativePath="..\wnt_ExternalFunction.cpp"
+			>
+		</File>
+		<File
+			RelativePath="..\wnt_ExternalFunction.h"
+			>
+		</File>
+		<File
+			RelativePath="..\wnt_FunctionSignature.cpp"
+			>
+		</File>
+		<File
+			RelativePath="..\wnt_FunctionSignature.h"
+			>
+		</File>
+		<File
+			RelativePath="..\wnt_LangParser.cpp"
+			>
+		</File>
+		<File
+			RelativePath="..\wnt_LangParser.h"
+			>
+		</File>
+		<File
+			RelativePath="..\wnt_Lexer.cpp"
+			>
+		</File>
+		<File
+			RelativePath="..\wnt_Lexer.h"
+			>
+		</File>
+		<File
+			RelativePath="..\wnt_Type.cpp"
+			>
+		</File>
+		<File
+			RelativePath="..\wnt_Type.h"
 			>
 		</File>
 	</Files>

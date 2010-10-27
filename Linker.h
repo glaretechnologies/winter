@@ -5,11 +5,15 @@
 #include "wnt_FunctionSignature.h"
 #include "wnt_ASTNode.h"
 #include <map>
+#include <set>
 namespace llvm { class Module; }
 
 
 namespace Winter
 {
+
+
+class ExternalFunction;
 
 
 class Linker
@@ -20,6 +24,7 @@ public:
 
 
 	void addFunctions(BufferRoot& root);
+	void addExternalFunctions(std::vector<ExternalFunction>& f);
 
 	//void linkFunctions(BufferRoot& root);
 
@@ -34,6 +39,8 @@ private:
 
 	typedef std::map<FunctionSignature, Reference<FunctionDefinition> > FuncMapType;
 	FuncMapType functions;
+
+	//FuncMapType external_functions;
 
 };
 

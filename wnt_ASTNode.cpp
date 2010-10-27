@@ -46,41 +46,7 @@ namespace Winter
 {
 
 
-static llvm::FunctionType* llvmInternalFunctionType(
-	const vector<TypeRef>& arg_types, TypeRef return_type, llvm::LLVMContext& context)
-{
-	if(return_type->passByValue())
-	{
-		vector<const llvm::Type*> llvm_arg_types;
 
-		for(unsigned int i=0; i<arg_types.size(); ++i)
-			llvm_arg_types.push_back(arg_types[i]->passByValue() ? arg_types[i]->LLVMType(context) : LLVMTypeUtils::pointerType(*arg_types[i]->LLVMType(context)));
-
-		return llvm::FunctionType::get(
-			return_type->LLVMType(context), // return type
-			llvm_arg_types,
-			false // varargs
-		);
-	}
-	else
-	{
-		// The return value is passed by reference, so that means the zero-th argument will be a pointer to memory where the return value will be placed.
-
-		vector<const llvm::Type*> llvm_arg_types;
-		llvm_arg_types.push_back(LLVMTypeUtils::pointerType(*return_type->LLVMType(context)));
-
-		// Append normal arguments
-		for(unsigned int i=0; i<arg_types.size(); ++i)
-			llvm_arg_types.push_back(arg_types[i]->passByValue() ? arg_types[i]->LLVMType(context) : LLVMTypeUtils::pointerType(*arg_types[i]->LLVMType(context)));
-
-		return llvm::FunctionType::get(
-			//LLVMTypeUtils::pointerType(*return_type->LLVMType(context)), 
-			llvm::Type::getVoidTy(context), // return type - void as return value will be written to mem via zero-th arg.
-			llvm_arg_types,
-			false // varargs
-		);
-	}
-}
 
 /*
 ASTNode::ASTNode()
@@ -354,7 +320,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	)
 {
 #if USE_LLVM
-	llvm::FunctionType* functype = llvmInternalFunctionType(
+	llvm::FunctionType* functype = LLVMTypeUtils::llvmInternalFunctionType(
 		this->sig.param_types, 
 		returnType(), 
 		module->getContext()
@@ -779,7 +745,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 		);
 	assert(target_llvm_func);*/
 
-	llvm::FunctionType* target_func_type = llvmInternalFunctionType(
+	llvm::FunctionType* target_func_type = LLVMTypeUtils::llvmInternalFunctionType(
 		this->target_function->sig.param_types, 
 		this->target_function->returnType(), 
 		*params.context
@@ -1891,6 +1857,7 @@ llvm::Value* UnaryMinusExpression::emitLLVMCode(EmitLLVMCodeParams& params) cons
 	else
 	{
 		assert(!"UnaryMinusExpression type invalid!");
+		return NULL;
 	}
 #else
 	return NULL;

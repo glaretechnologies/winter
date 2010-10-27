@@ -21,6 +21,7 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "Value.h"
 #include "LanguageTests.h"
 #include "VirtualMachine.h"
+#include "LLVMTypeUtils.h"
 #if USE_LLVM
 #include "llvm/Module.h"
 #include "llvm/Analysis/Verifier.h"
@@ -42,7 +43,14 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 namespace Winter
 {
 
+
+float testFunc(float x)
+{
+	std::cout << "In test func!, " << x << std::endl;
+	return x * x;
+}
 	
+
 VirtualMachine::VirtualMachine()
 {
 	this->llvm_context = new llvm::LLVMContext();
@@ -58,6 +66,24 @@ VirtualMachine::VirtualMachine()
 		&error_str
 	);
 
+	this->llvm_exec_engine->DisableLazyCompilation();
+	//this->llvm_exec_engine->InstallLazyFunctionCreator(lazyFunctionCreator);
+	this->llvm_exec_engine->DisableSymbolSearching();
+
+	{
+		ExternalFunction f;
+		f.func = testFunc;
+		f.return_type = TypeRef(new Float());
+		f.sig = FunctionSignature("testFunc", vector<TypeRef>(1, TypeRef(new Float())));
+
+		this->external_functions.push_back(f);
+	}
+
+	for(int i=0; i<this->external_functions.size(); ++i)
+		addExternalFunction(this->external_functions[i], *this->llvm_context, *this->llvm_module);
+	
+	
+
 	assert(this->llvm_exec_engine);
 	assert(error_str.empty());
 }
@@ -70,6 +96,18 @@ VirtualMachine::~VirtualMachine()
 	delete this->llvm_exec_engine;
 
 	delete llvm_context;
+}
+
+
+void VirtualMachine::addExternalFunction(const ExternalFunction& f, llvm::LLVMContext& context, llvm::Module& module)
+{
+	llvm::FunctionType* llvm_f_type = LLVMTypeUtils::llvmInternalFunctionType(f.sig.param_types, f.return_type, context);
+
+	llvm::Function* llvm_f = static_cast<llvm::Function*>(module.getOrInsertFunction(
+		f.sig.toString(), // Name
+		llvm_f_type // Type
+	));
+	this->llvm_exec_engine->addGlobalMapping(llvm_f, f.func);
 }
 
 
@@ -111,6 +149,7 @@ void VirtualMachine::loadSource(const std::string& source)
 
 	// Link functions
 	//Linker linker;
+	linker.addExternalFunctions(this->external_functions);
 	linker.addFunctions(*root);
 	{
 		std::vector<ASTNode*> stack;

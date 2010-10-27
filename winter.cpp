@@ -4,10 +4,10 @@
 #include <cassert>
 #include <fstream>
 #include "utils/FileUtils.h"
-#include "Lexer.h"
+#include "wnt_Lexer.h"
 #include "TokenBase.h"
-#include "LangParser.h"
-#include "ASTNode.h"
+#include "wnt_LangParser.h"
+#include "wnt_ASTNode.h"
 #include "VMState.h"
 #include "Linker.h"
 #include "Value.h"

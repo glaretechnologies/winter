@@ -482,6 +482,10 @@ static void testVectorInStruct(const std::string& src, const StructWithVec& stru
 
 void LanguageTests::run()
 {
+	// Test call to external function
+	testMainFloat("def main() float : testFunc(3.0)", 9.0);
+
+
 	/*
 	// Simple test
 	testMainFloat("def main() float : 1.0", 1.0);
@@ -494,7 +498,7 @@ void LanguageTests::run()
 */
 	// Test multiple integer additions
 	testMainInteger("def main() int : 1 + 2 + 3", 6);
-	testMainInteger("def main() int : 1 + 2 + 3 + 4", 10);
+	//testMainInteger("def main() int : 1 + 2 + 3 + 4", 10);
 
 	// Test left-to-right associativity
 	assert(2 - 3 + 4 == (2 - 3) + 4);

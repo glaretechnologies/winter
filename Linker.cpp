@@ -5,6 +5,7 @@
 #include "BuiltInFunctionImpl.h"
 #include <iostream>
 #include "utils/stringutils.h"
+#include "wnt_ExternalFunction.h"
 
 
 using std::vector;
@@ -29,6 +30,29 @@ void Linker::addFunctions(BufferRoot& root)
 		Reference<FunctionDefinition> def = root.func_defs[i];
 
 		this->functions.insert(std::make_pair(def->sig, def));
+	}
+}
+
+
+void Linker::addExternalFunctions(vector<ExternalFunction>& funcs)
+{
+	for(int i=0; i<funcs.size(); ++i)
+	{
+		vector<FunctionDefinition::FunctionArg> args;
+		for(int z=0; z<funcs[i].sig.param_types.size(); ++z)
+			args.push_back(FunctionDefinition::FunctionArg(funcs[i].sig.param_types[z], "arg_" + ::toString(z)));
+
+		Reference<FunctionDefinition> def(new FunctionDefinition(
+			funcs[i].sig.name,
+			args,
+			vector<Reference<LetASTNode>>(),
+			ASTNodeRef(NULL),
+			funcs[i].return_type,
+			NULL
+		));
+		//this->external_functions.insert(f[i].sig);
+
+		this->functions.insert(std::make_pair(funcs[i].sig, def));
 	}
 }
 

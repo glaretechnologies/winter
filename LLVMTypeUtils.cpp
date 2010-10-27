@@ -24,6 +24,13 @@ Generated at Wed Oct 20 15:22:37 +1300 2010
 #endif
 
 
+using std::vector;
+
+
+namespace Winter
+{
+
+
 namespace LLVMTypeUtils
 {
 
@@ -46,4 +53,43 @@ const llvm::Type* pointerType(const llvm::Type& type)
 }
 
 
+llvm::FunctionType* llvmInternalFunctionType(const vector<TypeRef>& arg_types, TypeRef return_type, llvm::LLVMContext& context)
+{
+	if(return_type->passByValue())
+	{
+		vector<const llvm::Type*> llvm_arg_types;
+
+		for(unsigned int i=0; i<arg_types.size(); ++i)
+			llvm_arg_types.push_back(arg_types[i]->passByValue() ? arg_types[i]->LLVMType(context) : LLVMTypeUtils::pointerType(*arg_types[i]->LLVMType(context)));
+
+		return llvm::FunctionType::get(
+			return_type->LLVMType(context), // return type
+			llvm_arg_types,
+			false // varargs
+			);
+	}
+	else
+	{
+		// The return value is passed by reference, so that means the zero-th argument will be a pointer to memory where the return value will be placed.
+
+		vector<const llvm::Type*> llvm_arg_types;
+		llvm_arg_types.push_back(LLVMTypeUtils::pointerType(*return_type->LLVMType(context)));
+
+		// Append normal arguments
+		for(unsigned int i=0; i<arg_types.size(); ++i)
+			llvm_arg_types.push_back(arg_types[i]->passByValue() ? arg_types[i]->LLVMType(context) : LLVMTypeUtils::pointerType(*arg_types[i]->LLVMType(context)));
+
+		return llvm::FunctionType::get(
+			//LLVMTypeUtils::pointerType(*return_type->LLVMType(context)), 
+			llvm::Type::getVoidTy(context), // return type - void as return value will be written to mem via zero-th arg.
+			llvm_arg_types,
+			false // varargs
+			);
+	}
+}
+
+
 }; // end namespace LLVMTypeUtils
+
+
+}; // end namespace Winter
