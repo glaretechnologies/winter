@@ -18,7 +18,9 @@ using std::vector;
 #include "utils/reference.h"
 #include "wnt_Type.h"
 #include "wnt_FunctionSignature.h"
+#include "wnt_ExternalFunction.h"
 #include "BaseException.h"
+#include "TokenBase.h"
 #if USE_LLVM
 #include <llvm/Support/IRBuilder.h>
 #endif
@@ -104,6 +106,7 @@ public:
 		MulExpressionType,
 		UnaryMinusExpressionType,
 		LetType,
+		ComparisonExpressionType,
 		AnonFunctionType
 	};
 
@@ -259,7 +262,8 @@ public:
 
 	//Reference<ASTNode> target_function;
 	//ASTNode* target_function;
-	FunctionDefinition* target_function;
+	FunctionDefinition* target_function; // May be NULL
+	Reference<ExternalFunction> target_external_function; // May be NULL
 	int argument_index;
 	//int argument_offset; // Currently, a variable must be an argument to the enclosing function
 	enum BindingType
@@ -526,6 +530,26 @@ public:
 
 	std::string variable_name;
 	ASTNodeRef expr;
+};
+
+
+class ComparisonExpression : public ASTNode
+{
+public:
+	ComparisonExpression(Reference<TokenBase>& token_, ASTNodeRef a_, ASTNodeRef b_) : 
+	  token(token_), a(a_), b(b_) {}
+
+	virtual Value* exec(VMState& vmstate);
+	virtual ASTNodeType nodeType() const { return ComparisonExpressionType; }
+	virtual TypeRef type() const { return TypeRef(new Bool()); }
+	virtual void print(int depth, std::ostream& s) const;
+	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+	virtual Reference<ASTNode> clone();
+
+	Reference<TokenBase> token;
+	ASTNodeRef a;
+	ASTNodeRef b;
 };
 
 

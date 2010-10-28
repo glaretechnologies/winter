@@ -11,6 +11,7 @@ Copyright 2009 Nicholas Chapman
 
 
 #include "utils/refcounted.h"
+#include "utils/reference.h"
 #include <string>
 //#include "Type.h"
 

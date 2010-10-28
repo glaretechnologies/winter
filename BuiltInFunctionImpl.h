@@ -97,4 +97,18 @@ private:
 	TypeRef T;
 };
 
+
+class IfBuiltInFunc : public BuiltInFunctionImpl
+{
+public:
+	IfBuiltInFunc(TypeRef& T_) : T(T_) {}
+	virtual ~IfBuiltInFunc(){}
+
+	virtual Value* invoke(VMState& vmstate);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+private:
+	TypeRef T;
+};
+
+
 }

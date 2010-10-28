@@ -90,3 +90,17 @@ file.puts "\t\tdefault: return \"[Unknown]\";"
 file.puts "\t}"
 file.puts "}"
 
+
+file.puts "\n\ninline Reference<TokenBase> makeTokenObject(unsigned int token_type, unsigned int char_index)"
+file.puts '{'
+file.puts "\tswitch(token_type) {"
+$i = 10
+tokens.each do |t|
+	classname = "#{t[0]}_Token"
+	
+	file.puts "\t\tcase #{$i}: return Reference<TokenBase>(new #{classname}(char_index));"
+	$i += 1
+end
+file.puts "\t\tdefault: return  Reference<TokenBase>();"
+file.puts "\t}"
+file.puts "}"

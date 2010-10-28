@@ -36,8 +36,9 @@ int main(int argc, char** argv)
 		std::string filecontents;
 		FileUtils::readEntireFile(argv[1], filecontents);
 
-		VirtualMachine vm;
-		vm.loadSource(filecontents);
+		VMConstructionArgs vm_args;
+		vm_args.source_buffers.push_back(filecontents);
+		VirtualMachine vm(vm_args);
 
 
 		// Get main function

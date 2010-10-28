@@ -343,7 +343,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 		//function_attr |= llvm::Attribute::ReadNone
 
 		bool has_ptr_arg = false;
-		for(int i=0; i<this->args.size(); ++i)
+		for(unsigned int i=0; i<this->args.size(); ++i)
 		{
 			if(!this->args[i].type->passByValue())
 				has_ptr_arg = true;
@@ -549,6 +549,16 @@ Value* FunctionExpression::exec(VMState& vmstate)
 	if(VERBOSE_EXEC) std::cout << indent(vmstate) << "FunctionExpression, target_name=" << this->function_name << "\n";
 	
 	//assert(target_function);
+	if(this->target_external_function.nonNull())
+	{
+		vector<const Value*> args;
+		for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
+			args.push_back(this->argument_expressions[i]->exec(vmstate));
+
+		Value* result = this->target_external_function->interpreted_func(args);
+		return result;
+	}
+
 	// Get target function
 	FunctionDefinition* use_target_func = runtimeBind(vmstate);
 
@@ -666,10 +676,24 @@ void FunctionExpression::linkFunctions(Linker& linker, std::vector<ASTNode*>& st
 		//Linker::FuncMapType::iterator res = linker.functions.find(sig);
 		//if(res == linker.functions.end())
 		//	throw BaseException("Failed to find function with signature " + sig.toString());
-		
-		this->target_function = linker.findMatchingFunction(sig).getPointer();
-		this->binding_type = Bound;
-		this->target_function_return_type = this->target_function->returnType();
+
+		// Try and resolve to external function
+		ExternalFunctionRef extern_func = linker.findMatchingExternalFunction(sig);
+
+		if(extern_func.nonNull())
+		{
+			this->target_function = NULL;
+			this->target_external_function = extern_func;
+			this->binding_type = Bound;
+			this->target_function_return_type = extern_func->return_type;
+		}
+		else
+		{
+			// Try and resolve to internal function.
+			this->target_function = linker.findMatchingFunction(sig).getPointer();
+			this->binding_type = Bound;
+			this->target_function_return_type = this->target_function->returnType();
+		}
 	}
 }
 
@@ -708,6 +732,8 @@ void FunctionExpression::print(int depth, std::ostream& s) const
 	s << "FunctionExpr";
 	if(this->target_function)
 		s << "; target: " << this->target_function->sig.toString();
+	else if(this->target_external_function.nonNull())
+		s << "; target (external): " << this->target_external_function->sig.toString();
 	else if(this->binding_type == Arg)
 		s << "; runtime bound to arg index " << this->argument_index;
 	else if(this->binding_type == Let)
@@ -745,14 +771,17 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 		);
 	assert(target_llvm_func);*/
 
+	FunctionSignature target_sig = this->target_function ? this->target_function->sig : this->target_external_function->sig;
+	TypeRef target_ret_type = this->target_function_return_type;
+
 	llvm::FunctionType* target_func_type = LLVMTypeUtils::llvmInternalFunctionType(
-		this->target_function->sig.param_types, 
-		this->target_function->returnType(), 
+		target_sig.param_types, 
+		target_ret_type, 
 		*params.context
 	);
 
 	llvm::Function* target_llvm_func = static_cast<llvm::Function*>(params.module->getOrInsertFunction(
-		this->target_function->sig.toString(), // Name
+		target_sig.toString(), // Name
 		target_func_type // Type
 	));
 
@@ -762,7 +791,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 	//------------------
 	// Build args list
 
-	if(target_function->returnType()->passByValue())
+	if(target_ret_type->passByValue())
 	{
 		vector<llvm::Value*> args;
 
@@ -784,10 +813,10 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 		// Allocate return value on stack
 		llvm::Value* return_val_addr = params.builder->Insert(new llvm::AllocaInst(
-			target_function->returnType()->LLVMType(*params.context), // type
+			target_ret_type->LLVMType(*params.context), // type
 			NULL, // ArraySize
 			16, // alignment
-			this->target_function->sig.toString() + " return_val_addr"
+			target_sig.toString() + " return_val_addr"
 		));
 
 		vector<llvm::Value*> args(1, return_val_addr);
@@ -817,6 +846,7 @@ Reference<ASTNode> FunctionExpression::clone()
 		e->argument_expressions.push_back(argument_expressions[i]->clone());
 	
 	e->target_function = this->target_function;
+	e->target_external_function = this->target_external_function;
 	e->argument_index = this->argument_index;
 	e->binding_type = this->binding_type;
 
@@ -1490,11 +1520,11 @@ Value* AdditionExpression::exec(VMState& vmstate)
 		switch(vectype->t->getType())
 		{
 		case Type::FloatType:
-			for(int i=0; i<elem_values.size(); ++i)
+			for(unsigned int i=0; i<elem_values.size(); ++i)
 				elem_values[i] = new FloatValue(static_cast<FloatValue*>(aval_vec->e[i])->value + static_cast<FloatValue*>(bval_vec->e[i])->value);
 			break;
 		case Type::IntType:
-			for(int i=0; i<elem_values.size(); ++i)
+			for(unsigned int i=0; i<elem_values.size(); ++i)
 				elem_values[i] = new IntValue(static_cast<IntValue*>(aval_vec->e[i])->value + static_cast<IntValue*>(bval_vec->e[i])->value);
 			break;
 		default:
@@ -1599,11 +1629,11 @@ Value* SubtractionExpression::exec(VMState& vmstate)
 		switch(vectype->t->getType())
 		{
 		case Type::FloatType:
-			for(int i=0; i<elem_values.size(); ++i)
+			for(unsigned int i=0; i<elem_values.size(); ++i)
 				elem_values[i] = new FloatValue(static_cast<FloatValue*>(aval_vec->e[i])->value - static_cast<FloatValue*>(bval_vec->e[i])->value);
 			break;
 		case Type::IntType:
-			for(int i=0; i<elem_values.size(); ++i)
+			for(unsigned int i=0; i<elem_values.size(); ++i)
 				elem_values[i] = new IntValue(static_cast<IntValue*>(aval_vec->e[i])->value - static_cast<IntValue*>(bval_vec->e[i])->value);
 			break;
 		default:
@@ -1923,6 +1953,169 @@ Reference<ASTNode> LetASTNode::clone()
 	LetASTNode* e = new LetASTNode(this->variable_name);
 	e->expr = this->expr->clone();
 	return ASTNodeRef(e);
+}
+
+
+//---------------------------------------------------------------------------------
+
+template <class T> static bool lt(Value* a, Value* b)
+{
+	return static_cast<T*>(a)->value < static_cast<T*>(b)->value;
+}
+
+
+template <class T> static bool gt(Value* a, Value* b)
+{
+	return static_cast<T*>(a)->value > static_cast<T*>(b)->value;
+}
+
+
+template <class T> static bool lte(Value* a, Value* b)
+{
+	return static_cast<T*>(a)->value <= static_cast<T*>(b)->value;
+}
+
+
+template <class T> static bool gte(Value* a, Value* b)
+{
+	return static_cast<T*>(a)->value >= static_cast<T*>(b)->value;
+}
+
+
+template <class T> static bool eq(Value* a, Value* b)
+{
+	return static_cast<T*>(a)->value == static_cast<T*>(b)->value;
+}
+
+
+template <class T> static bool neq(Value* a, Value* b)
+{
+	return static_cast<T*>(a)->value != static_cast<T*>(b)->value;
+}
+
+
+template <class T>
+static BoolValue* compare(unsigned int token_type, Value* a, Value* b)
+{
+	switch(token_type)
+	{
+	case LEFT_ANGLE_BRACKET_TOKEN:
+		return new BoolValue(lt<T>(a, b));
+	case RIGHT_ANGLE_BRACKET_TOKEN:
+		return new BoolValue(gt<T>(a, b));
+	case DOUBLE_EQUALS_TOKEN:
+		return new BoolValue(eq<T>(a, b));
+	case NOT_EQUALS_TOKEN:
+		return new BoolValue(neq<T>(a, b));
+	case LESS_EQUAL_TOKEN:
+		return new BoolValue(lte<T>(a, b));
+	case GREATER_EQUAL_TOKEN:
+		return new BoolValue(gte<T>(a, b));
+	default:
+		assert(!"Unknown comparison token type.");
+		return false;
+	}
+}
+
+
+Value* ComparisonExpression::exec(VMState& vmstate)
+{
+	Value* aval = a->exec(vmstate);
+	Value* bval = b->exec(vmstate);
+
+	Value* retval = NULL;
+
+	switch(a->type()->getType())
+	{
+	case Type::FloatType:
+		retval = compare<FloatValue>(this->token->getType(), aval, bval);
+		break;
+	case Type::IntType:
+		retval = compare<IntValue>(this->token->getType(), aval, bval);
+		break;
+	default:
+		assert(!"SubtractionExpression type invalid!");
+	}
+	delete aval;
+	delete bval;
+
+	return retval;
+}
+
+
+void ComparisonExpression::print(int depth, std::ostream& s) const
+{
+	printMargin(depth, s);
+	s << "Comparison, token = '" + tokenName(this->token->getType()) + "'\n";
+	this->a->print(depth+1, s);
+	this->b->print(depth+1, s);
+}
+
+
+void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
+{
+	stack.push_back(this);
+	a->traverse(payload, stack);
+	b->traverse(payload, stack);
+	stack.pop_back();
+
+	if(payload.operation == TraversalPayload::TypeCheck)
+	{
+		if(a->type()->getType() == Type::GenericTypeType || a->type()->getType() == Type::IntType || a->type()->getType() == Type::FloatType)
+		{}
+		else
+		{
+			throw BaseException("Child type '" + this->type()->toString() + "' does not define Comparison operators. '*'.");
+		}
+	}
+}
+
+
+llvm::Value* ComparisonExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	llvm::Value* a_code = a->emitLLVMCode(params);
+	llvm::Value* b_code = b->emitLLVMCode(params);
+
+	switch(a->type()->getType())
+	{
+	case Type::FloatType:
+		{
+			switch(this->token->getType())
+			{
+			case LEFT_ANGLE_BRACKET_TOKEN: return params.builder->CreateFCmpOLT(a_code, b_code);
+			case RIGHT_ANGLE_BRACKET_TOKEN: return params.builder->CreateFCmpOGT(a_code, b_code);
+			case DOUBLE_EQUALS_TOKEN: return params.builder->CreateFCmpOEQ(a_code, b_code);
+			case NOT_EQUALS_TOKEN: return params.builder->CreateFCmpONE(a_code, b_code);
+			case LESS_EQUAL_TOKEN: return params.builder->CreateFCmpOLE(a_code, b_code);
+			case GREATER_EQUAL_TOKEN: return params.builder->CreateFCmpOGE(a_code, b_code);
+			default: assert(0); throw BaseException("Unsupported token type for comparison");
+			}
+		}
+		break;
+	case Type::IntType:
+		{
+			switch(this->token->getType())
+			{
+			case LEFT_ANGLE_BRACKET_TOKEN: return params.builder->CreateICmpSLT(a_code, b_code);
+			case RIGHT_ANGLE_BRACKET_TOKEN: return params.builder->CreateICmpSGT(a_code, b_code);
+			case DOUBLE_EQUALS_TOKEN: return params.builder->CreateICmpEQ(a_code, b_code);
+			case NOT_EQUALS_TOKEN: return params.builder->CreateICmpNE(a_code, b_code);
+			case LESS_EQUAL_TOKEN: return params.builder->CreateICmpSLE(a_code, b_code);
+			case GREATER_EQUAL_TOKEN: return params.builder->CreateICmpSGE(a_code, b_code);
+			default: assert(0); throw BaseException("Unsupported token type for comparison");
+			}
+		}
+		break;
+	default:
+		assert(!"ComparisonExpression type invalid!");
+		throw BaseException("ComparisonExpression type invalid");
+	}
+}
+
+
+Reference<ASTNode> ComparisonExpression::clone()
+{
+	return Reference<ASTNode>(new ComparisonExpression(token, a, b));
 }
 
 

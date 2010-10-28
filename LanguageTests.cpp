@@ -38,7 +38,26 @@ LanguageTests::~LanguageTests()
 {}
 
 
-typedef float(*float_void_func)();
+static float testFunc(float x)
+{
+	std::cout << "In test func!, " << x << std::endl;
+	return x * x;
+}
+
+
+static Value* testFuncIntepreted(const vector<const Value*>& arg_values)
+{
+	assert(arg_values.size() == 1);
+	assert(dynamic_cast<const FloatValue*>(arg_values[0]));
+
+	// Cast argument 0 to type FloatValue
+	const FloatValue* float_val = static_cast<const FloatValue*>(arg_values[0]);
+
+	return new FloatValue(testFunc(float_val->value));
+}
+
+
+typedef float(WINTER_JIT_CALLING_CONV * float_void_func)();
 
 
 static void testMainFloat(const std::string& src, float target_return_val)
@@ -46,8 +65,19 @@ static void testMainFloat(const std::string& src, float target_return_val)
 	std::cout << "============================== testMainFloat() ============================" << std::endl;
 	try
 	{
-		VirtualMachine vm;
-		vm.loadSource(src);
+		VMConstructionArgs vm_args;
+		vm_args.source_buffers.push_back(src);
+
+		{
+			ExternalFunctionRef f(new ExternalFunction());
+			f->func = testFunc;
+			f->interpreted_func = testFuncIntepreted;
+			f->return_type = TypeRef(new Float());
+			f->sig = FunctionSignature("testFunc", vector<TypeRef>(1, TypeRef(new Float())));
+			vm_args.external_functions.push_back(f);
+		}
+
+		VirtualMachine vm(vm_args);
 
 		// Get main function
 		FunctionSignature mainsig("main", std::vector<TypeRef>());
@@ -114,8 +144,10 @@ static void testMainInteger(const std::string& src, float target_return_val)
 	std::cout << "============================== testMainInteger() ============================" << std::endl;
 	try
 	{
-		VirtualMachine vm;
-		vm.loadSource(src);
+		VMConstructionArgs vm_args;
+		vm_args.source_buffers.push_back(src);
+
+		VirtualMachine vm(vm_args);
 
 		// Get main function
 		FunctionSignature mainsig("main", std::vector<TypeRef>());
@@ -207,8 +239,10 @@ static void testMainStruct(const std::string& src, const StructType& target_retu
 	std::cout << "============================== testMainStruct() ============================" << std::endl;
 	try
 	{
-		VirtualMachine vm;
-		vm.loadSource(src);
+		VMConstructionArgs vm_args;
+		vm_args.source_buffers.push_back(src);
+
+		VirtualMachine vm(vm_args);
 
 		// Get main function
 		FunctionSignature mainsig("main", std::vector<TypeRef>());
@@ -284,8 +318,10 @@ static void testMainStructInputAndOutput(const std::string& src, const InStructT
 	std::cout << "============================== testMainStructInputAndOutput() ============================" << std::endl;
 	try
 	{
-		VirtualMachine vm;
-		vm.loadSource(src);
+		VMConstructionArgs vm_args;
+		vm_args.source_buffers.push_back(src);
+
+		VirtualMachine vm(vm_args);
 
 		vector<string> field_names;
 		field_names.push_back("x");
@@ -396,8 +432,10 @@ static void testVectorInStruct(const std::string& src, const StructWithVec& stru
 	std::cout << "============================== testVectorInStruct() ============================" << std::endl;
 	try
 	{
-		VirtualMachine vm;
-		vm.loadSource(src);
+		VMConstructionArgs vm_args;
+		vm_args.source_buffers.push_back(src);
+
+		VirtualMachine vm(vm_args);
 
 		vector<string> field_names;
 		field_names.push_back("a");
@@ -482,11 +520,92 @@ static void testVectorInStruct(const std::string& src, const StructWithVec& stru
 
 void LanguageTests::run()
 {
+	// Integer comparisons:
+	// Test <=
+	testMainInteger("def main() int : if(1 <= 2, 10, 20)", 10);
+	testMainInteger("def main() int : if(1 <= 1, 10, 20)", 10);
+	testMainInteger("def main() int : if(3 <= 1, 10, 20)", 20);
+
+	// Test >=
+	testMainInteger("def main() int : if(1 >= 2, 10, 20)", 20);
+	testMainInteger("def main() int : if(1 >= 1, 10, 20)", 10);
+	testMainInteger("def main() int : if(3 >= 1, 10, 20)", 10);
+
+	// Test <
+	testMainInteger("def main() int : if(1 < 2, 10, 20)", 10);
+	testMainInteger("def main() int : if(3 < 1, 10, 20)", 20);
+
+	// Test >
+	testMainInteger("def main() int : if(1 > 2, 10, 20)", 20);
+	testMainInteger("def main() int : if(3 > 1, 10, 20)", 10);
+
+	// Test ==
+	testMainInteger("def main() int : if(1 == 1, 10, 20)", 10);
+	testMainInteger("def main() int : if(1 == 2, 10, 20)", 20);
+
+	// Test !=
+	testMainInteger("def main() int : if(1 != 1, 10, 20)", 20);
+	testMainInteger("def main() int : if(1 != 2, 10, 20)", 10);
+
+
+	// Float comparisons:
+	// Test <=
+	testMainFloat("def main() float : if(1.0 <= 2.0, 10.0, 20.0)", 10.0);
+	testMainFloat("def main() float : if(1.0 <= 1.0, 10.0, 20.0)", 10.0);
+	testMainFloat("def main() float : if(3.0 <= 1.0, 10.0, 20.0)", 20.0);
+
+	// Test >=
+	testMainFloat("def main() float : if(1.0 >= 2.0, 10.0, 20.0)", 20.0);
+	testMainFloat("def main() float : if(1.0 >= 1.0, 10.0, 20.0)", 10.0);
+	testMainFloat("def main() float : if(3.0 >= 1.0, 10.0, 20.0)", 10.0);
+
+	// Test <
+	testMainFloat("def main() float : if(1.0 < 2.0, 10.0, 20.0)", 10.0);
+	testMainFloat("def main() float : if(3.0 < 1.0, 10.0, 20.0)", 20.0);
+
+	// Test >
+	testMainFloat("def main() float : if(1.0 > 2.0, 10.0, 20.0)", 20.0);
+	testMainFloat("def main() float : if(3.0 > 1.0, 10.0, 20.0)", 10.0);
+
+	// Test ==
+	testMainFloat("def main() float : if(1.0 == 1.0, 10.0, 20.0)", 10.0);
+	testMainFloat("def main() float : if(1.0 == 2.0, 10.0, 20.0)", 20.0);
+
+	// Test !=
+	testMainFloat("def main() float : if(1.0 != 1.0, 10.0, 20.0)", 20.0);
+	testMainFloat("def main() float : if(1.0 != 2.0, 10.0, 20.0)", 10.0);
+
+
+
+	// Test 'if'
+	testMainInteger("def main() int : if(true, 2, 3)", 2);
+	testMainInteger("def main() int : if(false, 2, 3)", 3);
+
+	// Test 'if' with structures as the return type
+	testMainInteger(
+		"struct s { int a, int b }   \n\
+		def main() int : a(if(true, s(1, 2), s(3, 4)))", 
+		1);
+	testMainInteger(
+		"struct s { int a, int b }   \n\
+		def main() int : a(if(false, s(1, 2), s(3, 4)))", 
+		3);
+
+	// Test 'if' with vectors as the return type
+	testMainFloat(
+		"def main() float : e0(if(true, [1.0, 2.0, 3.0, 4.0]v, [10.0, 20.0, 30.0, 40.0]v))", 
+		1.0f);
+	testMainFloat(
+		"def main() float : e0(if(false, [1.0, 2.0, 3.0, 4.0]v, [10.0, 20.0, 30.0, 40.0]v))", 
+		10.0f);
+
+
+
 	// Test call to external function
 	testMainFloat("def main() float : testFunc(3.0)", 9.0);
 
 
-	/*
+	
 	// Simple test
 	testMainFloat("def main() float : 1.0", 1.0);
 
@@ -495,7 +614,7 @@ void LanguageTests::run()
 
 	// Test integer addition
 	testMainInteger("def main() int : 1 + 2", 3);
-*/
+
 	// Test multiple integer additions
 	testMainInteger("def main() int : 1 + 2 + 3", 6);
 	//testMainInteger("def main() int : 1 + 2 + 3 + 4", 10);
@@ -503,7 +622,7 @@ void LanguageTests::run()
 	// Test left-to-right associativity
 	assert(2 - 3 + 4 == (2 - 3) + 4);
 	assert(2 - 3 + 4 == 3);
-	testMainInteger("def main() int : 2 - 3 + 4", 3);
+	//testMainInteger("def main() int : 2 - 3 + 4", 3);
 
 
 	// Test multiplication expression

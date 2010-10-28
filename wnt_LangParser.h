@@ -92,6 +92,7 @@ private:
 	Reference<StructureType> parseStructType(const ParseInfo& p, const std::vector<std::string>& generic_type_params);
 	TypeRef parseVectorType(const ParseInfo& p, const std::vector<std::string>& generic_type_params);
 
+	ASTNodeRef parseComparisonExpression(const ParseInfo& parseinfo);
 	ASTNodeRef parseUnaryExpression(const ParseInfo& parseinfo);
 	ASTNodeRef parseAddSubExpression(const ParseInfo& parseinfo);
 	ASTNodeRef parseMulDivExpression(const ParseInfo& parseinfo);

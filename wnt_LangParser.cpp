@@ -95,6 +95,34 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 			root->func_defs.push_back(Reference<FunctionDefinition>(def));
 		}
 
+		// Create 'if' built in function
+		{
+			vector<FunctionDefinition::FunctionArg> args(3);
+			args[0].name = "condition";
+			args[0].type = TypeRef(new Bool());
+
+			TypeRef T(new GenericType(
+				0 // generic_type_param_index
+			));
+
+			args[1].type = T;
+			args[1].name = "a";
+			args[2].type = T;
+			args[2].name = "b";
+
+			FunctionDefinition* def = new FunctionDefinition(
+				"if", // name
+				args, // args
+				vector<Reference<LetASTNode> >(), // lets
+				ASTNodeRef(NULL), // body expr
+				T, // return type
+				new IfBuiltInFunc(T) // built in impl.
+			);
+
+			root->func_defs.push_back(Reference<FunctionDefinition>(def));
+		}
+
+
 
 
 		std::map<std::string, TypeRef> named_types;
@@ -663,7 +691,7 @@ ASTNodeRef LangParser::parseAddSubExpression(const ParseInfo& p)
 
 ASTNodeRef LangParser::parseMulDivExpression(const ParseInfo& p)
 {
-	ASTNodeRef left = parseUnaryExpression(p);
+	ASTNodeRef left = parseComparisonExpression(p);
 	if(isTokenCurrent(ASTERISK_TOKEN, p))
 	{
 		parseToken(ASTERISK_TOKEN, p);
@@ -671,11 +699,39 @@ ASTNodeRef LangParser::parseMulDivExpression(const ParseInfo& p)
 		MulExpression* addexpr = new MulExpression();
 		addexpr->a = left;
 		//left->setParent(addexpr);
-		addexpr->b = parseUnaryExpression(p);
+		addexpr->b = parseComparisonExpression(p);
 		return ASTNodeRef(addexpr);
 	}
 	else
 		return left;
+}
+
+
+ASTNodeRef LangParser::parseComparisonExpression(const ParseInfo& p)
+{
+	ASTNodeRef left = parseUnaryExpression(p);
+
+	vector<unsigned int> comparison_tokens;
+	comparison_tokens.push_back(DOUBLE_EQUALS_TOKEN);
+	comparison_tokens.push_back(NOT_EQUALS_TOKEN);
+	comparison_tokens.push_back(LEFT_ANGLE_BRACKET_TOKEN);
+	comparison_tokens.push_back(RIGHT_ANGLE_BRACKET_TOKEN);
+	comparison_tokens.push_back(LESS_EQUAL_TOKEN);
+	comparison_tokens.push_back(GREATER_EQUAL_TOKEN);
+
+	for(unsigned int i=0; i<comparison_tokens.size(); ++i)
+	{
+		const unsigned int token = comparison_tokens[i];
+		if(isTokenCurrent(token, p))
+		{
+			parseToken(token, p);
+
+			ComparisonExpression* expr = new ComparisonExpression(makeTokenObject(token, p.tokens[p.i - 1]->char_index), left, parseUnaryExpression(p));
+			return ASTNodeRef(expr);
+		}
+	}
+
+	return left;
 }
 
 

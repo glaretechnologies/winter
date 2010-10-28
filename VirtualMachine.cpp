@@ -40,18 +40,14 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #endif
 
 
+using std::vector;
+
+
 namespace Winter
 {
 
 
-float testFunc(float x)
-{
-	std::cout << "In test func!, " << x << std::endl;
-	return x * x;
-}
-	
-
-VirtualMachine::VirtualMachine()
+VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 {
 	this->llvm_context = new llvm::LLVMContext();
 	
@@ -67,25 +63,22 @@ VirtualMachine::VirtualMachine()
 	);
 
 	this->llvm_exec_engine->DisableLazyCompilation();
-	//this->llvm_exec_engine->InstallLazyFunctionCreator(lazyFunctionCreator);
 	this->llvm_exec_engine->DisableSymbolSearching();
 
-	{
-		ExternalFunction f;
-		f.func = testFunc;
-		f.return_type = TypeRef(new Float());
-		f.sig = FunctionSignature("testFunc", vector<TypeRef>(1, TypeRef(new Float())));
+	this->external_functions = args.external_functions;
 
-		this->external_functions.push_back(f);
-	}
-
-	for(int i=0; i<this->external_functions.size(); ++i)
+	for(unsigned int i=0; i<this->external_functions.size(); ++i)
 		addExternalFunction(this->external_functions[i], *this->llvm_context, *this->llvm_module);
-	
 	
 
 	assert(this->llvm_exec_engine);
 	assert(error_str.empty());
+
+	// Load source buffers
+	for(unsigned int i=0; i<args.source_buffers.size(); ++i)
+		loadSource(args.source_buffers[i]);
+
+	this->build();
 }
 
 
@@ -99,15 +92,15 @@ VirtualMachine::~VirtualMachine()
 }
 
 
-void VirtualMachine::addExternalFunction(const ExternalFunction& f, llvm::LLVMContext& context, llvm::Module& module)
+void VirtualMachine::addExternalFunction(const ExternalFunctionRef& f, llvm::LLVMContext& context, llvm::Module& module)
 {
-	llvm::FunctionType* llvm_f_type = LLVMTypeUtils::llvmInternalFunctionType(f.sig.param_types, f.return_type, context);
+	llvm::FunctionType* llvm_f_type = LLVMTypeUtils::llvmInternalFunctionType(f->sig.param_types, f->return_type, context);
 
 	llvm::Function* llvm_f = static_cast<llvm::Function*>(module.getOrInsertFunction(
-		f.sig.toString(), // Name
+		f->sig.toString(), // Name
 		llvm_f_type // Type
 	));
-	this->llvm_exec_engine->addGlobalMapping(llvm_f, f.func);
+	this->llvm_exec_engine->addGlobalMapping(llvm_f, f->func);
 }
 
 
@@ -125,7 +118,6 @@ static void optimiseFunctions(llvm::FunctionPassManager& fpm, llvm::Module* modu
 
 	fpm.doFinalization();
 }
-
 
 
 void VirtualMachine::loadSource(const std::string& source)
@@ -148,7 +140,6 @@ void VirtualMachine::loadSource(const std::string& source)
 	}
 
 	// Link functions
-	//Linker linker;
 	linker.addExternalFunctions(this->external_functions);
 	linker.addFunctions(*root);
 	{
@@ -167,11 +158,12 @@ void VirtualMachine::loadSource(const std::string& source)
 		assert(stack.size() == 0);
 	}
 
-
 	//rootref->print(0, std::cout);
+}
 
 
-
+void VirtualMachine::build()
+{
 	linker.buildLLVMCode(this->llvm_module);
 
 	// Verify module
@@ -181,7 +173,7 @@ void VirtualMachine::loadSource(const std::string& source)
 			*this->llvm_module, 
 			llvm::ReturnStatusAction, // Action to take
 			&error_str
-		);
+			);
 		if(ver_errors)
 		{
 			std::cout << "Module verification errors: " << error_str << std::endl;
@@ -206,11 +198,11 @@ void VirtualMachine::loadSource(const std::string& source)
 		llvm::createStandardFunctionPasses(
 			&fpm,
 			2
-		);
-		
+			);
+
 
 		llvm::PassManager pm;
-		
+
 		llvm::Pass* inlining_pass = llvm::createFunctionInliningPass();
 
 		llvm::createStandardModulePasses(
@@ -222,43 +214,43 @@ void VirtualMachine::loadSource(const std::string& source)
 			true, // simplify lib calls
 			false, // have exceptions
 			inlining_pass // inlining pass
-		);
+			);
 
 
 
-/*		// Build list of functions with external linkage (entry points)
+		/*		// Build list of functions with external linkage (entry points)
 		std::vector<const char*> export_list;
 		std::vector<std::string> export_list_strings;
 		for(unsigned int i=0; i<entry_point_function_sigs.size(); ++i)
 		{
-			//if(compiled_functions.count(entry_point_function_sigs[i]) == 0)
-			//	throw VMExcep("entry_point_function_sigs");
+		//if(compiled_functions.count(entry_point_function_sigs[i]) == 0)
+		//	throw VMExcep("entry_point_function_sigs");
 
-			if(compiled_functions.count(entry_point_function_sigs[i]) > 0)
-			{
-				if(compiled_functions[entry_point_function_sigs[i]]->llvm_func == NULL)
-					throw VMInternalExcep("compiled_functions[entry_point_function_sigs[i]]->llvm_func == NULL");
+		if(compiled_functions.count(entry_point_function_sigs[i]) > 0)
+		{
+		if(compiled_functions[entry_point_function_sigs[i]]->llvm_func == NULL)
+		throw VMInternalExcep("compiled_functions[entry_point_function_sigs[i]]->llvm_func == NULL");
 
-				export_list_strings.push_back(compiled_functions[entry_point_function_sigs[i]]->llvm_func->getName());
-			}
+		export_list_strings.push_back(compiled_functions[entry_point_function_sigs[i]]->llvm_func->getName());
+		}
 		}
 
 		for(unsigned int i=0; i<export_list_strings.size(); ++i)
-			export_list.push_back(export_list_strings[i].c_str());
+		export_list.push_back(export_list_strings[i].c_str());
 
 		pm.add(llvm::createInternalizePass(export_list));
-		
+
 		pm.add(llvm::createGlobalDCEPass()); // Delete unreachable internal functions / global vars
-*/
+		*/
 		optimiseFunctions(fpm, this->llvm_module, verbose);
 
 		// Run module optimisation.  This may remove some functions, so we have to be careful accessing llvm functions from now on.
 		{
-		if(verbose)
-			std::cout << "Optimising module... " << std::endl;
-		const bool changed = pm.run(*this->llvm_module);
-		if(verbose)
-			std::cout << "Done. (changed = " + toString(changed) + ")" << std::endl;
+			if(verbose)
+				std::cout << "Optimising module... " << std::endl;
+			const bool changed = pm.run(*this->llvm_module);
+			if(verbose)
+				std::cout << "Done. (changed = " + toString(changed) + ")" << std::endl;
 		}
 
 		optimiseFunctions(fpm, this->llvm_module, verbose);
@@ -269,18 +261,18 @@ void VirtualMachine::loadSource(const std::string& source)
 	// Verify module again.
 	{
 
-	
-	string error_str;
-	const bool ver_errors = llvm::verifyModule(
-		*this->llvm_module, 
-		llvm::ReturnStatusAction, // Action to take
-		&error_str
-		);
-	if(ver_errors)
-	{
-		std::cout << "Module verification errors: " << error_str << std::endl;
-	}
-	assert(!ver_errors);
+
+		string error_str;
+		const bool ver_errors = llvm::verifyModule(
+			*this->llvm_module, 
+			llvm::ReturnStatusAction, // Action to take
+			&error_str
+			);
+		if(ver_errors)
+		{
+			std::cout << "Module verification errors: " << error_str << std::endl;
+		}
+		assert(!ver_errors);
 	}
 
 
@@ -290,8 +282,8 @@ void VirtualMachine::loadSource(const std::string& source)
 
 		/*std::string errorinfo;
 		llvm::raw_fd_ostream f(
-			"module.txt",
-			errorinfo
+		"module.txt",
+		errorinfo
 		);
 		this->llvm_module->print(f, NULL);*/
 	}

@@ -3,6 +3,7 @@
 
 
 #include "wnt_FunctionSignature.h"
+#include "wnt_ExternalFunction.h"
 #include "wnt_ASTNode.h"
 #include <map>
 #include <set>
@@ -24,10 +25,11 @@ public:
 
 
 	void addFunctions(BufferRoot& root);
-	void addExternalFunctions(std::vector<ExternalFunction>& f);
+	void addExternalFunctions(std::vector<ExternalFunctionRef>& f);
 
 	//void linkFunctions(BufferRoot& root);
 
+	ExternalFunctionRef findMatchingExternalFunction(const FunctionSignature& sig);
 	FunctionDefinitionRef findMatchingFunction(const FunctionSignature& sig);
 
 	void buildLLVMCode(llvm::Module* module);
@@ -40,7 +42,8 @@ private:
 	typedef std::map<FunctionSignature, Reference<FunctionDefinition> > FuncMapType;
 	FuncMapType functions;
 
-	//FuncMapType external_functions;
+	typedef std::map<FunctionSignature, ExternalFunctionRef > ExternalFuncMapType;
+	ExternalFuncMapType external_functions;
 
 };
 

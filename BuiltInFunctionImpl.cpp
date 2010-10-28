@@ -22,17 +22,18 @@
 #include <llvm/Intrinsics.h>
 #endif
 
+
 using std::vector;
 
 
 namespace Winter
 {
 
+
 Constructor::Constructor(Reference<StructureType>& struct_type_)
 :	struct_type(struct_type_)
 {
 }
-
 
 
 Value* Constructor::invoke(VMState& vmstate)
@@ -271,6 +272,138 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 {
 	assert(0);
 	return NULL;
+}
+
+
+//----------------------------------------------------------------------------------------------
+
+
+Value* IfBuiltInFunc::invoke(VMState& vmstate)
+{
+	const Value* condition = vmstate.argument_stack[vmstate.argument_stack.size() - 3];
+	assert(dynamic_cast<const BoolValue*>(condition));
+
+	if(static_cast<const BoolValue*>(condition)->value) // If condition is true
+	{
+		return vmstate.argument_stack[vmstate.argument_stack.size() - 2]->clone();
+	}
+	else
+	{
+		return vmstate.argument_stack[vmstate.argument_stack.size() - 1]->clone();
+	}
+}
+
+
+llvm::Value* IfBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+#if USE_LLVM
+
+	const int arg_offset = this->T->passByValue() ? 0 : 1;
+
+	llvm::Value* condition_code = LLVMTypeUtils::getNthArg(params.currently_building_func, 0 + arg_offset);
+
+
+	//llvm::Value* child_a_code = LLVMTypeUtils::getNthArg(params.currently_building_func, 1 + arg_offset);
+	//llvm::Value* child_b_code = LLVMTypeUtils::getNthArg(params.currently_building_func, 2 + arg_offset);
+	llvm::Value* child_a_code = NULL;
+	llvm::Value* child_b_code = NULL;
+	if(this->T->passByValue())
+	{
+		child_a_code = LLVMTypeUtils::getNthArg(params.currently_building_func, 1 + arg_offset);
+		child_b_code = LLVMTypeUtils::getNthArg(params.currently_building_func, 2 + arg_offset);
+	}
+	else
+	{
+
+		child_a_code = LLVMTypeUtils::getNthArg(params.currently_building_func, 1 + arg_offset);
+
+		/*child_a_code = params.builder->CreateLoad(
+			a_ptr
+		);*/
+
+		//child_a_code = params.builder->CreateStore(
+		//	a_val, // value
+		//	return_val_ptr // ptr
+		//	);
+
+		child_b_code = LLVMTypeUtils::getNthArg(params.currently_building_func, 2 + arg_offset);
+
+		/*child_b_code = params.builder->CreateLoad(
+		b_ptr
+		);*/
+
+		//child_b_code = params.builder->CreateStore(
+		//	b_val, // value
+		//	return_val_ptr // ptr
+		//	);
+	}
+
+
+
+
+
+
+	// Get a pointer to the current function
+	llvm::Function* the_function = params.builder->GetInsertBlock()->getParent();
+
+	// Create blocks for the then and else cases.  Insert the 'then' block at the end of the function.
+	llvm::BasicBlock *ThenBB = llvm::BasicBlock::Create(*params.context, "then", the_function);
+	llvm::BasicBlock *ElseBB = llvm::BasicBlock::Create(*params.context, "else");
+	llvm::BasicBlock *MergeBB = llvm::BasicBlock::Create(*params.context, "ifcont");
+
+	params.builder->CreateCondBr(condition_code, ThenBB, ElseBB);
+
+	// Emit then value.
+	params.builder->SetInsertPoint(ThenBB);
+
+	params.builder->CreateBr(MergeBB);
+
+	// Codegen of 'Then' can change the current block, update ThenBB for the PHI.
+	ThenBB = params.builder->GetInsertBlock();
+
+	// Emit else block.
+	the_function->getBasicBlockList().push_back(ElseBB);
+	params.builder->SetInsertPoint(ElseBB);
+
+	params.builder->CreateBr(MergeBB);
+
+	// Codegen of 'Else' can change the current block, update ElseBB for the PHI.
+	ElseBB = params.builder->GetInsertBlock();
+
+
+	// Emit merge block.
+	the_function->getBasicBlockList().push_back(MergeBB);
+	params.builder->SetInsertPoint(MergeBB);
+	llvm::PHINode *PN = params.builder->CreatePHI(
+		this->T->passByValue() ? this->T->LLVMType(*params.context) : LLVMTypeUtils::pointerType(*this->T->LLVMType(*params.context)),
+		"iftmp"
+	);
+
+	PN->addIncoming(child_a_code, ThenBB);
+	PN->addIncoming(child_b_code, ElseBB);
+
+	llvm::Value* phi_result = PN;
+
+	if(this->T->passByValue())
+		return phi_result;
+	else
+	{
+		llvm::Value* arg_val = params.builder->CreateLoad(
+			phi_result
+		);
+
+		llvm::Value* return_val_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+
+		params.builder->CreateStore(
+			arg_val, // value
+			return_val_ptr // ptr
+		);
+		return NULL;
+	}
+
+#else
+	return NULL;
+#endif
 }
 
 

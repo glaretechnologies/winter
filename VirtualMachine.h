@@ -36,16 +36,20 @@ VirtualMachine
 -------------------
 
 =====================================================================*/
+class VMConstructionArgs
+{
+public:
+	std::vector<ExternalFunctionRef> external_functions;
+	std::vector<std::string> source_buffers;
+};
+
+
 class VirtualMachine
 {
 public:
-	VirtualMachine();
+	VirtualMachine(const VMConstructionArgs& args);
 	~VirtualMachine();
 
-	//TEMP
-	std::vector<ExternalFunction> external_functions;
-	
-	void loadSource(const std::string& s);
 
 
 	Reference<FunctionDefinition> findMatchingFunction(const FunctionSignature& sig);
@@ -53,8 +57,11 @@ public:
 	void* getJittedFunction(const FunctionSignature& sig);
 
 private:
-	void addExternalFunction(const ExternalFunction& f, llvm::LLVMContext& context, llvm::Module& module);
+	void loadSource(const std::string& s);
+	void build();
+	void addExternalFunction(const ExternalFunctionRef& f, llvm::LLVMContext& context, llvm::Module& module);
 
+	std::vector<ExternalFunctionRef> external_functions;
 	ASTNodeRef rootref;
 	Linker linker;
 	llvm::LLVMContext* llvm_context;

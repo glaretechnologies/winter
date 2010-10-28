@@ -34,11 +34,11 @@ void Linker::addFunctions(BufferRoot& root)
 }
 
 
-void Linker::addExternalFunctions(vector<ExternalFunction>& funcs)
+void Linker::addExternalFunctions(vector<ExternalFunctionRef>& funcs)
 {
-	for(int i=0; i<funcs.size(); ++i)
+	for(unsigned int i=0; i<funcs.size(); ++i)
 	{
-		vector<FunctionDefinition::FunctionArg> args;
+		/*vector<FunctionDefinition::FunctionArg> args;
 		for(int z=0; z<funcs[i].sig.param_types.size(); ++z)
 			args.push_back(FunctionDefinition::FunctionArg(funcs[i].sig.param_types[z], "arg_" + ::toString(z)));
 
@@ -52,7 +52,8 @@ void Linker::addExternalFunctions(vector<ExternalFunction>& funcs)
 		));
 		//this->external_functions.insert(f[i].sig);
 
-		this->functions.insert(std::make_pair(funcs[i].sig, def));
+		this->functions.insert(std::make_pair(funcs[i].sig, def));*/
+		this->external_functions.insert(std::make_pair(funcs[i]->sig, funcs[i]));
 	}
 }
 
@@ -84,6 +85,18 @@ void Linker::linkFunctions(BufferRoot& root)
 {
 	root.linkFunctions(*this);
 }*/
+
+
+ExternalFunctionRef Linker::findMatchingExternalFunction(const FunctionSignature& sig)
+{
+	ExternalFuncMapType::iterator res = external_functions.find(sig);
+	if(res != external_functions.end())
+	{
+		return res->second;
+	}
+	return ExternalFunctionRef();
+}
+
 
 Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignature& sig)
 {
@@ -272,6 +285,11 @@ Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDef
 		{
 			assert(type_mappings.size() == 1);
 			built_in_impl = new ArrayFoldBuiltInFunc(type_mappings[0]);
+		}
+		else if(generic_func->sig.name == "if")
+		{
+			assert(type_mappings.size() >= 1);
+			built_in_impl = new IfBuiltInFunc(type_mappings[0]);
 		}
 		else
 		{
