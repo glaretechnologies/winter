@@ -31,6 +31,7 @@ public:
 
 	ExternalFunctionRef findMatchingExternalFunction(const FunctionSignature& sig);
 	FunctionDefinitionRef findMatchingFunction(const FunctionSignature& sig);
+	FunctionDefinitionRef findMatchingFunctionByName(const std::string& name); // NOTE: rather unsafe
 
 	void buildLLVMCode(llvm::Module* module);
 

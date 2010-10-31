@@ -118,7 +118,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 							if sig.T_i is concrete type
 	*/	
 
-	if(sig.name[0] == 'e')
+	if(sig.name.size() > 1 && sig.name[0] == 'e')
 	{
 		bool numeric = true;
 		for(unsigned int i=1; i<sig.name.size(); ++i)
@@ -239,6 +239,19 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 	else
 		return (*res).second;
 		*/
+}
+
+
+Reference<FunctionDefinition> Linker::findMatchingFunctionByName(const std::string& name)
+{
+	for(Linker::FuncMapType::iterator it = this->functions.begin(); it != functions.end(); ++it)
+	{
+		FunctionDefinition& f = *(*it).second;
+		if(f.sig.name == name)
+			return it->second;
+	}
+
+	throw BaseException("Could not find function '" + name + "'");
 }
 
 

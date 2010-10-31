@@ -507,6 +507,10 @@ TypeRef LangParser::parseType(const ParseInfo& p, const std::vector<std::string>
 		return TypeRef(new Int());
 	else if(t == "string")
 		return TypeRef(new String());
+	else if(t == "voidptr")
+		return TypeRef(new VoidPtrType());
+	else if(t == "bool")
+		return TypeRef(new Bool());
 	else if(t == "map")
 		return parseMapType(p, generic_type_params);
 	else if(t == "array")
@@ -696,11 +700,19 @@ ASTNodeRef LangParser::parseMulDivExpression(const ParseInfo& p)
 	{
 		parseToken(ASTERISK_TOKEN, p);
 
-		MulExpression* addexpr = new MulExpression();
-		addexpr->a = left;
-		//left->setParent(addexpr);
-		addexpr->b = parseComparisonExpression(p);
-		return ASTNodeRef(addexpr);
+		MulExpression* expr = new MulExpression();
+		expr->a = left;
+		expr->b = parseComparisonExpression(p);
+		return ASTNodeRef(expr);
+	}
+	else if(isTokenCurrent(FORWARDS_SLASH_TOKEN, p))
+	{
+		parseToken(FORWARDS_SLASH_TOKEN, p);
+
+		DivExpression* expr = new DivExpression();
+		expr->a = left;
+		expr->b = parseComparisonExpression(p);
+		return ASTNodeRef(expr);
 	}
 	else
 		return left;

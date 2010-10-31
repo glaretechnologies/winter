@@ -36,7 +36,8 @@ public:
 		ArrayTypeType,
 		FunctionType,
 		StructureTypeType,
-		VectorTypeType
+		VectorTypeType,
+		VoidPtrTypeType
 	};
 
 	virtual TypeType getType() const = 0;
@@ -334,6 +335,33 @@ public:
 
 	TypeRef t;
 	unsigned int num;
+};
+
+
+// Something like void*
+class VoidPtrType : public Type
+{
+public:
+	VoidPtrType() {}
+
+	virtual TypeType getType() const { return VoidPtrTypeType; }
+	virtual const std::string toString() const;
+	virtual bool lessThan(const Type& b) const
+	{
+		if(getType() < b.getType())
+			return true;
+		else if(b.getType() < getType())
+			return false;
+		else
+		{
+			return false;
+		}
+	}
+	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
+
+#if USE_LLVM
+	virtual const llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+#endif
 };
 
 

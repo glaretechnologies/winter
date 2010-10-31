@@ -281,4 +281,27 @@ const llvm::Type* VectorType::LLVMType(llvm::LLVMContext& context) const
 }
 
 
+//===============================================================================
+
+
+const std::string VoidPtrType::toString() const
+{
+	return "void_ptr";
+}
+
+
+bool VoidPtrType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
+{
+	//NOTE: This right?
+	return (this->getType() == b.getType());
+}
+
+
+const llvm::Type* VoidPtrType::LLVMType(llvm::LLVMContext& context) const
+{
+	// Not sure if LLVM has a pointer to void type, so just use a pointer to int32.
+	return llvm::Type::getInt32PtrTy(context);
+}
+
+
 } // end namespace Winter

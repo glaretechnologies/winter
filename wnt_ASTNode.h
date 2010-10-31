@@ -104,6 +104,7 @@ public:
 		AdditionExpressionType,
 		SubtractionExpressionType,
 		MulExpressionType,
+		DivExpressionType,
 		UnaryMinusExpressionType,
 		LetType,
 		ComparisonExpressionType,
@@ -486,6 +487,24 @@ public:
 	virtual void print(int depth, std::ostream& s) const;
 	//virtual void linkFunctions(Linker& linker);
 	//virtual void bindVariables(const std::vector<ASTNode*>& stack);
+	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+	virtual Reference<ASTNode> clone();
+
+	ASTNodeRef a;
+	ASTNodeRef b;
+};
+
+
+class DivExpression : public ASTNode
+{
+public:
+	DivExpression()  {}
+
+	virtual Value* exec(VMState& vmstate);
+	virtual ASTNodeType nodeType() const { return DivExpressionType; }
+	virtual TypeRef type() const { return a->type(); }
+	virtual void print(int depth, std::ostream& s) const;
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual Reference<ASTNode> clone();

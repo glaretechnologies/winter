@@ -47,7 +47,7 @@ public:
 class VirtualMachine
 {
 public:
-	VirtualMachine(const VMConstructionArgs& args);
+	VirtualMachine(const VMConstructionArgs& args); // throws BaseException
 	~VirtualMachine();
 
 
@@ -55,6 +55,7 @@ public:
 	Reference<FunctionDefinition> findMatchingFunction(const FunctionSignature& sig);
 
 	void* getJittedFunction(const FunctionSignature& sig);
+	void* getJittedFunctionByName(const std::string& name);
 
 private:
 	void loadSource(const std::string& s);

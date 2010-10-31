@@ -14,6 +14,7 @@ Copyright 2009 Nicholas Chapman
 #include <vector>
 #include <map>
 #include "TokenBase.h"
+#include "BaseException.h"
 #include "wnt_ASTNode.h"
 #include "utils/reference.h"
 #include "wnt_Type.h"
@@ -23,15 +24,12 @@ namespace Winter
 {
 
 
-class LangParserExcep
+class LangParserExcep : public BaseException
 {
 public:
-	LangParserExcep(const std::string& text_) : text(text_) {}
+	LangParserExcep(const std::string& text_) : BaseException(text_) {}
 	~LangParserExcep(){}
-
-	const std::string& what() const { return text; }
 private:
-	std::string text;
 };
 
 

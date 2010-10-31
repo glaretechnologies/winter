@@ -13,6 +13,7 @@ Copyright 2009 Nicholas Chapman
 #include <string>
 #include <vector>
 #include "TokenBase.h"
+#include "BaseException.h"
 #include "utils/reference.h"
 class Parser;
 
@@ -21,15 +22,13 @@ namespace Winter
 {
 
 
-class LexerExcep
+class LexerExcep : public BaseException
 {
 public:
-	LexerExcep(const std::string& text_) : text(text_) {}
+	LexerExcep(const std::string& text_) : BaseException(text_) {}
 	~LexerExcep(){}
 
-	const std::string& what() const { return text; }
 private:
-	std::string text;
 };
 
 

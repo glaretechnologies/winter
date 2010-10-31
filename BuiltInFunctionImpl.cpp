@@ -73,22 +73,15 @@ llvm::Value* Constructor::emitLLVMCode(EmitLLVMCodeParams& params) const
 	{
 
 
-		// Pointer to structure will be in 0th argument.
+		// Pointer to structure memory will be in 0th argument.
 		llvm::Value* struct_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
-
-		// actual_struct_ptr = &arg_0[0]
-		/*llvm::Value* actual_struct_ptr = params.builder->CreateGEP(
-			struct_ptr, // ptr
-			llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true)) // index
-			);*/
 
 		// For each field in the structure
 		for(unsigned int i=0; i<this->struct_type->component_types.size(); ++i)
 		{
 			// Get the argument to the constructor
 
-			llvm::Value* arg_value = LLVMTypeUtils::getNthArg(params.currently_building_func, i + 1);
-
+	
 			vector<llvm::Value*> indices;
 			indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true)));
 			indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, i, true)));
@@ -105,6 +98,16 @@ llvm::Value* Constructor::emitLLVMCode(EmitLLVMCodeParams& params) const
 				actual_struct_ptr, // ptr
 				llvm::ConstantInt::get(*params.context, llvm::APInt(32, i, true)) // index
 			);*/
+
+
+			llvm::Value* arg_value = LLVMTypeUtils::getNthArg(params.currently_building_func, i + 1);
+			if(!this->struct_type->component_types[i]->passByValue())
+			{
+				// Load the value from memory
+				arg_value = params.builder->CreateLoad(
+					arg_value // ptr
+				);
+			}
 
 			params.builder->CreateStore(
 				arg_value, // value
@@ -143,22 +146,54 @@ llvm::Value* GetField::emitLLVMCode(EmitLLVMCodeParams& params) const
 	}
 	else
 	{
-		// Pointer to structure will be in 0th argument.
-		llvm::Value* struct_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+		TypeRef field_type = this->struct_type->component_types[this->index];
 
-		vector<llvm::Value*> indices;
-		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true)));
-		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, this->index, true)));
+		if(field_type->passByValue())
+		{
+			// Pointer to structure will be in 0th argument.
+			llvm::Value* struct_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
 
-		llvm::Value* field_ptr = params.builder->CreateGEP(
-			struct_ptr, // ptr
-			indices.begin(),
-			indices.end()
+			vector<llvm::Value*> indices;
+			indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true)));
+			indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, this->index, true)));
+
+			llvm::Value* field_ptr = params.builder->CreateGEP(
+				struct_ptr, // ptr
+				indices.begin(),
+				indices.end()
+				);
+
+			return params.builder->CreateLoad(
+				field_ptr
+			);
+		}
+		else
+		{
+			// Pointer to memory for return value will be 0th argument.
+			llvm::Value* return_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+
+			// Pointer to structure will be in 1st argument.
+			llvm::Value* struct_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
+
+			vector<llvm::Value*> indices;
+			indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true)));
+			indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, this->index, true)));
+
+			llvm::Value* field_ptr = params.builder->CreateGEP(
+				struct_ptr, // ptr
+				indices.begin(),
+				indices.end()
 			);
 
-		return params.builder->CreateLoad(
-			field_ptr
-		);
+			llvm::Value* field_val = params.builder->CreateLoad(
+				field_ptr
+			);
+
+			params.builder->CreateStore(
+				field_val, // value
+				return_ptr // ptr
+			);
+		}
 	}
 }
 

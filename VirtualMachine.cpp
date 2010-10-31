@@ -177,6 +177,7 @@ void VirtualMachine::build()
 		if(ver_errors)
 		{
 			std::cout << "Module verification errors: " << error_str << std::endl;
+			throw BaseException("Module verification errors: " + error_str);
 		}
 		assert(!ver_errors);
 	}
@@ -304,6 +305,16 @@ void* VirtualMachine::getJittedFunction(const FunctionSignature& sig)
 	return this->llvm_exec_engine->getPointerToFunction(
 		func->built_llvm_function
 	);
+}
+
+
+void* VirtualMachine::getJittedFunctionByName(const std::string& name)
+{
+	FunctionDefinitionRef func = linker.findMatchingFunctionByName(name);
+
+	return this->llvm_exec_engine->getPointerToFunction(
+		func->built_llvm_function
+		);
 }
 
 

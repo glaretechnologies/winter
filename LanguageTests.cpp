@@ -126,16 +126,6 @@ static void testMainFloat(const std::string& src, float target_return_val)
 		std::cerr << e.what() << std::endl;
 		exit(1);
 	}
-	catch(Winter::LexerExcep& e)
-	{
-		std::cerr << e.what() << std::endl;
-		exit(1);
-	}
-	catch(Winter::LangParserExcep& e)
-	{
-		std::cerr << e.what() << std::endl;
-		exit(1);
-	}
 }
 
 
@@ -189,16 +179,6 @@ static void testMainInteger(const std::string& src, float target_return_val)
 
 	}
 	catch(Winter::BaseException& e)
-	{
-		std::cerr << e.what() << std::endl;
-		exit(1);
-	}
-	catch(Winter::LexerExcep& e)
-	{
-		std::cerr << e.what() << std::endl;
-		exit(1);
-	}
-	catch(Winter::LangParserExcep& e)
 	{
 		std::cerr << e.what() << std::endl;
 		exit(1);
@@ -299,16 +279,6 @@ static void testMainStruct(const std::string& src, const StructType& target_retu
 		std::cerr << e.what() << std::endl;
 		exit(1);
 	}
-	catch(Winter::LexerExcep& e)
-	{
-		std::cerr << e.what() << std::endl;
-		exit(1);
-	}
-	catch(Winter::LangParserExcep& e)
-	{
-		std::cerr << e.what() << std::endl;
-		exit(1);
-	}
 }
 
 
@@ -380,16 +350,6 @@ static void testMainStructInputAndOutput(const std::string& src, const InStructT
 
 	}
 	catch(Winter::BaseException& e)
-	{
-		std::cerr << e.what() << std::endl;
-		exit(1);
-	}
-	catch(Winter::LexerExcep& e)
-	{
-		std::cerr << e.what() << std::endl;
-		exit(1);
-	}
-	catch(Winter::LangParserExcep& e)
 	{
 		std::cerr << e.what() << std::endl;
 		exit(1);
@@ -505,23 +465,13 @@ static void testVectorInStruct(const std::string& src, const StructWithVec& stru
 		std::cerr << e.what() << std::endl;
 		exit(1);
 	}
-	catch(Winter::LexerExcep& e)
-	{
-		std::cerr << e.what() << std::endl;
-		exit(1);
-	}
-	catch(Winter::LangParserExcep& e)
-	{
-		std::cerr << e.what() << std::endl;
-		exit(1);
-	}
 }
 
 
 void LanguageTests::run()
 {
 	// Integer comparisons:
-	// Test <=
+	/*// Test <=
 	testMainInteger("def main() int : if(1 <= 2, 10, 20)", 10);
 	testMainInteger("def main() int : if(1 <= 1, 10, 20)", 10);
 	testMainInteger("def main() int : if(3 <= 1, 10, 20)", 20);
@@ -743,6 +693,13 @@ void LanguageTests::run()
 	testMainFloat("struct Complex { float re, float im } \
  				  def main() float : im(Complex(2.0, 3.0))", 3.0f);
 
+	// Test struct in struct
+	testMainFloat("struct Complex { float re, float im } \
+				  struct ComplexPair { Complex a, Complex b } \
+				  def main() float : im(a(ComplexPair(Complex(2.0, 3.0), Complex(4.0, 5.0))))",
+				  3.0f);
+
+
 
 	// Test vector
 	testMainFloat("	def main() float : \
@@ -767,6 +724,19 @@ void LanguageTests::run()
 					let x = [1.0, 2.0, 3.0, 4.0]v \
 					let y = [10.0, 20.0, 30.0, 40.0]v \
 					e1(x - y)", -18.0f);
+*/
+	// Test vector * float multiplication
+	// NOTE: doesn't work yet.
+	//testMainFloat("	def main() float : \
+	//			  let x = [1.0, 2.0, 3.0, 4.0]v \
+	///		  e1(x * 10.0)", 2.0f * 10.0f);
+
+	// Test vector * vector multiplication
+	// NOTE: doesn't work yet.
+	testMainFloat("	def main() float : \
+				  let x = [1.0, 2.0, 3.0, 4.0]v \
+				  let y = [10.0, 20.0, 30.0, 40.0]v \
+				e1(x * y)", 2.0f * 20.0f);
 
 
 	// Test structure being returned from main function

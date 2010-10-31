@@ -112,16 +112,6 @@ int main(int argc, char** argv)
 		std::cerr << e.what() << std::endl;
 		return 1;
 	}
-	catch(Winter::LexerExcep& e)
-	{
-		std::cerr << e.what() << std::endl;
-		return 1;
-	}
-	catch(Winter::LangParserExcep& e)
-	{
-		std::cerr << e.what() << std::endl;
-		return 1;
-	}
 
 	const bool found_mem_leaks = _CrtDumpMemoryLeaks() != 0; // == TRUE;
 	if(found_mem_leaks)

@@ -1726,6 +1726,19 @@ Value* MulExpression::exec(VMState& vmstate)
 	{
 		retval = new IntValue(static_cast<IntValue*>(aval)->value * static_cast<IntValue*>(bval)->value);
 	}
+	else if(this->type()->getType() == Type::VectorTypeType)
+	{
+		VectorValue* aval_vec = static_cast<VectorValue*>(aval);
+		VectorValue* bval_vec = static_cast<VectorValue*>(bval);
+
+		vector<Value*> elem_values(aval_vec->e.size());
+		for(int i=0; i<elem_values.size(); ++i)
+		{
+			elem_values[i] = new FloatValue(static_cast<FloatValue*>(aval_vec->e[i])->value * static_cast<FloatValue*>(bval_vec->e[i])->value);
+		}
+
+		retval = new VectorValue(elem_values);
+	}
 	else
 	{
 		assert(!"mulexpression type invalid!");
@@ -1753,14 +1766,20 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	stack.pop_back();
 
 	if(payload.operation == TraversalPayload::TypeCheck)
+	{
 		if(this->type()->getType() == Type::GenericTypeType || *this->type() == Int() || *this->type() == Float())
 		{}
+		else if(a->type()->getType() == Type::VectorTypeType && b->type()->getType() == Type::VectorTypeType)
+		{
+			// this is alright.
+			// NOTE: need to do more checking tho.
+		}
 		else
 		{
-			throw BaseException("Child type '" + this->type()->toString() + "' does not define binary operator '*'.");
+			throw BaseException("MulExpression: Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'");
 		}
+	}
 }
-
 
 
 void MulExpression::print(int depth, std::ostream& s) const
@@ -1796,6 +1815,99 @@ llvm::Value* MulExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 Reference<ASTNode> MulExpression::clone()
 {
 	MulExpression* e = new MulExpression();
+	e->a = this->a->clone();
+	e->b = this->b->clone();
+	return ASTNodeRef(e);
+}
+
+
+//-------------------------------------------------------------------------------------------------------
+
+
+Value* DivExpression::exec(VMState& vmstate)
+{
+	Value* aval = a->exec(vmstate);
+	Value* bval = b->exec(vmstate);
+	Value* retval = NULL;
+
+	if(this->type()->getType() == Type::FloatType)
+	{
+		retval = new FloatValue(static_cast<FloatValue*>(aval)->value / static_cast<FloatValue*>(bval)->value);
+	}
+	else if(this->type()->getType() == Type::IntType)
+	{
+		retval = new IntValue(static_cast<IntValue*>(aval)->value / static_cast<IntValue*>(bval)->value);
+	}
+	else
+	{
+		assert(!"divexpression type invalid!");
+	}
+	delete aval;
+	delete bval;
+	return retval;
+}
+
+
+void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
+{
+	stack.push_back(this);
+	a->traverse(payload, stack);
+	b->traverse(payload, stack);
+	stack.pop_back();
+
+	if(payload.operation == TraversalPayload::TypeCheck)
+		if(this->type()->getType() == Type::GenericTypeType || *this->type() == Int() || *this->type() == Float())
+		{}
+		else
+		{
+			throw BaseException("Child type '" + this->type()->toString() + "' does not define binary operator '/'.");
+		}
+}
+
+
+
+void DivExpression::print(int depth, std::ostream& s) const
+{
+	printMargin(depth, s);
+	s << "Div Expression\n";
+	this->a->print(depth+1, s);
+	this->b->print(depth+1, s);
+}
+
+
+llvm::Value* DivExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+#if USE_LLVM
+	if(this->type()->getType() == Type::FloatType)
+	{
+		return params.builder->CreateBinOp(
+			llvm::Instruction::FDiv, 
+			a->emitLLVMCode(params), 
+			b->emitLLVMCode(params)
+		);
+	}
+	else if(this->type()->getType() == Type::IntType)
+	{
+		return params.builder->CreateBinOp(
+			llvm::Instruction::SDiv, 
+			a->emitLLVMCode(params), 
+			b->emitLLVMCode(params)
+		);
+	}
+	else
+	{
+		assert(!"divexpression type invalid!");
+	}
+
+#else
+	return NULL;
+#endif
+}
+
+
+Reference<ASTNode> DivExpression::clone()
+{
+	DivExpression* e = new DivExpression();
 	e->a = this->a->clone();
 	e->b = this->b->clone();
 	return ASTNodeRef(e);
