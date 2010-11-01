@@ -271,6 +271,10 @@
 			>
 		</File>
 		<File
+			RelativePath="..\grammar.txt"
+			>
+		</File>
+		<File
 			RelativePath="..\LanguageTests.cpp"
 			>
 		</File>

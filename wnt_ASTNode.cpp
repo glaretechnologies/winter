@@ -238,7 +238,7 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 	if(payload.operation == TraversalPayload::TypeCheck)
 	{
 		if(this->isGenericFunction())
-			return; // Don't type check this.  Conrete versions of this func will be type check individually.
+			return; // Don't type check this.  Concrete versions of this func will be type checked individually.
 
 		if(this->body.nonNull())
 		{

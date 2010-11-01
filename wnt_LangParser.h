@@ -81,6 +81,7 @@ private:
 	void parseToken(unsigned int token_type, const ParseInfo& parseinfo);
 	bool isTokenCurrent(unsigned int token_type, const ParseInfo& parseinfo);
 
+	ASTNodeRef parseFieldExpression(const ParseInfo& parseinfo);
 	ASTNodeRef parseVariableExpression(const ParseInfo& parseinfo);
 
 	TypeRef parseType(const ParseInfo& parseinfo, const std::vector<std::string>& generic_type_params);
@@ -101,6 +102,8 @@ private:
 	FunctionDefinitionRef parseAnonFunction(const ParseInfo& parseinfo);
 	void parseParameterList(const ParseInfo& parseinfo, const std::vector<std::string>& generic_type_params, std::vector<FunctionDefinition::FunctionArg>& args_out);
 
+private:
+	std::vector<unsigned int> comparison_tokens;
 
 };
 

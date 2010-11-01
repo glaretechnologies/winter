@@ -279,7 +279,7 @@ void VirtualMachine::build()
 
 	{
 		// Dump to stdout
-		this->llvm_module->dump();
+		//this->llvm_module->dump();
 
 		/*std::string errorinfo;
 		llvm::raw_fd_ostream f(

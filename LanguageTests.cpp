@@ -534,9 +534,22 @@ static void testVectorInStruct(const std::string& src, const StructWithVec& stru
 }
 
 
+float test()
+{
+	return 10;
+}
+
+int test2()
+{
+	return 3.0f;
+}
+
 void LanguageTests::run()
 {
-/*	// Integer comparisons:
+	testMainFloat("def main() float : 10", 10);
+
+
+	// Integer comparisons:
 	// Test <=
 	testMainInteger("def main() int : if(1 <= 2, 10, 20)", 10);
 	testMainInteger("def main() int : if(1 <= 1, 10, 20)", 10);
@@ -592,7 +605,6 @@ void LanguageTests::run()
 	testMainFloat("def main() float : if(1.0 != 2.0, 10.0, 20.0)", 10.0);
 
 
-
 	// Test 'if'
 	testMainInteger("def main() int : if(true, 2, 3)", 2);
 	testMainInteger("def main() int : if(false, 2, 3)", 3);
@@ -633,19 +645,36 @@ void LanguageTests::run()
 
 	// Test multiple integer additions
 	testMainInteger("def main() int : 1 + 2 + 3", 6);
-	//testMainInteger("def main() int : 1 + 2 + 3 + 4", 10);
+	testMainInteger("def main() int : 1 + 2 + 3 + 4", 10);
+
+	// Test multiple integer subtractions
+	testMainInteger("def main() int : 1 - 2 - 3 - 4", 1 - 2 - 3 - 4);
 
 	// Test left-to-right associativity
+	// Note that right-to-left associativity here would give 2 - (3 + 4) = -5
 	assert(2 - 3 + 4 == (2 - 3) + 4);
 	assert(2 - 3 + 4 == 3);
-	//testMainInteger("def main() int : 2 - 3 + 4", 3);
+	testMainInteger("def main() int : 2 - 3 + 4", 3);
 
 
 	// Test multiplication expression
 	testMainFloat("def main() float : 3.0 * 2.0", 6.0);
 
+
+
+
 	// Test integer multiplication
 	testMainInteger("def main() int : 2 * 3", 6);
+
+	// Test multiple integer multiplication
+	testMainInteger("def main() int : 2 * 3 * 4 * 5", 2 * 3 * 4 * 5);
+
+	// Test left-to-right associativity of division
+	// 12 / 4 / 3 = (12 / 4) / 3 = 1
+	// whereas
+	// 12 / (4 / 3) = 12 / 1 = 12
+	testMainInteger("def main() int : 12 / 4 / 3", 1);
+
 
 	// Test float subtraction
 	testMainFloat("def main() float : 3.0 - 2.0", 1.0);
@@ -759,6 +788,7 @@ void LanguageTests::run()
 				  def main() float : f(2.0)", 6.0);
 
 
+	
 	// Test struct
 	testMainFloat("struct Complex { float re, float im } \
 				  def main() float : re(Complex(2.0, 3.0))", 2.0f);
@@ -772,6 +802,29 @@ void LanguageTests::run()
 				  def main() float : im(a(ComplexPair(Complex(2.0, 3.0), Complex(4.0, 5.0))))",
 				  3.0f);
 
+	// Test field access with '.' applied to a variable.
+	testMainFloat("struct Complex { float re, float im } \n\
+ 				  def main() float : \n\
+					let z = Complex(2.0, 3.0) \n\
+					z.im", 3.0f);
+
+	// Test field access with '.' applied to a structure literal.
+	testMainFloat("struct Complex { float re, float im } \n\
+ 				  def main() float : \n\
+					Complex(2.0, 3.0).im", 3.0f);
+
+	// Test field access with '.' applied to a function call expression.
+	testMainFloat("struct Complex { float re, float im } \n\
+				  def f() Complex : Complex(1.0, 2.0) \n\
+ 				  def main() float : \n\
+					f().im", 2.0f);
+
+
+	// Test field access for nested structures.
+	testMainFloat("struct Complex { float re, float im } \n\
+				  struct ComplexPair { Complex a, Complex b } \n\
+				  def main() float : ComplexPair(Complex(2.0, 3.0), Complex(4.0, 5.0)).a.im",
+				  3.0f);
 
 
 	// Test vector
@@ -815,7 +868,7 @@ void LanguageTests::run()
 					def main() float : \
 						let x = [1.0, 2.0, 3.0, 4.0]v \
 						let y = 10.0 \
-						e1(mul(x, y))", 2.0f * 10.0f);
+						mul(x, y).e1", 2.0f * 10.0f);
 
 	testMainFloatArg("	def mul(vector<float, 4> v, float x) vector<float, 4> : v * [x, x, x, x]v \n\
 				  def main(float x) float : \
@@ -846,7 +899,7 @@ void LanguageTests::run()
 				  let a = [1.0, 2.0, 3.0, 4.0]v \
 				  let b = [11.0, 12.0, 13.0, 14.0]v \
 				  e2(max(b, a))", 13.0);
-				  */
+				  
 
 	testMainFloat("	def clamp(vector<float, 4> x, vector<float, 4> lowerbound, vector<float, 4> upperbound) vector<float, 4> : max(lowerbound, min(upperbound, x))  \n\
 					def make_v4f(float x) vector<float, 4> : [x, x, x, x]v  \n\

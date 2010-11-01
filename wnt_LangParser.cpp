@@ -26,6 +26,12 @@ namespace Winter
 
 LangParser::LangParser()
 {
+	comparison_tokens.push_back(DOUBLE_EQUALS_TOKEN);
+	comparison_tokens.push_back(NOT_EQUALS_TOKEN);
+	comparison_tokens.push_back(LEFT_ANGLE_BRACKET_TOKEN);
+	comparison_tokens.push_back(RIGHT_ANGLE_BRACKET_TOKEN);
+	comparison_tokens.push_back(LESS_EQUAL_TOKEN);
+	comparison_tokens.push_back(GREATER_EQUAL_TOKEN);
 }
 
 
@@ -293,6 +299,61 @@ bool LangParser::isTokenCurrent(unsigned int token_type, const ParseInfo& p)
 }
 
 
+ASTNodeRef LangParser::parseFieldExpression(const ParseInfo& p)
+{
+//	ASTNodeRef var_expression = parseVariableExpression(p);
+	ASTNodeRef var_expression;
+
+	// If next token is a '(', then this is a function expression
+	if(p.i + 1 < p.tokens.size() && p.tokens[p.i+1]->getType() == OPEN_PARENTHESIS_TOKEN)
+		var_expression = parseFunctionExpression(p);
+	else
+		var_expression = parseVariableExpression(p);
+
+
+	/*if(isTokenCurrent(DOT_TOKEN, p))
+	{
+		parseToken(DOT_TOKEN, p);
+
+		const std::string field_name = parseIdentifier("field name", p);
+
+		FunctionExpression* func_expr(new FunctionExpression());
+		func_expr->function_name = field_name;
+		func_expr->argument_expressions.push_back(var_expression);
+		return ASTNodeRef(func_expr);
+	}*/
+	while(isTokenCurrent(DOT_TOKEN, p))
+	{
+		parseToken(DOT_TOKEN, p);
+
+		const std::string field_name = parseIdentifier("field name", p);
+
+		FunctionExpression* func_expr(new FunctionExpression());
+		func_expr->function_name = field_name;
+		func_expr->argument_expressions.push_back(var_expression);
+		var_expression = ASTNodeRef(func_expr);
+	}
+
+/*
+
+a.b.c
+->
+c(b(a))
+
+->
+c
+|
+b
+|
+a
+
+
+*/
+
+	return var_expression;
+}
+
+
 ASTNodeRef LangParser::parseVariableExpression(const ParseInfo& p)
 {
 	const std::string name = parseIdentifier("variable name", p);
@@ -543,11 +604,15 @@ ASTNodeRef LangParser::parseBasicExpression(const ParseInfo& p)
 	}
 	else if(p.tokens[p.i]->isIdentifier())
 	{
+		return parseFieldExpression(p);
+
+		/*
 		// If next token is a '(', then this is a function expression
 		if(p.i + 1 < p.tokens.size() && p.tokens[p.i+1]->getType() == OPEN_PARENTHESIS_TOKEN)
 			return parseFunctionExpression(p);
 		else
 			return parseVariableExpression(p);
+		*/
 	}
 	else if(p.tokens[p.i]->getType() == OPEN_BRACE_TOKEN)
 	{
@@ -717,89 +782,83 @@ TypeRef LangParser::parseVectorType(const ParseInfo& p, const std::vector<std::s
 
 ASTNodeRef LangParser::parseAddSubExpression(const ParseInfo& p)
 {
+/*
+Should be left associative
+a + b + c = (a + b) + c
+
+
+     +
+    / \
+   +   c
+  / \
+ a   b
+
+
+*/
 	ASTNodeRef left = parseMulDivExpression(p);
-	if(isTokenCurrent(PLUS_TOKEN, p))
+
+	while(1)
 	{
-		parseToken(PLUS_TOKEN, p);
+		if(isTokenCurrent(PLUS_TOKEN, p))
+		{
+			parseToken(PLUS_TOKEN, p);
 
-		AdditionExpression* addexpr = new AdditionExpression();
-		addexpr->a = left;
-		addexpr->b = parseAddSubExpression(p);
-		return ASTNodeRef(addexpr);
+			AdditionExpression* addexpr = new AdditionExpression();
+			addexpr->a = left;
+			addexpr->b = parseMulDivExpression(p);
+			
+			left = ASTNodeRef(addexpr);
+		}
+		else if(isTokenCurrent(MINUS_TOKEN, p))
+		{
+			parseToken(MINUS_TOKEN, p);
+
+			SubtractionExpression* e = new SubtractionExpression();
+			e->a = left;
+			e->b = parseMulDivExpression(p);
+			
+			left = ASTNodeRef(e);
+		}
+		else
+		{
+			return left;
+		}
 	}
-	else if(isTokenCurrent(MINUS_TOKEN, p))
-	{
-		parseToken(MINUS_TOKEN, p);
-
-		SubtractionExpression* e = new SubtractionExpression();
-		e->a = left;
-		e->b = parseAddSubExpression(p);
-		return ASTNodeRef(e);
-	}
-	else
-		return left;
-
-	/*ASTNodeRef left = parseMulDivExpression(p);
-	if(isTokenCurrent(PLUS_TOKEN, p))
-	{
-		parseToken(PLUS_TOKEN, p);
-
-		AdditionExpression* addexpr = new AdditionExpression();
-		addexpr->a = left;
-		addexpr->b = parseMulDivExpression(p);
-		return ASTNodeRef(addexpr);
-	}
-	else if(isTokenCurrent(MINUS_TOKEN, p))
-	{
-		parseToken(MINUS_TOKEN, p);
-
-		SubtractionExpression* e = new SubtractionExpression();
-		e->a = left;
-		e->b = parseMulDivExpression(p);
-		return ASTNodeRef(e);
-	}
-	else
-		return left;*/
 }
 
 
 ASTNodeRef LangParser::parseMulDivExpression(const ParseInfo& p)
 {
 	ASTNodeRef left = parseComparisonExpression(p);
-	if(isTokenCurrent(ASTERISK_TOKEN, p))
+	while(1)
 	{
-		parseToken(ASTERISK_TOKEN, p);
+		if(isTokenCurrent(ASTERISK_TOKEN, p))
+		{
+			parseToken(ASTERISK_TOKEN, p);
 
-		MulExpression* expr = new MulExpression();
-		expr->a = left;
-		expr->b = parseComparisonExpression(p);
-		return ASTNodeRef(expr);
-	}
-	else if(isTokenCurrent(FORWARDS_SLASH_TOKEN, p))
-	{
-		parseToken(FORWARDS_SLASH_TOKEN, p);
+			MulExpression* expr = new MulExpression();
+			expr->a = left;
+			expr->b = parseComparisonExpression(p);
+			left = ASTNodeRef(expr);
+		}
+		else if(isTokenCurrent(FORWARDS_SLASH_TOKEN, p))
+		{
+			parseToken(FORWARDS_SLASH_TOKEN, p);
 
-		DivExpression* expr = new DivExpression();
-		expr->a = left;
-		expr->b = parseComparisonExpression(p);
-		return ASTNodeRef(expr);
+			DivExpression* expr = new DivExpression();
+			expr->a = left;
+			expr->b = parseComparisonExpression(p);
+			left = ASTNodeRef(expr);
+		}
+		else
+			return left;
 	}
-	else
-		return left;
 }
 
 
 ASTNodeRef LangParser::parseComparisonExpression(const ParseInfo& p)
 {
 	ASTNodeRef left = parseUnaryExpression(p);
-
-	vector<unsigned int> comparison_tokens;
-	comparison_tokens.push_back(DOUBLE_EQUALS_TOKEN);
-	comparison_tokens.push_back(NOT_EQUALS_TOKEN);
-	comparison_tokens.push_back(LEFT_ANGLE_BRACKET_TOKEN);
-	comparison_tokens.push_back(RIGHT_ANGLE_BRACKET_TOKEN);
-	comparison_tokens.push_back(LESS_EQUAL_TOKEN);
-	comparison_tokens.push_back(GREATER_EQUAL_TOKEN);
 
 	for(unsigned int i=0; i<comparison_tokens.size(); ++i)
 	{

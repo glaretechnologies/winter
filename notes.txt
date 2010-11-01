@@ -1,6 +1,37 @@
 Copyright 2009- Nicholas Chapman
 
 
+Type Coercion
+=============
+Integer -> Float
+----------------
+This should be done iff the integer can be exactly represented by the float.
+This should also only be done for constant expressions (not function calls etc..).  Otherwise it will be impossible to check
+that the result is exactly convertible as an integer.
+
+Integer to float promotion in arithmetical expressions:
+1 + 2.0   =>  1.0 + 2.0
+
+Promotion to match function return type:
+
+def f() float : 1
+
+Promotion to match required arguments for function expression:
+
+def f(float a, float b)
+
+f(1, 2) =>  f(1.0, 2.0)
+
+iff there are no other functions such as f(float, int), or f(int, int) etc.., e.g. as long as the overloading 
+is not ambiguous.
+
+
+Float -> Int
+------------
+Since floats can rarely be represented exactly as ints, and truncation may not be the desired behaviour for negative numbers,
+type coercion of this kind should *not* be done.
+
+
 
 Passing structures by value
 ===========================

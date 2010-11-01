@@ -283,6 +283,11 @@ void Lexer::process(const std::string& buffer, std::vector<Reference<TokenBase> 
 			if(!parser.parseString("!="))
 				throw LexerExcep("Error while parsing '!='" + errorPosition(buffer, parser.currentPos()));
 		}
+		else if(parser.current() == '.')
+		{
+			tokens_out.push_back(Reference<TokenBase>(new DOT_Token(parser.currentPos())));
+			parser.advance();
+		}
 		else if(parser.current() == '|')
 		{
 			tokens_out.push_back(Reference<TokenBase>(new OR_Token(parser.currentPos())));

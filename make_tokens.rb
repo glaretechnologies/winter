@@ -33,6 +33,7 @@ tokens = [
 [ "AND",				:bin_infix,		"and",			40			],	
 [ "OR",					:bin_infix,		"or",			30			],	
 [ "EXCLAMATION_MARK",	:nil,			nil,			nil			],	
+[ "DOT",				:nil,			nil,			nil			],	
 
 ]
 
