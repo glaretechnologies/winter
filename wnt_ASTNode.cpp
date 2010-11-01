@@ -131,6 +131,8 @@ FunctionDefinition::FunctionDefinition(const std::string& name, const std::vecto
 
 	// TODO: fix this, make into method
 	function_type = TypeRef(new Function(sig.param_types, declared_rettype));
+
+	this->let_exprs_llvm_value = std::vector<llvm::Value*>(this->lets.size(), NULL);
 }
 
 
@@ -515,6 +517,17 @@ bool FunctionDefinition::isGenericFunction() const // true if it is parameterise
 		if(this->args[i].type->getType() == Type::GenericTypeType)
 			return true;
 	return false;
+}
+
+
+llvm::Value* FunctionDefinition::getLetExpressionLLVMValue(EmitLLVMCodeParams& params, unsigned int let_index)
+{
+	if(let_exprs_llvm_value[let_index] == NULL)
+	{
+		let_exprs_llvm_value[let_index] = this->lets[let_index]->emitLLVMCode(params);
+	}
+
+	return let_exprs_llvm_value[let_index];
 }
 
 
@@ -1043,17 +1056,9 @@ void Variable::print(int depth, std::ostream& s) const
 llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
 #if USE_LLVM
-	// Emit a call to constructStringOnHeap(this->value);
-	//return emitExternalLinkageCall(
-	//	//true, // implicit void arg?
-	//	"constructStringOnHeap", // target name
-	//	params
-	//	);
-
 	if(vartype == LetVariable)
 	{
-		// TODO: only compute once, then refer to let value.
-		return this->parent_function->lets[this->argument_index]->emitLLVMCode(params);
+		return this->parent_function->getLetExpressionLLVMValue(params, this->argument_index);
 	}
 	else
 	{

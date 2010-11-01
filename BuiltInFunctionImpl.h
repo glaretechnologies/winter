@@ -124,4 +124,30 @@ private:
 };
 
 
+class VectorMinBuiltInFunc : public BuiltInFunctionImpl
+{
+public:
+	VectorMinBuiltInFunc(Reference<VectorType>& vector_type_) : vector_type(vector_type_) {}
+	virtual ~VectorMinBuiltInFunc(){}
+
+	virtual Value* invoke(VMState& vmstate);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+private:
+	Reference<VectorType> vector_type;
+};
+
+
+class VectorMaxBuiltInFunc : public BuiltInFunctionImpl
+{
+public:
+	VectorMaxBuiltInFunc(Reference<VectorType>& vector_type_) : vector_type(vector_type_) {}
+	virtual ~VectorMaxBuiltInFunc(){}
+
+	virtual Value* invoke(VMState& vmstate);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+private:
+	Reference<VectorType> vector_type;
+};
+
+
 }

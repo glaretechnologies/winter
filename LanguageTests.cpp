@@ -536,7 +536,7 @@ static void testVectorInStruct(const std::string& src, const StructWithVec& stru
 
 void LanguageTests::run()
 {
-	// Integer comparisons:
+/*	// Integer comparisons:
 	// Test <=
 	testMainInteger("def main() int : if(1 <= 2, 10, 20)", 10);
 	testMainInteger("def main() int : if(1 <= 1, 10, 20)", 10);
@@ -752,6 +752,13 @@ void LanguageTests::run()
 					def main() float : f(2.0)", 3.0);
 
 
+	// Test use of let variable twice
+	testMainFloat("	def f(float x) float : \
+				  let z = x + 1.0 \
+				  z + z\
+				  def main() float : f(2.0)", 6.0);
+
+
 	// Test struct
 	testMainFloat("struct Complex { float re, float im } \
 				  def main() float : re(Complex(2.0, 3.0))", 2.0f);
@@ -819,6 +826,66 @@ void LanguageTests::run()
 	testMainFloatArg("	def main(float x) float : \
 					 let v = [x, x, x, x]v \
 					 dot(v, v)", 2.0f, 16.0f);
+
+	// Test vector min
+	testMainFloat("	def main() float : \
+					 let a = [1.0, 2.0, 3.0, 4.0]v \
+					 let b = [11.0, 12.0, 13.0, 14.0]v \
+					 e2(min(a, b))", 3.0);
+	testMainFloat("	def main() float : \
+				  let a = [1.0, 2.0, 3.0, 4.0]v \
+				  let b = [11.0, 12.0, 13.0, 14.0]v \
+				  e2(min(b, a))", 3.0);
+
+	// Test vector max
+	testMainFloat("	def main() float : \
+				  let a = [1.0, 2.0, 3.0, 4.0]v \
+				  let b = [11.0, 12.0, 13.0, 14.0]v \
+				  e2(max(a, b))", 13.0);
+	testMainFloat("	def main() float : \
+				  let a = [1.0, 2.0, 3.0, 4.0]v \
+				  let b = [11.0, 12.0, 13.0, 14.0]v \
+				  e2(max(b, a))", 13.0);
+				  */
+
+	testMainFloat("	def clamp(vector<float, 4> x, vector<float, 4> lowerbound, vector<float, 4> upperbound) vector<float, 4> : max(lowerbound, min(upperbound, x))  \n\
+					def make_v4f(float x) vector<float, 4> : [x, x, x, x]v  \n\
+					def main() float : \
+					let a = [1.0, 2.0, 3.0, 4.0]v \
+					e2(clamp(a, make_v4f(2.0), make_v4f(2.5)))", 2.5);
+
+	testMainFloat("	struct PolarisationVec { vector<float, 8> e } \n\
+																	\n\
+					def clamp(vector<float, 4> x, vector<float, 4> lowerbound, vector<float, 4> upperbound) vector<float, 4> : max(lowerbound, min(upperbound, x))  \n\
+																																					\n\
+					def clamp(PolarisationVec x, float lowerbound, float upperbound) PolarisationVec : \n\
+						let lo = [e0(e(x)), e1(e(x)), e2(e(x)), e3(e(x))]v   \n\
+						let hi = [e4(e(x)), e5(e(x)), e6(e(x)), e7(e(x))]v    \n\
+						let clamped_lo = clamp(lo, make_v4f(lowerbound), make_v4f(upperbound))   \n\
+						let clamped_hi = clamp(hi, make_v4f(lowerbound), make_v4f(upperbound))   \n\
+						PolarisationVec([e0(clamped_lo), e1(clamped_lo), e2(clamped_lo), e3(clamped_lo), e0(clamped_hi), e1(clamped_hi), e2(clamped_hi), e3(clamped_hi)]v)   \n\
+																																												\n\
+				  def make_v4f(float x) vector<float, 4> : [x, x, x, x]v  \n\
+																		\n\
+				  def main() float : \
+					let a = PolarisationVec([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]v) \
+					e5(e(clamp(a, 2.0, 2.5)))", 2.5);
+
+	//class PolarisationVec
+	//{
+	//public:
+	//	__m128 e[2];
+
+
+	/* Try matrix * vec4f mult
+
+	*/
+	/*testMainFloatArg("	struct Matrix { vector<float, 4> r0, vector<float, 4> r1, vector<float, 4> r2, vector<float, 4> r3 } \n\
+						def mul(Matrix m, vector<float, 4> v) vector<float, 4> : [dot(r0(m), v), dot(r1(m), v), dot(r2(m), v), dot(r3(m), v)]v  \n\
+						def main(float x) float : \
+						let m = Matrix([x, x, x, x]v, [x, x, x, x]v, [x, x, x, x]v, [x, x, x, x]v) \
+					 let v = [1.0, 2.0, 3.0, 4.0]v \
+					 e0(mul(m, v))", 1.0f, 10.0f);*/
 
 
 	// Test structure being returned from main function

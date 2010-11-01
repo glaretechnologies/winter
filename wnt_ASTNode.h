@@ -231,6 +231,10 @@ public:
 
 	llvm::Function* built_llvm_function;
 	void* jitted_function;
+
+	llvm::Value* getLetExpressionLLVMValue(EmitLLVMCodeParams& params, unsigned int let_index);
+
+	std::vector<llvm::Value*> let_exprs_llvm_value;
 };
 
 typedef Reference<FunctionDefinition> FunctionDefinitionRef;

@@ -136,7 +136,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 				throw BaseException("eN() functions must take one argument.");
 
 			if(sig.param_types[0]->getType() != Type::VectorTypeType)
-				throw BaseException("eN() functions must take a vector as their argument");
+				throw BaseException("eN() functions must take a vector as their argument.  Call: " + sig.name + ", found arg type: " + sig.param_types[0]->toString());
 
 
 			Reference<VectorType> vec_type(

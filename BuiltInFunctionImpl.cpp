@@ -6,7 +6,7 @@
 #include "wnt_ASTNode.h"
 #include <vector>
 #include "LLVMTypeUtils.h"
-#include "../utils/platformutils.h"
+#include "utils/platformutils.h"
 #if USE_LLVM
 #include "llvm/Type.h"
 #include "llvm/Module.h"
@@ -521,6 +521,102 @@ llvm::Value* DotProductBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) con
 		}
 
 		return x;
+	}
+}
+
+
+//----------------------------------------------------------------------------------------------
+
+
+Value* VectorMinBuiltInFunc::invoke(VMState& vmstate)
+{
+	const VectorValue* a = dynamic_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1]);
+	const VectorValue* b = dynamic_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 0]);
+	assert(a && b);
+
+	
+	vector<Value*> res_values(vector_type->num);
+
+	for(unsigned int i=0; i<vector_type->num; ++i)
+	{
+		const float x = static_cast<const FloatValue*>(a->e[i])->value;
+		const float y = static_cast<const FloatValue*>(b->e[i])->value;
+		res_values[i] = new FloatValue(x < y ? x : y);
+	}
+
+	return new VectorValue(res_values);
+}
+
+
+llvm::Value* VectorMinBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	llvm::Value* a = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+	llvm::Value* b = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
+
+	if(params.cpu_info->sse1)
+	{
+		// emit dot product intrinsic
+
+		vector<llvm::Value*> args;
+		args.push_back(a);
+		args.push_back(b);
+
+		llvm::Function* minps_func = llvm::Intrinsic::getDeclaration(params.module, llvm::Intrinsic::x86_sse_min_ps);
+
+		return params.builder->CreateCall(minps_func, args.begin(), args.end());
+	}
+	else
+	{
+		assert(!"VectorMinBuiltInFunc::emitLLVMCode assumes sse");
+		return NULL;
+	}
+}
+
+
+//----------------------------------------------------------------------------------------------
+
+
+Value* VectorMaxBuiltInFunc::invoke(VMState& vmstate)
+{
+	const VectorValue* a = dynamic_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1]);
+	const VectorValue* b = dynamic_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 0]);
+	assert(a && b);
+
+
+	vector<Value*> res_values(vector_type->num);
+
+	for(unsigned int i=0; i<vector_type->num; ++i)
+	{
+		const float x = static_cast<const FloatValue*>(a->e[i])->value;
+		const float y = static_cast<const FloatValue*>(b->e[i])->value;
+		res_values[i] = new FloatValue(x > y ? x : y);
+	}
+
+	return new VectorValue(res_values);
+}
+
+
+llvm::Value* VectorMaxBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	llvm::Value* a = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+	llvm::Value* b = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
+
+	if(params.cpu_info->sse1)
+	{
+		// emit dot product intrinsic
+
+		vector<llvm::Value*> args;
+		args.push_back(a);
+		args.push_back(b);
+
+		llvm::Function* maxps_func = llvm::Intrinsic::getDeclaration(params.module, llvm::Intrinsic::x86_sse_max_ps);
+
+		return params.builder->CreateCall(maxps_func, args.begin(), args.end());
+	}
+	else
+	{
+		assert(!"VectorMaxBuiltInFunc::emitLLVMCode assumes sse");
+		return NULL;
 	}
 }
 

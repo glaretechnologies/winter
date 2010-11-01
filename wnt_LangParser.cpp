@@ -146,6 +146,52 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 			root->func_defs.push_back(Reference<FunctionDefinition>(def));
 		}
 
+		// Create vec4f min built-in function
+		{
+			TypeRef vec4f_type(new VectorType(TypeRef(new Float()), 4));
+			Reference<VectorType> vec4f_type_v(new VectorType(TypeRef(new Float()), 4));
+
+			vector<FunctionDefinition::FunctionArg> args(2);
+			args[0].name = "a";
+			args[0].type = vec4f_type;
+			args[1].name = "b";
+			args[1].type = vec4f_type;
+
+			FunctionDefinition* def = new FunctionDefinition(
+				"min", // name
+				args, // args
+				vector<Reference<LetASTNode> >(), // lets
+				ASTNodeRef(NULL), // body expr
+				vec4f_type, // return type
+				new VectorMinBuiltInFunc(vec4f_type_v) // built in impl.
+				);
+
+			root->func_defs.push_back(Reference<FunctionDefinition>(def));
+		}
+
+		// Create vec4f max built-in function
+		{
+			TypeRef vec4f_type(new VectorType(TypeRef(new Float()), 4));
+			Reference<VectorType> vec4f_type_v(new VectorType(TypeRef(new Float()), 4));
+
+			vector<FunctionDefinition::FunctionArg> args(2);
+			args[0].name = "a";
+			args[0].type = vec4f_type;
+			args[1].name = "b";
+			args[1].type = vec4f_type;
+
+			FunctionDefinition* def = new FunctionDefinition(
+				"max", // name
+				args, // args
+				vector<Reference<LetASTNode> >(), // lets
+				ASTNodeRef(NULL), // body expr
+				vec4f_type, // return type
+				new VectorMaxBuiltInFunc(vec4f_type_v) // built in impl.
+				);
+
+			root->func_defs.push_back(Reference<FunctionDefinition>(def));
+		}
+
 
 
 
