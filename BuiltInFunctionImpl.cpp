@@ -6,6 +6,7 @@
 #include "wnt_ASTNode.h"
 #include <vector>
 #include "LLVMTypeUtils.h"
+#include "../utils/platformutils.h"
 #if USE_LLVM
 #include "llvm/Type.h"
 #include "llvm/Module.h"
@@ -193,6 +194,8 @@ llvm::Value* GetField::emitLLVMCode(EmitLLVMCodeParams& params) const
 				field_val, // value
 				return_ptr // ptr
 			);
+
+			return NULL;
 		}
 	}
 }
@@ -439,6 +442,86 @@ llvm::Value* IfBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 #else
 	return NULL;
 #endif
+}
+
+
+//----------------------------------------------------------------------------------------------
+
+
+Value* DotProductBuiltInFunc::invoke(VMState& vmstate)
+{
+	const VectorValue* a = dynamic_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1]);
+	const VectorValue* b = dynamic_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 0]);
+	assert(a && b);
+
+	FloatValue* res = new FloatValue(0.0f);
+
+	for(unsigned int i=0; i<vector_type->num; ++i)
+	{
+		res->value += static_cast<const FloatValue*>(a->e[i])->value + static_cast<const FloatValue*>(b->e[i])->value;
+	}
+
+	return res;
+}
+
+
+llvm::Value* DotProductBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	llvm::Value* a = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+	llvm::Value* b = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
+
+	// If (have sse4.1)
+	if(params.cpu_info->sse4_1)
+	{
+		// emit dot product intrinsic
+
+		vector<llvm::Value*> args;
+		args.push_back(a);
+		args.push_back(b);
+		args.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 255))); // SSE DPPS control bits
+
+		llvm::Function* dot_func = llvm::Intrinsic::getDeclaration(params.module, llvm::Intrinsic::x86_sse41_dpps);
+
+		// dot product intrinsic returns a 4-vector.
+		llvm::Value* vector_res = params.builder->CreateCall(dot_func, args.begin(), args.end());
+
+		return params.builder->CreateExtractElement(
+			vector_res, // vec
+			llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0)) // index
+		);
+	}
+	else
+	{
+		// emit call to dotproduct fallback: _dotProduct()
+		//assert(0);
+		//return NULL;
+
+		// x = a[0] * b[0]
+		llvm::Value* x = params.builder->CreateBinOp(
+			llvm::Instruction::Mul, 
+			params.builder->CreateExtractElement(a, llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0))),
+			params.builder->CreateExtractElement(b, llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0)))
+		);
+			
+		for(unsigned int i=1; i<this->vector_type->num; ++i)
+		{
+			// y = a[i] * b[i]
+			llvm::Value* y = params.builder->CreateBinOp(
+				llvm::Instruction::Mul, 
+				params.builder->CreateExtractElement(a, llvm::ConstantInt::get(*params.context, llvm::APInt(32, i))),
+				params.builder->CreateExtractElement(b, llvm::ConstantInt::get(*params.context, llvm::APInt(32, i)))
+			);
+
+			// x = x + y
+			x = params.builder->CreateBinOp(
+				llvm::Instruction::Add, 
+				x,
+				y
+			);
+		}
+
+		return x;
+	}
 }
 
 

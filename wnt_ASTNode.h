@@ -28,7 +28,7 @@ namespace llvm { class Function; };
 namespace llvm { class Value; };
 namespace llvm { class Module; };
 namespace llvm { class LLVMContext; };
-
+namespace PlatformUtils { class CPUInfo; }
 
 namespace Winter
 {
@@ -66,6 +66,7 @@ class EmitLLVMCodeParams
 {
 public:
 	FunctionDefinition* currently_building_func_def;
+	const PlatformUtils::CPUInfo* cpu_info;
 #if USE_LLVM
 	llvm::IRBuilder<>* builder;
 	llvm::Module* module;
@@ -223,7 +224,8 @@ public:
 	bool isGenericFunction() const; // true if it is parameterised by type.
 
 	llvm::Function* buildLLVMFunction(
-		llvm::Module* module//, 
+		llvm::Module* module,
+		const PlatformUtils::CPUInfo& cpu_info
 		//std::map<Lang::FunctionSignature, llvm::Function*>& external_functions
 	);
 

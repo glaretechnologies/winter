@@ -315,7 +315,8 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 
 llvm::Function* FunctionDefinition::buildLLVMFunction(
-	llvm::Module* module
+	llvm::Module* module,
+	const PlatformUtils::CPUInfo& cpu_info
 	//std::map<Lang::FunctionSignature, llvm::Function*>& external_functions
 	)
 {
@@ -410,6 +411,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	// Build body LLVM code
 	EmitLLVMCodeParams params;
 	params.currently_building_func_def = this;
+	params.cpu_info = &cpu_info;
 	params.builder = &builder;
 	params.module = module;
 	params.currently_building_func = internal_llvm_func;
@@ -1732,7 +1734,7 @@ Value* MulExpression::exec(VMState& vmstate)
 		VectorValue* bval_vec = static_cast<VectorValue*>(bval);
 
 		vector<Value*> elem_values(aval_vec->e.size());
-		for(int i=0; i<elem_values.size(); ++i)
+		for(unsigned int i=0; i<elem_values.size(); ++i)
 		{
 			elem_values[i] = new FloatValue(static_cast<FloatValue*>(aval_vec->e[i])->value * static_cast<FloatValue*>(bval_vec->e[i])->value);
 		}
@@ -1773,6 +1775,7 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 		{
 			// this is alright.
 			// NOTE: need to do more checking tho.
+			// Need to check number of elements is same in both vectors, and field types are the same.
 		}
 		else
 		{
@@ -1897,6 +1900,7 @@ llvm::Value* DivExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 	else
 	{
 		assert(!"divexpression type invalid!");
+		return NULL;
 	}
 
 #else

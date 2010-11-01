@@ -5,6 +5,7 @@
 #include "BuiltInFunctionImpl.h"
 #include <iostream>
 #include "utils/stringutils.h"
+#include "utils/platformutils.h"
 #include "wnt_ExternalFunction.h"
 
 
@@ -60,13 +61,16 @@ void Linker::addExternalFunctions(vector<ExternalFunctionRef>& funcs)
 
 void Linker::buildLLVMCode(llvm::Module* module)
 {
+	PlatformUtils::CPUInfo cpu_info;
+	PlatformUtils::getCPUInfo(cpu_info);
+
 	for(Linker::FuncMapType::iterator it = this->functions.begin(); it != functions.end(); ++it)
 	{
 		FunctionDefinition& f = *(*it).second;
 
 		if(!f.isGenericFunction())
 		{
-			f.buildLLVMFunction(module);
+			f.buildLLVMFunction(module, cpu_info);
 		}
 	}
 
@@ -75,7 +79,7 @@ void Linker::buildLLVMCode(llvm::Module* module)
 	{
 		assert(!concrete_funcs[i]->isGenericFunction());
 
-		concrete_funcs[i]->buildLLVMFunction(module);
+		concrete_funcs[i]->buildLLVMFunction(module, cpu_info);
 	}
 }
 

@@ -111,4 +111,17 @@ private:
 };
 
 
+class DotProductBuiltInFunc : public BuiltInFunctionImpl
+{
+public:
+	DotProductBuiltInFunc(Reference<VectorType>& vector_type_) : vector_type(vector_type_) {}
+	virtual ~DotProductBuiltInFunc(){}
+
+	virtual Value* invoke(VMState& vmstate);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+private:
+	Reference<VectorType> vector_type;
+};
+
+
 }

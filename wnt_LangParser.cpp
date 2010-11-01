@@ -65,6 +65,7 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 
 			root->func_defs.push_back(Reference<FunctionDefinition>(def));
 		}*/
+
 		// TEMP: Create float array fold definition
 		// #decl fold<T>(function<T, T, T>, array<T>, T) T
 		{
@@ -118,6 +119,29 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 				T, // return type
 				new IfBuiltInFunc(T) // built in impl.
 			);
+
+			root->func_defs.push_back(Reference<FunctionDefinition>(def));
+		}
+
+		// Create 'dot' (dot product) built-in function
+		{
+			TypeRef vec4f_type(new VectorType(TypeRef(new Float()), 4));
+			Reference<VectorType> vec4f_type_v(new VectorType(TypeRef(new Float()), 4));
+
+			vector<FunctionDefinition::FunctionArg> args(2);
+			args[0].name = "a";
+			args[0].type = vec4f_type;
+			args[1].name = "b";
+			args[1].type = vec4f_type;
+
+			FunctionDefinition* def = new FunctionDefinition(
+				"dot", // name
+				args, // args
+				vector<Reference<LetASTNode> >(), // lets
+				ASTNodeRef(NULL), // body expr
+				TypeRef(new Float()), // return type
+				new DotProductBuiltInFunc(vec4f_type_v) // built in impl.
+				);
 
 			root->func_defs.push_back(Reference<FunctionDefinition>(def));
 		}

@@ -209,6 +209,14 @@
 					>
 				</File>
 				<File
+					RelativePath="..\utils\platformutils.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\utils\platformutils.h"
+					>
+				</File>
+				<File
 					RelativePath="..\utils\refcounted.cpp"
 					>
 				</File>

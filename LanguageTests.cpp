@@ -129,6 +129,72 @@ static void testMainFloat(const std::string& src, float target_return_val)
 }
 
 
+static void testMainFloatArg(const std::string& src, float argument, float target_return_val)
+{
+	std::cout << "============================== testMainFloat() ============================" << std::endl;
+	try
+	{
+		VMConstructionArgs vm_args;
+		vm_args.source_buffers.push_back(src);
+
+		{
+			ExternalFunctionRef f(new ExternalFunction());
+			f->func = testFunc;
+			f->interpreted_func = testFuncIntepreted;
+			f->return_type = TypeRef(new Float());
+			f->sig = FunctionSignature("testFunc", vector<TypeRef>(1, TypeRef(new Float())));
+			vm_args.external_functions.push_back(f);
+		}
+
+		VirtualMachine vm(vm_args);
+
+		// Get main function
+		FunctionSignature mainsig("main", std::vector<TypeRef>(1, TypeRef(new Float())));
+		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
+
+		float(WINTER_JIT_CALLING_CONV*f)(float) = (float(WINTER_JIT_CALLING_CONV*)(float))vm.getJittedFunction(mainsig);
+
+		// Call the JIT'd function
+		const float jitted_result = f(argument);
+
+		// Check JIT'd result.
+		if(jitted_result != target_return_val)
+		{
+			std::cerr << "Test failed: JIT'd main returned " << jitted_result << ", target was " << target_return_val << std::endl;
+			exit(1);
+		}
+
+		VMState vmstate;
+		vmstate.func_args_start.push_back(0);
+		vmstate.argument_stack.push_back(new FloatValue(argument));
+
+		Value* retval = maindef->invoke(vmstate);
+
+		vmstate.func_args_start.pop_back();
+		FloatValue* val = dynamic_cast<FloatValue*>(retval);
+		if(!val)
+		{
+			std::cerr << "main() Return value was of unexpected type." << std::endl;
+			exit(1);
+		}
+
+		if(val->value != target_return_val)
+		{
+			std::cerr << "Test failed: main returned " << val->value << ", target was " << target_return_val << std::endl;
+			exit(1);
+		}
+
+		delete retval;
+
+	}
+	catch(Winter::BaseException& e)
+	{
+		std::cerr << e.what() << std::endl;
+		exit(1);
+	}
+}
+
+
 static void testMainInteger(const std::string& src, float target_return_val)
 {
 	std::cout << "============================== testMainInteger() ============================" << std::endl;
@@ -471,7 +537,7 @@ static void testVectorInStruct(const std::string& src, const StructWithVec& stru
 void LanguageTests::run()
 {
 	// Integer comparisons:
-	/*// Test <=
+	// Test <=
 	testMainInteger("def main() int : if(1 <= 2, 10, 20)", 10);
 	testMainInteger("def main() int : if(1 <= 1, 10, 20)", 10);
 	testMainInteger("def main() int : if(3 <= 1, 10, 20)", 20);
@@ -724,7 +790,7 @@ void LanguageTests::run()
 					let x = [1.0, 2.0, 3.0, 4.0]v \
 					let y = [10.0, 20.0, 30.0, 40.0]v \
 					e1(x - y)", -18.0f);
-*/
+
 	// Test vector * float multiplication
 	// NOTE: doesn't work yet.
 	//testMainFloat("	def main() float : \
@@ -732,11 +798,27 @@ void LanguageTests::run()
 	///		  e1(x * 10.0)", 2.0f * 10.0f);
 
 	// Test vector * vector multiplication
-	// NOTE: doesn't work yet.
 	testMainFloat("	def main() float : \
 				  let x = [1.0, 2.0, 3.0, 4.0]v \
 				  let y = [10.0, 20.0, 30.0, 40.0]v \
 				e1(x * y)", 2.0f * 20.0f);
+
+	// Test vector * scalar multiplication
+	testMainFloat("	def mul(vector<float, 4> v, float x) vector<float, 4> : v * [x, x, x, x]v \n\
+					def main() float : \
+						let x = [1.0, 2.0, 3.0, 4.0]v \
+						let y = 10.0 \
+						e1(mul(x, y))", 2.0f * 10.0f);
+
+	testMainFloatArg("	def mul(vector<float, 4> v, float x) vector<float, 4> : v * [x, x, x, x]v \n\
+				  def main(float x) float : \
+				  let v = [1.0, 2.0, 3.0, 4.0]v \
+				  e1(mul(v, x))", 10.0f, 2.0f * 10.0f);
+
+	// Try dot product
+	testMainFloatArg("	def main(float x) float : \
+					 let v = [x, x, x, x]v \
+					 dot(v, v)", 2.0f, 16.0f);
 
 
 	// Test structure being returned from main function
