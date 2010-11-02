@@ -47,6 +47,20 @@ namespace Winter
 {
 
 
+static Value* powWrapper(const vector<const Value*>& arg_values)
+{
+	assert(arg_values.size() == 2);
+	assert(dynamic_cast<const FloatValue*>(arg_values[0]));
+	assert(dynamic_cast<const FloatValue*>(arg_values[1]));
+
+	// Cast argument 0 to type FloatValue
+	const FloatValue* a = static_cast<const FloatValue*>(arg_values[0]);
+	const FloatValue* b = static_cast<const FloatValue*>(arg_values[1]);
+
+	return new FloatValue(std::pow(a->value, b->value));
+}
+
+
 VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 {
 	this->llvm_context = new llvm::LLVMContext();
@@ -66,6 +80,19 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 	this->llvm_exec_engine->DisableSymbolSearching();
 
 	this->external_functions = args.external_functions;
+
+
+	//TEMP: add some more external functions
+
+	// Add powf
+	{
+		ExternalFunctionRef f(new ExternalFunction());
+		f->func = (void*)(float(*)(float, float))std::powf;
+		f->interpreted_func = powWrapper;
+		f->return_type = TypeRef(new Float());
+		f->sig = FunctionSignature("pow", vector<TypeRef>(2, TypeRef(new Float())));
+		this->external_functions.push_back(f);
+	}
 
 	for(unsigned int i=0; i<this->external_functions.size(); ++i)
 		addExternalFunction(this->external_functions[i], *this->llvm_context, *this->llvm_module);
@@ -279,7 +306,7 @@ void VirtualMachine::build()
 
 	{
 		// Dump to stdout
-		//this->llvm_module->dump();
+		this->llvm_module->dump();
 
 		/*std::string errorinfo;
 		llvm::raw_fd_ostream f(

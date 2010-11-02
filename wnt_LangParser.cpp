@@ -198,6 +198,44 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 			root->func_defs.push_back(Reference<FunctionDefinition>(def));
 		}
 
+		// Create 'pow' built-in function
+		/*{
+			vector<FunctionDefinition::FunctionArg> args(2);
+			args[0].name = "a";
+			args[0].type = TypeRef(new Float());
+			args[1].name = "b";
+			args[1].type = TypeRef(new Float());
+
+			FunctionDefinition* def = new FunctionDefinition(
+				"pow", // name
+				args, // args
+				vector<Reference<LetASTNode> >(), // lets
+				ASTNodeRef(NULL), // body expr
+				TypeRef(new Float()), // return type
+				new PowBuiltInFunc() // built in impl.
+				);
+
+			root->func_defs.push_back(Reference<FunctionDefinition>(def));
+		}*/
+
+		// Create 'sqrt' built-in function
+		{
+			vector<FunctionDefinition::FunctionArg> args(1);
+			args[0].name = "x";
+			args[0].type = TypeRef(new Float());
+
+			FunctionDefinition* def = new FunctionDefinition(
+				"sqrt", // name
+				args, // args
+				vector<Reference<LetASTNode> >(), // lets
+				ASTNodeRef(NULL), // body expr
+				TypeRef(new Float()), // return type
+				new SqrtBuiltInFunc() // built in impl.
+				);
+
+			root->func_defs.push_back(Reference<FunctionDefinition>(def));
+		}
+
 
 
 

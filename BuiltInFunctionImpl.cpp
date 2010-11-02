@@ -483,7 +483,7 @@ llvm::Value* DotProductBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) con
 		llvm::Function* dot_func = llvm::Intrinsic::getDeclaration(params.module, llvm::Intrinsic::x86_sse41_dpps);
 
 		// dot product intrinsic returns a 4-vector.
-		llvm::Value* vector_res = params.builder->CreateCall(dot_func, args.begin(), args.end());
+		llvm::Value* vector_res = params.builder->CreateCall(dot_func, args.begin(), args.end(), "Vector_res");
 
 		return params.builder->CreateExtractElement(
 			vector_res, // vec
@@ -618,6 +618,69 @@ llvm::Value* VectorMaxBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 		assert(!"VectorMaxBuiltInFunc::emitLLVMCode assumes sse");
 		return NULL;
 	}
+}
+
+
+//----------------------------------------------------------------------------------------------
+
+
+Value* PowBuiltInFunc::invoke(VMState& vmstate)
+{
+	const FloatValue* a = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1]);
+	const FloatValue* b = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 0]);
+
+	return new FloatValue(std::pow(a->value, b->value));
+}
+
+
+llvm::Value* PowBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	vector<llvm::Value*> args;
+	args.push_back(LLVMTypeUtils::getNthArg(params.currently_building_func, 0));
+	args.push_back(LLVMTypeUtils::getNthArg(params.currently_building_func, 1));
+
+	vector<const llvm::Type*> types;
+	types.push_back(TypeRef(new Float())->LLVMType(*params.context));
+
+	llvm::Function* func = llvm::Intrinsic::getDeclaration(params.module, llvm::Intrinsic::pow, &types[0], types.size());
+
+	assert(func);
+	assert(func->isIntrinsic());
+
+	return params.builder->CreateCall(
+		func,
+		args.begin(), 
+		args.end()
+	);
+}
+
+
+//----------------------------------------------------------------------------------------------
+
+
+Value* SqrtBuiltInFunc::invoke(VMState& vmstate)
+{
+	const FloatValue* a = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back()]);
+
+	return new FloatValue(std::sqrt(a->value));
+}
+
+
+llvm::Value* SqrtBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	vector<llvm::Value*> args;
+	args.push_back(LLVMTypeUtils::getNthArg(params.currently_building_func, 0));
+
+	vector<const llvm::Type*> types;
+	types.push_back(TypeRef(new Float())->LLVMType(*params.context));
+
+	llvm::Function* func = llvm::Intrinsic::getDeclaration(params.module, llvm::Intrinsic::sqrt, &types[0], types.size());
+
+	return params.builder->CreateCall(
+		func,
+		args.begin(), 
+		args.end()
+	);
 }
 
 

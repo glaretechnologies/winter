@@ -570,6 +570,7 @@ Value* FunctionExpression::exec(VMState& vmstate)
 		for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
 			args.push_back(this->argument_expressions[i]->exec(vmstate));
 
+		assert(this->target_external_function->interpreted_func);
 		Value* result = this->target_external_function->interpreted_func(args);
 		return result;
 	}

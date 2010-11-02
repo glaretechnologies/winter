@@ -150,4 +150,28 @@ private:
 };
 
 
+class PowBuiltInFunc : public BuiltInFunctionImpl
+{
+public:
+	PowBuiltInFunc() {}
+	virtual ~PowBuiltInFunc(){}
+
+	virtual Value* invoke(VMState& vmstate);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+private:
+};
+
+
+class SqrtBuiltInFunc : public BuiltInFunctionImpl
+{
+public:
+	SqrtBuiltInFunc() {}
+	virtual ~SqrtBuiltInFunc(){}
+
+	virtual Value* invoke(VMState& vmstate);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+private:
+};
+
+
 }

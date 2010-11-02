@@ -546,8 +546,8 @@ int test2()
 
 void LanguageTests::run()
 {
-	testMainFloat("def main() float : 10", 10);
-
+	testMainFloat("def main() float : sqrt(9.0)", std::sqrt(9.0f));
+	testMainFloat("def main() float : pow(2.4, 3.0)", std::pow(2.4f, 3.0f));
 
 	// Integer comparisons:
 	// Test <=

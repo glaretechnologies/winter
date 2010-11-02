@@ -1,6 +1,13 @@
 Copyright 2009- Nicholas Chapman
 
 
+Helpful things todo:
+====================
+Allow lets anywhere, particularly inside if statements.
+
+Allow optional type declarations for let statements
+
+
 Type Coercion
 =============
 Integer -> Float
