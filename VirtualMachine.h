@@ -39,8 +39,10 @@ VirtualMachine
 class VMConstructionArgs
 {
 public:
+	VMConstructionArgs() : env(NULL) {}
 	std::vector<ExternalFunctionRef> external_functions;
 	std::vector<std::string> source_buffers;
+	void* env;
 };
 
 
@@ -68,7 +70,8 @@ private:
 	llvm::LLVMContext* llvm_context;
 	llvm::Module* llvm_module;
 	llvm::ExecutionEngine* llvm_exec_engine;
-
+	bool hidden_voidptr_arg;
+	void* env;
 };
 
 

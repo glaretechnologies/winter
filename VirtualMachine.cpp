@@ -47,22 +47,29 @@ namespace Winter
 {
 
 
-static Value* powWrapper(const vector<const Value*>& arg_values)
+static ValueRef powWrapper(const vector<ValueRef>& arg_values)
 {
-	assert(arg_values.size() == 2);
-	assert(dynamic_cast<const FloatValue*>(arg_values[0]));
-	assert(dynamic_cast<const FloatValue*>(arg_values[1]));
+	//assert(arg_values.size() == 2);
+	assert(dynamic_cast<const FloatValue*>(arg_values[0].getPointer()));
+	assert(dynamic_cast<const FloatValue*>(arg_values[1].getPointer()));
 
 	// Cast argument 0 to type FloatValue
-	const FloatValue* a = static_cast<const FloatValue*>(arg_values[0]);
-	const FloatValue* b = static_cast<const FloatValue*>(arg_values[1]);
+	const FloatValue* a = static_cast<const FloatValue*>(arg_values[0].getPointer());
+	const FloatValue* b = static_cast<const FloatValue*>(arg_values[1].getPointer());
 
-	return new FloatValue(std::pow(a->value, b->value));
+	return ValueRef(new FloatValue(std::pow(a->value, b->value)));
 }
 
 
 VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
+:	linker(
+		true, // hidden_voidptr_arg
+		args.env
+	),
+	env(args.env)
 {
+	hidden_voidptr_arg = true;
+
 	this->llvm_context = new llvm::LLVMContext();
 	
 	this->llvm_module = new llvm::Module("WinterModule", *this->llvm_context);
@@ -121,7 +128,7 @@ VirtualMachine::~VirtualMachine()
 
 void VirtualMachine::addExternalFunction(const ExternalFunctionRef& f, llvm::LLVMContext& context, llvm::Module& module)
 {
-	llvm::FunctionType* llvm_f_type = LLVMTypeUtils::llvmInternalFunctionType(f->sig.param_types, f->return_type, context);
+	llvm::FunctionType* llvm_f_type = LLVMTypeUtils::llvmFunctionType(f->sig.param_types, f->return_type, context, hidden_voidptr_arg);
 
 	llvm::Function* llvm_f = static_cast<llvm::Function*>(module.getOrInsertFunction(
 		f->sig.toString(), // Name
@@ -158,29 +165,73 @@ void VirtualMachine::loadSource(const std::string& source)
 
 	BufferRoot* root = dynamic_cast<BufferRoot*>(rootref.getPointer());
 
-	// Bind variables
+	// Do Type Coercion
 	{
 		std::vector<ASTNode*> stack;
-		TraversalPayload payload(TraversalPayload::BindVariables);
+		TraversalPayload payload(TraversalPayload::TypeCoercion, hidden_voidptr_arg, env);
 		root->traverse(payload, stack);
 		assert(stack.size() == 0);
 	}
+
+	// Bind variables
+	{
+		std::vector<ASTNode*> stack;
+		TraversalPayload payload(TraversalPayload::BindVariables, hidden_voidptr_arg, env);
+		root->traverse(payload, stack);
+		assert(stack.size() == 0);
+	}
+
+
 
 	// Link functions
 	linker.addExternalFunctions(this->external_functions);
 	linker.addFunctions(*root);
 	{
 		std::vector<ASTNode*> stack;
-		TraversalPayload payload(TraversalPayload::LinkFunctions);
+		TraversalPayload payload(TraversalPayload::LinkFunctions, hidden_voidptr_arg, env);
 		payload.linker = &linker;
 		root->traverse(payload, stack);
 		assert(stack.size() == 0);
 	}
 
+//	rootref->print(0, std::cout);
+
+	
+	while(true)
+	{
+		bool tree_changed = false;
+
+		// Do Constant Folding
+		{
+			std::vector<ASTNode*> stack;
+			TraversalPayload payload(TraversalPayload::ConstantFolding, hidden_voidptr_arg, env);
+			root->traverse(payload, stack);
+			assert(stack.size() == 0);
+
+			tree_changed = tree_changed || payload.tree_changed;
+		}
+
+		// Do another pass of type coercion, as constant folding may have made new literals that can be coerced.
+		{
+			std::vector<ASTNode*> stack;
+			TraversalPayload payload(TraversalPayload::TypeCoercion, hidden_voidptr_arg, env);
+			root->traverse(payload, stack);
+			assert(stack.size() == 0);
+
+			tree_changed = tree_changed || payload.tree_changed;
+		}
+
+//		rootref->print(0, std::cout);
+
+		if(!tree_changed)
+			break;
+	}
+
+
 	// TypeCheck
 	{
 		std::vector<ASTNode*> stack;
-		TraversalPayload payload(TraversalPayload::TypeCheck);
+		TraversalPayload payload(TraversalPayload::TypeCheck, hidden_voidptr_arg, env);
 		root->traverse(payload, stack);
 		assert(stack.size() == 0);
 	}
@@ -335,14 +386,14 @@ void* VirtualMachine::getJittedFunction(const FunctionSignature& sig)
 }
 
 
-void* VirtualMachine::getJittedFunctionByName(const std::string& name)
-{
-	FunctionDefinitionRef func = linker.findMatchingFunctionByName(name);
-
-	return this->llvm_exec_engine->getPointerToFunction(
-		func->built_llvm_function
-		);
-}
+//void* VirtualMachine::getJittedFunctionByName(const std::string& name)
+//{
+//	FunctionDefinitionRef func = linker.findMatchingFunctionByName(name);
+//
+//	return this->llvm_exec_engine->getPointerToFunction(
+//		func->built_llvm_function
+//		);
+//}
 
 
 } // end namespace Winter

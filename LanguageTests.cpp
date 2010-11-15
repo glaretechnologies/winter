@@ -38,26 +38,35 @@ LanguageTests::~LanguageTests()
 {}
 
 
-static float testFunc(float x)
+struct TestEnv
+{
+	float val;
+};
+
+
+static float testFunc(float x, TestEnv* env)
 {
 	std::cout << "In test func!, " << x << std::endl;
-	return x * x;
+	std::cout << "In test func!, env->val: " << env->val << std::endl;
+	return env->val;
 }
 
 
-static Value* testFuncIntepreted(const vector<const Value*>& arg_values)
+static ValueRef testFuncIntepreted(const vector<ValueRef>& arg_values)
 {
-	assert(arg_values.size() == 1);
-	assert(dynamic_cast<const FloatValue*>(arg_values[0]));
+	assert(arg_values.size() == 2);
+	assert(dynamic_cast<const FloatValue*>(arg_values[0].getPointer()));
+	assert(dynamic_cast<const VoidPtrValue*>(arg_values[1].getPointer()));
 
 	// Cast argument 0 to type FloatValue
-	const FloatValue* float_val = static_cast<const FloatValue*>(arg_values[0]);
+	const FloatValue* float_val = static_cast<const FloatValue*>(arg_values[0].getPointer());
+	const VoidPtrValue* voidptr_val = static_cast<const VoidPtrValue*>(arg_values[1].getPointer());
 
-	return new FloatValue(testFunc(float_val->value));
+	return ValueRef(new FloatValue(testFunc(float_val->value, (TestEnv*)voidptr_val->value)));
 }
 
 
-typedef float(WINTER_JIT_CALLING_CONV * float_void_func)();
+typedef float(WINTER_JIT_CALLING_CONV * float_void_func)(void* env);
 
 
 static void testMainFloat(const std::string& src, float target_return_val)
@@ -65,8 +74,12 @@ static void testMainFloat(const std::string& src, float target_return_val)
 	std::cout << "============================== testMainFloat() ============================" << std::endl;
 	try
 	{
+		TestEnv test_env;
+		test_env.val = 10;
+
 		VMConstructionArgs vm_args;
 		vm_args.source_buffers.push_back(src);
+		vm_args.env = &test_env;
 
 		{
 			ExternalFunctionRef f(new ExternalFunction());
@@ -88,8 +101,9 @@ static void testMainFloat(const std::string& src, float target_return_val)
 		// cast to correct type
 		float_void_func mainf = (float_void_func)f;
 
+
 		// Call the JIT'd function
-		const float jitted_result = mainf();
+		const float jitted_result = mainf(&test_env);
 
 
 		// Check JIT'd result.
@@ -99,13 +113,16 @@ static void testMainFloat(const std::string& src, float target_return_val)
 			exit(1);
 		}
 
-		VMState vmstate;
+		VMState vmstate(true);
 		vmstate.func_args_start.push_back(0);
+		vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(&test_env)));
 
-		Value* retval = maindef->invoke(vmstate);
+		ValueRef retval = maindef->invoke(vmstate);
 
+		assert(vmstate.argument_stack.size() == 1);
+		//delete vmstate.argument_stack[0];
 		vmstate.func_args_start.pop_back();
-		FloatValue* val = dynamic_cast<FloatValue*>(retval);
+		FloatValue* val = dynamic_cast<FloatValue*>(retval.getPointer());
 		if(!val)
 		{
 			std::cerr << "main() Return value was of unexpected type." << std::endl;
@@ -118,7 +135,7 @@ static void testMainFloat(const std::string& src, float target_return_val)
 			exit(1);
 		}
 
-		delete retval;
+	//	delete retval;
 
 	}
 	catch(Winter::BaseException& e)
@@ -134,8 +151,12 @@ static void testMainFloatArg(const std::string& src, float argument, float targe
 	std::cout << "============================== testMainFloat() ============================" << std::endl;
 	try
 	{
+		TestEnv test_env;
+		test_env.val = 10;
+
 		VMConstructionArgs vm_args;
 		vm_args.source_buffers.push_back(src);
+		vm_args.env = &test_env;
 
 		{
 			ExternalFunctionRef f(new ExternalFunction());
@@ -152,10 +173,11 @@ static void testMainFloatArg(const std::string& src, float argument, float targe
 		FunctionSignature mainsig("main", std::vector<TypeRef>(1, TypeRef(new Float())));
 		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
 
-		float(WINTER_JIT_CALLING_CONV*f)(float) = (float(WINTER_JIT_CALLING_CONV*)(float))vm.getJittedFunction(mainsig);
+		float(WINTER_JIT_CALLING_CONV*f)(float, void*) = (float(WINTER_JIT_CALLING_CONV*)(float, void*))vm.getJittedFunction(mainsig);
+
 
 		// Call the JIT'd function
-		const float jitted_result = f(argument);
+		const float jitted_result = f(argument, &test_env);
 
 		// Check JIT'd result.
 		if(jitted_result != target_return_val)
@@ -164,14 +186,14 @@ static void testMainFloatArg(const std::string& src, float argument, float targe
 			exit(1);
 		}
 
-		VMState vmstate;
+		VMState vmstate(true);
 		vmstate.func_args_start.push_back(0);
-		vmstate.argument_stack.push_back(new FloatValue(argument));
+		vmstate.argument_stack.push_back(ValueRef(new FloatValue(argument)));
 
-		Value* retval = maindef->invoke(vmstate);
+		ValueRef retval = maindef->invoke(vmstate);
 
 		vmstate.func_args_start.pop_back();
-		FloatValue* val = dynamic_cast<FloatValue*>(retval);
+		FloatValue* val = dynamic_cast<FloatValue*>(retval.getPointer());
 		if(!val)
 		{
 			std::cerr << "main() Return value was of unexpected type." << std::endl;
@@ -184,7 +206,7 @@ static void testMainFloatArg(const std::string& src, float argument, float targe
 			exit(1);
 		}
 
-		delete retval;
+		//delete retval;
 
 	}
 	catch(Winter::BaseException& e)
@@ -209,10 +231,13 @@ static void testMainInteger(const std::string& src, float target_return_val)
 		FunctionSignature mainsig("main", std::vector<TypeRef>());
 		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
 
-		int (WINTER_JIT_CALLING_CONV *f)() = (int (WINTER_JIT_CALLING_CONV *)()) vm.getJittedFunction(mainsig);
+		int (WINTER_JIT_CALLING_CONV *f)(void*) = (int (WINTER_JIT_CALLING_CONV *)(void*)) vm.getJittedFunction(mainsig);
+
+		TestEnv test_env;
+		test_env.val = 10;
 
 		// Call the JIT'd function
-		const int jitted_result = f();
+		const int jitted_result = f(&test_env);
 
 
 		// Check JIT'd result.
@@ -222,13 +247,13 @@ static void testMainInteger(const std::string& src, float target_return_val)
 			exit(1);
 		}
 
-		VMState vmstate;
+		VMState vmstate(true);
 		vmstate.func_args_start.push_back(0);
 
-		Value* retval = maindef->invoke(vmstate);
+		ValueRef retval = maindef->invoke(vmstate);
 
 		vmstate.func_args_start.pop_back();
-		IntValue* val = dynamic_cast<IntValue*>(retval);
+		IntValue* val = dynamic_cast<IntValue*>(retval.getPointer());
 		if(!val)
 		{
 			std::cerr << "main() Return value was of unexpected type." << std::endl;
@@ -241,7 +266,7 @@ static void testMainInteger(const std::string& src, float target_return_val)
 			exit(1);
 		}
 
-		delete retval;
+		//delete retval;
 
 	}
 	catch(Winter::BaseException& e)
@@ -296,12 +321,15 @@ static void testMainStruct(const std::string& src, const StructType& target_retu
 
 		SSE_ALIGN StructType jitted_result;
 		
-		void (WINTER_JIT_CALLING_CONV *f)(StructType*) = (void (WINTER_JIT_CALLING_CONV *)(StructType*))vm.getJittedFunction(mainsig);
+		void (WINTER_JIT_CALLING_CONV *f)(StructType*, void*) = (void (WINTER_JIT_CALLING_CONV *)(StructType*, void*))vm.getJittedFunction(mainsig);
 		//StructType (WINTER_JIT_CALLING_CONV *f)() = (StructType (WINTER_JIT_CALLING_CONV *)())vm.getJittedFunction(mainsig);
+
+		TestEnv test_env;
+		test_env.val = 10;
 
 
 		// Call the JIT'd function
-		f(&jitted_result);
+		f(&jitted_result, &test_env);
 		//jitted_result = f();
 
 		/*std::cout << "============================" << std::endl;
@@ -376,14 +404,17 @@ static void testMainStructInputAndOutput(const std::string& src, const InStructT
 
 
 		// __cdecl
-		void (WINTER_JIT_CALLING_CONV *f)(OutStructType*, InStructType*) = (void (WINTER_JIT_CALLING_CONV *)(OutStructType*, InStructType*))vm.getJittedFunction(mainsig);
+		void (WINTER_JIT_CALLING_CONV *f)(OutStructType*, InStructType*, void*) = (void (WINTER_JIT_CALLING_CONV *)(OutStructType*, InStructType*, void*))vm.getJittedFunction(mainsig);
 
 		// Call the JIT'd function
 		SSE_ALIGN OutStructType jitted_result;
 
 		SSE_ALIGN InStructType aligned_struct_in = struct_in;
 
-		f(&jitted_result, &aligned_struct_in);
+		TestEnv test_env;
+		test_env.val = 10;
+
+		f(&jitted_result, &aligned_struct_in, &test_env);
 
 		// Check JIT'd result.
 		if(!(jitted_result == target_return_val))
@@ -487,14 +518,17 @@ static void testVectorInStruct(const std::string& src, const StructWithVec& stru
 
 
 		// __cdecl
-		void (WINTER_JIT_CALLING_CONV *f)(StructWithVec*, StructWithVec*) = (void (WINTER_JIT_CALLING_CONV *)(StructWithVec*, StructWithVec*))vm.getJittedFunction(mainsig);
+		void (WINTER_JIT_CALLING_CONV *f)(StructWithVec*, StructWithVec*, void*) = (void (WINTER_JIT_CALLING_CONV *)(StructWithVec*, StructWithVec*, void*))vm.getJittedFunction(mainsig);
 
 		// Call the JIT'd function
 		SSE_ALIGN StructWithVec jitted_result;
 
 		SSE_ALIGN StructWithVec aligned_struct_in = struct_in;
 
-		f(&jitted_result, &aligned_struct_in);
+		TestEnv test_env;
+		test_env.val = 10;
+
+		f(&jitted_result, &aligned_struct_in, &test_env);
 
 		// Check JIT'd result.
 		if(!(jitted_result == target_return_val))
@@ -539,15 +573,51 @@ float test()
 	return 10;
 }
 
-int test2()
-{
-	return 3.0f;
-}
+//int test2()
+//{
+//	return 3.0f;
+//}
 
 void LanguageTests::run()
 {
 	testMainFloat("def main() float : sqrt(9.0)", std::sqrt(9.0f));
 	testMainFloat("def main() float : pow(2.4, 3.0)", std::pow(2.4f, 3.0f));
+	testMainFloat("def f(float x) float : x*x         def main() float : f(10)", 100.0);
+	testMainFloat("def f(float x, float y) float : 1.0f   \n\
+				  def f(float x, int y) float : 2.0f   \n\
+				  def main() float : f(1.0, 2)", 2.0);
+	// Test implicit conversion from int to float in addition operation
+	testMainFloat("def main() float : 3.0 + 4", 7.0);
+	testMainFloat("def main() float : 3 + 4.0", 7.0);
+
+	testMainFloat("def main() float : 3.0 - 4", -1.0);
+	testMainFloat("def main() float : 3 - 4.0", -1.0);
+
+	testMainFloat("def main() float : 3.0 * 4", 12.0);
+	testMainFloat("def main() float : 3 * 4.0", 12.0);
+
+	testMainFloat("def main() float : 12.0 / 4", 3.0);
+	testMainFloat("def main() float : 12 / 4.0", 3.0);
+
+	testMainFloat("def f(float x) float : x*x      def main() float : 14 / (f(2.0) + 3)", 2.0);
+	testMainFloat("def f(float x) float : x*x      def main() float : 14 / (f(2) + 3)", 2.0);
+	testMainFloat("def f(int x) int : x*x      def main() float : 14 / (f(2) + 3)", 2.0);
+	testMainFloat("def f<T>(T x) T : x*x      def main() float : 14 / (f(2) + 3)", 2.0);
+
+
+	// Test promotion to match function return type:
+	testMainFloat("def main() float : 3", 3.0);
+
+	testMainFloat("def main() float : 1.0 + (2 + 3)", 6.0);
+
+	testMainFloat("def main() float : 1.0 + 2 + 3", 6.0);
+
+	// Test implicit conversion from int to float in addition operation with a function call
+	testMainFloat("def f(int x) : x*x    def main() float : 1.0 + f(2) + 3", 8.0);
+
+	testMainFloat("def main() float : (1.0 + 2.0) + (3 + 4)", 10.0);
+	testMainFloat("def main() float : (1.0 + 2) + (3 + 4)", 10.0);
+
 
 	// Integer comparisons:
 	// Test <=
@@ -630,7 +700,7 @@ void LanguageTests::run()
 
 
 	// Test call to external function
-	testMainFloat("def main() float : testFunc(3.0)", 9.0);
+	testMainFloat("def main() float : testFunc(3.0)", 10.0);
 
 
 	
@@ -723,6 +793,7 @@ void LanguageTests::run()
 	// Test generic function with inferred return type (f)
 	testMainFloat("def f<T>(T x) : x        def main() float : f(2.0)", 2.0);
 
+
 	// Test function overloading - call with int param, should select 1st overload
 	testMainFloat("def overloadedFunc(int x) float : 4.0 \
 				  def overloadedFunc(float x) float : 5.0 \
@@ -738,6 +809,7 @@ void LanguageTests::run()
 				  def overloadedFunc(float x) float : 5.0 \
 				  def f<T>(T x) float: overloadedFunc(x)\
 				  def main() float : f(1)", 4.0f);
+
 	// Call f with float param
 	testMainFloat("def overloadedFunc(int x) float : 4.0 \
 				  def overloadedFunc(float x) float : 5.0 \

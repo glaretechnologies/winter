@@ -2,6 +2,7 @@
 
 
 #include "wnt_Type.h"
+#include "Value.h"
 
 
 namespace Winter
@@ -18,7 +19,7 @@ class BuiltInFunctionImpl
 public:
 	virtual ~BuiltInFunctionImpl(){}
 
-	virtual Value* invoke(VMState& vmstate) = 0;
+	virtual ValueRef invoke(VMState& vmstate) = 0;
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const = 0;
 };
 
@@ -29,7 +30,7 @@ public:
 	Constructor(Reference<StructureType>& struct_type);
 	virtual ~Constructor(){}
 
-	virtual Value* invoke(VMState& vmstate);
+	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 
 private:
@@ -43,7 +44,7 @@ public:
 	GetField(Reference<StructureType>& struct_type_, unsigned int index_) : struct_type(struct_type_), index(index_) {}
 	virtual ~GetField(){}
 
-	virtual Value* invoke(VMState& vmstate);
+	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
 	Reference<StructureType> struct_type;
@@ -57,7 +58,7 @@ public:
 	GetVectorElement(Reference<VectorType>& vector_type_, unsigned int index_) : vector_type(vector_type_), index(index_) {}
 	virtual ~GetVectorElement(){}
 
-	virtual Value* invoke(VMState& vmstate);
+	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
 	Reference<VectorType> vector_type;
@@ -71,7 +72,7 @@ public:
 	ArrayMapBuiltInFunc(TypeRef& from_type_, Reference<Function>& func_type_) : from_type(from_type_), func_type(func_type_) {}
 	virtual ~ArrayMapBuiltInFunc(){}
 
-	virtual Value* invoke(VMState& vmstate);
+	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
 	TypeRef from_type;
@@ -91,7 +92,7 @@ public:
 	ArrayFoldBuiltInFunc(TypeRef& T_) : T(T_) {}
 	virtual ~ArrayFoldBuiltInFunc(){}
 
-	virtual Value* invoke(VMState& vmstate);
+	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
 	TypeRef T;
@@ -104,7 +105,7 @@ public:
 	IfBuiltInFunc(TypeRef& T_) : T(T_) {}
 	virtual ~IfBuiltInFunc(){}
 
-	virtual Value* invoke(VMState& vmstate);
+	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
 	TypeRef T;
@@ -117,7 +118,7 @@ public:
 	DotProductBuiltInFunc(Reference<VectorType>& vector_type_) : vector_type(vector_type_) {}
 	virtual ~DotProductBuiltInFunc(){}
 
-	virtual Value* invoke(VMState& vmstate);
+	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
 	Reference<VectorType> vector_type;
@@ -130,7 +131,7 @@ public:
 	VectorMinBuiltInFunc(Reference<VectorType>& vector_type_) : vector_type(vector_type_) {}
 	virtual ~VectorMinBuiltInFunc(){}
 
-	virtual Value* invoke(VMState& vmstate);
+	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
 	Reference<VectorType> vector_type;
@@ -143,7 +144,7 @@ public:
 	VectorMaxBuiltInFunc(Reference<VectorType>& vector_type_) : vector_type(vector_type_) {}
 	virtual ~VectorMaxBuiltInFunc(){}
 
-	virtual Value* invoke(VMState& vmstate);
+	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
 	Reference<VectorType> vector_type;
@@ -156,7 +157,7 @@ public:
 	PowBuiltInFunc() {}
 	virtual ~PowBuiltInFunc(){}
 
-	virtual Value* invoke(VMState& vmstate);
+	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
 };
@@ -168,7 +169,7 @@ public:
 	SqrtBuiltInFunc() {}
 	virtual ~SqrtBuiltInFunc(){}
 
-	virtual Value* invoke(VMState& vmstate);
+	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
 };

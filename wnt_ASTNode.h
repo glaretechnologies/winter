@@ -1,5 +1,5 @@
 /*=====================================================================
-ASTNode.h
+ASTNode.h`
 ---------
 File created by ClassTemplate on Wed Jun 11 03:55:25 2008
 Code By Nicholas Chapman.
@@ -21,6 +21,7 @@ using std::vector;
 #include "wnt_ExternalFunction.h"
 #include "BaseException.h"
 #include "TokenBase.h"
+#include "Value.h"
 #if USE_LLVM
 #include <llvm/Support/IRBuilder.h>
 #endif
@@ -49,17 +50,24 @@ public:
 	{
 		LinkFunctions,
 		BindVariables,
+		TypeCoercion,
 		TypeCheck,
+		ConstantFolding,
 		SubstituteType // for making concrete types out of generic types.
 	};
 
-	TraversalPayload(Operation e) : operation(e) {}
+	TraversalPayload(Operation e, bool hidden_voidptr_arg_, void* env_) : operation(e), tree_changed(false), hidden_voidptr_arg(hidden_voidptr_arg_), env(env_) {}
 
 	Linker* linker;
 
 	Operation operation;
 
 	std::vector<TypeRef> type_mappings; // for substitute type operation.
+
+	bool tree_changed;
+
+	bool hidden_voidptr_arg;
+	void* env;
 };
 
 class EmitLLVMCodeParams
@@ -67,6 +75,7 @@ class EmitLLVMCodeParams
 public:
 	FunctionDefinition* currently_building_func_def;
 	const PlatformUtils::CPUInfo* cpu_info;
+	bool hidden_voidptr_arg;
 #if USE_LLVM
 	llvm::IRBuilder<>* builder;
 	llvm::Module* module;
@@ -87,7 +96,7 @@ public:
 	ASTNode(/*ASTNode* p*/) /*: parent(p)*/ {}
 	virtual ~ASTNode() {}
 
-	virtual Value* exec(VMState& vmstate) = 0;
+	virtual ValueRef exec(VMState& vmstate) = 0;
 
 	enum ASTNodeType
 	{
@@ -125,6 +134,9 @@ public:
 	
 	virtual void print(int depth, std::ostream& s) const = 0;
 
+	// True iff the expression does not depend on any variables
+	virtual bool isConstant() const = 0;
+
 protected:
 	static llvm::Value* emitExternalLinkageCall(const std::string& target_name, EmitLLVMCodeParams& params);
 
@@ -147,7 +159,7 @@ public:
 	{}
 	vector<Reference<FunctionDefinition> > func_defs;
 
-	virtual Value* exec(VMState& vmstate){ return NULL; }
+	virtual ValueRef exec(VMState& vmstate){ return ValueRef(); }
 	virtual ASTNodeType nodeType() const { return BufferRootType; }
 	virtual TypeRef type() const { throw BaseException("root has no type."); }
 
@@ -157,6 +169,7 @@ public:
 	virtual void print(int depth, std::ostream& s) const;
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual Reference<ASTNode> clone();
+	virtual bool isConstant() const;
 
 };
 
@@ -208,9 +221,10 @@ public:
 
 	FunctionSignature sig;
 	BuiltInFunctionImpl* built_in_func_impl;
+	ExternalFunctionRef external_function;
 
-	virtual Value* invoke(VMState& vmstate);
-	virtual Value* exec(VMState& vmstate);
+	virtual ValueRef invoke(VMState& vmstate);
+	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return FunctionDefinitionType; }
 	virtual TypeRef type() const { return function_type; }
 
@@ -220,12 +234,15 @@ public:
 	virtual void print(int depth, std::ostream& s) const;
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual Reference<ASTNode> clone();
+	virtual bool isConstant() const;
 
 	bool isGenericFunction() const; // true if it is parameterised by type.
+	bool isExternalFunction() const { return external_function.nonNull(); }
 
 	llvm::Function* buildLLVMFunction(
 		llvm::Module* module,
-		const PlatformUtils::CPUInfo& cpu_info
+		const PlatformUtils::CPUInfo& cpu_info,
+		bool hidden_voidptr_arg
 		//std::map<Lang::FunctionSignature, llvm::Function*>& external_functions
 	);
 
@@ -246,11 +263,11 @@ e.g.   f(a, 1)
 class FunctionExpression : public ASTNode
 {
 public:
-	FunctionExpression(/*ASTNode* p*/) : /*ASTNode(p),*/ target_function(NULL),argument_index(-1) {}
+	FunctionExpression();
 
 	bool doesFunctionTypeMatch(TypeRef& type);
 
-	virtual Value* exec(VMState& vmstate);
+	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return FunctionExpressionType; }
 	virtual TypeRef type() const;
 
@@ -260,6 +277,7 @@ public:
 	virtual void print(int depth, std::ostream& s) const;
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual Reference<ASTNode> clone();
+	virtual bool isConstant() const;
 	FunctionDefinition* runtimeBind(VMState& vmstate);
 
 	///////
@@ -270,11 +288,12 @@ public:
 	//Reference<ASTNode> target_function;
 	//ASTNode* target_function;
 	FunctionDefinition* target_function; // May be NULL
-	Reference<ExternalFunction> target_external_function; // May be NULL
+	//Reference<ExternalFunction> target_external_function; // May be NULL
 	int argument_index;
 	//int argument_offset; // Currently, a variable must be an argument to the enclosing function
 	enum BindingType
 	{
+		Unbound,
 		Let,
 		Arg,
 		Bound
@@ -297,7 +316,7 @@ public:
 
 	Variable(const std::string& name);
 
-	virtual Value* exec(VMState& vmstate);
+	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return VariableASTNodeType; }
 	virtual TypeRef type() const;
 	virtual void print(int depth, std::ostream& s) const;
@@ -305,7 +324,7 @@ public:
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual Reference<ASTNode> clone();
-
+	virtual bool isConstant() const { return false; }
 
 	FunctionDefinition* parent_function; // Function for which the variable is an argument of,
 	// or for what it is a let of.
@@ -325,12 +344,13 @@ class FloatLiteral : public ASTNode
 public:
 	FloatLiteral(/*ASTNode* parent, */float v) : /*ASTNode(parent), */ value(v) {}
 
-	virtual Value* exec(VMState& vmstate);
+	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return FloatLiteralType; }
 	virtual TypeRef type() const { return TypeRef(new Float()); }
 	virtual void print(int depth, std::ostream& s) const;
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual Reference<ASTNode> clone();
+	virtual bool isConstant() const { return true; }
 
 	float value;
 };
@@ -342,12 +362,13 @@ public:
 	IntLiteral(/*ASTNode* parent, */int v) : /*ASTNode(parent),*/ value(v) {}
 	int value;
 
-	virtual Value* exec(VMState& vmstate);
+	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return IntLiteralType; }
 	virtual TypeRef type() const { return TypeRef(new Int()); }
 	virtual void print(int depth, std::ostream& s) const;
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual Reference<ASTNode> clone();
+	virtual bool isConstant() const { return true; }
 };
 
 
@@ -357,12 +378,13 @@ public:
 	StringLiteral(/*ASTNode* parent, */const std::string& v) : /*ASTNode(parent), */value(v) {}
 	string value;
 
-	virtual Value* exec(VMState& vmstate);
+	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return StringLiteralType; }
 	virtual TypeRef type() const { return TypeRef(new String()); }
 	virtual void print(int depth, std::ostream& s) const;
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual Reference<ASTNode> clone();
+	virtual bool isConstant() const { return true; }
 };
 
 
@@ -372,12 +394,13 @@ public:
 	BoolLiteral(/*ASTNode* parent, */bool v) : /*ASTNode(parent), */value(v) {}
 	bool value;
 
-	virtual Value* exec(VMState& vmstate);
+	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return BoolLiteralType; }
 	virtual TypeRef type() const { return TypeRef(new Bool()); }
 	virtual void print(int depth, std::ostream& s) const;
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual Reference<ASTNode> clone();
+	virtual bool isConstant() const { return true; }
 };
 
 
@@ -386,7 +409,7 @@ class MapLiteral : public ASTNode
 public:
 	MapLiteral(/*ASTNode* parent*/) /*: ASTNode(parent)*/ {}
 
-	virtual Value* exec(VMState& vmstate);
+	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return MapLiteralType; }
 	virtual TypeRef type() const { return maptype; }
 	virtual void print(int depth, std::ostream& s) const;
@@ -395,6 +418,7 @@ public:
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual Reference<ASTNode> clone();
+	virtual bool isConstant() const;
 
 
 
@@ -408,7 +432,7 @@ class ArrayLiteral : public ASTNode
 public:
 	ArrayLiteral(const std::vector<ASTNodeRef>& elems);
 
-	virtual Value* exec(VMState& vmstate);
+	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return ArrayLiteralType; }
 	virtual TypeRef type() const;// { return array_type; }
 	virtual void print(int depth, std::ostream& s) const;
@@ -417,6 +441,7 @@ public:
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual Reference<ASTNode> clone();
+	virtual bool isConstant() const;
 
 private:
 	//TypeRef array_type;
@@ -429,13 +454,14 @@ class VectorLiteral : public ASTNode
 public:
 	VectorLiteral(const std::vector<ASTNodeRef>& elems);
 
-	virtual Value* exec(VMState& vmstate);
+	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return VectorLiteralType; }
 	virtual TypeRef type() const;
 	virtual void print(int depth, std::ostream& s) const;
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual Reference<ASTNode> clone();
+	virtual bool isConstant() const;
 
 private:
 	std::vector<ASTNodeRef> elements;
@@ -447,7 +473,7 @@ class AdditionExpression : public ASTNode
 public:
 	AdditionExpression(/*ASTNode* parent*/) /*: ASTNode(parent)*/ {}
 
-	virtual Value* exec(VMState& vmstate);
+	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return AdditionExpressionType; }
 	virtual TypeRef type() const { return a->type(); }
 	virtual void print(int depth, std::ostream& s) const;
@@ -456,6 +482,7 @@ public:
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual Reference<ASTNode> clone();
+	virtual bool isConstant() const;
 
 	ASTNodeRef a;
 	ASTNodeRef b;
@@ -467,7 +494,7 @@ class SubtractionExpression : public ASTNode
 public:
 	SubtractionExpression(/*ASTNode* parent*/) /*: ASTNode(parent)*/ {}
 
-	virtual Value* exec(VMState& vmstate);
+	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return SubtractionExpressionType; }
 	virtual TypeRef type() const { return a->type(); }
 	virtual void print(int depth, std::ostream& s) const;
@@ -476,6 +503,7 @@ public:
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual Reference<ASTNode> clone();
+	virtual bool isConstant() const;
 
 	ASTNodeRef a;
 	ASTNodeRef b;
@@ -487,7 +515,7 @@ class MulExpression : public ASTNode
 public:
 	MulExpression(/*ASTNode* parent*/) /*: ASTNode(parent)*/ {}
 
-	virtual Value* exec(VMState& vmstate);
+	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return MulExpressionType; }
 	virtual TypeRef type() const { return a->type(); }
 	virtual void print(int depth, std::ostream& s) const;
@@ -496,6 +524,7 @@ public:
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual Reference<ASTNode> clone();
+	virtual bool isConstant() const;
 
 	ASTNodeRef a;
 	ASTNodeRef b;
@@ -507,13 +536,14 @@ class DivExpression : public ASTNode
 public:
 	DivExpression()  {}
 
-	virtual Value* exec(VMState& vmstate);
+	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return DivExpressionType; }
 	virtual TypeRef type() const { return a->type(); }
 	virtual void print(int depth, std::ostream& s) const;
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual Reference<ASTNode> clone();
+	virtual bool isConstant() const;
 
 	ASTNodeRef a;
 	ASTNodeRef b;
@@ -525,13 +555,14 @@ class UnaryMinusExpression : public ASTNode
 public:
 	UnaryMinusExpression() {}
 
-	virtual Value* exec(VMState& vmstate);
+	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return UnaryMinusExpressionType; }
 	virtual TypeRef type() const { return expr->type(); }
 	virtual void print(int depth, std::ostream& s) const;
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual Reference<ASTNode> clone();
+	virtual bool isConstant() const;
 
 	ASTNodeRef expr;
 };
@@ -543,7 +574,7 @@ public:
 	LetASTNode(/*ASTNode* parent, */const std::string var_name) : 
 	  /*ASTNode(parent), */ variable_name(var_name) {}
 
-	virtual Value* exec(VMState& vmstate);
+	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return LetType; }
 	virtual TypeRef type() const { return expr->type(); }
 	virtual void print(int depth, std::ostream& s) const;
@@ -552,6 +583,7 @@ public:
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual Reference<ASTNode> clone();
+	virtual bool isConstant() const;
 
 	std::string variable_name;
 	ASTNodeRef expr;
@@ -564,13 +596,14 @@ public:
 	ComparisonExpression(Reference<TokenBase>& token_, ASTNodeRef a_, ASTNodeRef b_) : 
 	  token(token_), a(a_), b(b_) {}
 
-	virtual Value* exec(VMState& vmstate);
+	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return ComparisonExpressionType; }
 	virtual TypeRef type() const { return TypeRef(new Bool()); }
 	virtual void print(int depth, std::ostream& s) const;
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual Reference<ASTNode> clone();
+	virtual bool isConstant() const;
 
 	Reference<TokenBase> token;
 	ASTNodeRef a;

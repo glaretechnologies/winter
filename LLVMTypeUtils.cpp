@@ -44,6 +44,12 @@ llvm::Value* getNthArg(llvm::Function *func, int n)
 }
 
 
+llvm::Value* getLastArg(llvm::Function *func)
+{
+	return getNthArg(func, func->arg_size() - 1);
+}
+
+
 const llvm::Type* pointerType(const llvm::Type& type)
 {
 	return llvm::PointerType::get(
@@ -53,7 +59,15 @@ const llvm::Type* pointerType(const llvm::Type& type)
 }
 
 
-llvm::FunctionType* llvmInternalFunctionType(const vector<TypeRef>& arg_types, TypeRef return_type, llvm::LLVMContext& context)
+const llvm::Type* voidPtrType(llvm::LLVMContext& context)
+{
+	// Not sure if LLVM has a pointer to void type, so just use a pointer to int32.
+	return llvm::Type::getInt32PtrTy(context);
+}
+
+
+llvm::FunctionType* llvmFunctionType(const vector<TypeRef>& arg_types, TypeRef return_type, llvm::LLVMContext& context,
+									 bool hidden_voidptr_arg)
 {
 	if(return_type->passByValue())
 	{
@@ -61,6 +75,9 @@ llvm::FunctionType* llvmInternalFunctionType(const vector<TypeRef>& arg_types, T
 
 		for(unsigned int i=0; i<arg_types.size(); ++i)
 			llvm_arg_types.push_back(arg_types[i]->passByValue() ? arg_types[i]->LLVMType(context) : LLVMTypeUtils::pointerType(*arg_types[i]->LLVMType(context)));
+
+		if(hidden_voidptr_arg)
+			llvm_arg_types.push_back(voidPtrType(context));
 
 		return llvm::FunctionType::get(
 			return_type->LLVMType(context), // return type
@@ -78,6 +95,9 @@ llvm::FunctionType* llvmInternalFunctionType(const vector<TypeRef>& arg_types, T
 		// Append normal arguments
 		for(unsigned int i=0; i<arg_types.size(); ++i)
 			llvm_arg_types.push_back(arg_types[i]->passByValue() ? arg_types[i]->LLVMType(context) : LLVMTypeUtils::pointerType(*arg_types[i]->LLVMType(context)));
+
+		if(hidden_voidptr_arg)
+			llvm_arg_types.push_back(voidPtrType(context));
 
 		return llvm::FunctionType::get(
 			//LLVMTypeUtils::pointerType(*return_type->LLVMType(context)), 

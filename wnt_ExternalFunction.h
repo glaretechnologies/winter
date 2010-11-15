@@ -11,6 +11,7 @@ Generated at Wed Oct 27 16:44:39 +1300 2010
 #include "wnt_FunctionSignature.h"
 #include "utils/refcounted.h"
 #include "utils/reference.h"
+#include "Value.h"
 
 
 namespace Winter
@@ -29,7 +30,7 @@ public:
 	~ExternalFunction();
 
 	void* func;
-	Value* (* interpreted_func)(const std::vector<const Value*>& arg_values);
+	ValueRef (* interpreted_func)(const std::vector<ValueRef>& arg_values);
 
 	FunctionSignature sig;
 	TypeRef return_type;

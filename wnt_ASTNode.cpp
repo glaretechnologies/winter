@@ -46,6 +46,104 @@ namespace Winter
 {
 
 
+static bool isIntExactlyRepresentableAsFloat(int x)
+{
+	return ((int)((float)x)) == x;
+}
+
+
+static bool expressionIsWellTyped(ASTNodeRef& e, TraversalPayload& payload_)
+{
+	// NOTE: do this without exceptions?
+	try
+	{
+		vector<ASTNode*> stack;
+		TraversalPayload payload(TraversalPayload::TypeCheck, payload_.hidden_voidptr_arg, payload_.env);
+		e->traverse(payload, stack);
+		assert(stack.size() == 0);
+
+		return true;
+	}
+	catch(BaseException& )
+	{
+		return false;
+	}
+}
+
+
+static bool shouldFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
+{
+	return	e.nonNull() &&
+			e->isConstant() && 
+			(	(e->type()->getType() == Type::FloatType &&		
+				(e->nodeType() != ASTNode::FloatLiteralType)) ||
+				(e->type()->getType() == Type::BoolType &&		
+				(e->nodeType() != ASTNode::BoolLiteralType)) ||
+				(e->type()->getType() == Type::IntType &&
+				(e->nodeType() != ASTNode::IntLiteralType))
+			) &&
+			expressionIsWellTyped(e, payload);
+}
+	
+
+static ASTNodeRef foldExpression(ASTNodeRef& e, TraversalPayload& payload)
+{
+	VMState vmstate(payload.hidden_voidptr_arg);
+	vmstate.func_args_start.push_back(0);
+	if(payload.hidden_voidptr_arg)
+		vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(payload.env)));
+
+	ValueRef retval = e->exec(vmstate);
+
+	assert(vmstate.argument_stack.size() == 1);
+	//delete vmstate.argument_stack[0];
+	vmstate.func_args_start.pop_back();
+
+	if(e->type()->getType() == Type::FloatType)
+	{
+		assert(dynamic_cast<FloatValue*>(retval.getPointer()));
+		FloatValue* val = static_cast<FloatValue*>(retval.getPointer());
+
+		return ASTNodeRef(new FloatLiteral(val->value));
+	}
+	else if(e->type()->getType() == Type::IntType)
+	{
+		assert(dynamic_cast<IntValue*>(retval.getPointer()));
+		IntValue* val = static_cast<IntValue*>(retval.getPointer());
+
+		return ASTNodeRef(new IntLiteral(val->value));
+	}
+	else if(e->type()->getType() == Type::BoolType)
+	{
+		assert(dynamic_cast<BoolValue*>(retval.getPointer()));
+		BoolValue* val = static_cast<BoolValue*>(retval.getPointer());
+
+		return ASTNodeRef(new BoolLiteral(val->value));
+	}
+	else
+	{
+		assert(0);
+		return ASTNodeRef(NULL);
+	}
+}
+
+
+void checkFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
+{
+	if(shouldFoldExpression(e, payload))
+	{
+		e = foldExpression(e, payload);
+		payload.tree_changed = true;
+	}
+}
+
+
+template <class T> 
+T cast(ValueRef& v)
+{
+	assert(dynamic_cast<T>(v.getPointer()) != NULL);
+	return static_cast<T>(v.getPointer());
+}
 
 
 /*
@@ -87,7 +185,6 @@ void BufferRoot::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 }
 
 
-
 void BufferRoot::print(int depth, std::ostream& s) const
 {
 	//s << "========================================================\n";
@@ -112,6 +209,13 @@ Reference<ASTNode> BufferRoot::clone()
 }
 
 
+bool BufferRoot::isConstant() const
+{
+	assert(0);
+	return false;
+}
+
+
 //----------------------------------------------------------------------------------
 
 
@@ -123,7 +227,9 @@ FunctionDefinition::FunctionDefinition(const std::string& name, const std::vecto
 	lets(lets_),
 	body(body_),
 	declared_return_type(declared_rettype),
-	built_in_func_impl(impl)
+	built_in_func_impl(impl),
+	built_llvm_function(NULL),
+	jitted_function(NULL)
 {
 	sig.name = name;
 	for(unsigned int i=0; i<args_.size(); ++i)
@@ -154,9 +260,9 @@ TypeRef FunctionDefinition::returnType() const
 }
 
 
-Value* FunctionDefinition::exec(VMState& vmstate)
+ValueRef FunctionDefinition::exec(VMState& vmstate)
 {
-	return new FunctionValue(this);
+	return ValueRef(new FunctionValue(this));
 }
 
 
@@ -179,7 +285,7 @@ static void printStack(VMState& vmstate)
 
 
 
-Value* FunctionDefinition::invoke(VMState& vmstate)
+ValueRef FunctionDefinition::invoke(VMState& vmstate)
 {
 	if(VERBOSE_EXEC) 
 	{
@@ -197,12 +303,12 @@ Value* FunctionDefinition::invoke(VMState& vmstate)
 		vmstate.let_stack.push_back(lets[i]->exec(vmstate));
 
 	// Execute body of function
-	Value* ret = body->exec(vmstate);
+	ValueRef ret = body->exec(vmstate);
 
 	// Pop things off let stack
 	for(unsigned int i=0; i<lets.size(); ++i)
 	{
-		delete vmstate.let_stack.back();
+		//delete vmstate.let_stack.back();
 		vmstate.let_stack.pop_back();
 	}
 	// Pop let frame index
@@ -235,6 +341,13 @@ void FunctionDefinition::bindVariables(const std::vector<ASTNode*>& stack)
 
 void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
+	if(payload.operation == TraversalPayload::ConstantFolding)
+	{
+		// Don't try and fold down generic expressions, since we can't evaluate expressions without knowing the types involved.
+		if(!this->isGenericFunction())
+			checkFoldExpression(body, payload);
+	}
+
 	if(payload.operation == TraversalPayload::TypeCheck)
 	{
 		if(this->isGenericFunction())
@@ -274,6 +387,26 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 		this->body->traverse(payload, stack);
 
 	stack.pop_back();
+
+	if(payload.operation == TraversalPayload::TypeCoercion)
+	{
+		if(this->declared_return_type.nonNull() &&
+			this->declared_return_type->getType() == Type::FloatType && 
+			this->body.nonNull() && 
+			this->body->nodeType() == ASTNode::IntLiteralType)
+		{
+			IntLiteral* body_lit = static_cast<IntLiteral*>(this->body.getPointer());
+			if(isIntExactlyRepresentableAsFloat(body_lit->value))
+			{
+				ASTNodeRef new_body(new FloatLiteral((float)body_lit->value));
+
+				this->body = new_body;
+				payload.tree_changed = true;
+			}
+		}
+
+	}
+
 }
 
 
@@ -318,15 +451,17 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 llvm::Function* FunctionDefinition::buildLLVMFunction(
 	llvm::Module* module,
-	const PlatformUtils::CPUInfo& cpu_info
+	const PlatformUtils::CPUInfo& cpu_info,
+	bool hidden_voidptr_arg
 	//std::map<Lang::FunctionSignature, llvm::Function*>& external_functions
 	)
 {
 #if USE_LLVM
-	llvm::FunctionType* functype = LLVMTypeUtils::llvmInternalFunctionType(
+	llvm::FunctionType* functype = LLVMTypeUtils::llvmFunctionType(
 		this->sig.param_types, 
 		returnType(), 
-		module->getContext()
+		module->getContext(),
+		hidden_voidptr_arg
 	);
 
 	// Make attribute list
@@ -372,41 +507,50 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 
 
 	
-	llvm::Function *internal_llvm_func = static_cast<llvm::Function*>(module->getOrInsertFunction(
-		this->sig.toString(), // internalFuncName(this->getSig()), // Name
-		functype//, // Type
-		//attribute_list // attribute_list
+	llvm::Function* llvm_func = static_cast<llvm::Function*>(module->getOrInsertFunction(
+		this->sig.toString(), // Name
+		functype // Type
 		));
 
-	internal_llvm_func->setAttributes(attribute_list);
+	llvm_func->setAttributes(attribute_list);
 
 	// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
-	internal_llvm_func->setCallingConv(llvm::CallingConv::C);
+	llvm_func->setCallingConv(llvm::CallingConv::C);
 
 	//internal_llvm_func->setAttributes(
 
 	// Set names for all arguments.
-	int i = 0;
-	for(llvm::Function::arg_iterator AI = internal_llvm_func->arg_begin(); AI != internal_llvm_func->arg_end(); ++AI, ++i)
+	/*
+	NOTE: for some reason this crashes with optimisations enabled.
+	unsigned int i = 0;
+	for(llvm::Function::arg_iterator AI = llvm_func->arg_begin(); AI != llvm_func->arg_end(); ++AI, ++i)
 	{
 		if(this->returnType()->passByValue())
-		{
-			AI->setName(this->args[i].name);
+		{					
+			if(i >= this->args.size())
+				AI->setName("hidden");
+			else
+				AI->setName(this->args[i].name);
 		}
 		else
 		{
 			if(i == 0)
 				AI->setName("ret");
+			else if(i > this->args.size())
+				AI->setName("hidden");
 			else
+			{
+				std::cout << i << std::endl;
 				AI->setName(this->args[i-1].name);
+			}
 		}
-	}
+	}*/
 
 
 	llvm::BasicBlock* block = llvm::BasicBlock::Create(
 		module->getContext(), 
 		"entry", 
-		internal_llvm_func
+		llvm_func
 	);
 	llvm::IRBuilder<> builder(block);
 
@@ -416,7 +560,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	params.cpu_info = &cpu_info;
 	params.builder = &builder;
 	params.module = module;
-	params.currently_building_func = internal_llvm_func;
+	params.currently_building_func = llvm_func;
 	params.context = &module->getContext();
 
 	//llvm::Value* body_code = NULL;
@@ -440,7 +584,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 		{
 			// body code will return a pointer to the result of the body expression, allocated on the stack.
 			// So load from the stack, and save to the return pointer which will have been passed in as arg zero.
-			llvm::Value* return_val_ptr = LLVMTypeUtils::getNthArg(internal_llvm_func, 0);
+			llvm::Value* return_val_ptr = LLVMTypeUtils::getNthArg(llvm_func, 0);
 
 			//if(*this->returnType() == 
 			if(this->returnType()->getType() == Type::StructureTypeType)
@@ -497,8 +641,8 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	}
 
 
-	this->built_llvm_function = internal_llvm_func;
-	return internal_llvm_func;
+	this->built_llvm_function = llvm_func;
+	return llvm_func;
 #else
 	return NULL;
 #endif
@@ -507,6 +651,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 
 Reference<ASTNode> FunctionDefinition::clone()
 {
+	assert(0);
 	throw BaseException("FunctionDefinition::clone()");
 }
 
@@ -531,7 +676,22 @@ llvm::Value* FunctionDefinition::getLetExpressionLLVMValue(EmitLLVMCodeParams& p
 }
 
 
+bool FunctionDefinition::isConstant() const
+{
+	assert(0);
+	return false;
+}
+
+
 //--------------------------------------------------------------------------------
+
+
+FunctionExpression::FunctionExpression() 
+:	target_function(NULL),
+	argument_index(-1),
+	binding_type(Unbound)
+{
+}
 
 
 FunctionDefinition* FunctionExpression::runtimeBind(VMState& vmstate)
@@ -541,16 +701,16 @@ FunctionDefinition* FunctionExpression::runtimeBind(VMState& vmstate)
 		use_target_function = target_function;
 	else if(this->binding_type == Arg)
 	{
-		Value* arg = vmstate.argument_stack[vmstate.func_args_start.back() + this->argument_index];
-		assert(dynamic_cast<FunctionValue*>(arg));
-		FunctionValue* function_value = dynamic_cast<FunctionValue*>(arg);
+		ValueRef arg = vmstate.argument_stack[vmstate.func_args_start.back() + this->argument_index];
+		assert(dynamic_cast<FunctionValue*>(arg.getPointer()));
+		FunctionValue* function_value = dynamic_cast<FunctionValue*>(arg.getPointer());
 		use_target_function = function_value->func_def;
 	}
 	else
 	{
-		Value* arg = vmstate.let_stack[vmstate.let_stack_start.back() + this->argument_index];
-		assert(dynamic_cast<FunctionValue*>(arg));
-		FunctionValue* function_value = dynamic_cast<FunctionValue*>(arg);
+		ValueRef arg = vmstate.let_stack[vmstate.let_stack_start.back() + this->argument_index];
+		assert(dynamic_cast<FunctionValue*>(arg.getPointer()));
+		FunctionValue* function_value = dynamic_cast<FunctionValue*>(arg.getPointer());
 		use_target_function = function_value->func_def;
 	}
 
@@ -559,23 +719,27 @@ FunctionDefinition* FunctionExpression::runtimeBind(VMState& vmstate)
 }
 
 
-Value* FunctionExpression::exec(VMState& vmstate)
+ValueRef FunctionExpression::exec(VMState& vmstate)
 {
 	if(VERBOSE_EXEC) std::cout << indent(vmstate) << "FunctionExpression, target_name=" << this->function_name << "\n";
 	
 	//assert(target_function);
-	if(this->target_external_function.nonNull())
+	if(this->target_function->external_function.nonNull())
 	{
-		vector<const Value*> args;
+		vector<ValueRef> args;
 		for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
 			args.push_back(this->argument_expressions[i]->exec(vmstate));
 
-		assert(this->target_external_function->interpreted_func);
-		Value* result = this->target_external_function->interpreted_func(args);
+		if(vmstate.hidden_voidptr_arg)
+			args.push_back(vmstate.argument_stack.back());
+
+		ValueRef result = this->target_function->external_function->interpreted_func(args);
+
 		return result;
 	}
 
-	// Get target function
+	// Get target function.  The target function is resolved at runtime, because it may be a function 
+	// passed in as a variable to this function.
 	FunctionDefinition* use_target_func = runtimeBind(vmstate);
 
 	// Push arguments onto argument stack
@@ -591,20 +755,24 @@ Value* FunctionExpression::exec(VMState& vmstate)
 		}
 	}
 
-	assert(vmstate.argument_stack.size() == initial_arg_stack_size + this->argument_expressions.size());
+	if(vmstate.hidden_voidptr_arg)
+		vmstate.argument_stack.push_back(vmstate.argument_stack[initial_arg_stack_size - 1]);
+
+
+	//assert(vmstate.argument_stack.size() == initial_arg_stack_size + this->argument_expressions.size());
 
 	if(VERBOSE_EXEC)
 		std::cout << indent(vmstate) << "Calling " << this->function_name << ", func_args_start: " << vmstate.func_args_start.back() << "\n";
 
 	// Execute target function
 	vmstate.func_args_start.push_back(initial_arg_stack_size);
-	Value* ret = use_target_func->invoke(vmstate);
+	ValueRef ret = use_target_func->invoke(vmstate);
 	vmstate.func_args_start.pop_back();
 
 	// Remove arguments from stack
-	for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
+	while(vmstate.argument_stack.size() > initial_arg_stack_size) //for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
 	{
-		delete vmstate.argument_stack.back();
+		//delete vmstate.argument_stack.back();
 		vmstate.argument_stack.pop_back();
 	}
 	assert(vmstate.argument_stack.size() == initial_arg_stack_size);
@@ -634,6 +802,29 @@ bool FunctionExpression::doesFunctionTypeMatch(TypeRef& type)
 	return true;
 }
 
+
+static bool couldCoerceFunctionCall(vector<ASTNodeRef>& argument_expressions, FunctionDefinitionRef func)
+{
+	if(func->args.size() != argument_expressions.size())
+		return false;
+	
+
+	for(size_t i=0; i<argument_expressions.size(); ++i)
+	{
+		if(*func->args[i].type == *argument_expressions[i]->type())
+		{
+		}
+		else if(	func->args[i].type->getType() == Type::FloatType &&
+			argument_expressions[i]->nodeType() == ASTNode::IntLiteralType &&
+			isIntExactlyRepresentableAsFloat(static_cast<IntLiteral*>(argument_expressions[i].getPointer())->value))
+		{
+		}
+		else
+			return false;
+	}
+
+	return true;
+}
 
 void FunctionExpression::linkFunctions(Linker& linker, std::vector<ASTNode*>& stack)
 {
@@ -689,27 +880,54 @@ void FunctionExpression::linkFunctions(Linker& linker, std::vector<ASTNode*>& st
 
 		FunctionSignature sig(this->function_name, argtypes);
 
-		//Linker::FuncMapType::iterator res = linker.functions.find(sig);
-		//if(res == linker.functions.end())
-		//	throw BaseException("Failed to find function with signature " + sig.toString());
-
-		// Try and resolve to external function
-		ExternalFunctionRef extern_func = linker.findMatchingExternalFunction(sig);
-
-		if(extern_func.nonNull())
+		// Try and resolve to internal function.
+		this->target_function = linker.findMatchingFunction(sig).getPointer();
+		if(this->target_function)
 		{
-			this->target_function = NULL;
-			this->target_external_function = extern_func;
-			this->binding_type = Bound;
-			this->target_function_return_type = extern_func->return_type;
-		}
-		else
-		{
-			// Try and resolve to internal function.
-			this->target_function = linker.findMatchingFunction(sig).getPointer();
 			this->binding_type = Bound;
 			this->target_function_return_type = this->target_function->returnType();
 		}
+		else
+		{
+			// Try and promote integer args to float args.
+			vector<FunctionDefinitionRef> funcs;
+			linker.getFuncsWithMatchingName(sig.name, funcs);
+
+			vector<FunctionDefinitionRef> possible_matches;
+
+			for(size_t z=0; z<funcs.size(); ++z)
+				if(couldCoerceFunctionCall(argument_expressions, funcs[z]))
+					possible_matches.push_back(funcs[z]);
+
+			if(possible_matches.size() == 1)
+			{
+				for(size_t i=0; i<argument_expressions.size(); ++i)
+				{
+					if(	possible_matches[0]->args[i].type->getType() == Type::FloatType &&
+						argument_expressions[i]->nodeType() == ASTNode::IntLiteralType &&
+						isIntExactlyRepresentableAsFloat(static_cast<IntLiteral*>(argument_expressions[i].getPointer())->value))
+					{
+						// Replace int literal with float literal
+						this->argument_expressions[i] = ASTNodeRef(new FloatLiteral((float)static_cast<IntLiteral*>(argument_expressions[i].getPointer())->value));
+					}
+				}
+
+				
+				this->target_function = possible_matches[0].getPointer();
+				this->binding_type = Bound;
+				this->target_function_return_type = this->target_function->returnType();
+			}
+			else if(possible_matches.size() > 1)
+			{
+				string s = "Found more than one possible match for overloaded function: \n";
+				for(size_t z=0; z<possible_matches.size(); ++z)
+					s += possible_matches[z]->sig.toString() + "\n";
+				throw BaseException(s);
+			}
+		}
+
+		if(this->binding_type == Unbound)
+			throw BaseException("Failed to find function '" + sig.toString() + "'");
 	}
 }
 
@@ -726,6 +944,17 @@ void FunctionExpression::linkFunctions(Linker& linker, std::vector<ASTNode*>& st
 
 void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
+	if(payload.operation == TraversalPayload::ConstantFolding)
+	{
+		for(size_t i=0; i<argument_expressions.size(); ++i)
+			if(shouldFoldExpression(argument_expressions[i], payload))
+			{
+				argument_expressions[i] = foldExpression(argument_expressions[i], payload);
+				payload.tree_changed = true;
+			}
+	}
+
+
 	// NOTE: we want to do a post-order traversal here.
 	// Thhis is because we want our argument expressions to be linked first.
 
@@ -748,8 +977,6 @@ void FunctionExpression::print(int depth, std::ostream& s) const
 	s << "FunctionExpr";
 	if(this->target_function)
 		s << "; target: " << this->target_function->sig.toString();
-	else if(this->target_external_function.nonNull())
-		s << "; target (external): " << this->target_external_function->sig.toString();
 	else if(this->binding_type == Arg)
 		s << "; runtime bound to arg index " << this->argument_index;
 	else if(this->binding_type == Let)
@@ -787,13 +1014,14 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 		);
 	assert(target_llvm_func);*/
 
-	FunctionSignature target_sig = this->target_function ? this->target_function->sig : this->target_external_function->sig;
+	FunctionSignature target_sig = this->target_function->sig;
 	TypeRef target_ret_type = this->target_function_return_type;
 
-	llvm::FunctionType* target_func_type = LLVMTypeUtils::llvmInternalFunctionType(
+	llvm::FunctionType* target_func_type = LLVMTypeUtils::llvmFunctionType(
 		target_sig.param_types, 
 		target_ret_type, 
-		*params.context
+		*params.context,
+		params.hidden_voidptr_arg
 	);
 
 	llvm::Function* target_llvm_func = static_cast<llvm::Function*>(params.module->getOrInsertFunction(
@@ -813,6 +1041,10 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 		for(unsigned int i=0; i<argument_expressions.size(); ++i)
 			args.push_back(argument_expressions[i]->emitLLVMCode(params));
+
+		// Set hidden voidptr argument
+		if(params.hidden_voidptr_arg)
+			args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));
 
 		llvm::CallInst* call_inst = params.builder->CreateCall(target_llvm_func, args.begin(), args.end());
 
@@ -840,6 +1072,10 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 		for(unsigned int i=0; i<argument_expressions.size(); ++i)
 			args.push_back(argument_expressions[i]->emitLLVMCode(params));
 
+		// Set hidden voidptr argument
+		if(params.hidden_voidptr_arg)
+			args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));
+
 		llvm::CallInst* call_inst = params.builder->CreateCall(target_llvm_func, args.begin(), args.end());
 		
 		// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
@@ -862,11 +1098,19 @@ Reference<ASTNode> FunctionExpression::clone()
 		e->argument_expressions.push_back(argument_expressions[i]->clone());
 	
 	e->target_function = this->target_function;
-	e->target_external_function = this->target_external_function;
 	e->argument_index = this->argument_index;
 	e->binding_type = this->binding_type;
 
 	return ASTNodeRef(e);
+}
+
+
+bool FunctionExpression::isConstant() const
+{
+	for(unsigned int i=0; i<argument_expressions.size(); ++i)
+		if(!argument_expressions[i]->isConstant())
+			return false;
+	return true;
 }
 
 
@@ -998,17 +1242,17 @@ void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 }
 
 
-Value* Variable::exec(VMState& vmstate)
+ValueRef Variable::exec(VMState& vmstate)
 {
 	assert(this->argument_index >= 0);
 
 	if(this->vartype == ArgumentVariable)
 	{
-		return vmstate.argument_stack[vmstate.func_args_start.back() + argument_index]->clone();
+		return vmstate.argument_stack[vmstate.func_args_start.back() + argument_index];
 	}
 	else
 	{
-		return vmstate.let_stack[vmstate.let_stack_start.back() + argument_index]->clone();
+		return vmstate.let_stack[vmstate.let_stack_start.back() + argument_index];
 	}
 }
 
@@ -1098,9 +1342,9 @@ Reference<ASTNode> Variable::clone()
 //------------------------------------------------------------------------------------
 
 
-Value* FloatLiteral::exec(VMState& vmstate)
+ValueRef FloatLiteral::exec(VMState& vmstate)
 {
-	return new FloatValue(value);
+	return ValueRef(new FloatValue(value));
 }
 
 
@@ -1133,9 +1377,9 @@ Reference<ASTNode> FloatLiteral::clone()
 //------------------------------------------------------------------------------------
 
 
-Value* IntLiteral::exec(VMState& vmstate)
+ValueRef IntLiteral::exec(VMState& vmstate)
 {
-	return new IntValue(value);
+	return ValueRef(new IntValue(value));
 }
 
 
@@ -1172,9 +1416,9 @@ Reference<ASTNode> IntLiteral::clone()
 //-------------------------------------------------------------------------------------
 
 
-Value* BoolLiteral::exec(VMState& vmstate)
+ValueRef BoolLiteral::exec(VMState& vmstate)
 {
-	return new BoolValue(value);
+	return ValueRef(new BoolValue(value));
 }
 
 
@@ -1207,7 +1451,7 @@ Reference<ASTNode> BoolLiteral::clone()
 //----------------------------------------------------------------------------------------------
 
 
-Value* MapLiteral::exec(VMState& vmstate)
+ValueRef MapLiteral::exec(VMState& vmstate)
 {
 /*	std::map<Value*, Value*> m;
 	for(unsigned int i=0; i<this->items.size(); ++i)
@@ -1226,7 +1470,7 @@ Value* MapLiteral::exec(VMState& vmstate)
 	return new MapValue(m);
 	*/
 	assert(0);
-	return NULL;
+	return ValueRef();
 }
 
 
@@ -1250,6 +1494,23 @@ void MapLiteral::print(int depth, std::ostream& s) const
 
 void MapLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
+	if(payload.operation == TraversalPayload::ConstantFolding)
+	{
+		for(size_t i=0; i<items.size(); ++i)
+		{
+			if(shouldFoldExpression(items[i].first, payload))
+			{
+				items[i].first = foldExpression(items[i].first, payload);
+				payload.tree_changed = true;
+			}
+			if(shouldFoldExpression(items[i].second, payload))
+			{
+				items[i].second = foldExpression(items[i].second, payload);
+				payload.tree_changed = true;
+			}
+		}
+	}
+
 	stack.push_back(this);
 	for(unsigned int i=0; i<this->items.size(); ++i)
 	{
@@ -1276,6 +1537,15 @@ Reference<ASTNode> MapLiteral::clone()
 }
 
 
+bool MapLiteral::isConstant() const
+{
+	for(size_t i=0; i<items.size(); ++i)
+		if(!items[i].first->isConstant() || !items[i].second->isConstant())
+			return false;
+	return true;
+}
+
+
 //----------------------------------------------------------------------------------------------
 ArrayLiteral::ArrayLiteral(const std::vector<ASTNodeRef>& elems)
 :	elements(elems)
@@ -1292,16 +1562,16 @@ TypeRef ArrayLiteral::type() const// { return array_type; }
 }
 
 
-Value* ArrayLiteral::exec(VMState& vmstate)
+ValueRef ArrayLiteral::exec(VMState& vmstate)
 {
-	std::vector<Value*> elem_values(elements.size());
+	vector<ValueRef> elem_values(elements.size());
 
 	for(unsigned int i=0; i<this->elements.size(); ++i)
 	{
 		elem_values[i] = this->elements[i]->exec(vmstate);
 	}
 
-	return new ArrayValue(elem_values);
+	return ValueRef(new ArrayValue(elem_values));
 }
 
 
@@ -1320,6 +1590,18 @@ void ArrayLiteral::print(int depth, std::ostream& s) const
 
 void ArrayLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
+	if(payload.operation == TraversalPayload::ConstantFolding)
+	{
+		for(size_t i=0; i<elements.size(); ++i)
+		{
+			if(shouldFoldExpression(elements[i], payload))
+			{
+				elements[i] = foldExpression(elements[i], payload);
+				payload.tree_changed = true;
+			}
+		}
+	}
+
 	stack.push_back(this);
 	for(unsigned int i=0; i<this->elements.size(); ++i)
 	{
@@ -1353,6 +1635,15 @@ Reference<ASTNode> ArrayLiteral::clone()
 }
 
 
+bool ArrayLiteral::isConstant() const
+{
+	for(size_t i=0; i<elements.size(); ++i)
+		if(!elements[i]->isConstant())
+			return false;
+	return true;
+}
+
+
 //------------------------------------------------------------------------------------------
 
 
@@ -1370,16 +1661,16 @@ TypeRef VectorLiteral::type() const
 }
 
 
-Value* VectorLiteral::exec(VMState& vmstate)
+ValueRef VectorLiteral::exec(VMState& vmstate)
 {
-	std::vector<Value*> elem_values(elements.size());
+	vector<ValueRef> elem_values(elements.size());
 
 	for(unsigned int i=0; i<this->elements.size(); ++i)
 	{
 		elem_values[i] = this->elements[i]->exec(vmstate);
 	}
 
-	return new VectorValue(elem_values);
+	return ValueRef(new VectorValue(elem_values));
 }
 
 
@@ -1398,6 +1689,18 @@ void VectorLiteral::print(int depth, std::ostream& s) const
 
 void VectorLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
+	if(payload.operation == TraversalPayload::ConstantFolding)
+	{
+		for(size_t i=0; i<elements.size(); ++i)
+		{
+			if(shouldFoldExpression(elements[i], payload))
+			{
+				elements[i] = foldExpression(elements[i], payload);
+				payload.tree_changed = true;
+			}
+		}
+	}
+
 	stack.push_back(this);
 	for(unsigned int i=0; i<this->elements.size(); ++i)
 	{
@@ -1462,6 +1765,15 @@ Reference<ASTNode> VectorLiteral::clone()
 }
 
 
+bool VectorLiteral::isConstant() const
+{
+	for(size_t i=0; i<elements.size(); ++i)
+		if(!elements[i]->isConstant())
+			return false;
+	return true;
+}
+
+
 //------------------------------------------------------------------------------------------
 
 
@@ -1475,9 +1787,9 @@ Reference<ASTNode> VectorLiteral::clone()
 }*/
 
 
-Value* StringLiteral::exec(VMState& vmstate)
+ValueRef StringLiteral::exec(VMState& vmstate)
 {
-	return new StringValue(value);
+	return ValueRef(new StringValue(value));
 }
 
 
@@ -1501,21 +1813,106 @@ Reference<ASTNode> StringLiteral::clone()
 
 //-----------------------------------------------------------------------------------------------
 
-
-Value* AdditionExpression::exec(VMState& vmstate)
+class AddOp
 {
-	Value* aval = a->exec(vmstate);
-	Value* bval = b->exec(vmstate);
+public:
+	float operator() (float x, float y) { return x + y; }
+	int operator() (int x, int y) { return x + y; }
+};
 
-	Value* retval = NULL;
+
+class SubOp
+{
+public:
+	float operator() (float x, float y) { return x - y; }
+	int operator() (int x, int y) { return x - y; }
+};
+
+
+class MulOp
+{
+public:
+	float operator() (float x, float y) { return x * y; }
+	int operator() (int x, int y) { return x * y; }
+};
+
+
+template <class Op>
+ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
+{
+	ValueRef aval = a->exec(vmstate);
+	ValueRef bval = b->exec(vmstate);
+
+	ValueRef retval;
+
+	switch(a->type()->getType())
+	{
+	case Type::FloatType:
+		retval = ValueRef(new FloatValue(op(
+			static_cast<FloatValue*>(aval.getPointer())->value,
+			static_cast<FloatValue*>(bval.getPointer())->value
+		)));
+		break;
+	case Type::IntType:
+		retval = ValueRef(new IntValue(op(
+			static_cast<IntValue*>(aval.getPointer())->value,
+			static_cast<IntValue*>(bval.getPointer())->value
+		)));
+		break;
+	case Type::VectorTypeType:
+		{
+		TypeRef this_type = a->type();
+		VectorType* vectype = static_cast<VectorType*>(this_type.getPointer());
+
+		VectorValue* aval_vec = static_cast<VectorValue*>(aval.getPointer());
+		VectorValue* bval_vec = static_cast<VectorValue*>(bval.getPointer());
+		vector<ValueRef> elem_values(aval_vec->e.size());
+		switch(vectype->t->getType())
+		{
+		case Type::FloatType:
+			for(unsigned int i=0; i<elem_values.size(); ++i)
+				elem_values[i] = ValueRef(new FloatValue(op(
+					static_cast<FloatValue*>(aval_vec->e[i].getPointer())->value,
+					static_cast<FloatValue*>(bval_vec->e[i].getPointer())->value
+				)));
+			break;
+		case Type::IntType:
+			for(unsigned int i=0; i<elem_values.size(); ++i)
+				elem_values[i] = ValueRef(new IntValue(op(
+					static_cast<IntValue*>(aval_vec->e[i].getPointer())->value,
+					static_cast<IntValue*>(bval_vec->e[i].getPointer())->value
+				)));
+			break;
+		default:
+			assert(!"expression vector field type invalid!");
+		};
+		retval = ValueRef(new VectorValue(elem_values));
+		break;
+		}
+	default:
+		assert(!"expression type invalid!");
+	}
+
+	return retval;
+}
+
+
+ValueRef AdditionExpression::exec(VMState& vmstate)
+{
+	return execBinaryOp(vmstate, a, b, AddOp());
+/*
+	Value* aval = a->exec(vmstate).getPointer();
+	Value* bval = b->exec(vmstate).getPointer();
+
+	ValueRef retval;
 
 	switch(this->type()->getType())
 	{
 	case Type::FloatType:
-		retval = new FloatValue(static_cast<FloatValue*>(aval)->value + static_cast<FloatValue*>(bval)->value);
+		retval = ValueRef(new FloatValue(static_cast<FloatValue*>(aval)->value + static_cast<FloatValue*>(bval)->value));
 		break;
 	case Type::IntType:
-		retval = new IntValue(static_cast<IntValue*>(aval)->value + static_cast<IntValue*>(bval)->value);
+		retval = ValueRef(new IntValue(static_cast<IntValue*>(aval)->value + static_cast<IntValue*>(bval)->value));
 		break;
 	case Type::VectorTypeType:
 		{
@@ -1524,30 +1921,29 @@ Value* AdditionExpression::exec(VMState& vmstate)
 
 		VectorValue* aval_vec = static_cast<VectorValue*>(aval);
 		VectorValue* bval_vec = static_cast<VectorValue*>(bval);
-		vector<Value*> elem_values(aval_vec->e.size());
+		vector<ValueRef> elem_values(aval_vec->e.size());
 		switch(vectype->t->getType())
 		{
 		case Type::FloatType:
 			for(unsigned int i=0; i<elem_values.size(); ++i)
-				elem_values[i] = new FloatValue(static_cast<FloatValue*>(aval_vec->e[i])->value + static_cast<FloatValue*>(bval_vec->e[i])->value);
+				elem_values[i] = ValueRef(new FloatValue(static_cast<FloatValue*>(aval_vec->e[i].getPointer())->value + static_cast<FloatValue*>(bval_vec->e[i].getPointer())->value));
 			break;
 		case Type::IntType:
 			for(unsigned int i=0; i<elem_values.size(); ++i)
-				elem_values[i] = new IntValue(static_cast<IntValue*>(aval_vec->e[i])->value + static_cast<IntValue*>(bval_vec->e[i])->value);
+				elem_values[i] = ValueRef(new IntValue(static_cast<IntValue*>(aval_vec->e[i].getPointer())->value + static_cast<IntValue*>(bval_vec->e[i].getPointer())->value));
 			break;
 		default:
 			assert(!"additionexpression vector field type invalid!");
 		};
-		retval = new VectorValue(elem_values);
+		retval = ValueRef(new VectorValue(elem_values));
 		break;
 		}
 	default:
 		assert(!"additionexpression type invalid!");
 	}
-	delete aval;
-	delete bval;
 
 	return retval;
+	*/
 }
 
 
@@ -1576,12 +1972,73 @@ void AdditionExpression::bindVariables(const std::vector<ASTNode*>& stack)
 }*/
 
 
+
+
 void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
+	if(payload.operation == TraversalPayload::ConstantFolding)
+	{
+		if(shouldFoldExpression(a, payload))
+		{
+			a = foldExpression(a, payload);
+			payload.tree_changed = true;
+		}
+		if(shouldFoldExpression(b, payload))
+		{
+			b = foldExpression(b, payload);
+			payload.tree_changed = true;
+		}
+	}
+
 	stack.push_back(this);
 	a->traverse(payload, stack);
 	b->traverse(payload, stack);
 	stack.pop_back();
+
+	if(payload.operation == TraversalPayload::TypeCoercion)
+	{
+		// implicit conversion from int to float in addition operation:
+		// 3.0 + 4
+		if(a->nodeType() == ASTNode::FloatLiteralType && b->nodeType() == ASTNode::IntLiteralType)
+		{
+			IntLiteral* b_lit = static_cast<IntLiteral*>(b.getPointer());
+			if(isIntExactlyRepresentableAsFloat(b_lit->value))
+			{
+				b = ASTNodeRef(new FloatLiteral((float)b_lit->value));
+				payload.tree_changed = true;
+			}
+		}
+
+		// 3 + 4.0
+		if(b->nodeType() == ASTNode::FloatLiteralType && a->nodeType() == ASTNode::IntLiteralType)
+		{
+			IntLiteral* a_lit = static_cast<IntLiteral*>(a.getPointer());
+			if(isIntExactlyRepresentableAsFloat(a_lit->value))
+			{
+				a = ASTNodeRef(new FloatLiteral((float)a_lit->value));
+				payload.tree_changed = true;
+			}
+		}
+	}
+
+	if(payload.operation == TraversalPayload::TypeCheck)
+	{
+		if(this->type()->getType() == Type::GenericTypeType || *this->type() == Int() || *this->type() == Float())
+		{
+			if(*a->type() != *b->type())
+				throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'");
+		}
+		else if(a->type()->getType() == Type::VectorTypeType && b->type()->getType() == Type::VectorTypeType)
+		{
+			// this is alright.
+			// NOTE: need to do more checking tho.
+			// Need to check number of elements is same in both vectors, and field types are the same.
+		}
+		else
+		{
+			throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'");
+		}
+	}
 }
 
 
@@ -1608,23 +2065,31 @@ Reference<ASTNode> AdditionExpression::clone()
 }
 
 
+bool AdditionExpression::isConstant() const
+{
+	return a->isConstant() && b->isConstant();
+}
+
+
 //-------------------------------------------------------------------------------------------------
 
 
-Value* SubtractionExpression::exec(VMState& vmstate)
+ValueRef SubtractionExpression::exec(VMState& vmstate)
 {
-	Value* aval = a->exec(vmstate);
-	Value* bval = b->exec(vmstate);
+	return execBinaryOp(vmstate, a, b, SubOp());
+/*
+	Value* aval = a->exec(vmstate).getPointer();
+	Value* bval = b->exec(vmstate).getPointer();
 
-	Value* retval = NULL;
+	ValueRef retval;
 
 	switch(this->type()->getType())
 	{
 	case Type::FloatType:
-		retval = new FloatValue(static_cast<FloatValue*>(aval)->value - static_cast<FloatValue*>(bval)->value);
+		retval = ValueRef(new FloatValue(static_cast<FloatValue*>(aval)->value - static_cast<FloatValue*>(bval)->value));
 		break;
 	case Type::IntType:
-		retval = new IntValue(static_cast<IntValue*>(aval)->value - static_cast<IntValue*>(bval)->value);
+		retval = ValueRef(new IntValue(static_cast<IntValue*>(aval)->value - static_cast<IntValue*>(bval)->value));
 		break;
 	case Type::VectorTypeType:
 		{
@@ -1633,30 +2098,29 @@ Value* SubtractionExpression::exec(VMState& vmstate)
 
 		VectorValue* aval_vec = static_cast<VectorValue*>(aval);
 		VectorValue* bval_vec = static_cast<VectorValue*>(bval);
-		vector<Value*> elem_values(aval_vec->e.size());
+		vector<ValueRef> elem_values(aval_vec->e.size());
 		switch(vectype->t->getType())
 		{
 		case Type::FloatType:
 			for(unsigned int i=0; i<elem_values.size(); ++i)
-				elem_values[i] = new FloatValue(static_cast<FloatValue*>(aval_vec->e[i])->value - static_cast<FloatValue*>(bval_vec->e[i])->value);
+				elem_values[i] = ValueRef(new FloatValue(static_cast<FloatValue*>(aval_vec->e[i].getPointer())->value - static_cast<FloatValue*>(bval_vec->e[i].getPointer())->value));
 			break;
 		case Type::IntType:
 			for(unsigned int i=0; i<elem_values.size(); ++i)
-				elem_values[i] = new IntValue(static_cast<IntValue*>(aval_vec->e[i])->value - static_cast<IntValue*>(bval_vec->e[i])->value);
+				elem_values[i] = ValueRef(new IntValue(static_cast<IntValue*>(aval_vec->e[i].getPointer())->value - static_cast<IntValue*>(bval_vec->e[i].getPointer())->value));
 			break;
 		default:
 			assert(!"SubtractionExpression vector field type invalid!");
 		};
-		retval = new VectorValue(elem_values);
+		retval = ValueRef(new VectorValue(elem_values));
 		break;
 		}
 	default:
 		assert(!"SubtractionExpression type invalid!");
 	}
-	delete aval;
-	delete bval;
 
 	return retval;
+	*/
 }
 
 
@@ -1687,10 +2151,70 @@ void SubtractionExpression::bindVariables(const std::vector<ASTNode*>& stack)
 
 void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
+	if(payload.operation == TraversalPayload::ConstantFolding)
+	{
+		if(shouldFoldExpression(a, payload))
+		{
+			a = foldExpression(a, payload);
+			payload.tree_changed = true;
+		}
+		if(shouldFoldExpression(b, payload))
+		{
+			b = foldExpression(b, payload);
+			payload.tree_changed = true;
+		}
+	}
+
 	stack.push_back(this);
 	a->traverse(payload, stack);
 	b->traverse(payload, stack);
 	stack.pop_back();
+
+	if(payload.operation == TraversalPayload::TypeCoercion)
+	{
+		// implicit conversion from int to float
+		// 3.0 - 4
+		if(a->nodeType() == ASTNode::FloatLiteralType && b->nodeType() == ASTNode::IntLiteralType)
+		{
+			IntLiteral* b_lit = static_cast<IntLiteral*>(b.getPointer());
+			if(isIntExactlyRepresentableAsFloat(b_lit->value))
+			{
+				b = ASTNodeRef(new FloatLiteral((float)b_lit->value));
+				payload.tree_changed = true;
+			}
+		}
+
+		// 3 - 4.0
+		if(b->nodeType() == ASTNode::FloatLiteralType && a->nodeType() == ASTNode::IntLiteralType)
+		{
+			IntLiteral* a_lit = static_cast<IntLiteral*>(a.getPointer());
+			if(isIntExactlyRepresentableAsFloat(a_lit->value))
+			{
+				a = ASTNodeRef(new FloatLiteral((float)a_lit->value));
+				payload.tree_changed = true;
+			}
+		}
+	}
+
+	if(payload.operation == TraversalPayload::TypeCheck)
+	{
+		if(this->type()->getType() == Type::GenericTypeType || *this->type() == Int() || *this->type() == Float())
+		{
+			if(*a->type() != *b->type())
+				throw BaseException("Binary operator '-' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'");
+		}
+		else if(a->type()->getType() == Type::VectorTypeType && b->type()->getType() == Type::VectorTypeType)
+		{
+			// this is alright.
+			// NOTE: need to do more checking tho.
+			// Need to check number of elements is same in both vectors, and field types are the same.
+		}
+		else
+		{
+			throw BaseException("Binary operator '-' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'");
+		}
+	}
+
 }
 
 
@@ -1717,43 +2241,50 @@ Reference<ASTNode> SubtractionExpression::clone()
 }
 
 
+bool SubtractionExpression::isConstant() const
+{
+	return a->isConstant() && b->isConstant();
+}
+
+
 //-------------------------------------------------------------------------------------------------------
 
 
-Value* MulExpression::exec(VMState& vmstate)
+ValueRef MulExpression::exec(VMState& vmstate)
 {
-	Value* aval = a->exec(vmstate);
-	Value* bval = b->exec(vmstate);
-	Value* retval = NULL;
+	return execBinaryOp(vmstate, a, b, MulOp());
+	/*
+	Value* aval = a->exec(vmstate).getPointer();
+	Value* bval = b->exec(vmstate).getPointer();
+	ValueRef retval;
 
 	if(this->type()->getType() == Type::FloatType)
 	{
-		retval = new FloatValue(static_cast<FloatValue*>(aval)->value * static_cast<FloatValue*>(bval)->value);
+		retval = ValueRef(new FloatValue(static_cast<FloatValue*>(aval)->value * static_cast<FloatValue*>(bval)->value));
 	}
 	else if(this->type()->getType() == Type::IntType)
 	{
-		retval = new IntValue(static_cast<IntValue*>(aval)->value * static_cast<IntValue*>(bval)->value);
+		retval = ValueRef(new IntValue(static_cast<IntValue*>(aval)->value * static_cast<IntValue*>(bval)->value));
 	}
 	else if(this->type()->getType() == Type::VectorTypeType)
 	{
 		VectorValue* aval_vec = static_cast<VectorValue*>(aval);
 		VectorValue* bval_vec = static_cast<VectorValue*>(bval);
 
-		vector<Value*> elem_values(aval_vec->e.size());
+		vector<ValueRef> elem_values(aval_vec->e.size());
 		for(unsigned int i=0; i<elem_values.size(); ++i)
 		{
-			elem_values[i] = new FloatValue(static_cast<FloatValue*>(aval_vec->e[i])->value * static_cast<FloatValue*>(bval_vec->e[i])->value);
+			elem_values[i] = ValueRef(new FloatValue(static_cast<FloatValue*>(aval_vec->e[i].getPointer())->value * static_cast<FloatValue*>(bval_vec->e[i].getPointer())->value));
 		}
 
-		retval = new VectorValue(elem_values);
+		retval = ValueRef(new VectorValue(elem_values));
 	}
 	else
 	{
 		assert(!"mulexpression type invalid!");
 	}
-	delete aval;
-	delete bval;
 	return retval;
+	*/
 }
 
 
@@ -1768,15 +2299,59 @@ Value* MulExpression::exec(VMState& vmstate)
 
 void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
+	if(payload.operation == TraversalPayload::ConstantFolding)
+	{
+		if(shouldFoldExpression(a, payload))
+		{
+			a = foldExpression(a, payload);
+			payload.tree_changed = true;
+		}
+		if(shouldFoldExpression(b, payload))
+		{
+			b = foldExpression(b, payload);
+			payload.tree_changed = true;
+		}
+	}
+
 	stack.push_back(this);
 	a->traverse(payload, stack);
 	b->traverse(payload, stack);
 	stack.pop_back();
 
+	if(payload.operation == TraversalPayload::TypeCoercion)
+	{
+		// implicit conversion from int to float
+		// 3.0 * 4
+		if(a->nodeType() == ASTNode::FloatLiteralType && b->nodeType() == ASTNode::IntLiteralType)
+		{
+			IntLiteral* b_lit = static_cast<IntLiteral*>(b.getPointer());
+			if(isIntExactlyRepresentableAsFloat(b_lit->value))
+			{
+				b = ASTNodeRef(new FloatLiteral((float)b_lit->value));
+				payload.tree_changed = true;
+			}
+		}
+
+		// 3 * 4.0
+		if(b->nodeType() == ASTNode::FloatLiteralType && a->nodeType() == ASTNode::IntLiteralType)
+		{
+			IntLiteral* a_lit = static_cast<IntLiteral*>(a.getPointer());
+			if(isIntExactlyRepresentableAsFloat(a_lit->value))
+			{
+				a = ASTNodeRef(new FloatLiteral((float)a_lit->value));
+				payload.tree_changed = true;
+			}
+		}
+	}
+
+
 	if(payload.operation == TraversalPayload::TypeCheck)
 	{
 		if(this->type()->getType() == Type::GenericTypeType || *this->type() == Int() || *this->type() == Float())
-		{}
+		{
+			if(*a->type() != *b->type())
+				throw BaseException("Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'");
+		}
 		else if(a->type()->getType() == Type::VectorTypeType && b->type()->getType() == Type::VectorTypeType)
 		{
 			// this is alright.
@@ -1785,7 +2360,7 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 		}
 		else
 		{
-			throw BaseException("MulExpression: Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'");
+			throw BaseException("Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'");
 		}
 	}
 }
@@ -1830,47 +2405,105 @@ Reference<ASTNode> MulExpression::clone()
 }
 
 
+bool MulExpression::isConstant() const
+{
+	return a->isConstant() && b->isConstant();
+}
+
+
 //-------------------------------------------------------------------------------------------------------
 
 
-Value* DivExpression::exec(VMState& vmstate)
+ValueRef DivExpression::exec(VMState& vmstate)
 {
-	Value* aval = a->exec(vmstate);
-	Value* bval = b->exec(vmstate);
-	Value* retval = NULL;
+	ValueRef aval = a->exec(vmstate);
+	ValueRef bval = b->exec(vmstate);
+	ValueRef retval;
 
 	if(this->type()->getType() == Type::FloatType)
 	{
-		retval = new FloatValue(static_cast<FloatValue*>(aval)->value / static_cast<FloatValue*>(bval)->value);
+		retval = ValueRef(new FloatValue(static_cast<FloatValue*>(aval.getPointer())->value / static_cast<FloatValue*>(bval.getPointer())->value));
 	}
 	else if(this->type()->getType() == Type::IntType)
 	{
-		retval = new IntValue(static_cast<IntValue*>(aval)->value / static_cast<IntValue*>(bval)->value);
+		// TODO: catch divide by zero.
+		retval = ValueRef(new IntValue(static_cast<IntValue*>(aval.getPointer())->value / static_cast<IntValue*>(bval.getPointer())->value));
 	}
 	else
 	{
 		assert(!"divexpression type invalid!");
 	}
-	delete aval;
-	delete bval;
 	return retval;
 }
 
 
 void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
+	if(payload.operation == TraversalPayload::ConstantFolding)
+	{
+		if(shouldFoldExpression(a, payload))
+		{
+			a = foldExpression(a, payload);
+			payload.tree_changed = true;
+		}
+		if(shouldFoldExpression(b, payload))
+		{
+			b = foldExpression(b, payload);
+			payload.tree_changed = true;
+		}
+	}
+
 	stack.push_back(this);
 	a->traverse(payload, stack);
 	b->traverse(payload, stack);
 	stack.pop_back();
 
+	if(payload.operation == TraversalPayload::TypeCoercion)
+	{
+		// implicit conversion from int to float
+		// 3.0 / 4
+		// Only do this if b is != 0.  Otherwise we are messing with divide by zero semantics.
+		if(a->nodeType() == ASTNode::FloatLiteralType && b->nodeType() == ASTNode::IntLiteralType)
+		{
+			IntLiteral* b_lit = static_cast<IntLiteral*>(b.getPointer());
+			if(isIntExactlyRepresentableAsFloat(b_lit->value) && (b_lit->value != 0))
+			{
+				b = ASTNodeRef(new FloatLiteral((float)b_lit->value));
+				payload.tree_changed = true;
+			}
+		}
+
+		// 3 / 4.0
+		if(b->nodeType() == ASTNode::FloatLiteralType && a->nodeType() == ASTNode::IntLiteralType)
+		{
+			IntLiteral* a_lit = static_cast<IntLiteral*>(a.getPointer());
+			if(isIntExactlyRepresentableAsFloat(a_lit->value))
+			{
+				a = ASTNodeRef(new FloatLiteral((float)a_lit->value));
+				payload.tree_changed = true;
+			}
+		}
+	}
+
+
 	if(payload.operation == TraversalPayload::TypeCheck)
+	{
 		if(this->type()->getType() == Type::GenericTypeType || *this->type() == Int() || *this->type() == Float())
-		{}
+		{
+			if(*a->type() != *b->type())
+				throw BaseException("Binary operator '/' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'");
+		}
+		else if(a->type()->getType() == Type::VectorTypeType && b->type()->getType() == Type::VectorTypeType)
+		{
+			// this is alright.
+			// NOTE: need to do more checking tho.
+			// Need to check number of elements is same in both vectors, and field types are the same.
+		}
 		else
 		{
-			throw BaseException("Child type '" + this->type()->toString() + "' does not define binary operator '/'.");
+			throw BaseException("Binary operator '/' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'");
 		}
+	}
 }
 
 
@@ -1924,27 +2557,32 @@ Reference<ASTNode> DivExpression::clone()
 }
 
 
+bool DivExpression::isConstant() const
+{
+	return a->isConstant() && b->isConstant();
+}
+
+
 //----------------------------------------------------------------------------------------
 
 
-Value* UnaryMinusExpression::exec(VMState& vmstate)
+ValueRef UnaryMinusExpression::exec(VMState& vmstate)
 {
-	Value* aval = expr->exec(vmstate);
-	Value* retval = NULL;
+	ValueRef aval = expr->exec(vmstate);
+	ValueRef retval;
 
 	if(this->type()->getType() == Type::FloatType)
 	{
-		retval = new FloatValue(-static_cast<FloatValue*>(aval)->value);
+		retval = ValueRef(new FloatValue(-cast<FloatValue*>(aval)->value));
 	}
 	else if(this->type()->getType() == Type::IntType)
 	{
-		retval = new IntValue(-static_cast<IntValue*>(aval)->value);
+		retval = ValueRef(new IntValue(-cast<IntValue*>(aval)->value));
 	}
 	else
 	{
 		assert(!"UnaryMinusExpression type invalid!");
 	}
-	delete aval;
 	return retval;
 }
 
@@ -1960,6 +2598,15 @@ Value* UnaryMinusExpression::exec(VMState& vmstate)
 
 void UnaryMinusExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
+	if(payload.operation == TraversalPayload::ConstantFolding)
+	{
+		if(shouldFoldExpression(expr, payload))
+		{
+			expr = foldExpression(expr, payload);
+			payload.tree_changed = true;
+		}
+	}
+
 	stack.push_back(this);
 	expr->traverse(payload, stack);
 	stack.pop_back();
@@ -2025,10 +2672,16 @@ Reference<ASTNode> UnaryMinusExpression::clone()
 }
 
 
+bool UnaryMinusExpression::isConstant() const
+{
+	return expr->isConstant();
+}
+
+
 //----------------------------------------------------------------------------------------
 
 
-Value* LetASTNode::exec(VMState& vmstate)
+ValueRef LetASTNode::exec(VMState& vmstate)
 {
 	return this->expr->exec(vmstate);
 }
@@ -2044,6 +2697,15 @@ void LetASTNode::print(int depth, std::ostream& s) const
 
 void LetASTNode::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
+	if(payload.operation == TraversalPayload::ConstantFolding)
+	{
+		if(shouldFoldExpression(expr, payload))
+		{
+			expr = foldExpression(expr, payload);
+			payload.tree_changed = true;
+		}
+	}
+
 	stack.push_back(this);
 	expr->traverse(payload, stack);
 	stack.pop_back();
@@ -2075,6 +2737,12 @@ Reference<ASTNode> LetASTNode::clone()
 	LetASTNode* e = new LetASTNode(this->variable_name);
 	e->expr = this->expr->clone();
 	return ASTNodeRef(e);
+}
+
+
+bool LetASTNode::isConstant() const
+{
+	return expr->isConstant();
 }
 
 
@@ -2140,26 +2808,24 @@ static BoolValue* compare(unsigned int token_type, Value* a, Value* b)
 }
 
 
-Value* ComparisonExpression::exec(VMState& vmstate)
+ValueRef ComparisonExpression::exec(VMState& vmstate)
 {
-	Value* aval = a->exec(vmstate);
-	Value* bval = b->exec(vmstate);
+	ValueRef aval = a->exec(vmstate);
+	ValueRef bval = b->exec(vmstate);
 
-	Value* retval = NULL;
+	ValueRef retval;
 
 	switch(a->type()->getType())
 	{
 	case Type::FloatType:
-		retval = compare<FloatValue>(this->token->getType(), aval, bval);
+		retval = ValueRef(compare<FloatValue>(this->token->getType(), aval.getPointer(), bval.getPointer()));
 		break;
 	case Type::IntType:
-		retval = compare<IntValue>(this->token->getType(), aval, bval);
+		retval = ValueRef(compare<IntValue>(this->token->getType(), aval.getPointer(), bval.getPointer()));
 		break;
 	default:
 		assert(!"SubtractionExpression type invalid!");
 	}
-	delete aval;
-	delete bval;
 
 	return retval;
 }
@@ -2176,6 +2842,20 @@ void ComparisonExpression::print(int depth, std::ostream& s) const
 
 void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
+	if(payload.operation == TraversalPayload::ConstantFolding)
+	{
+		if(shouldFoldExpression(a, payload))
+		{
+			a = foldExpression(a, payload);
+			payload.tree_changed = true;
+		}
+		if(shouldFoldExpression(b, payload))
+		{
+			b = foldExpression(b, payload);
+			payload.tree_changed = true;
+		}
+	}
+
 	stack.push_back(this);
 	a->traverse(payload, stack);
 	b->traverse(payload, stack);
@@ -2238,6 +2918,12 @@ llvm::Value* ComparisonExpression::emitLLVMCode(EmitLLVMCodeParams& params) cons
 Reference<ASTNode> ComparisonExpression::clone()
 {
 	return Reference<ASTNode>(new ComparisonExpression(token, a, b));
+}
+
+
+bool ComparisonExpression::isConstant() const
+{
+	return a->isConstant() && b->isConstant();
 }
 
 

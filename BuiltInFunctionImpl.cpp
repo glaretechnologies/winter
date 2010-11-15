@@ -37,14 +37,16 @@ Constructor::Constructor(Reference<StructureType>& struct_type_)
 }
 
 
-Value* Constructor::invoke(VMState& vmstate)
+ValueRef Constructor::invoke(VMState& vmstate)
 {
-	vector<Value*> field_values(this->struct_type->component_names.size());
+	vector<ValueRef> field_values(this->struct_type->component_names.size());
+
+	const size_t func_args_start = vmstate.func_args_start.back();
 	
 	for(unsigned int i=0; i<this->struct_type->component_types.size(); ++i)
-		field_values[i] = vmstate.argument_stack[vmstate.argument_stack.size() - this->struct_type->component_types.size() + i]->clone();
+		field_values[i] = vmstate.argument_stack[func_args_start + i];
 
-	return new StructureValue(field_values);
+	return ValueRef(new StructureValue(field_values));
 }
 
 
@@ -124,15 +126,18 @@ llvm::Value* Constructor::emitLLVMCode(EmitLLVMCodeParams& params) const
 }
 
 
-Value* GetField::invoke(VMState& vmstate)
+ValueRef GetField::invoke(VMState& vmstate)
 {
+	const size_t func_args_start = vmstate.func_args_start.back();
+
 	// Top param on arg stack should be a structure
-	const StructureValue* s = dynamic_cast<const StructureValue*>(vmstate.argument_stack.back());
+	assert(dynamic_cast<const StructureValue*>(vmstate.argument_stack[func_args_start].getPointer()));
+	const StructureValue* s = static_cast<const StructureValue*>(vmstate.argument_stack[func_args_start].getPointer());
 
 	assert(s);
 	assert(this->index < s->fields.size());
 
-	return s->fields[this->index]->clone();
+	return s->fields[this->index];
 }
 
 
@@ -201,15 +206,16 @@ llvm::Value* GetField::emitLLVMCode(EmitLLVMCodeParams& params) const
 }
 
 
-Value* GetVectorElement::invoke(VMState& vmstate)
+ValueRef GetVectorElement::invoke(VMState& vmstate)
 {
-	// Top param on arg stack should be a vector
-	const VectorValue* vec = dynamic_cast<const VectorValue*>(vmstate.argument_stack.back());
+	const size_t func_args_start = vmstate.func_args_start.back();
+
+	const VectorValue* vec = static_cast<const VectorValue*>(vmstate.argument_stack[func_args_start].getPointer());
 
 	assert(vec);
 	assert(this->index < vec->e.size());
 
-	return vec->e[this->index]->clone();
+	return vec->e[this->index];
 }
 
 
@@ -239,10 +245,12 @@ llvm::Value* GetVectorElement::emitLLVMCode(EmitLLVMCodeParams& params) const
 }
 
 
-Value* ArrayMapBuiltInFunc::invoke(VMState& vmstate)
+ValueRef ArrayMapBuiltInFunc::invoke(VMState& vmstate)
 {
-	const FunctionValue* f = dynamic_cast<const FunctionValue*>(vmstate.argument_stack[vmstate.func_args_start.back()]);
-	const ArrayValue* from = dynamic_cast<const ArrayValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1]);
+	const size_t func_args_start = vmstate.func_args_start.back();
+
+	const FunctionValue* f = static_cast<const FunctionValue*>(vmstate.argument_stack[func_args_start].getPointer());
+	const ArrayValue* from = static_cast<const ArrayValue*>(vmstate.argument_stack[func_args_start + 1].getPointer());
 
 	assert(f);
 	assert(from);
@@ -262,7 +270,7 @@ Value* ArrayMapBuiltInFunc::invoke(VMState& vmstate)
 		vmstate.func_args_start.pop_back();
 	}
 
-	return retval;
+	return ValueRef(retval);
 }
 
 
@@ -275,16 +283,16 @@ llvm::Value* ArrayMapBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 //------------------------------------------------------------------------------------
 
 
-Value* ArrayFoldBuiltInFunc::invoke(VMState& vmstate)
+ValueRef ArrayFoldBuiltInFunc::invoke(VMState& vmstate)
 {
 	// fold(function<T, T, T> func, array<T> array, T initial val) T
-	const FunctionValue* f = dynamic_cast<const FunctionValue*>(vmstate.argument_stack[vmstate.func_args_start.back()]);
-	const ArrayValue* arr = dynamic_cast<const ArrayValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1]);
-	const Value* initial_val = vmstate.argument_stack[vmstate.func_args_start.back() + 2];
+	const FunctionValue* f = dynamic_cast<const FunctionValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+	const ArrayValue* arr = dynamic_cast<const ArrayValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
+	const ValueRef initial_val = vmstate.argument_stack[vmstate.func_args_start.back() + 2];
 
-	assert(f && arr && initial_val);
+	assert(f && arr && initial_val.nonNull());
 
-	Value* running_val = initial_val->clone();
+	ValueRef running_val = initial_val;
 	for(unsigned int i=0; i<arr->e.size(); ++i)
 	{
 		// Set up arg stack
@@ -292,13 +300,13 @@ Value* ArrayFoldBuiltInFunc::invoke(VMState& vmstate)
 		vmstate.argument_stack.push_back(running_val); // Push value arg
 		vmstate.argument_stack.push_back(arr->e[i]); // Push value arg
 		
-		Value* new_running_val = f->func_def->invoke(vmstate);
+		ValueRef new_running_val = f->func_def->invoke(vmstate);
 
 		vmstate.argument_stack.pop_back(); // Pop Value arg
 		vmstate.argument_stack.pop_back(); // Pop Value arg
 		vmstate.func_args_start.pop_back();
 
-		delete running_val;
+		//delete running_val;
 		running_val = new_running_val;
 	}
 
@@ -316,18 +324,20 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 //----------------------------------------------------------------------------------------------
 
 
-Value* IfBuiltInFunc::invoke(VMState& vmstate)
+ValueRef IfBuiltInFunc::invoke(VMState& vmstate)
 {
-	const Value* condition = vmstate.argument_stack[vmstate.argument_stack.size() - 3];
+	const size_t func_args_start = vmstate.func_args_start.back();
+
+	const Value* condition = vmstate.argument_stack[func_args_start].getPointer();
 	assert(dynamic_cast<const BoolValue*>(condition));
 
 	if(static_cast<const BoolValue*>(condition)->value) // If condition is true
 	{
-		return vmstate.argument_stack[vmstate.argument_stack.size() - 2]->clone();
+		return vmstate.argument_stack[func_args_start + 1];
 	}
 	else
 	{
-		return vmstate.argument_stack[vmstate.argument_stack.size() - 1]->clone();
+		return vmstate.argument_stack[func_args_start + 2];
 	}
 }
 
@@ -448,20 +458,20 @@ llvm::Value* IfBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 //----------------------------------------------------------------------------------------------
 
 
-Value* DotProductBuiltInFunc::invoke(VMState& vmstate)
+ValueRef DotProductBuiltInFunc::invoke(VMState& vmstate)
 {
-	const VectorValue* a = dynamic_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1]);
-	const VectorValue* b = dynamic_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 0]);
+	const VectorValue* a = dynamic_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 0].getPointer());
+	const VectorValue* b = dynamic_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
 	assert(a && b);
 
 	FloatValue* res = new FloatValue(0.0f);
 
 	for(unsigned int i=0; i<vector_type->num; ++i)
 	{
-		res->value += static_cast<const FloatValue*>(a->e[i])->value + static_cast<const FloatValue*>(b->e[i])->value;
+		res->value += static_cast<const FloatValue*>(a->e[i].getPointer())->value + static_cast<const FloatValue*>(b->e[i].getPointer())->value;
 	}
 
-	return res;
+	return ValueRef(res);
 }
 
 
@@ -528,23 +538,23 @@ llvm::Value* DotProductBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) con
 //----------------------------------------------------------------------------------------------
 
 
-Value* VectorMinBuiltInFunc::invoke(VMState& vmstate)
+ValueRef VectorMinBuiltInFunc::invoke(VMState& vmstate)
 {
-	const VectorValue* a = dynamic_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1]);
-	const VectorValue* b = dynamic_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 0]);
+	const VectorValue* a = dynamic_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 0].getPointer());
+	const VectorValue* b = dynamic_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
 	assert(a && b);
 
 	
-	vector<Value*> res_values(vector_type->num);
+	vector<ValueRef> res_values(vector_type->num);
 
 	for(unsigned int i=0; i<vector_type->num; ++i)
 	{
-		const float x = static_cast<const FloatValue*>(a->e[i])->value;
-		const float y = static_cast<const FloatValue*>(b->e[i])->value;
-		res_values[i] = new FloatValue(x < y ? x : y);
+		const float x = static_cast<const FloatValue*>(a->e[i].getPointer())->value;
+		const float y = static_cast<const FloatValue*>(b->e[i].getPointer())->value;
+		res_values[i] = ValueRef(new FloatValue(x < y ? x : y));
 	}
 
-	return new VectorValue(res_values);
+	return ValueRef(new VectorValue(res_values));
 }
 
 
@@ -576,23 +586,23 @@ llvm::Value* VectorMinBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 //----------------------------------------------------------------------------------------------
 
 
-Value* VectorMaxBuiltInFunc::invoke(VMState& vmstate)
+ValueRef VectorMaxBuiltInFunc::invoke(VMState& vmstate)
 {
-	const VectorValue* a = dynamic_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1]);
-	const VectorValue* b = dynamic_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 0]);
+	const VectorValue* a = dynamic_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 0].getPointer());
+	const VectorValue* b = dynamic_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
 	assert(a && b);
 
 
-	vector<Value*> res_values(vector_type->num);
+	vector<ValueRef> res_values(vector_type->num);
 
 	for(unsigned int i=0; i<vector_type->num; ++i)
 	{
-		const float x = static_cast<const FloatValue*>(a->e[i])->value;
-		const float y = static_cast<const FloatValue*>(b->e[i])->value;
-		res_values[i] = new FloatValue(x > y ? x : y);
+		const float x = static_cast<const FloatValue*>(a->e[i].getPointer())->value;
+		const float y = static_cast<const FloatValue*>(b->e[i].getPointer())->value;
+		res_values[i] = ValueRef(new FloatValue(x > y ? x : y));
 	}
 
-	return new VectorValue(res_values);
+	return ValueRef(new VectorValue(res_values));
 }
 
 
@@ -624,12 +634,12 @@ llvm::Value* VectorMaxBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 //----------------------------------------------------------------------------------------------
 
 
-Value* PowBuiltInFunc::invoke(VMState& vmstate)
+ValueRef PowBuiltInFunc::invoke(VMState& vmstate)
 {
-	const FloatValue* a = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1]);
-	const FloatValue* b = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 0]);
+	const FloatValue* a = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 0].getPointer());
+	const FloatValue* b = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
 
-	return new FloatValue(std::pow(a->value, b->value));
+	return ValueRef(new FloatValue(std::pow(a->value, b->value)));
 }
 
 
@@ -658,11 +668,11 @@ llvm::Value* PowBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 //----------------------------------------------------------------------------------------------
 
 
-Value* SqrtBuiltInFunc::invoke(VMState& vmstate)
+ValueRef SqrtBuiltInFunc::invoke(VMState& vmstate)
 {
-	const FloatValue* a = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back()]);
+	const FloatValue* a = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 
-	return new FloatValue(std::sqrt(a->value));
+	return ValueRef(new FloatValue(std::sqrt(a->value)));
 }
 
 

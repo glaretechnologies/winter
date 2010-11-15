@@ -25,10 +25,14 @@ namespace LLVMTypeUtils
 
 
 llvm::Value* getNthArg(llvm::Function *func, int n);
+llvm::Value* getLastArg(llvm::Function *func);
 
 const llvm::Type* pointerType(const llvm::Type& type);
 
-llvm::FunctionType* llvmInternalFunctionType(const std::vector<TypeRef>& arg_types, TypeRef return_type, llvm::LLVMContext& context);
+const llvm::Type* voidPtrType(llvm::LLVMContext& context);
+
+llvm::FunctionType* llvmFunctionType(const std::vector<TypeRef>& arg_types, TypeRef return_type, llvm::LLVMContext& context,
+									 bool hidden_voidptr_arg);
 
 
 }; // end namespace LLVMTypeUtils

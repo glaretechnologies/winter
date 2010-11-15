@@ -16,7 +16,9 @@ namespace Winter
 {
 
 
-Linker::Linker()
+Linker::Linker(bool hidden_voidptr_arg_, void* env_)
+:	hidden_voidptr_arg(hidden_voidptr_arg_),
+	env(env_)
 {}
 
 
@@ -30,8 +32,17 @@ void Linker::addFunctions(BufferRoot& root)
 	{
 		Reference<FunctionDefinition> def = root.func_defs[i];
 
-		this->functions.insert(std::make_pair(def->sig, def));
+		addFunction(def);
+		//this->name_to_functions_map[def->sig.name].push_back(def);
+		//this->sig_to_function_map.insert(std::make_pair(def->sig, def));
 	}
+}
+
+
+void Linker::addFunction(const FunctionDefinitionRef& def)
+{
+	this->name_to_functions_map[def->sig.name].push_back(def);
+	this->sig_to_function_map.insert(std::make_pair(def->sig, def));
 }
 
 
@@ -39,22 +50,27 @@ void Linker::addExternalFunctions(vector<ExternalFunctionRef>& funcs)
 {
 	for(unsigned int i=0; i<funcs.size(); ++i)
 	{
-		/*vector<FunctionDefinition::FunctionArg> args;
-		for(int z=0; z<funcs[i].sig.param_types.size(); ++z)
-			args.push_back(FunctionDefinition::FunctionArg(funcs[i].sig.param_types[z], "arg_" + ::toString(z)));
+		ExternalFunctionRef& f = funcs[i];
+
+		vector<FunctionDefinition::FunctionArg> args;
+		for(size_t z=0; z<f->sig.param_types.size(); ++z)
+			args.push_back(FunctionDefinition::FunctionArg(f->sig.param_types[z], "arg_" + ::toString(z)));
 
 		Reference<FunctionDefinition> def(new FunctionDefinition(
-			funcs[i].sig.name,
+			f->sig.name,
 			args,
 			vector<Reference<LetASTNode>>(),
-			ASTNodeRef(NULL),
-			funcs[i].return_type,
+			ASTNodeRef(NULL), // body
+			f->return_type, // declared return type
 			NULL
 		));
-		//this->external_functions.insert(f[i].sig);
 
-		this->functions.insert(std::make_pair(funcs[i].sig, def));*/
-		this->external_functions.insert(std::make_pair(funcs[i]->sig, funcs[i]));
+		def->external_function = f;
+		//this->external_functions.insert(f[i].sig);
+		addFunction(def);
+
+		//this->functions.insert(std::make_pair(funcs[i].sig, def));*/
+		//this->external_functions.insert(std::make_pair(funcs[i]->sig, funcs[i]));
 	}
 }
 
@@ -64,13 +80,13 @@ void Linker::buildLLVMCode(llvm::Module* module)
 	PlatformUtils::CPUInfo cpu_info;
 	PlatformUtils::getCPUInfo(cpu_info);
 
-	for(Linker::FuncMapType::iterator it = this->functions.begin(); it != functions.end(); ++it)
+	for(Linker::SigToFuncMapType::iterator it = sig_to_function_map.begin(); it != sig_to_function_map.end(); ++it)
 	{
 		FunctionDefinition& f = *(*it).second;
 
-		if(!f.isGenericFunction())
+		if(!f.isGenericFunction() && !f.isExternalFunction())
 		{
-			f.buildLLVMFunction(module, cpu_info);
+			f.buildLLVMFunction(module, cpu_info, hidden_voidptr_arg);
 		}
 	}
 
@@ -79,7 +95,7 @@ void Linker::buildLLVMCode(llvm::Module* module)
 	{
 		assert(!concrete_funcs[i]->isGenericFunction());
 
-		concrete_funcs[i]->buildLLVMFunction(module, cpu_info);
+		concrete_funcs[i]->buildLLVMFunction(module, cpu_info, hidden_voidptr_arg);
 	}
 }
 
@@ -166,75 +182,82 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 				)// built in func impl
 			));
 
-			if(functions.find(sig) == functions.end())
+			if(sig_to_function_map.find(sig) == sig_to_function_map.end())
 			{
-				functions.insert(std::make_pair(
+				/*sig_to_function_map.insert(std::make_pair(
 					sig,
 					new_func_def
-				));
+				));*/
+				addFunction(new_func_def);
 			}
 		}
 	}
 
-	for(Linker::FuncMapType::iterator it = this->functions.begin(); it != functions.end(); ++it)
+	NameToFuncMapType::iterator res = this->name_to_functions_map.find(sig.name);
+	if(res != this->name_to_functions_map.end())
 	{
-		FunctionDefinition& f = *(*it).second;
-		//bool match = true;
-		if(f.sig.name == sig.name)
+		vector<FunctionDefinitionRef> funcs = res->second;
+		for(size_t z=0; z<funcs.size(); ++z)
 		{
-			if(f.sig.param_types.size() == sig.param_types.size())
+			FunctionDefinition& f = *funcs[z];
+			//bool match = true;
+			if(f.sig.name == sig.name)
 			{
-				bool match = true;
-				//std::map<int, TypeRef> types; // generic types
-				vector<TypeRef> type_mapping;
-
-				for(unsigned int i=0; match && (i<f.sig.param_types.size()); ++i)
+				if(f.sig.param_types.size() == sig.param_types.size())
 				{
-					/*if(f.sig.param_types[i]->getType() == Type::GenericTypeType)
+					bool match = true;
+					//std::map<int, TypeRef> types; // generic types
+					vector<TypeRef> type_mapping;
+
+					for(unsigned int i=0; match && (i<f.sig.param_types.size()); ++i)
 					{
-						GenericType* gt = dynamic_cast<GenericType*>(f.sig.param_types[i].getPointer());
-						assert(gt);
-						if(gt->genericTypeParamIndex() < (int)types.size() && types[gt->genericTypeParamIndex()].nonNull())
+						/*if(f.sig.param_types[i]->getType() == Type::GenericTypeType)
 						{
-							if(*types[gt->genericTypeParamIndex()] != *sig.param_types[i])
+							GenericType* gt = dynamic_cast<GenericType*>(f.sig.param_types[i].getPointer());
+							assert(gt);
+							if(gt->genericTypeParamIndex() < (int)types.size() && types[gt->genericTypeParamIndex()].nonNull())
+							{
+								if(*types[gt->genericTypeParamIndex()] != *sig.param_types[i])
+									match = false;
+							}
+							else
+							{
+								if(gt->genericTypeParamIndex() >= (int)types.size())
+									types.resize(gt->genericTypeParamIndex() + 1);
+								types[gt->genericTypeParamIndex()] = sig.param_types[i];
+							}
+						}
+						else // else concrete type
+						{
+							if(*f.sig.param_types[i] != *sig.param_types[i])
 								match = false;
+						}*/
+						const bool arg_match = f.sig.param_types[i]->matchTypes(*sig.param_types[i], type_mapping);
+						if(!arg_match)
+							match = false;
+					}
+
+					if(match)
+					{
+						if(f.isGenericFunction())
+						{
+							concrete_funcs.push_back(makeConcreteFunction(
+								funcs[z],
+								type_mapping
+							));
+
+							return concrete_funcs.back();
 						}
 						else
-						{
-							if(gt->genericTypeParamIndex() >= (int)types.size())
-								types.resize(gt->genericTypeParamIndex() + 1);
-							types[gt->genericTypeParamIndex()] = sig.param_types[i];
-						}
+							return funcs[z];
 					}
-					else // else concrete type
-					{
-						if(*f.sig.param_types[i] != *sig.param_types[i])
-							match = false;
-					}*/
-					const bool arg_match = f.sig.param_types[i]->matchTypes(*sig.param_types[i], type_mapping);
-					if(!arg_match)
-						match = false;
-				}
-
-				if(match)
-				{
-					if(f.isGenericFunction())
-					{
-						concrete_funcs.push_back(makeConcreteFunction(
-							(*it).second,
-							type_mapping
-						));
-
-						return concrete_funcs.back();
-					}
-					else
-						return (*it).second;
 				}
 			}
 		}
 	}
 
-	throw BaseException("Could not find " + sig.toString());
+//	throw BaseException("Could not find " + sig.toString());
+	return FunctionDefinitionRef();
 /*
 
 	Linker::FuncMapType::iterator res = this->functions.find(sig);
@@ -246,17 +269,32 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 }
 
 
-Reference<FunctionDefinition> Linker::findMatchingFunctionByName(const std::string& name)
+void Linker::getFuncsWithMatchingName(const std::string& name, vector<FunctionDefinitionRef>& funcs_out)
 {
-	for(Linker::FuncMapType::iterator it = this->functions.begin(); it != functions.end(); ++it)
+	/*for(Linker::FuncMapType::iterator it = this->functions.begin(); it != functions.end(); ++it)
 	{
-		FunctionDefinition& f = *(*it).second;
-		if(f.sig.name == name)
-			return it->second;
-	}
-
-	throw BaseException("Could not find function '" + name + "'");
+		FunctionDefinitionRef& f = (*it).second;
+		if(f->sig.name == name)
+			funcs_out.push_back(f);
+	}*/
+	NameToFuncMapType::iterator res = name_to_functions_map.find(name);
+	if(res != name_to_functions_map.end())
+		funcs_out = res->second;
 }
+
+
+//Reference<FunctionDefinition> Linker::findMatchingFunctionByName(const std::string& name)
+//{
+//	for(Linker::FuncMapType::iterator it = this->functions.begin(); it != functions.end(); ++it)
+//	{
+//		FunctionDefinition& f = *(*it).second;
+//		if(f.sig.name == name)
+//			return it->second;
+//	}
+//
+//	//throw BaseException("Could not find function '" + name + "'");
+//	return FunctionDefinitionRef();
+//}
 
 
 Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDefinition> generic_func, 
@@ -343,7 +381,7 @@ Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDef
 	{
 		// Rebind variables to get new type.
 		{
-		TraversalPayload payload(TraversalPayload::BindVariables);
+		TraversalPayload payload(TraversalPayload::BindVariables, hidden_voidptr_arg, env);
 		body->traverse(payload, 
 			std::vector<ASTNode*>(1, def) // stack
 		);
@@ -351,7 +389,7 @@ Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDef
 
 		// Relink, now that conrete types are known
 		{
-		TraversalPayload payload(TraversalPayload::LinkFunctions);
+		TraversalPayload payload(TraversalPayload::LinkFunctions, hidden_voidptr_arg, env);
 		payload.linker = this;
 		body->traverse(payload, 
 			std::vector<ASTNode*>(1, def) // stack
@@ -360,7 +398,7 @@ Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDef
 
 		// Type check again
 		{
-			TraversalPayload payload(TraversalPayload::TypeCheck);
+			TraversalPayload payload(TraversalPayload::TypeCheck, hidden_voidptr_arg, env);
 			body->traverse(payload, 
 				std::vector<ASTNode*>(1, def) // stack
 			);

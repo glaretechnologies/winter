@@ -59,11 +59,11 @@ int main(int argc, char** argv)
 		std::cout << "JIT'd function returned " << result << std::endl;
 
 
-		VMState vmstate;
+		VMState vmstate(true);
 		vmstate.func_args_start.push_back(0);
 
 		assert(maindef->built_llvm_function);
-		Value* retval = maindef->invoke(vmstate);
+		ValueRef retval = maindef->invoke(vmstate);
 
 		vmstate.func_args_start.pop_back();
 

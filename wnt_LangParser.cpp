@@ -674,7 +674,7 @@ ASTNodeRef LangParser::parseBasicExpression(const ParseInfo& p)
 TypeRef LangParser::parseType(const ParseInfo& p, const std::vector<std::string>& generic_type_params)
 {
 	const std::string t = parseIdentifier("type", p);
-	if(t == "float")
+	if(t == "float" || t == "real")
 		return TypeRef(new Float());
 	else if(t == "int")
 		return TypeRef(new Int());

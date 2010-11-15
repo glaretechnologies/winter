@@ -3,6 +3,7 @@
 
 
 #include "wnt_Type.h"
+#include "utils/refcounted.h"
 #include <string>
 #include <vector>
 #include <map>
@@ -17,7 +18,7 @@ namespace Winter
 class FunctionDefinition;
 
 
-class Value
+class Value : public RefCounted
 {
 public:
 	Value() {} // : refcount(1) {}
@@ -28,6 +29,9 @@ public:
 	
 	virtual const std::string toString() const { return "Value"; }
 };
+
+
+typedef Reference<Value> ValueRef;
 
 
 class IntValue : public Value
@@ -71,9 +75,9 @@ public:
 class MapValue : public Value
 {
 public:
-	MapValue(const std::map<Value*, Value*>& v) : value(v) {}
+	MapValue(const std::map<ValueRef, ValueRef>& v) : value(v) {}
 	virtual Value* clone() const { return new MapValue(value); }
-	std::map<Value*, Value*> value;
+	std::map<ValueRef, ValueRef> value;
 };
 
 
@@ -93,12 +97,12 @@ public:
 class StructureValue : public Value
 {
 public:
-	StructureValue(const vector<Value*>& fields_) : fields(fields_) {}
+	StructureValue(const vector<ValueRef>& fields_) : fields(fields_) {}
 	~StructureValue();
 	virtual Value* clone() const;
 	virtual const std::string toString() const { return "struct"; }
 
-	vector<Value*> fields;
+	vector<ValueRef> fields;
 };
 
 
@@ -106,12 +110,12 @@ class ArrayValue : public Value
 {
 public:
 	ArrayValue(){}
-	ArrayValue(const vector<Value*>& e_) : e(e_) {}
+	ArrayValue(const vector<ValueRef>& e_) : e(e_) {}
 	~ArrayValue();
 	virtual Value* clone() const;
 	virtual const std::string toString() const;
 
-	vector<Value*> e;
+	vector<ValueRef> e;
 };
 
 
@@ -119,12 +123,25 @@ class VectorValue : public Value
 {
 public:
 	VectorValue(){}
-	VectorValue(const vector<Value*>& e_) : e(e_) {}
+	VectorValue(const vector<ValueRef>& e_) : e(e_) {}
 	~VectorValue();
 	virtual Value* clone() const;
 	virtual const std::string toString() const;
 
-	vector<Value*> e;
+	vector<ValueRef> e;
 };
+
+
+class VoidPtrValue : public Value
+{
+public:
+	VoidPtrValue(void* v) : value(v) {}
+	virtual Value* clone() const { return new VoidPtrValue(value); }
+	virtual const std::string toString() const;
+	void* value;
+};
+
+
+
 
 }

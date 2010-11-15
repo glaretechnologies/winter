@@ -4,6 +4,7 @@
 #include "utils/stringutils.h"
 #include "BaseException.h"
 #include "llvm/Constants.h"
+#include "LLVMTypeUtils.h"
 #include <vector>
 
 
@@ -299,8 +300,7 @@ bool VoidPtrType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) 
 
 const llvm::Type* VoidPtrType::LLVMType(llvm::LLVMContext& context) const
 {
-	// Not sure if LLVM has a pointer to void type, so just use a pointer to int32.
-	return llvm::Type::getInt32PtrTy(context);
+	return LLVMTypeUtils::voidPtrType(context);
 }
 
 

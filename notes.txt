@@ -32,11 +32,33 @@ f(1, 2) =>  f(1.0, 2.0)
 iff there are no other functions such as f(float, int), or f(int, int) etc.., e.g. as long as the overloading 
 is not ambiguous.
 
+Recursive type promotion:
+1.0 + (2 + 3)
+1.0 + 5          [replacement of constant subexprssion with literal]
+1.0 + 5.0        [type promotion]
+
+1.0 + 2 + 3
+1.0 + 2.0 + 3    [type promotion]
+3.0 + 3          [replacement of constant subexprssion with literal]
+3.0 + 3.0        [type promotion]
+6.0              [replacement of constant subexprssion with literal]
+
+
+1.0 / 2
+
 
 Float -> Int
 ------------
 Since floats can rarely be represented exactly as ints, and truncation may not be the desired behaviour for negative numbers,
 type coercion of this kind should *not* be done.
+
+
+
+Constant Folding
+================
+1 + 2
+->
+3
 
 
 
