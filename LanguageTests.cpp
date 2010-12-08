@@ -580,8 +580,40 @@ float test()
 
 void LanguageTests::run()
 {
+
+// test op_add
+	testMainFloat("struct s { float x, float y } \n\
+				  def op_add(s a, s b) : s(a.x + b.x, a.y + b.y) \n\
+				  def main() float : x(s(1, 2) + s(3, 4))", 4.0f);
+
+	// test op_mul
+	testMainFloat("struct s { float x, float y } \n\
+				  def op_mul(s a, s b) : s(a.x * b.x, a.y * b.y) \n\
+				  def main() float : x(s(2, 3) * s(3, 4))", 6.0f);
+
+	// Test op_sub
+	testMainFloat("struct s { float x, float y } \n\
+				  def op_sub(s a, s b) : s(a.x - b.x, a.y - b.y) \n\
+				  def main() float : x(s(2, 3) - s(3, 4))", -1.0f);
+
+	// Test op_div
+	testMainFloat("struct s { float x, float y } \n\
+				  def op_div(s a, s b) : s(a.x / b.x, a.y / b.y) \n\
+				  def main() float : x(s(2, 3) / s(3, 4))", 2.0f / 3.0f);
+
+	// sqrt
 	testMainFloat("def main() float : sqrt(9.0)", std::sqrt(9.0f));
+
+	//pow
 	testMainFloat("def main() float : pow(2.4, 3.0)", std::pow(2.4f, 3.0f));
+	testMainFloat("def main() float : pow(2.0, 3.0)", std::pow(2.0f, 3.0f));
+
+	// sin
+	testMainFloat("def main() float : sin(1.0f)", std::sin(1.0f));
+
+	// cos
+	testMainFloat("def main() float : cos(1.0f)", std::cos(1.0f));
+
 	testMainFloat("def f(float x) float : x*x         def main() float : f(10)", 100.0);
 	testMainFloat("def f(float x, float y) float : 1.0f   \n\
 				  def f(float x, int y) float : 2.0f   \n\
@@ -819,14 +851,17 @@ void LanguageTests::run()
 	// Test let
 	testMainFloat("def f(float x) float : \
 				  let z = 2.0 \
+				  in \
 				  z \
 				  def main() float : f(0.0)", 2.0);
 
 	// Test two let clauses
 	testMainFloat("def f(float x) float : \
-				  let z = 2.0 \
-				  let y = 3.0 \
-				  y \
+				  let	\
+					z = 2.0 \
+					y = 3.0 \
+				  in \
+					y \
 				  def main() float : f(0.0)", 3.0);
 
 	// Test Lambda in let
@@ -835,27 +870,27 @@ void LanguageTests::run()
 
 	// Test addition expression in let
 	testMainFloat("def f(float x) float : \
-				  let z = 2.0 + 3.0 \
+				  let z = 2.0 + 3.0 in\
 				  z \
 				  def main() float : f(0.0)", 5.0);
 
 	// Test function expression in let
 	testMainFloat("	def g(float x) float : x + 1.0 \
 					def f(float x) float : \
-					let z = g(1.0) \
+					let z = g(1.0) in \
 					z \
 					def main() float : f(0.0)", 2.0);
 
 	// Test function argument in let
 	testMainFloat("	def f(float x) float : \
-					let z = x + 1.0 \
+					let z = x + 1.0 in\
 					z \
 					def main() float : f(2.0)", 3.0);
 
 
 	// Test use of let variable twice
 	testMainFloat("	def f(float x) float : \
-				  let z = x + 1.0 \
+				  let z = x + 1.0 in\
 				  z + z\
 				  def main() float : f(2.0)", 6.0);
 
@@ -877,7 +912,7 @@ void LanguageTests::run()
 	// Test field access with '.' applied to a variable.
 	testMainFloat("struct Complex { float re, float im } \n\
  				  def main() float : \n\
-					let z = Complex(2.0, 3.0) \n\
+					let z = Complex(2.0, 3.0) in \n\
 					z.im", 3.0f);
 
 	// Test field access with '.' applied to a structure literal.
@@ -901,10 +936,10 @@ void LanguageTests::run()
 
 	// Test vector
 	testMainFloat("	def main() float : \
-					let x = [1.0, 2.0, 3.0, 4.0]v \
+					let x = [1.0, 2.0, 3.0, 4.0]v in\
 					e0(x)", 1.0f);
 	testMainFloat("	def main() float : \
-					let x = [1.0, 2.0, 3.0, 4.0]v \
+					let x = [1.0, 2.0, 3.0, 4.0]v in \
 					e1(x)", 2.0f);
 
 	// Test vector being returned from a function
@@ -914,13 +949,13 @@ void LanguageTests::run()
 	// Test vector addition
 	testMainFloat("	def main() float : \
 					let x = [1.0, 2.0, 3.0, 4.0]v \
-					let y = [10.0, 20.0, 30.0, 40.0]v \
+					y = [10.0, 20.0, 30.0, 40.0]v in\
 					e1(x + y)", 22.0f);
 
 	// Test vector subtraction
 	testMainFloat("	def main() float : \
 					let x = [1.0, 2.0, 3.0, 4.0]v \
-					let y = [10.0, 20.0, 30.0, 40.0]v \
+					y = [10.0, 20.0, 30.0, 40.0]v in \
 					e1(x - y)", -18.0f);
 
 	// Test vector * float multiplication
@@ -932,51 +967,51 @@ void LanguageTests::run()
 	// Test vector * vector multiplication
 	testMainFloat("	def main() float : \
 				  let x = [1.0, 2.0, 3.0, 4.0]v \
-				  let y = [10.0, 20.0, 30.0, 40.0]v \
+				  y = [10.0, 20.0, 30.0, 40.0]v in\
 				e1(x * y)", 2.0f * 20.0f);
 
 	// Test vector * scalar multiplication
 	testMainFloat("	def mul(vector<float, 4> v, float x) vector<float, 4> : v * [x, x, x, x]v \n\
 					def main() float : \
 						let x = [1.0, 2.0, 3.0, 4.0]v \
-						let y = 10.0 \
+						y = 10.0 in \
 						mul(x, y).e1", 2.0f * 10.0f);
 
 	testMainFloatArg("	def mul(vector<float, 4> v, float x) vector<float, 4> : v * [x, x, x, x]v \n\
 				  def main(float x) float : \
-				  let v = [1.0, 2.0, 3.0, 4.0]v \
+				  let v = [1.0, 2.0, 3.0, 4.0]v in\
 				  e1(mul(v, x))", 10.0f, 2.0f * 10.0f);
 
 	// Try dot product
 	testMainFloatArg("	def main(float x) float : \
-					 let v = [x, x, x, x]v \
+					 let v = [x, x, x, x]v in\
 					 dot(v, v)", 2.0f, 16.0f);
 
 	// Test vector min
 	testMainFloat("	def main() float : \
 					 let a = [1.0, 2.0, 3.0, 4.0]v \
-					 let b = [11.0, 12.0, 13.0, 14.0]v \
+					 b = [11.0, 12.0, 13.0, 14.0]v in\
 					 e2(min(a, b))", 3.0);
 	testMainFloat("	def main() float : \
 				  let a = [1.0, 2.0, 3.0, 4.0]v \
-				  let b = [11.0, 12.0, 13.0, 14.0]v \
+				  b = [11.0, 12.0, 13.0, 14.0]v in \
 				  e2(min(b, a))", 3.0);
 
 	// Test vector max
 	testMainFloat("	def main() float : \
 				  let a = [1.0, 2.0, 3.0, 4.0]v \
-				  let b = [11.0, 12.0, 13.0, 14.0]v \
+				  b = [11.0, 12.0, 13.0, 14.0]v in \
 				  e2(max(a, b))", 13.0);
 	testMainFloat("	def main() float : \
 				  let a = [1.0, 2.0, 3.0, 4.0]v \
-				  let b = [11.0, 12.0, 13.0, 14.0]v \
+				  b = [11.0, 12.0, 13.0, 14.0]v in \
 				  e2(max(b, a))", 13.0);
 				  
 
 	testMainFloat("	def clamp(vector<float, 4> x, vector<float, 4> lowerbound, vector<float, 4> upperbound) vector<float, 4> : max(lowerbound, min(upperbound, x))  \n\
 					def make_v4f(float x) vector<float, 4> : [x, x, x, x]v  \n\
 					def main() float : \
-					let a = [1.0, 2.0, 3.0, 4.0]v \
+					let a = [1.0, 2.0, 3.0, 4.0]v in\
 					e2(clamp(a, make_v4f(2.0), make_v4f(2.5)))", 2.5);
 
 	testMainFloat("	struct PolarisationVec { vector<float, 8> e } \n\
@@ -985,15 +1020,15 @@ void LanguageTests::run()
 																																					\n\
 					def clamp(PolarisationVec x, float lowerbound, float upperbound) PolarisationVec : \n\
 						let lo = [e0(e(x)), e1(e(x)), e2(e(x)), e3(e(x))]v   \n\
-						let hi = [e4(e(x)), e5(e(x)), e6(e(x)), e7(e(x))]v    \n\
-						let clamped_lo = clamp(lo, make_v4f(lowerbound), make_v4f(upperbound))   \n\
-						let clamped_hi = clamp(hi, make_v4f(lowerbound), make_v4f(upperbound))   \n\
+						hi = [e4(e(x)), e5(e(x)), e6(e(x)), e7(e(x))]v   \n\
+						clamped_lo = clamp(lo, make_v4f(lowerbound), make_v4f(upperbound))   \n\
+						clamped_hi = clamp(hi, make_v4f(lowerbound), make_v4f(upperbound))  in \n\
 						PolarisationVec([e0(clamped_lo), e1(clamped_lo), e2(clamped_lo), e3(clamped_lo), e0(clamped_hi), e1(clamped_hi), e2(clamped_hi), e3(clamped_hi)]v)   \n\
 																																												\n\
 				  def make_v4f(float x) vector<float, 4> : [x, x, x, x]v  \n\
 																		\n\
 				  def main() float : \
-					let a = PolarisationVec([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]v) \
+					let a = PolarisationVec([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]v) in \
 					e5(e(clamp(a, 2.0, 2.5)))", 2.5);
 
 	//class PolarisationVec

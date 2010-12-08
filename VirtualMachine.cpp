@@ -47,18 +47,18 @@ namespace Winter
 {
 
 
-static ValueRef powWrapper(const vector<ValueRef>& arg_values)
-{
-	//assert(arg_values.size() == 2);
-	assert(dynamic_cast<const FloatValue*>(arg_values[0].getPointer()));
-	assert(dynamic_cast<const FloatValue*>(arg_values[1].getPointer()));
-
-	// Cast argument 0 to type FloatValue
-	const FloatValue* a = static_cast<const FloatValue*>(arg_values[0].getPointer());
-	const FloatValue* b = static_cast<const FloatValue*>(arg_values[1].getPointer());
-
-	return ValueRef(new FloatValue(std::pow(a->value, b->value)));
-}
+//static ValueRef powWrapper(const vector<ValueRef>& arg_values)
+//{
+//	//assert(arg_values.size() == 2);
+//	assert(dynamic_cast<const FloatValue*>(arg_values[0].getPointer()));
+//	assert(dynamic_cast<const FloatValue*>(arg_values[1].getPointer()));
+//
+//	// Cast argument 0 to type FloatValue
+//	const FloatValue* a = static_cast<const FloatValue*>(arg_values[0].getPointer());
+//	const FloatValue* b = static_cast<const FloatValue*>(arg_values[1].getPointer());
+//
+//	return ValueRef(new FloatValue(std::pow(a->value, b->value)));
+//}
 
 
 VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
@@ -92,14 +92,14 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 	//TEMP: add some more external functions
 
 	// Add powf
-	{
+	/*{
 		ExternalFunctionRef f(new ExternalFunction());
 		f->func = (void*)(float(*)(float, float))std::powf;
 		f->interpreted_func = powWrapper;
 		f->return_type = TypeRef(new Float());
 		f->sig = FunctionSignature("pow", vector<TypeRef>(2, TypeRef(new Float())));
 		this->external_functions.push_back(f);
-	}
+	}*/
 
 	for(unsigned int i=0; i<this->external_functions.size(); ++i)
 		addExternalFunction(this->external_functions[i], *this->llvm_context, *this->llvm_module);
@@ -193,6 +193,28 @@ void VirtualMachine::loadSource(const std::string& source)
 		root->traverse(payload, stack);
 		assert(stack.size() == 0);
 	}
+
+	// Do Operator overloading conversion
+	bool op_overloading_changed_tree = false;
+	{
+		std::vector<ASTNode*> stack;
+		TraversalPayload payload(TraversalPayload::OperatorOverloadConversion, hidden_voidptr_arg, env);
+		root->traverse(payload, stack);
+		assert(stack.size() == 0);
+
+		op_overloading_changed_tree = payload.tree_changed;
+	}
+	
+	// Link functions again if tree has changed due to operator overloading conversion
+	if(op_overloading_changed_tree)
+	{
+		std::vector<ASTNode*> stack;
+		TraversalPayload payload(TraversalPayload::LinkFunctions, hidden_voidptr_arg, env);
+		payload.linker = &linker;
+		root->traverse(payload, stack);
+		assert(stack.size() == 0);
+	}
+
 
 //	rootref->print(0, std::cout);
 

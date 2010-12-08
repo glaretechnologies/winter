@@ -74,6 +74,7 @@ private:
 
 	Reference<ASTNode> parseFunctionExpression(const ParseInfo& parseinfo);
 
+	Reference<ASTNode> parseLetBlock(const ParseInfo& parseinfo);
 	Reference<ASTNode> parseExpression(const ParseInfo& parseinfo);
 	ASTNodeRef parseBasicExpression(const ParseInfo& parseinfo);
 

@@ -59,7 +59,7 @@ void Linker::addExternalFunctions(vector<ExternalFunctionRef>& funcs)
 		Reference<FunctionDefinition> def(new FunctionDefinition(
 			f->sig.name,
 			args,
-			vector<Reference<LetASTNode>>(),
+			//vector<Reference<LetASTNode>>(),
 			ASTNodeRef(NULL), // body
 			f->return_type, // declared return type
 			NULL
@@ -173,7 +173,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 			FunctionDefinitionRef new_func_def(new FunctionDefinition(
 				sig.name, // name
 				args,
-				vector<Reference<LetASTNode> >(), // lets
+				//vector<Reference<LetASTNode> >(), // lets
 				ASTNodeRef(NULL), // body expr
 				vec_type->t, // declared return type
 				new GetVectorElement(
@@ -371,7 +371,7 @@ Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDef
 	FunctionDefinition* def = new FunctionDefinition(
 		generic_func->sig.name, // name
 		args, // args
-		vector<Reference<LetASTNode> >(), // lets
+		//vector<Reference<LetASTNode> >(), // lets
 		body,
 		concrete_declared_ret_type, // return type
 		built_in_impl // built in func impl

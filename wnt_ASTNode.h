@@ -53,7 +53,8 @@ public:
 		TypeCoercion,
 		TypeCheck,
 		ConstantFolding,
-		SubstituteType // for making concrete types out of generic types.
+		SubstituteType, // for making concrete types out of generic types.
+		OperatorOverloadConversion // Converting '+' to op_add
 	};
 
 	TraversalPayload(Operation e, bool hidden_voidptr_arg_, void* env_) : operation(e), tree_changed(false), hidden_voidptr_arg(hidden_voidptr_arg_), env(env_) {}
@@ -118,7 +119,8 @@ public:
 		UnaryMinusExpressionType,
 		LetType,
 		ComparisonExpressionType,
-		AnonFunctionType
+		AnonFunctionType,
+		LetBlockType
 	};
 
 	virtual ASTNodeType nodeType() const = 0;
@@ -150,6 +152,7 @@ typedef Reference<ASTNode> ASTNodeRef;
 
 
 class FunctionDefinition;
+class LetBlock;
 
 
 class BufferRoot : public ASTNode
@@ -204,7 +207,7 @@ public:
 	};
 
 	FunctionDefinition(const std::string& name, const std::vector<FunctionArg>& args, 
-		const vector<Reference<LetASTNode> >& lets,
+		//const vector<Reference<LetASTNode> >& lets,
 		const ASTNodeRef& body, 
 		const TypeRef& declared_rettype, // May be null, if return type is to be inferred.
 		BuiltInFunctionImpl* impl);
@@ -217,7 +220,7 @@ public:
 	ASTNodeRef body;
 	TypeRef declared_return_type;
 	TypeRef function_type;
-	vector<Reference<LetASTNode> > lets;
+	//vector<Reference<LetASTNode> > lets;
 
 	FunctionSignature sig;
 	BuiltInFunctionImpl* built_in_func_impl;
@@ -249,9 +252,9 @@ public:
 	llvm::Function* built_llvm_function;
 	void* jitted_function;
 
-	llvm::Value* getLetExpressionLLVMValue(EmitLLVMCodeParams& params, unsigned int let_index);
+//	llvm::Value* getLetExpressionLLVMValue(EmitLLVMCodeParams& params, unsigned int let_index);
 
-	std::vector<llvm::Value*> let_exprs_llvm_value;
+//	std::vector<llvm::Value*> let_exprs_llvm_value;
 };
 
 typedef Reference<FunctionDefinition> FunctionDefinitionRef;
@@ -264,6 +267,7 @@ class FunctionExpression : public ASTNode
 {
 public:
 	FunctionExpression();
+	FunctionExpression(const std::string& func_name, const ASTNodeRef& arg0, const ASTNodeRef& arg1); // 2-arg function
 
 	bool doesFunctionTypeMatch(TypeRef& type);
 
@@ -326,14 +330,16 @@ public:
 	virtual Reference<ASTNode> clone();
 	virtual bool isConstant() const { return false; }
 
-	FunctionDefinition* parent_function; // Function for which the variable is an argument of,
 	// or for what it is a let of.
 	//AnonFunction* parent_anon_function;
 	//ASTNode* referenced_var;
 	//TypeRef referenced_var_type; // Type of the variable.
 	VariableType vartype; // let or arg.
 
-	int argument_index; // index in parent function definition argument list.
+	FunctionDefinition* bound_function; // Function for which the variable is an argument of,
+	LetBlock* bound_let_block;
+
+	int bound_index; // index in parent function definition argument list.
 	//int argument_offset; // Currently, a variable must be an argument to the enclosing function
 	string name; // variable name.
 };
@@ -608,6 +614,31 @@ public:
 	Reference<TokenBase> token;
 	ASTNodeRef a;
 	ASTNodeRef b;
+};
+
+
+class LetBlock : public ASTNode
+{
+public:
+	LetBlock(ASTNodeRef& e, vector<Reference<LetASTNode> > lets_) : expr(e), lets(lets_) {
+		let_exprs_llvm_value = vector<llvm::Value*>(lets_.size(), NULL); }
+
+	virtual ValueRef exec(VMState& vmstate);
+	virtual ASTNodeType nodeType() const { return LetBlockType; }
+	virtual TypeRef type() const { return expr->type(); }
+	virtual void print(int depth, std::ostream& s) const;
+	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+	virtual Reference<ASTNode> clone();
+	virtual bool isConstant() const;
+
+	vector<Reference<LetASTNode> > lets;
+
+	llvm::Value* getLetExpressionLLVMValue(EmitLLVMCodeParams& params, unsigned int let_index);
+
+	std::vector<llvm::Value*> let_exprs_llvm_value;
+
+	ASTNodeRef expr;
 };
 
 

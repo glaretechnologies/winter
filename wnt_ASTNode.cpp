@@ -138,6 +138,69 @@ void checkFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
 }
 
 
+void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload)
+{
+	if(e.isNull())
+		return;
+
+	switch(e->nodeType())
+	{
+	case ASTNode::AdditionExpressionType:
+	{
+		AdditionExpression* expr = static_cast<AdditionExpression*>(e.getPointer());
+		if(expr->a->type().nonNull() && expr->b->type().nonNull())
+			if(*expr->a->type() == *expr->b->type()) // If a and b have the same types
+				if(expr->a->type()->getType() == Type::StructureTypeType)
+				{
+					// Replace expr with an op_add function call.
+					e = ASTNodeRef(new FunctionExpression("op_add", expr->a, expr->b));
+					payload.tree_changed = true;
+				}
+		break;
+	}
+	case ASTNode::SubtractionExpressionType:
+	{
+		SubtractionExpression* expr = static_cast<SubtractionExpression*>(e.getPointer());
+		if(expr->a->type().nonNull() && expr->b->type().nonNull())
+			if(*expr->a->type() == *expr->b->type()) // If a and b have the same types
+				if(expr->a->type()->getType() == Type::StructureTypeType)
+				{
+					// Replace expr with an op_add function call.
+					e = ASTNodeRef(new FunctionExpression("op_sub", expr->a, expr->b));
+					payload.tree_changed = true;
+				}
+		break;
+	}
+	case ASTNode::MulExpressionType:
+	{
+		MulExpression* expr = static_cast<MulExpression*>(e.getPointer());
+		if(expr->a->type().nonNull() && expr->b->type().nonNull())
+			if(*expr->a->type() == *expr->b->type()) // If a and b have the same types
+				if(expr->a->type()->getType() == Type::StructureTypeType)
+				{
+					// Replace expr with an op_add function call.
+					e = ASTNodeRef(new FunctionExpression("op_mul", expr->a, expr->b));
+					payload.tree_changed = true;
+				}
+		break;
+	}
+	case ASTNode::DivExpressionType:
+	{
+		DivExpression* expr = static_cast<DivExpression*>(e.getPointer());
+		if(expr->a->type().nonNull() && expr->b->type().nonNull())
+			if(*expr->a->type() == *expr->b->type()) // If a and b have the same types
+				if(expr->a->type()->getType() == Type::StructureTypeType)
+				{
+					// Replace expr with an op_add function call.
+					e = ASTNodeRef(new FunctionExpression("op_div", expr->a, expr->b));
+					payload.tree_changed = true;
+				}
+		break;
+	}
+	};
+}
+
+
 template <class T> 
 T cast(ValueRef& v)
 {
@@ -220,11 +283,11 @@ bool BufferRoot::isConstant() const
 
 
 FunctionDefinition::FunctionDefinition(const std::string& name, const std::vector<FunctionArg>& args_, 
-									   const vector<Reference<LetASTNode> >& lets_,
+									   //const vector<Reference<LetASTNode> >& lets_,
 									   const ASTNodeRef& body_, const TypeRef& declared_rettype, 
 									   BuiltInFunctionImpl* impl)
 :	args(args_),
-	lets(lets_),
+	//lets(lets_),
 	body(body_),
 	declared_return_type(declared_rettype),
 	built_in_func_impl(impl),
@@ -238,7 +301,7 @@ FunctionDefinition::FunctionDefinition(const std::string& name, const std::vecto
 	// TODO: fix this, make into method
 	function_type = TypeRef(new Function(sig.param_types, declared_rettype));
 
-	this->let_exprs_llvm_value = std::vector<llvm::Value*>(this->lets.size(), NULL);
+	//this->let_exprs_llvm_value = std::vector<llvm::Value*>(this->lets.size(), NULL);
 }
 
 
@@ -298,21 +361,21 @@ ValueRef FunctionDefinition::invoke(VMState& vmstate)
 
 	
 	// Evaluate let clauses, which will each push the result onto the let stack
-	vmstate.let_stack_start.push_back(vmstate.let_stack.size()); // Push let frame index
-	for(unsigned int i=0; i<lets.size(); ++i)
-		vmstate.let_stack.push_back(lets[i]->exec(vmstate));
+	//vmstate.let_stack_start.push_back(vmstate.let_stack.size()); // Push let frame index
+	//for(unsigned int i=0; i<lets.size(); ++i)
+	//	vmstate.let_stack.push_back(lets[i]->exec(vmstate));
 
 	// Execute body of function
 	ValueRef ret = body->exec(vmstate);
 
 	// Pop things off let stack
-	for(unsigned int i=0; i<lets.size(); ++i)
-	{
-		//delete vmstate.let_stack.back();
-		vmstate.let_stack.pop_back();
-	}
-	// Pop let frame index
-	vmstate.let_stack_start.pop_back();
+	//for(unsigned int i=0; i<lets.size(); ++i)
+	//{
+	//	//delete vmstate.let_stack.back();
+	//	vmstate.let_stack.pop_back();
+	//}
+	//// Pop let frame index
+	//vmstate.let_stack_start.pop_back();
 
 	return ret;
 }
@@ -347,6 +410,10 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 		if(!this->isGenericFunction())
 			checkFoldExpression(body, payload);
 	}
+	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	{
+		convertOverloadedOperators(body, payload);
+	}
 
 	if(payload.operation == TraversalPayload::TypeCheck)
 	{
@@ -380,8 +447,8 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 
 	stack.push_back(this);
 
-	for(unsigned int i=0; i<lets.size(); ++i)
-		lets[i]->traverse(payload, stack);
+	//for(unsigned int i=0; i<lets.size(); ++i)
+	//	lets[i]->traverse(payload, stack);
 
 	if(this->body.nonNull()) // !this->built_in_func_impl)
 		this->body->traverse(payload, stack);
@@ -418,8 +485,8 @@ void FunctionDefinition::print(int depth, std::ostream& s) const
 	if(this->declared_return_type.nonNull())
 		s << " (Declared ret type: " + this->declared_return_type->toString() << ")";
 	s << "\n";
-	for(unsigned int i=0; i<this->lets.size(); ++i)
-		lets[i]->print(depth + 1, s);
+	//for(unsigned int i=0; i<this->lets.size(); ++i)
+	//	lets[i]->print(depth + 1, s);
 
 	if(this->built_in_func_impl)
 	{
@@ -665,7 +732,7 @@ bool FunctionDefinition::isGenericFunction() const // true if it is parameterise
 }
 
 
-llvm::Value* FunctionDefinition::getLetExpressionLLVMValue(EmitLLVMCodeParams& params, unsigned int let_index)
+/*llvm::Value* FunctionDefinition::getLetExpressionLLVMValue(EmitLLVMCodeParams& params, unsigned int let_index)
 {
 	if(let_exprs_llvm_value[let_index] == NULL)
 	{
@@ -673,7 +740,7 @@ llvm::Value* FunctionDefinition::getLetExpressionLLVMValue(EmitLLVMCodeParams& p
 	}
 
 	return let_exprs_llvm_value[let_index];
-}
+}*/
 
 
 bool FunctionDefinition::isConstant() const
@@ -691,6 +758,17 @@ FunctionExpression::FunctionExpression()
 	argument_index(-1),
 	binding_type(Unbound)
 {
+}
+
+
+FunctionExpression::FunctionExpression(const std::string& func_name, const ASTNodeRef& arg0, const ASTNodeRef& arg1) // 2-arg function
+:	target_function(NULL),
+	argument_index(-1),
+	binding_type(Unbound)
+{
+	function_name = func_name;
+	argument_expressions.push_back(arg0);
+	argument_expressions.push_back(arg1);
 }
 
 
@@ -840,20 +918,20 @@ void FunctionExpression::linkFunctions(Linker& linker, std::vector<ASTNode*>& st
 			FunctionDefinition* def = dynamic_cast<FunctionDefinition*>(stack[i]);
 			if(def != NULL)
 			{
-				for(unsigned int i=0; i<def->lets.size(); ++i)
-					if(def->lets[i]->variable_name == this->function_name && doesFunctionTypeMatch(def->lets[i]->type()))
-					{
-						this->argument_index = i;
-						//this->argument_offset = (int)def->lets.size() - i;
-						this->binding_type = Let;
-						// We know this lets_i body is a FunctionDefinition.
-						FunctionDefinition* let_def = dynamic_cast<FunctionDefinition*>(def->lets[i]->expr.getPointer());
-						//Function* let_func_type = dynamic_cast<Function*>(def->lets[i]->type().getPointer());
-						//if(!let_func_type)
-						//	throw BaseException(this->function_name + " used in function expression is not a function.");
-						this->target_function_return_type = let_def->returnType();
-						found_binding = true;
-					}
+				//for(unsigned int i=0; i<def->lets.size(); ++i)
+				//	if(def->lets[i]->variable_name == this->function_name && doesFunctionTypeMatch(def->lets[i]->type()))
+				//	{
+				//		this->argument_index = i;
+				//		//this->argument_offset = (int)def->lets.size() - i;
+				//		this->binding_type = Let;
+				//		// We know this lets_i body is a FunctionDefinition.
+				//		FunctionDefinition* let_def = dynamic_cast<FunctionDefinition*>(def->lets[i]->expr.getPointer());
+				//		//Function* let_func_type = dynamic_cast<Function*>(def->lets[i]->type().getPointer());
+				//		//if(!let_func_type)
+				//		//	throw BaseException(this->function_name + " used in function expression is not a function.");
+				//		this->target_function_return_type = let_def->returnType();
+				//		found_binding = true;
+				//	}
 
 				for(unsigned int i=0; i<def->args.size(); ++i)
 					if(def->args[i].name == this->function_name && doesFunctionTypeMatch(def->args[i].type))
@@ -953,6 +1031,12 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 				payload.tree_changed = true;
 			}
 	}
+	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	{
+		for(size_t i=0; i<argument_expressions.size(); ++i)
+			convertOverloadedOperators(argument_expressions[i], payload);
+	}
+
 
 
 	// NOTE: we want to do a post-order traversal here.
@@ -1122,8 +1206,9 @@ Variable::Variable(const std::string& name_)
 	//referenced_var(NULL),
 	name(name_),
 	//argument_offset(-1),
-	argument_index(-1),
-	parent_function(NULL)
+	bound_index(-1),
+	bound_function(NULL),
+	bound_let_block(NULL)
 	//parent_anon_function(NULL)
 {
 /*	ASTNode* c = parent;
@@ -1168,35 +1253,45 @@ void Variable::bindVariables(const std::vector<ASTNode*>& stack)
 	for(int i = (int)stack.size() - 1; i >= 0; --i)
 	{
 		{
-			FunctionDefinition* def = dynamic_cast<FunctionDefinition*>(stack[i]);
-			if(def != NULL)
+			if(FunctionDefinition* def = dynamic_cast<FunctionDefinition*>(stack[i]))
 			{
-				for(unsigned int i=0; i<def->lets.size(); ++i)
-					if(def->lets[i]->variable_name == this->name)
-					{
-						this->argument_index = i;
-						//this->argument_offset = (int)def->lets.size() - i;
-						//this->referenced_var_type = def->lets[i]->type();
-						this->vartype = LetVariable;
-						this->parent_function = def;
-						return;
-					}
+				//for(unsigned int i=0; i<def->lets.size(); ++i)
+				//	if(def->lets[i]->variable_name == this->name)
+				//	{
+				//		this->argument_index = i;
+				//		//this->argument_offset = (int)def->lets.size() - i;
+				//		//this->referenced_var_type = def->lets[i]->type();
+				//		this->vartype = LetVariable;
+				//		this->parent_function = def;
+				//		return;
+				//	}
 
 				for(unsigned int i=0; i<def->args.size(); ++i)
 					if(def->args[i].name == this->name)
 					{
-						this->argument_index = i;
-						//this->argument_offset = (int)def->args.size() - i;
-						//is->referenced_var_type = def->args[i].type;
 						this->vartype = ArgumentVariable;
-						this->parent_function = def;
+						this->bound_index = i;
+						this->bound_function = def;
 						return;
 					}
 
-				if(this->argument_index == -1)
-					throw BaseException("No such function argument '" + this->name + "'");
 			}
+			else if(LetBlock* let_block = dynamic_cast<LetBlock*>(stack[i]))
+			{
+				for(unsigned int i=0; i<let_block->lets.size(); ++i)
+					if(let_block->lets[i]->variable_name == this->name)
+					{
+						this->vartype = LetVariable;
+						this->bound_index = i;
+						this->bound_let_block = let_block;
+						return;
+					}
+			}
+			
 		}
+
+		//if(this->bound_index == -1)
+		//	throw BaseException("No such function argument or let expression '" + this->name + "'");
 
 #if 0
 		{
@@ -1244,22 +1339,22 @@ void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 
 ValueRef Variable::exec(VMState& vmstate)
 {
-	assert(this->argument_index >= 0);
+	assert(this->bound_index >= 0);
 
 	if(this->vartype == ArgumentVariable)
 	{
-		return vmstate.argument_stack[vmstate.func_args_start.back() + argument_index];
+		return vmstate.argument_stack[vmstate.func_args_start.back() + bound_index];
 	}
 	else
 	{
-		return vmstate.let_stack[vmstate.let_stack_start.back() + argument_index];
+		return vmstate.let_stack[vmstate.let_stack_start.back() + bound_index];
 	}
 }
 
 
 TypeRef Variable::type() const
 {
-	assert(this->argument_index >= 0);
+	assert(this->bound_index >= 0);
 	//assert(referenced_var_type.nonNull());
 
 	//if(!this->referenced_var)
@@ -1268,9 +1363,9 @@ TypeRef Variable::type() const
 	//return this->referenced_var_type;
 
 	if(this->vartype == LetVariable)
-		return this->parent_function->lets[this->argument_index]->type();
+		return this->bound_let_block->lets[this->bound_index]->type();
 	else if(this->vartype == ArgumentVariable)
-		return this->parent_function->args[this->argument_index].type;
+		return this->bound_function->args[this->bound_index].type;
 	else
 	{
 		assert(!"invalid vartype.");
@@ -1288,7 +1383,7 @@ inline static const std::string varType(Variable::VariableType t)
 void Variable::print(int depth, std::ostream& s) const
 {
 	printMargin(depth, s);
-	s << "Variable, name=" << this->name << ", " + varType(this->vartype) + ", argument_index=" << argument_index << "\n";
+	s << "Variable, name=" << this->name << ", " + varType(this->vartype) + ", bound_index=" << bound_index << "\n";
 }
 
 
@@ -1303,19 +1398,19 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params) const
 #if USE_LLVM
 	if(vartype == LetVariable)
 	{
-		return this->parent_function->getLetExpressionLLVMValue(params, this->argument_index);
+		return this->bound_let_block->getLetExpressionLLVMValue(params, this->bound_index);
 	}
 	else
 	{
-		assert(this->parent_function);
+		assert(this->bound_function);
 
 		//if(shouldPassByValue(*this->type()))
 		//{
 			// If the current function returns its result via pointer, then all args are offset by one.
 			if(params.currently_building_func_def->returnType()->passByValue())
-				return LLVMTypeUtils::getNthArg(params.currently_building_func, this->argument_index);
+				return LLVMTypeUtils::getNthArg(params.currently_building_func, this->bound_index);
 			else
-				return LLVMTypeUtils::getNthArg(params.currently_building_func, this->argument_index + 1);
+				return LLVMTypeUtils::getNthArg(params.currently_building_func, this->bound_index + 1);
 		/*}
 		else
 		{
@@ -1510,6 +1605,15 @@ void MapLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 			}
 		}
 	}
+	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	{
+		for(size_t i=0; i<items.size(); ++i)
+		{
+			convertOverloadedOperators(items[i].first, payload);
+			convertOverloadedOperators(items[i].second, payload);
+		}
+	}
+
 
 	stack.push_back(this);
 	for(unsigned int i=0; i<this->items.size(); ++i)
@@ -1601,6 +1705,12 @@ void ArrayLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 			}
 		}
 	}
+	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	{
+		for(size_t i=0; i<elements.size(); ++i)
+			convertOverloadedOperators(elements[i], payload);
+	}
+
 
 	stack.push_back(this);
 	for(unsigned int i=0; i<this->elements.size(); ++i)
@@ -1700,6 +1810,12 @@ void VectorLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 			}
 		}
 	}
+	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	{
+		for(size_t i=0; i<elements.size(); ++i)
+			convertOverloadedOperators(elements[i], payload);
+	}
+
 
 	stack.push_back(this);
 	for(unsigned int i=0; i<this->elements.size(); ++i)
@@ -1989,6 +2105,12 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 			payload.tree_changed = true;
 		}
 	}
+	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	{
+		convertOverloadedOperators(a, payload);
+		convertOverloadedOperators(b, payload);
+	}
+
 
 	stack.push_back(this);
 	a->traverse(payload, stack);
@@ -2164,6 +2286,12 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 			payload.tree_changed = true;
 		}
 	}
+	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	{
+		convertOverloadedOperators(a, payload);
+		convertOverloadedOperators(b, payload);
+	}
+
 
 	stack.push_back(this);
 	a->traverse(payload, stack);
@@ -2312,6 +2440,12 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 			payload.tree_changed = true;
 		}
 	}
+	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	{
+		convertOverloadedOperators(a, payload);
+		convertOverloadedOperators(b, payload);
+	}
+
 
 	stack.push_back(this);
 	a->traverse(payload, stack);
@@ -2451,6 +2585,11 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 			b = foldExpression(b, payload);
 			payload.tree_changed = true;
 		}
+	}
+	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	{
+		convertOverloadedOperators(a, payload);
+		convertOverloadedOperators(b, payload);
 	}
 
 	stack.push_back(this);
@@ -2606,6 +2745,10 @@ void UnaryMinusExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 			payload.tree_changed = true;
 		}
 	}
+	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	{
+		convertOverloadedOperators(expr, payload);
+	}
 
 	stack.push_back(this);
 	expr->traverse(payload, stack);
@@ -2704,6 +2847,10 @@ void LetASTNode::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 			expr = foldExpression(expr, payload);
 			payload.tree_changed = true;
 		}
+	}
+	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	{
+		convertOverloadedOperators(expr, payload);
 	}
 
 	stack.push_back(this);
@@ -2855,6 +3002,11 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 			payload.tree_changed = true;
 		}
 	}
+	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	{
+		convertOverloadedOperators(a, payload);
+		convertOverloadedOperators(b, payload);
+	}
 
 	stack.push_back(this);
 	a->traverse(payload, stack);
@@ -2924,6 +3076,97 @@ Reference<ASTNode> ComparisonExpression::clone()
 bool ComparisonExpression::isConstant() const
 {
 	return a->isConstant() && b->isConstant();
+}
+
+
+//----------------------------------------------------------------------------------------
+
+
+ValueRef LetBlock::exec(VMState& vmstate)
+{
+	// Evaluate let clauses, which will each push the result onto the let stack
+	vmstate.let_stack_start.push_back(vmstate.let_stack.size()); // Push let frame index
+	for(unsigned int i=0; i<lets.size(); ++i)
+		vmstate.let_stack.push_back(lets[i]->exec(vmstate));
+
+	return this->expr->exec(vmstate);
+
+	// Pop things off let stack
+	for(unsigned int i=0; i<lets.size(); ++i)
+		vmstate.let_stack.pop_back();
+	
+	// Pop let frame index
+	vmstate.let_stack_start.pop_back();
+}
+
+
+void LetBlock::print(int depth, std::ostream& s) const
+{
+	printMargin(depth, s);
+	s << "Let Block\n";
+	this->expr->print(depth+1, s);
+}
+
+
+void LetBlock::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
+{
+	if(payload.operation == TraversalPayload::ConstantFolding)
+	{
+		if(shouldFoldExpression(expr, payload))
+		{
+			expr = foldExpression(expr, payload);
+			payload.tree_changed = true;
+		}
+	}
+	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	{
+		convertOverloadedOperators(expr, payload);
+	}
+
+	stack.push_back(this);
+
+	for(unsigned int i=0; i<lets.size(); ++i)
+		lets[i]->traverse(payload, stack);
+
+	expr->traverse(payload, stack);
+	stack.pop_back();
+}
+
+
+llvm::Value* LetBlock::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	return expr->emitLLVMCode(params);
+}
+
+
+Reference<ASTNode> LetBlock::clone()
+{
+	vector<Reference<LetASTNode> > new_lets(lets.size());
+	for(size_t i=0; i<new_lets.size(); ++i)
+		new_lets[i] = Reference<LetASTNode>(static_cast<LetASTNode*>(lets[i]->clone().getPointer()));
+	return ASTNodeRef(new LetBlock(this->expr->clone(), new_lets));
+}
+
+
+bool LetBlock::isConstant() const
+{
+	//TODO: check let expressions for constants as well
+	for(size_t i=0; i<lets.size(); ++i)
+		if(!lets[i]->isConstant())
+			return false;
+
+	return expr->isConstant();
+}
+
+
+llvm::Value* LetBlock::getLetExpressionLLVMValue(EmitLLVMCodeParams& params, unsigned int let_index)
+{
+	if(let_exprs_llvm_value[let_index] == NULL)
+	{
+		let_exprs_llvm_value[let_index] = this->lets[let_index]->emitLLVMCode(params);
+	}
+
+	return let_exprs_llvm_value[let_index];
 }
 
 

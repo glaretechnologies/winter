@@ -90,7 +90,7 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 			FunctionDefinition* def = new FunctionDefinition(
 				"fold",
 				args,
-				vector<Reference<LetASTNode> >(),
+				//vector<Reference<LetASTNode> >(),
 				ASTNodeRef(NULL), // body expr
 				T, // return type
 				//new ArrayFoldBuiltInFunc(
@@ -120,7 +120,7 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 			FunctionDefinition* def = new FunctionDefinition(
 				"if", // name
 				args, // args
-				vector<Reference<LetASTNode> >(), // lets
+				//vector<Reference<LetASTNode> >(), // lets
 				ASTNodeRef(NULL), // body expr
 				T, // return type
 				new IfBuiltInFunc(T) // built in impl.
@@ -143,7 +143,7 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 			FunctionDefinition* def = new FunctionDefinition(
 				"dot", // name
 				args, // args
-				vector<Reference<LetASTNode> >(), // lets
+				//vector<Reference<LetASTNode> >(), // lets
 				ASTNodeRef(NULL), // body expr
 				TypeRef(new Float()), // return type
 				new DotProductBuiltInFunc(vec4f_type_v) // built in impl.
@@ -166,7 +166,7 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 			FunctionDefinition* def = new FunctionDefinition(
 				"min", // name
 				args, // args
-				vector<Reference<LetASTNode> >(), // lets
+				//vector<Reference<LetASTNode> >(), // lets
 				ASTNodeRef(NULL), // body expr
 				vec4f_type, // return type
 				new VectorMinBuiltInFunc(vec4f_type_v) // built in impl.
@@ -189,7 +189,7 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 			FunctionDefinition* def = new FunctionDefinition(
 				"max", // name
 				args, // args
-				vector<Reference<LetASTNode> >(), // lets
+				//vector<Reference<LetASTNode> >(), // lets
 				ASTNodeRef(NULL), // body expr
 				vec4f_type, // return type
 				new VectorMaxBuiltInFunc(vec4f_type_v) // built in impl.
@@ -199,7 +199,7 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 		}
 
 		// Create 'pow' built-in function
-		/*{
+		{
 			vector<FunctionDefinition::FunctionArg> args(2);
 			args[0].name = "a";
 			args[0].type = TypeRef(new Float());
@@ -209,14 +209,14 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 			FunctionDefinition* def = new FunctionDefinition(
 				"pow", // name
 				args, // args
-				vector<Reference<LetASTNode> >(), // lets
+				//vector<Reference<LetASTNode> >(), // lets
 				ASTNodeRef(NULL), // body expr
 				TypeRef(new Float()), // return type
 				new PowBuiltInFunc() // built in impl.
 				);
 
 			root->func_defs.push_back(Reference<FunctionDefinition>(def));
-		}*/
+		}
 
 		// Create 'sqrt' built-in function
 		{
@@ -227,7 +227,7 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 			FunctionDefinition* def = new FunctionDefinition(
 				"sqrt", // name
 				args, // args
-				vector<Reference<LetASTNode> >(), // lets
+				//vector<Reference<LetASTNode> >(), // lets
 				ASTNodeRef(NULL), // body expr
 				TypeRef(new Float()), // return type
 				new SqrtBuiltInFunc() // built in impl.
@@ -237,7 +237,42 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 		}
 
 
+		// Create 'sin' built-in function
+		{
+			vector<FunctionDefinition::FunctionArg> args(1);
+			args[0].name = "x";
+			args[0].type = TypeRef(new Float());
 
+			FunctionDefinition* def = new FunctionDefinition(
+				"sin", // name
+				args, // args
+				//vector<Reference<LetASTNode> >(), // lets
+				ASTNodeRef(NULL), // body expr
+				TypeRef(new Float()), // return type
+				new SinBuiltInFunc() // built in impl.
+				);
+
+			root->func_defs.push_back(Reference<FunctionDefinition>(def));
+		}
+
+
+		// Create 'cos' built-in function
+		{
+			vector<FunctionDefinition::FunctionArg> args(1);
+			args[0].name = "x";
+			args[0].type = TypeRef(new Float());
+
+			FunctionDefinition* def = new FunctionDefinition(
+				"cos", // name
+				args, // args
+				//vector<Reference<LetASTNode> >(), // lets
+				ASTNodeRef(NULL), // body expr
+				TypeRef(new Float()), // return type
+				new CosBuiltInFunc() // built in impl.
+				);
+
+			root->func_defs.push_back(Reference<FunctionDefinition>(def));
+		}
 
 		std::map<std::string, TypeRef> named_types;
 
@@ -269,7 +304,7 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 				FunctionDefinition* cons = new FunctionDefinition(
 					t->name, // name
 					args, // arguments
-					vector<Reference<LetASTNode> >(), // lets
+					//vector<Reference<LetASTNode> >(), // lets
 					ASTNodeRef(NULL), // body expr
 					TypeRef(t.getPointer()), // declard return type
 					new Constructor(t) // built in func impl.
@@ -286,7 +321,7 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 					root->func_defs.push_back(Reference<FunctionDefinition>(new FunctionDefinition(
 						t->component_names[i], // name
 						getfield_args, // args
-						vector<Reference<LetASTNode> >(), // lets
+						//vector<Reference<LetASTNode> >(), // lets
 						ASTNodeRef(NULL), // body expr
 						t->component_types[i], // return type
 						new GetField(t, i) // impl
@@ -453,22 +488,22 @@ FunctionDefinitionRef LangParser::parseFunctionDefinitionGivenName(const std::st
 		parseToken(COLON_TOKEN, p);
 		
 		
-		vector<Reference<LetASTNode> > lets;
+		/*vector<Reference<LetASTNode> > lets;
 
 		// Parse any 'lets'
 		while(p.i < p.tokens.size() && p.tokens[p.i]->isIdentifier() && p.tokens[p.i]->getIdentifierValue() == "let")
 		{
 			Reference<LetASTNode> let = parseLet(p);
 			lets.push_back(let);
-		}
+		}*/
 
 		// Parse function body
-		ASTNodeRef body = parseExpression(p);
+		ASTNodeRef body = parseLetBlock(p); //parseExpression(p);
 
 		Reference<FunctionDefinition> def(new FunctionDefinition(
 			func_name,
 			args,
-			lets,
+			//lets,
 			body,
 			return_type, // declared return type
 			NULL // built in func impl
@@ -603,6 +638,34 @@ Reference<IntLiteral> LangParser::parseIntLiteral(const ParseInfo& p)
 	}
 }
 
+
+Reference<ASTNode> LangParser::parseLetBlock(const ParseInfo& p)
+{
+	if(p.i < p.tokens.size() && p.tokens[p.i]->isIdentifier() && p.tokens[p.i]->getIdentifierValue() == "let")
+	{
+		p.i++;
+
+		vector<Reference<LetASTNode> > lets;
+		
+		while(p.i < p.tokens.size() && !(p.tokens[p.i]->isIdentifier() && p.tokens[p.i]->getIdentifierValue() == "in"))
+		{
+			Reference<LetASTNode> let = parseLet(p);
+			lets.push_back(let);
+		}
+
+		//TODO: better error msg
+		const std::string in = parseIdentifier("in", p);
+		if(in != "in")
+			throw BaseException("Missing 'in' after let expressions.");
+
+		ASTNodeRef main_expr = parseExpression(p);
+
+		return ASTNodeRef(new LetBlock(main_expr, lets));
+	}
+
+
+	return parseExpression(p);
+}
 
 
 ASTNodeRef LangParser::parseExpression(const ParseInfo& p)
@@ -1022,7 +1085,7 @@ ASTNodeRef LangParser::parseArrayOrVectorLiteralExpression(const ParseInfo& p)
 
 Reference<LetASTNode> LangParser::parseLet(const ParseInfo& p)
 {
-	parseIdentifier("let", p);
+	//parseIdentifier("let", p);
 
 	const std::string var_name = parseIdentifier("variable name", p);
 

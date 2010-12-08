@@ -668,6 +668,24 @@ llvm::Value* PowBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 //----------------------------------------------------------------------------------------------
 
 
+static llvm::Value* emitFloatFloatIntrinsic(EmitLLVMCodeParams& params, llvm::Intrinsic::ID id)
+{
+	vector<llvm::Value*> args;
+	args.push_back(LLVMTypeUtils::getNthArg(params.currently_building_func, 0));
+
+	vector<const llvm::Type*> types;
+	types.push_back(TypeRef(new Float())->LLVMType(*params.context));
+
+	llvm::Function* func = llvm::Intrinsic::getDeclaration(params.module, id, &types[0], types.size());
+
+	return params.builder->CreateCall(
+		func,
+		args.begin(), 
+		args.end()
+	);
+}
+
+
 ValueRef SqrtBuiltInFunc::invoke(VMState& vmstate)
 {
 	const FloatValue* a = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
@@ -678,19 +696,40 @@ ValueRef SqrtBuiltInFunc::invoke(VMState& vmstate)
 
 llvm::Value* SqrtBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
-	vector<llvm::Value*> args;
-	args.push_back(LLVMTypeUtils::getNthArg(params.currently_building_func, 0));
+	return emitFloatFloatIntrinsic(params, llvm::Intrinsic::sqrt);
+}
 
-	vector<const llvm::Type*> types;
-	types.push_back(TypeRef(new Float())->LLVMType(*params.context));
 
-	llvm::Function* func = llvm::Intrinsic::getDeclaration(params.module, llvm::Intrinsic::sqrt, &types[0], types.size());
+//----------------------------------------------------------------------------------------------
 
-	return params.builder->CreateCall(
-		func,
-		args.begin(), 
-		args.end()
-	);
+ValueRef SinBuiltInFunc::invoke(VMState& vmstate)
+{
+	const FloatValue* a = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+
+	return ValueRef(new FloatValue(std::sin(a->value)));
+}
+
+
+llvm::Value* SinBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	return emitFloatFloatIntrinsic(params, llvm::Intrinsic::sin);
+}
+
+
+//----------------------------------------------------------------------------------------------
+
+
+ValueRef CosBuiltInFunc::invoke(VMState& vmstate)
+{
+	const FloatValue* a = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+
+	return ValueRef(new FloatValue(std::cos(a->value)));
+}
+
+
+llvm::Value* CosBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	return emitFloatFloatIntrinsic(params, llvm::Intrinsic::cos);
 }
 
 

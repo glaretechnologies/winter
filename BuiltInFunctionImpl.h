@@ -175,4 +175,27 @@ private:
 };
 
 
+class SinBuiltInFunc : public BuiltInFunctionImpl
+{
+public:
+	SinBuiltInFunc() {}
+	virtual ~SinBuiltInFunc(){}
+
+	virtual ValueRef invoke(VMState& vmstate);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+private:
+};
+
+
+class CosBuiltInFunc : public BuiltInFunctionImpl
+{
+public:
+	CosBuiltInFunc() {}
+	virtual ~CosBuiltInFunc(){}
+
+	virtual ValueRef invoke(VMState& vmstate);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+private:
+};
+
 }
