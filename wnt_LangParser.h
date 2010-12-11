@@ -36,12 +36,14 @@ private:
 class ParseInfo
 {
 public:
-	ParseInfo(unsigned int& i_, const std::vector<Reference<TokenBase> >& t, std::map<std::string, TypeRef>& named_types_) 
-		: i(i_), tokens(t), named_types(named_types_) {}
+	ParseInfo(unsigned int& i_, const std::vector<Reference<TokenBase> >& t, std::map<std::string, TypeRef>& named_types_,
+		vector<FunctionDefinitionRef>& func_defs_) 
+		: i(i_), tokens(t), named_types(named_types_), func_defs(func_defs_) {}
 	const std::vector<Reference<TokenBase> >& tokens;
 	const char* text_buffer;
 	unsigned int& i;
 	std::map<std::string, TypeRef>& named_types;
+	vector<FunctionDefinitionRef>& func_defs;
 };
 
 
@@ -57,7 +59,8 @@ public:
 
 	~LangParser();
 
-	Reference<ASTNode> parseBuffer(const std::vector<Reference<TokenBase> >& tokens, const char* text_buffer);
+	Reference<ASTNode> parseBuffer(const std::vector<Reference<TokenBase> >& tokens, const char* text_buffer,
+		vector<FunctionDefinitionRef>& func_defs_out);
 
 	static void test();
 

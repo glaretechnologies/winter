@@ -299,7 +299,7 @@ FunctionDefinition::FunctionDefinition(const std::string& name, const std::vecto
 		sig.param_types.push_back(args_[i].type);
 
 	// TODO: fix this, make into method
-	function_type = TypeRef(new Function(sig.param_types, declared_rettype));
+	//function_type = TypeRef(new Function(sig.param_types, declared_rettype));
 
 	//this->let_exprs_llvm_value = std::vector<llvm::Value*>(this->lets.size(), NULL);
 }
@@ -320,6 +320,16 @@ TypeRef FunctionDefinition::returnType() const
 	assert(this->body->type().nonNull());
 	return this->body->type();
 	//return this->body.nonNull() ? this->body->type() : TypeRef(NULL);
+}
+
+
+TypeRef FunctionDefinition::type() const
+{
+	vector<TypeRef> arg_types(this->args.size());
+	for(size_t i=0; i<this->args.size(); ++i)
+		arg_types[i] = this->args[i].type;
+
+	return TypeRef(new Function(arg_types, this->returnType()));
 }
 
 
@@ -507,12 +517,19 @@ void FunctionDefinition::print(int depth, std::ostream& s) const
 
 llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
-	assert(0);
-	return NULL;
-	/*if(this->built_in_func_impl)
-		return this->built_in_func_impl->emitLLVMCode(params);
-	else
-		return body->emitLLVMCode(params);*/
+	// This will be called for lambda expressions.
+
+	llvm::FunctionType* target_func_type = LLVMTypeUtils::llvmFunctionType(
+		this->sig.param_types, 
+		this->returnType(), 
+		*params.context,
+		params.hidden_voidptr_arg
+	);
+
+	return static_cast<llvm::Function*>(params.module->getOrInsertFunction(
+		this->sig.toString(), // Name
+		target_func_type // Type
+	));
 }
 
 
@@ -745,8 +762,8 @@ bool FunctionDefinition::isGenericFunction() const // true if it is parameterise
 
 bool FunctionDefinition::isConstant() const
 {
-	assert(0);
-	return false;
+	//assert(!"FunctionDefinition::isConstant()");
+	return false;//TEMP
 }
 
 
@@ -755,16 +772,20 @@ bool FunctionDefinition::isConstant() const
 
 FunctionExpression::FunctionExpression() 
 :	target_function(NULL),
-	argument_index(-1),
-	binding_type(Unbound)
+	bound_index(-1),
+	binding_type(Unbound),
+	bound_let_block(NULL),
+	bound_function(NULL)
 {
 }
 
 
 FunctionExpression::FunctionExpression(const std::string& func_name, const ASTNodeRef& arg0, const ASTNodeRef& arg1) // 2-arg function
 :	target_function(NULL),
-	argument_index(-1),
-	binding_type(Unbound)
+	bound_index(-1),
+	binding_type(Unbound),
+	bound_let_block(NULL),
+	bound_function(NULL)
 {
 	function_name = func_name;
 	argument_expressions.push_back(arg0);
@@ -774,26 +795,24 @@ FunctionExpression::FunctionExpression(const std::string& func_name, const ASTNo
 
 FunctionDefinition* FunctionExpression::runtimeBind(VMState& vmstate)
 {
-	FunctionDefinition* use_target_function = NULL;
 	if(target_function)
-		use_target_function = target_function;
+		return target_function;
 	else if(this->binding_type == Arg)
 	{
-		ValueRef arg = vmstate.argument_stack[vmstate.func_args_start.back() + this->argument_index];
+		ValueRef arg = vmstate.argument_stack[vmstate.func_args_start.back() + this->bound_index];
 		assert(dynamic_cast<FunctionValue*>(arg.getPointer()));
 		FunctionValue* function_value = dynamic_cast<FunctionValue*>(arg.getPointer());
-		use_target_function = function_value->func_def;
+		return function_value->func_def;
 	}
 	else
 	{
-		ValueRef arg = vmstate.let_stack[vmstate.let_stack_start.back() + this->argument_index];
+		assert(this->binding_type == Let);
+
+		ValueRef arg = vmstate.let_stack[vmstate.let_stack_start.back() + this->bound_index];
 		assert(dynamic_cast<FunctionValue*>(arg.getPointer()));
 		FunctionValue* function_value = dynamic_cast<FunctionValue*>(arg.getPointer());
-		use_target_function = function_value->func_def;
+		return function_value->func_def;
 	}
-
-	assert(use_target_function);
-	return use_target_function;
 }
 
 
@@ -802,7 +821,7 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 	if(VERBOSE_EXEC) std::cout << indent(vmstate) << "FunctionExpression, target_name=" << this->function_name << "\n";
 	
 	//assert(target_function);
-	if(this->target_function->external_function.nonNull())
+	if(this->target_function != NULL && this->target_function->external_function.nonNull())
 	{
 		vector<ValueRef> args;
 		for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
@@ -915,36 +934,47 @@ void FunctionExpression::linkFunctions(Linker& linker, std::vector<ASTNode*>& st
 	for(int i = (int)stack.size() - 1; i >= 0 && !found_binding; --i)
 	{
 		{
-			FunctionDefinition* def = dynamic_cast<FunctionDefinition*>(stack[i]);
-			if(def != NULL)
+			if(FunctionDefinition* def = dynamic_cast<FunctionDefinition*>(stack[i]))
 			{
-				//for(unsigned int i=0; i<def->lets.size(); ++i)
-				//	if(def->lets[i]->variable_name == this->function_name && doesFunctionTypeMatch(def->lets[i]->type()))
-				//	{
-				//		this->argument_index = i;
-				//		//this->argument_offset = (int)def->lets.size() - i;
-				//		this->binding_type = Let;
-				//		// We know this lets_i body is a FunctionDefinition.
-				//		FunctionDefinition* let_def = dynamic_cast<FunctionDefinition*>(def->lets[i]->expr.getPointer());
-				//		//Function* let_func_type = dynamic_cast<Function*>(def->lets[i]->type().getPointer());
-				//		//if(!let_func_type)
-				//		//	throw BaseException(this->function_name + " used in function expression is not a function.");
-				//		this->target_function_return_type = let_def->returnType();
-				//		found_binding = true;
-				//	}
-
 				for(unsigned int i=0; i<def->args.size(); ++i)
 					if(def->args[i].name == this->function_name && doesFunctionTypeMatch(def->args[i].type))
 					{
-						this->argument_index = i;
-						//this->argument_offset = (int)def->args.size() - i;
+						//assert(dynamic_cast<Function*>(def->args[i].type.getPointer()));
+						//Function* func_type = static_cast<Function*>(def->args[i].type.getPointer());
+
+						//this->target_function_return_type = func_type->return_type;
+
+						this->bound_function = def;
+
+						this->bound_index = i;
 						this->binding_type = Arg;
-						//this->target_function_return_type = def->args[i].//def->returnType();
 						found_binding = true;
 					}
+			}
+			else if(LetBlock* let_block = dynamic_cast<LetBlock*>(stack[i]))
+			{
+				for(unsigned int i=0; i<let_block->lets.size(); ++i)
+					if(let_block->lets[i]->variable_name == this->function_name && doesFunctionTypeMatch(let_block->lets[i]->type()))
+					{
+						this->bound_index = i;
+						this->binding_type = Let;
+						// We know this lets_i body is a FunctionDefinition.
+						//FunctionDefinition* let_def = dynamic_cast<FunctionDefinition*>(let_block->lets[i]->expr.getPointer());
+						//assert(let_def);
+						//Function* let_func_type = dynamic_cast<Function*>(def->lets[i]->type().getPointer());
+						//if(!let_func_type)
+						//	throw BaseException(this->function_name + " used in function expression is not a function.");
+						//this->target_function_return_type = let_def->returnType();
 
-				//if(this->argument_offset == -1)
-				//	throw BaseException("No such function argument '" + this->name + "'");
+						//TypeRef let_type = let_block->lets[i]->type();
+						//assert(dynamic_cast<Function*>(let_type.getPointer()));
+						//Function* func_type = static_cast<Function*>(let_type.getPointer());
+						//this->target_function_return_type = func_type->return_type;
+
+
+						this->bound_let_block = let_block;
+						found_binding = true;
+					}
 			}
 		}
 	}
@@ -963,7 +993,7 @@ void FunctionExpression::linkFunctions(Linker& linker, std::vector<ASTNode*>& st
 		if(this->target_function)
 		{
 			this->binding_type = Bound;
-			this->target_function_return_type = this->target_function->returnType();
+			//this->target_function_return_type = this->target_function->returnType();
 		}
 		else
 		{
@@ -993,7 +1023,7 @@ void FunctionExpression::linkFunctions(Linker& linker, std::vector<ASTNode*>& st
 				
 				this->target_function = possible_matches[0].getPointer();
 				this->binding_type = Bound;
-				this->target_function_return_type = this->target_function->returnType();
+				//this->target_function_return_type = this->target_function->returnType();
 			}
 			else if(possible_matches.size() > 1)
 			{
@@ -1062,9 +1092,9 @@ void FunctionExpression::print(int depth, std::ostream& s) const
 	if(this->target_function)
 		s << "; target: " << this->target_function->sig.toString();
 	else if(this->binding_type == Arg)
-		s << "; runtime bound to arg index " << this->argument_index;
+		s << "; runtime bound to arg index " << this->bound_index;
 	else if(this->binding_type == Let)
-		s << "; runtime bound to let index " << this->argument_index;
+		s << "; runtime bound to let index " << this->bound_index;
 	s << "\n";
 	for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
 		this->argument_expressions[i]->print(depth + 1, s);
@@ -1073,12 +1103,32 @@ void FunctionExpression::print(int depth, std::ostream& s) const
 
 TypeRef FunctionExpression::type() const
 {
-	if(target_function_return_type.nonNull())
-		return target_function_return_type;
-	else
+	if(this->binding_type == Bound)
 	{
-		return this->target_function ? this->target_function->returnType() : TypeRef(NULL);
+		assert(this->target_function);
+		return this->target_function->returnType();
 	}
+	else if(this->binding_type == Let)
+	{
+		TypeRef t = this->bound_let_block->lets[this->bound_index]->type();
+		Function* func_type = static_cast<Function*>(t.getPointer());
+		return func_type->return_type;
+	}
+	else if(this->binding_type == Arg)
+	{
+		Function* func_type = static_cast<Function*>(this->bound_function->args[this->bound_index].type.getPointer());
+		return func_type->return_type;
+	}
+
+	assert(0);
+	return TypeRef(NULL);
+
+	//if(target_function_return_type.nonNull())
+	//	return target_function_return_type;
+	//else
+	//{
+	//	return this->target_function ? this->target_function->returnType() : TypeRef(NULL);
+	//}
 /*
 	if(!target_function)
 	{
@@ -1092,27 +1142,48 @@ TypeRef FunctionExpression::type() const
 llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
 #if USE_LLVM
-	// Lookup LLVM function, which should already be created and added to the module.
-	/*llvm::Function* target_llvm_func = params.module->getFunction(
-		this->target_function->sig.toString() //internalFuncName(call_target_sig)
+	llvm::Value* target_llvm_func = NULL;
+	TypeRef target_ret_type = this->type(); //this->target_function_return_type;
+
+	if(binding_type == Let)
+	{
+		target_llvm_func = this->bound_let_block->getLetExpressionLLVMValue(params, bound_index);
+
+		//target_llvm_func = dynamic_cast<llvm::Function*>(func);
+
+	}
+	else if(binding_type == Arg)
+	{
+		// If the current function returns its result via pointer, then all args are offset by one.
+		if(params.currently_building_func_def->returnType()->passByValue())
+			target_llvm_func = LLVMTypeUtils::getNthArg(params.currently_building_func, this->bound_index);
+		else
+			target_llvm_func = LLVMTypeUtils::getNthArg(params.currently_building_func, this->bound_index + 1);
+
+		//target_llvm_func = dynamic_cast<llvm::Function*>(func);
+	}
+	else
+	{
+		// Lookup LLVM function, which should already be created and added to the module.
+		/*llvm::Function* target_llvm_func = params.module->getFunction(
+			this->target_function->sig.toString() //internalFuncName(call_target_sig)
+			);
+		assert(target_llvm_func);*/
+
+		FunctionSignature target_sig = this->target_function->sig;
+
+		llvm::FunctionType* target_func_type = LLVMTypeUtils::llvmFunctionType(
+			target_sig.param_types, 
+			target_ret_type, 
+			*params.context,
+			params.hidden_voidptr_arg
 		);
-	assert(target_llvm_func);*/
 
-	FunctionSignature target_sig = this->target_function->sig;
-	TypeRef target_ret_type = this->target_function_return_type;
-
-	llvm::FunctionType* target_func_type = LLVMTypeUtils::llvmFunctionType(
-		target_sig.param_types, 
-		target_ret_type, 
-		*params.context,
-		params.hidden_voidptr_arg
-	);
-
-	llvm::Function* target_llvm_func = static_cast<llvm::Function*>(params.module->getOrInsertFunction(
-		target_sig.toString(), // Name
-		target_func_type // Type
-	));
-
+		target_llvm_func = params.module->getOrInsertFunction(
+			target_sig.toString(), // Name
+			target_func_type // Type
+		);
+	}
 	assert(target_llvm_func);
 
 
@@ -1148,7 +1219,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 			target_ret_type->LLVMType(*params.context), // type
 			NULL, // ArraySize
 			16, // alignment
-			target_sig.toString() + " return_val_addr"
+			"return_val_addr" // target_sig.toString() + " return_val_addr"
 		));
 
 		vector<llvm::Value*> args(1, return_val_addr);
@@ -1182,7 +1253,9 @@ Reference<ASTNode> FunctionExpression::clone()
 		e->argument_expressions.push_back(argument_expressions[i]->clone());
 	
 	e->target_function = this->target_function;
-	e->argument_index = this->argument_index;
+	e->bound_index = this->bound_index;
+	e->bound_function = this->bound_function;
+	e->bound_let_block = this->bound_let_block;
 	e->binding_type = this->binding_type;
 
 	return ASTNodeRef(e);
@@ -1191,6 +1264,10 @@ Reference<ASTNode> FunctionExpression::clone()
 
 bool FunctionExpression::isConstant() const
 {
+	// For now, we'll saw a function expression bound to an argument of let var is not constant.
+	if(this->binding_type != Bound)
+		return false;
+
 	for(unsigned int i=0; i<argument_expressions.size(); ++i)
 		if(!argument_expressions[i]->isConstant())
 			return false;

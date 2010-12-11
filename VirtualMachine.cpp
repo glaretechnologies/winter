@@ -159,8 +159,11 @@ void VirtualMachine::loadSource(const std::string& source)
 	std::vector<Reference<TokenBase> > tokens;
 	Lexer::process(source, tokens);
 
+
+	vector<FunctionDefinitionRef> func_defs;
+
 	LangParser parser;
-	this->rootref = parser.parseBuffer(tokens, source.c_str());
+	this->rootref = parser.parseBuffer(tokens, source.c_str(), func_defs);
 
 
 	BufferRoot* root = dynamic_cast<BufferRoot*>(rootref.getPointer());
@@ -185,7 +188,8 @@ void VirtualMachine::loadSource(const std::string& source)
 
 	// Link functions
 	linker.addExternalFunctions(this->external_functions);
-	linker.addFunctions(*root);
+	linker.addFunctions(func_defs);
+
 	{
 		std::vector<ASTNode*> stack;
 		TraversalPayload payload(TraversalPayload::LinkFunctions, hidden_voidptr_arg, env);

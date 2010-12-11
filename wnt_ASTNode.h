@@ -219,7 +219,7 @@ public:
 	vector<FunctionArg> args;
 	ASTNodeRef body;
 	TypeRef declared_return_type;
-	TypeRef function_type;
+	//TypeRef function_type;
 	//vector<Reference<LetASTNode> > lets;
 
 	FunctionSignature sig;
@@ -229,7 +229,7 @@ public:
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return FunctionDefinitionType; }
-	virtual TypeRef type() const { return function_type; }
+	virtual TypeRef type() const;// { return function_type; }
 
 	//virtual void linkFunctions(Linker& linker);
 	//virtual void bindVariables(const std::vector<ASTNode*>& stack);
@@ -293,7 +293,9 @@ public:
 	//ASTNode* target_function;
 	FunctionDefinition* target_function; // May be NULL
 	//Reference<ExternalFunction> target_external_function; // May be NULL
-	int argument_index;
+	int bound_index;
+	FunctionDefinition* bound_function; // Function for which the variable is an argument of,
+	LetBlock* bound_let_block;
 	//int argument_offset; // Currently, a variable must be an argument to the enclosing function
 	enum BindingType
 	{
@@ -304,7 +306,7 @@ public:
 	};
 	BindingType binding_type;
 
-	TypeRef target_function_return_type;
+	//TypeRef target_function_return_type;
 
 };
 

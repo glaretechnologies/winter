@@ -24,7 +24,8 @@ public:
 	~Linker();
 
 
-	void addFunctions(BufferRoot& root);
+	//void addFunctions(BufferRoot& root);
+	void addFunctions(const vector<FunctionDefinitionRef>& func_defs);
 	void addExternalFunctions(std::vector<ExternalFunctionRef>& f);
 
 	//void linkFunctions(BufferRoot& root);

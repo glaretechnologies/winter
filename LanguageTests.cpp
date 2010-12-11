@@ -580,8 +580,8 @@ float test()
 
 void LanguageTests::run()
 {
-
-// test op_add
+/*
+	// test op_add
 	testMainFloat("struct s { float x, float y } \n\
 				  def op_add(s a, s b) : s(a.x + b.x, a.y + b.y) \n\
 				  def main() float : x(s(1, 2) + s(3, 4))", 4.0f);
@@ -863,10 +863,42 @@ void LanguageTests::run()
 				  in \
 					y \
 				  def main() float : f(0.0)", 3.0);
-
+*/
 	// Test Lambda in let
-	//Doesn't work with LLVM
-	//testMainFloat("def main() float : let f = \\(float x) : x        f(2.0)", 2.0f);
+	testMainFloat("def main() float :           \n\
+				  let f = \\(float x) : x*x  in   \n\
+				  f(2.0)", 4.0f);
+
+	// Test return of a lambda from a function
+	testMainFloat("def makeLambda() : \\(float x) : x*x    \n\
+					def main() float :           \n\
+					let f = makeLambda()  in   \n\
+				  f(2.0)", 4.0f);
+
+	// Test generic lambda!!!
+	/*testMainFloat("def makeLambda() : \\<T>(T x) : x*x    \n\
+					def main() float :           \n\
+					let f = makeLambda()  in   \n\
+				  f(2.0)", 4.0f);*/
+
+	// Test Lambda passed as a function arg
+	testMainFloat("def g(function<float, float> f, float x) : f(x)       \n\
+					def main() float :           \n\
+					g(\\(float x) : x*x*x, 2.0f)", 8.0f);
+
+	// Test composition of two lambdas
+	//Test passing a normal function as an argument
+	testMainFloat("def g(function<float, float> f, float x) : f(x)       \n\
+				  def square(float x) : x*x                              \n\
+					def main() float :           \n\
+					g(square, 2.0f)", 4.0f);
+
+	//testMainFloat("def compose(function<float, float> f, function<float, float> g) : f(g)       \n\
+	//			  "
+	//				def main() float :           \n\
+	//				g(\\(float x) : x*x*x, 2.0f)", 8.0f);
+
+
 
 	// Test addition expression in let
 	testMainFloat("def f(float x) float : \

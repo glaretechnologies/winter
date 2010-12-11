@@ -26,16 +26,23 @@ Linker::~Linker()
 {}
 
 
-void Linker::addFunctions(BufferRoot& root)
-{
-	for(unsigned int i=0; i<root.func_defs.size(); ++i)
-	{
-		Reference<FunctionDefinition> def = root.func_defs[i];
+//void Linker::addFunctions(BufferRoot& root)
+//{
+//	for(unsigned int i=0; i<root.func_defs.size(); ++i)
+//	{
+//		Reference<FunctionDefinition> def = root.func_defs[i];
+//
+//		addFunction(def);
+//		//this->name_to_functions_map[def->sig.name].push_back(def);
+//		//this->sig_to_function_map.insert(std::make_pair(def->sig, def));
+//	}
+//}
 
-		addFunction(def);
-		//this->name_to_functions_map[def->sig.name].push_back(def);
-		//this->sig_to_function_map.insert(std::make_pair(def->sig, def));
-	}
+
+void Linker::addFunctions(const vector<FunctionDefinitionRef>& func_defs)
+{
+	for(unsigned int i=0; i<func_defs.size(); ++i)
+		addFunction(func_defs[i]);
 }
 
 

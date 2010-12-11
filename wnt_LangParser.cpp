@@ -40,7 +40,8 @@ LangParser::~LangParser()
 }
 
 
-Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase> >& tokens, const char* text_buffer)
+Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase> >& tokens, const char* text_buffer,
+										   vector<FunctionDefinitionRef>& func_defs_out)
 {
 	try
 	{
@@ -274,13 +275,17 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 			root->func_defs.push_back(Reference<FunctionDefinition>(def));
 		}
 
+		func_defs_out = root->func_defs;
+
+
+
 		std::map<std::string, TypeRef> named_types;
 
 		//Reference<ASTNode> root( new BufferRoot() );
 
 		unsigned int i = 0;
 
-		ParseInfo parseinfo(i, tokens, named_types);
+		ParseInfo parseinfo(i, tokens, named_types, func_defs_out);
 		parseinfo.text_buffer = text_buffer;
 
 		while(i < tokens.size())
@@ -310,6 +315,7 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 					new Constructor(t) // built in func impl.
 				);
 				root->func_defs.push_back(FunctionDefinitionRef(cons));
+				func_defs_out.push_back(FunctionDefinitionRef(cons));
 
 				// Make field access functions
 				vector<FunctionDefinition::FunctionArg> getfield_args(1);
@@ -318,14 +324,17 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 
 				for(unsigned int i=0; i<t->component_types.size(); ++i)
 				{
-					root->func_defs.push_back(Reference<FunctionDefinition>(new FunctionDefinition(
+					Reference<FunctionDefinition> def(new FunctionDefinition(
 						t->component_names[i], // name
 						getfield_args, // args
 						//vector<Reference<LetASTNode> >(), // lets
 						ASTNodeRef(NULL), // body expr
 						t->component_types[i], // return type
 						new GetField(t, i) // impl
-					)));
+					));
+
+					root->func_defs.push_back(def);
+					func_defs_out.push_back(def);
 				}
 			}
 			else
@@ -441,7 +450,12 @@ Reference<FunctionDefinition> LangParser::parseFunctionDefinition(const ParseInf
 
 	const std::string function_name = parseIdentifier("function name", p);
 
-	return parseFunctionDefinitionGivenName(function_name, p);
+	Reference<FunctionDefinition> def = parseFunctionDefinitionGivenName(function_name, p);
+
+	// Add this function def to the list of parsed function definitions.
+	p.func_defs.push_back(def);
+
+	return def;
 }
 
 
@@ -1107,7 +1121,11 @@ FunctionDefinitionRef LangParser::parseAnonFunction(const ParseInfo& p)
 
 	const std::string func_name = "anon_func_" + ::toString(p.i);
 
-	return parseFunctionDefinitionGivenName(func_name, p);
+	const FunctionDefinitionRef def = parseFunctionDefinitionGivenName(func_name, p);
+
+	// Add this anon function to list of parsed function definitions.
+	p.func_defs.push_back(def);
+	return def;
 
 	/*
 	// Parse parameter list
@@ -1218,9 +1236,9 @@ void LangParser::test()
 	try
 	{
 		LangParser lp;
-		Reference<ASTNode> root = lp.parseBuffer(tokens, s.c_str());
+//		Reference<ASTNode> root = lp.parseBuffer(tokens, s.c_str());
 	
-		testAssert(root->nodeType() == ASTNode::BufferRootType);
+//		testAssert(root->nodeType() == ASTNode::BufferRootType);
 		
 		//Reference<ASTNode> lerp = dynamic_cast<BufferRoot*>(root.getPointer())->children[0];
 		//testAssert(lerp->getType() == ASTNode::FunctionDefinitionType);

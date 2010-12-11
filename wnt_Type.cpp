@@ -126,8 +126,8 @@ bool Function::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) con
 		if(!this->arg_types[i]->matchTypes(*b_->arg_types[i], type_mapping))
 			return false;
 
-	if(!this->return_type->matchTypes(*b_->return_type, type_mapping))
-		return false;
+//	if(!this->return_type->matchTypes(*b_->return_type, type_mapping))
+//		return false;
 	return true;
 }
 
@@ -151,7 +151,18 @@ const std::string Function::toString() const // { return "function";
 
 const llvm::Type* Function::LLVMType(llvm::LLVMContext& context) const
 {
-	return pointerToVoidLLVMType(context);
+	vector<const llvm::Type*> llvm_arg_types(this->arg_types.size());
+	for(size_t i=0; i<this->arg_types.size(); ++i)
+		llvm_arg_types[i] = this->arg_types[i]->LLVMType(context);
+
+	//TEMP HACK: add hidden void* arg
+	llvm_arg_types.push_back(LLVMTypeUtils::voidPtrType(context));
+
+	return LLVMTypeUtils::pointerType(*llvm::FunctionType::get(
+		this->return_type->LLVMType(context), // result type
+		llvm_arg_types,
+		false // is var arg
+	));
 }
 
 
