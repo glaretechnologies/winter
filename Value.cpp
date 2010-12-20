@@ -100,7 +100,7 @@ const std::string VectorValue::toString() const
 
 const std::string VoidPtrValue::toString() const
 {
-	return ::toString((uint64)this->value);
+	return "void* " + ::toString((uint64)this->value);
 }
 
 

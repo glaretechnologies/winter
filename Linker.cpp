@@ -389,19 +389,21 @@ Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDef
 		// Rebind variables to get new type.
 		{
 		TraversalPayload payload(TraversalPayload::BindVariables, hidden_voidptr_arg, env);
-		body->traverse(payload, 
-			std::vector<ASTNode*>(1, def) // stack
-		);
-		}
-
-		// Relink, now that conrete types are known
-		{
-		TraversalPayload payload(TraversalPayload::LinkFunctions, hidden_voidptr_arg, env);
+		payload.func_def_stack.push_back(def);
 		payload.linker = this;
 		body->traverse(payload, 
 			std::vector<ASTNode*>(1, def) // stack
 		);
 		}
+
+		//// Relink, now that conrete types are known
+		//{
+		//TraversalPayload payload(TraversalPayload::LinkFunctions, hidden_voidptr_arg, env);
+		//payload.linker = this;
+		//body->traverse(payload, 
+		//	std::vector<ASTNode*>(1, def) // stack
+		//);
+		//}
 
 		// Type check again
 		{

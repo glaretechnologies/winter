@@ -66,6 +66,8 @@ public:
 
 private:
 	const std::string errorPosition(const std::string& buffer, unsigned int pos);
+	const std::string errorPosition(const ParseInfo& parseinfo);
+	const std::string errorPositionPrevToken(const ParseInfo& parseinfo);
 
 	const std::string parseIdentifier(const std::string& id_type, const ParseInfo& parseinfo);
 	ASTNodeRef parseLiteral(const ParseInfo& parseinfo);
@@ -106,6 +108,7 @@ private:
 	FunctionDefinitionRef parseAnonFunction(const ParseInfo& parseinfo);
 	void parseParameterList(const ParseInfo& parseinfo, const std::vector<std::string>& generic_type_params, std::vector<FunctionDefinition::FunctionArg>& args_out);
 
+	bool isKeyword(const std::string& name);
 private:
 	std::vector<unsigned int> comparison_tokens;
 

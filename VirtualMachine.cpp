@@ -16,6 +16,7 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "TokenBase.h"
 #include "wnt_LangParser.h"
 #include "wnt_ASTNode.h"
+#include "wnt_Frame.h"
 #include "VMState.h"
 #include "Linker.h"
 #include "Value.h"
@@ -166,6 +167,12 @@ void VirtualMachine::loadSource(const std::string& source)
 	this->rootref = parser.parseBuffer(tokens, source.c_str(), func_defs);
 
 
+	// Copy func devs to top level frame
+	FrameRef top_lvl_frame(new Frame());
+	for(size_t i=0; i<func_defs.size(); ++i)
+		top_lvl_frame->name_to_functions_map[func_defs[i]->sig.name].push_back(func_defs[i]);
+
+
 	BufferRoot* root = dynamic_cast<BufferRoot*>(rootref.getPointer());
 
 	// Do Type Coercion
@@ -176,27 +183,31 @@ void VirtualMachine::loadSource(const std::string& source)
 		assert(stack.size() == 0);
 	}
 
-	// Bind variables
-	{
-		std::vector<ASTNode*> stack;
-		TraversalPayload payload(TraversalPayload::BindVariables, hidden_voidptr_arg, env);
-		root->traverse(payload, stack);
-		assert(stack.size() == 0);
-	}
-
-
 
 	// Link functions
 	linker.addExternalFunctions(this->external_functions);
 	linker.addFunctions(func_defs);
 
+	// Bind variables
 	{
 		std::vector<ASTNode*> stack;
-		TraversalPayload payload(TraversalPayload::LinkFunctions, hidden_voidptr_arg, env);
+		TraversalPayload payload(TraversalPayload::BindVariables, hidden_voidptr_arg, env);
+		payload.top_lvl_frame = top_lvl_frame;
 		payload.linker = &linker;
 		root->traverse(payload, stack);
 		assert(stack.size() == 0);
 	}
+
+
+
+
+	//{
+	//	std::vector<ASTNode*> stack;
+	//	TraversalPayload payload(TraversalPayload::LinkFunctions, hidden_voidptr_arg, env);
+	//	payload.linker = &linker;
+	//	root->traverse(payload, stack);
+	//	assert(stack.size() == 0);
+	//}
 
 	// Do Operator overloading conversion
 	bool op_overloading_changed_tree = false;
@@ -209,11 +220,22 @@ void VirtualMachine::loadSource(const std::string& source)
 		op_overloading_changed_tree = payload.tree_changed;
 	}
 	
-	// Link functions again if tree has changed due to operator overloading conversion
+	// Link functions again if tree has changed due to operator overloading conversion,
+	// because we will now have unbound references to functions like 'op_add'.
+	//if(op_overloading_changed_tree)
+	//{
+	//	std::vector<ASTNode*> stack;
+	//	TraversalPayload payload(TraversalPayload::LinkFunctions, hidden_voidptr_arg, env);
+	//	payload.linker = &linker;
+	//	root->traverse(payload, stack);
+	//	assert(stack.size() == 0);
+	//}
+	// Bind variables
 	if(op_overloading_changed_tree)
 	{
 		std::vector<ASTNode*> stack;
-		TraversalPayload payload(TraversalPayload::LinkFunctions, hidden_voidptr_arg, env);
+		TraversalPayload payload(TraversalPayload::BindVariables, hidden_voidptr_arg, env);
+		payload.top_lvl_frame = top_lvl_frame;
 		payload.linker = &linker;
 		root->traverse(payload, stack);
 		assert(stack.size() == 0);
@@ -268,6 +290,8 @@ void VirtualMachine::loadSource(const std::string& source)
 
 void VirtualMachine::build()
 {
+	//return;//TEMP NO LLVM
+
 	linker.buildLLVMCode(this->llvm_module);
 
 	// Verify module

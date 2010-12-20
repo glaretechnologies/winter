@@ -359,6 +359,14 @@
 			>
 		</File>
 		<File
+			RelativePath="..\wnt_Frame.cpp"
+			>
+		</File>
+		<File
+			RelativePath="..\wnt_Frame.h"
+			>
+		</File>
+		<File
 			RelativePath="..\wnt_FunctionSignature.cpp"
 			>
 		</File>

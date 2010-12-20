@@ -19,6 +19,7 @@ using std::vector;
 #include "wnt_Type.h"
 #include "wnt_FunctionSignature.h"
 #include "wnt_ExternalFunction.h"
+#include "wnt_Frame.h"
 #include "BaseException.h"
 #include "TokenBase.h"
 #include "Value.h"
@@ -41,6 +42,22 @@ class AnonFunction;
 class Value;
 class BuiltInFunctionImpl;
 class FunctionDefinition;
+class Frame;
+class LetBlock;
+
+
+class CapturedVar
+{
+public:
+	enum Type
+	{
+		Let,
+		Arg
+	};
+	Type type;
+	int index;
+	int let_frame_offset;
+};
 
 
 class TraversalPayload
@@ -48,7 +65,7 @@ class TraversalPayload
 public:
 	enum Operation
 	{
-		LinkFunctions,
+		//LinkFunctions,
 		BindVariables,
 		TypeCoercion,
 		TypeCheck,
@@ -57,7 +74,8 @@ public:
 		OperatorOverloadConversion // Converting '+' to op_add
 	};
 
-	TraversalPayload(Operation e, bool hidden_voidptr_arg_, void* env_) : operation(e), tree_changed(false), hidden_voidptr_arg(hidden_voidptr_arg_), env(env_) {}
+	TraversalPayload(Operation e, bool hidden_voidptr_arg_, void* env_) : 
+		operation(e), tree_changed(false), hidden_voidptr_arg(hidden_voidptr_arg_), env(env_) {}
 
 	Linker* linker;
 
@@ -69,6 +87,14 @@ public:
 
 	bool hidden_voidptr_arg;
 	void* env;
+
+	FrameRef top_lvl_frame;
+
+	//bool capture_variables; // If true, variables and function expressions will capture variable and add to captured_vars
+	vector<CapturedVar> captured_vars; // For when parsing anon functions
+
+	//vector<LetBlock*> let_block_stack;
+	vector<FunctionDefinition*> func_def_stack;
 };
 
 class EmitLLVMCodeParams
@@ -83,6 +109,7 @@ public:
 	llvm::Function* currently_building_func;
 	llvm::LLVMContext* context;
 #endif
+	vector<ASTNode*> node_stack;
 };
 
 
@@ -206,6 +233,7 @@ public:
 		string name;
 	};
 
+
 	FunctionDefinition(const std::string& name, const std::vector<FunctionArg>& args, 
 		//const vector<Reference<LetASTNode> >& lets,
 		const ASTNodeRef& body, 
@@ -225,6 +253,10 @@ public:
 	FunctionSignature sig;
 	BuiltInFunctionImpl* built_in_func_impl;
 	ExternalFunctionRef external_function;
+
+	bool use_captured_vars;
+	vector<CapturedVar> captured_vars; // For when parsing anon functions
+
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual ValueRef exec(VMState& vmstate);
@@ -275,14 +307,14 @@ public:
 	virtual ASTNodeType nodeType() const { return FunctionExpressionType; }
 	virtual TypeRef type() const;
 
-	virtual void linkFunctions(Linker& linker, std::vector<ASTNode*>& stack);
+	virtual void linkFunctions(Linker& linker, TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	//virtual void bindVariables(const std::vector<ASTNode*>& stack);
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual void print(int depth, std::ostream& s) const;
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual Reference<ASTNode> clone();
 	virtual bool isConstant() const;
-	FunctionDefinition* runtimeBind(VMState& vmstate);
+	FunctionDefinition* runtimeBind(VMState& vmstate, FunctionValue*& function_value_out);
 
 	///////
 
@@ -302,12 +334,13 @@ public:
 		Unbound,
 		Let,
 		Arg,
-		Bound
+		BoundToGlobalDef
 	};
 	BindingType binding_type;
 
 	//TypeRef target_function_return_type;
-
+	bool use_captured_var;
+	int captured_var_index;
 };
 
 
@@ -317,7 +350,8 @@ public:
 	enum VariableType
 	{
 		LetVariable,
-		ArgumentVariable
+		ArgumentVariable,
+		BoundToGlobalDefVariable
 	};
 
 	Variable(const std::string& name);
@@ -326,7 +360,7 @@ public:
 	virtual ASTNodeType nodeType() const { return VariableASTNodeType; }
 	virtual TypeRef type() const;
 	virtual void print(int depth, std::ostream& s) const;
-	void bindVariables(const std::vector<ASTNode*>& stack);
+	void bindVariables(TraversalPayload& payload, const std::vector<ASTNode*>& stack);
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual Reference<ASTNode> clone();
@@ -344,6 +378,9 @@ public:
 	int bound_index; // index in parent function definition argument list.
 	//int argument_offset; // Currently, a variable must be an argument to the enclosing function
 	string name; // variable name.
+
+	bool use_captured_var;
+	int captured_var_index;
 };
 
 

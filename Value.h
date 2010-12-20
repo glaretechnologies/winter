@@ -81,19 +81,6 @@ public:
 };
 
 
-class FunctionValue : public Value
-{
-public:
-	FunctionValue(FunctionDefinition* func_def_) : func_def(func_def_) { std::cout << "FunctionValue(), this=" << this << "\n"; }
-	~FunctionValue() { std::cout << "~FunctionValue(), this=" << this << "\n"; }
-	virtual Value* clone() const { return new FunctionValue(func_def); }
-
-	virtual const std::string toString() const { return "Function"; }
-
-	FunctionDefinition* func_def;
-};
-
-
 class StructureValue : public Value
 {
 public:
@@ -103,6 +90,25 @@ public:
 	virtual const std::string toString() const { return "struct"; }
 
 	vector<ValueRef> fields;
+};
+
+
+typedef Reference<StructureValue> StructureValueRef;
+
+
+class FunctionValue : public Value
+{
+public:
+	FunctionValue(FunctionDefinition* func_def_, const Reference<StructureValue>& values_) : func_def(func_def_), captured_vars(values_) { /* std::cout << "FunctionValue(), this=" << this << "\n";*/ }
+	~FunctionValue() { /* std::cout << "~FunctionValue(), this=" << this << "\n"; */ }
+	virtual Value* clone() const { return new FunctionValue(func_def, captured_vars); }
+
+	virtual const std::string toString() const { return "Function"; }
+
+	FunctionDefinition* func_def;
+
+	// vector<ValueRef> values;
+	Reference<StructureValue> captured_vars;
 };
 
 

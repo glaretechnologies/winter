@@ -292,7 +292,8 @@ FunctionDefinition::FunctionDefinition(const std::string& name, const std::vecto
 	declared_return_type(declared_rettype),
 	built_in_func_impl(impl),
 	built_llvm_function(NULL),
-	jitted_function(NULL)
+	jitted_function(NULL),
+	use_captured_vars(false)
 {
 	sig.name = name;
 	for(unsigned int i=0; i<args_.size(); ++i)
@@ -335,7 +336,32 @@ TypeRef FunctionDefinition::type() const
 
 ValueRef FunctionDefinition::exec(VMState& vmstate)
 {
-	return ValueRef(new FunctionValue(this));
+	// Capture variables at this point, by getting them off the arg and let stack.
+	vector<ValueRef> vals;
+	for(size_t i=0; i<this->captured_vars.size(); ++i)
+	{
+		if(this->captured_vars[i].type == CapturedVar::Arg)
+		{
+			vals.push_back(vmstate.argument_stack[vmstate.func_args_start.back() + this->captured_vars[i].index]);
+		}
+		else if(this->captured_vars[i].type == CapturedVar::Let)
+		{
+			const int let_frame_offset = this->captured_vars[i].let_frame_offset;
+			assert(let_frame_offset < (int)vmstate.let_stack_start.size());
+
+			const int let_stack_start = vmstate.let_stack_start[vmstate.let_stack_start.size() - 1 - let_frame_offset];
+			vals.push_back(vmstate.let_stack[let_stack_start]);
+		}
+		else
+		{
+			assert(0);
+		}
+	}
+
+	// Put captured values into the variable struct.
+	Reference<StructureValue> var_struct(new StructureValue(vals));
+
+	return ValueRef(new FunctionValue(this, var_struct));
 }
 
 
@@ -352,7 +378,7 @@ static void printStack(VMState& vmstate)
 {
 	std::cout << indent(vmstate) << "arg Stack: [";
 	for(unsigned int i=0; i<vmstate.argument_stack.size(); ++i)
-		std::cout << vmstate.argument_stack[i]->toString() + ", ";
+		std::cout << vmstate.argument_stack[i]->toString() + (i + 1 < vmstate.argument_stack.size() ? string(", ") : string());
 	std::cout << "]\n";
 }
 
@@ -448,12 +474,23 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 		}
 	}
 
-	if(payload.operation == TraversalPayload::LinkFunctions)
-	{
-		if(this->isGenericFunction())
-			return; // Don't try and bind functions yet.
-	}
+	//if(payload.operation == TraversalPayload::BindVariables) // LinkFunctions)
+	//{
+		// If this is a generic function, we can't try and bind function expressions yet,
+		// because the binding depends on argument type due to function overloading, so we have to wait
+		// until we know the concrete type.
+//		if(this->isGenericFunction())
+//			return; // Don't try and bind functions yet.
+	//}
 
+	//bool old_use_captured_vars = payload.capture_variables;
+	//if(payload.operation == TraversalPayload::BindVariables)
+	//{
+	//	if(this->use_captured_vars) // if we are an anon function...
+	//		payload.capture_variables = true; // Tell varables in function expression tree to capture
+	//}
+
+	payload.func_def_stack.push_back(this);
 
 	stack.push_back(this);
 
@@ -464,6 +501,16 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 		this->body->traverse(payload, stack);
 
 	stack.pop_back();
+
+	payload.func_def_stack.pop_back();
+
+	//payload.capture_variables = old_use_captured_vars;
+
+	if(payload.operation == TraversalPayload::BindVariables)
+	{
+		this->captured_vars = payload.captured_vars;
+	}
+
 
 	if(payload.operation == TraversalPayload::TypeCoercion)
 	{
@@ -518,6 +565,51 @@ void FunctionDefinition::print(int depth, std::ostream& s) const
 llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
 	// This will be called for lambda expressions.
+	// Capture variables at this point, by getting them off the arg and let stack.
+
+	//vector<llvm::Value> vals;
+
+	// Load pointer to closure
+	llvm::Value* closure_pointer;
+
+	// for each captured var
+	for(size_t i=0; i<this->captured_vars.size(); ++i)
+	{
+		llvm::Value* val = NULL;
+		// If arg type
+		if(this->captured_vars[i].type == CapturedVar::Arg)
+		{
+			// Load arg
+			//NOTE: offset if return by ref
+			val = LLVMTypeUtils::getNthArg(params.currently_building_func, this->captured_vars[i].index);
+		}
+		// else if let type
+		else if(this->captured_vars[i].type == CapturedVar::Let)
+		{
+			// Load let:
+			// Walk up AST until we get to the correct let block
+			const int let_frame_offset = this->captured_vars[i].let_frame_offset;
+		}
+			
+		// store in captured var structure field
+		vector<llvm::Value*> indices;
+		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true)));
+		// Offset by one to allow room for function pointer.
+		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, i + 1, true)));
+		
+		llvm::Value* field_ptr = params.builder->CreateGEP(
+			closure_pointer, // ptr
+			indices.begin(),
+			indices.end()
+		);
+
+		params.builder->CreateStore(
+			val, // value
+			field_ptr // ptr
+		);
+	}
+
+	
 
 	llvm::FunctionType* target_func_type = LLVMTypeUtils::llvmFunctionType(
 		this->sig.param_types, 
@@ -526,10 +618,10 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params) const
 		params.hidden_voidptr_arg
 	);
 
-	return static_cast<llvm::Function*>(params.module->getOrInsertFunction(
+	return /*static_cast<llvm::Function*>(*/params.module->getOrInsertFunction(
 		this->sig.toString(), // Name
 		target_func_type // Type
-	));
+	);
 }
 
 
@@ -775,7 +867,9 @@ FunctionExpression::FunctionExpression()
 	bound_index(-1),
 	binding_type(Unbound),
 	bound_let_block(NULL),
-	bound_function(NULL)
+	bound_function(NULL),
+	use_captured_var(false),
+	captured_var_index(0)
 {
 }
 
@@ -785,7 +879,9 @@ FunctionExpression::FunctionExpression(const std::string& func_name, const ASTNo
 	bound_index(-1),
 	binding_type(Unbound),
 	bound_let_block(NULL),
-	bound_function(NULL)
+	bound_function(NULL),
+	use_captured_var(false),
+	captured_var_index(0)
 {
 	function_name = func_name;
 	argument_expressions.push_back(arg0);
@@ -793,15 +889,38 @@ FunctionExpression::FunctionExpression(const std::string& func_name, const ASTNo
 }
 
 
-FunctionDefinition* FunctionExpression::runtimeBind(VMState& vmstate)
+FunctionDefinition* FunctionExpression::runtimeBind(VMState& vmstate, FunctionValue*& function_value_out)
 {
+	if(use_captured_var)
+	{
+		// Get ref to capturedVars structure of values, will be passed in as last arg to function
+		ValueRef captured_struct = vmstate.argument_stack.back();
+		assert(dynamic_cast<StructureValue*>(captured_struct.getPointer()));
+		StructureValue* s = static_cast<StructureValue*>(captured_struct.getPointer());
+
+		ValueRef func_val = s->fields[this->captured_var_index];
+
+		assert(dynamic_cast<FunctionValue*>(func_val.getPointer()));
+
+		FunctionValue* function_val = static_cast<FunctionValue*>(func_val.getPointer());
+
+		function_value_out = function_val;
+
+		return function_val->func_def;
+	}
+
+
 	if(target_function)
+	{
+		function_value_out = NULL;
 		return target_function;
+	}
 	else if(this->binding_type == Arg)
 	{
 		ValueRef arg = vmstate.argument_stack[vmstate.func_args_start.back() + this->bound_index];
 		assert(dynamic_cast<FunctionValue*>(arg.getPointer()));
 		FunctionValue* function_value = dynamic_cast<FunctionValue*>(arg.getPointer());
+		function_value_out = function_value;
 		return function_value->func_def;
 	}
 	else
@@ -811,6 +930,7 @@ FunctionDefinition* FunctionExpression::runtimeBind(VMState& vmstate)
 		ValueRef arg = vmstate.let_stack[vmstate.let_stack_start.back() + this->bound_index];
 		assert(dynamic_cast<FunctionValue*>(arg.getPointer()));
 		FunctionValue* function_value = dynamic_cast<FunctionValue*>(arg.getPointer());
+		function_value_out = function_value;
 		return function_value->func_def;
 	}
 }
@@ -837,7 +957,8 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 
 	// Get target function.  The target function is resolved at runtime, because it may be a function 
 	// passed in as a variable to this function.
-	FunctionDefinition* use_target_func = runtimeBind(vmstate);
+	FunctionValue* function_value = NULL;
+	FunctionDefinition* use_target_func = runtimeBind(vmstate, function_value);
 
 	// Push arguments onto argument stack
 	const unsigned int initial_arg_stack_size = (unsigned int)vmstate.argument_stack.size();
@@ -854,6 +975,13 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 
 	if(vmstate.hidden_voidptr_arg)
 		vmstate.argument_stack.push_back(vmstate.argument_stack[initial_arg_stack_size - 1]);
+
+	// If the target function is an anon function and has captured values, push that onto the stack
+	if(use_target_func->use_captured_vars)
+	{
+		assert(function_value);
+		vmstate.argument_stack.push_back(ValueRef(function_value->captured_vars.getPointer()));
+	}
 
 
 	//assert(vmstate.argument_stack.size() == initial_arg_stack_size + this->argument_expressions.size());
@@ -923,58 +1051,75 @@ static bool couldCoerceFunctionCall(vector<ASTNodeRef>& argument_expressions, Fu
 	return true;
 }
 
-void FunctionExpression::linkFunctions(Linker& linker, std::vector<ASTNode*>& stack)
+
+void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
 	bool found_binding = false;
+	bool in_current_func_def = true;
+	int let_frame_offset = 0;
 	// We want to find a function that matches our argument expression types, and the function name
 
 
 
 	// First, walk up tree, and see if such a target function has been given a name with a let.
-	for(int i = (int)stack.size() - 1; i >= 0 && !found_binding; --i)
+	for(int s = (int)stack.size() - 1; s >= 0 && !found_binding; --s)
 	{
 		{
-			if(FunctionDefinition* def = dynamic_cast<FunctionDefinition*>(stack[i]))
+			if(FunctionDefinition* def = dynamic_cast<FunctionDefinition*>(stack[s]))
 			{
 				for(unsigned int i=0; i<def->args.size(); ++i)
 					if(def->args[i].name == this->function_name && doesFunctionTypeMatch(def->args[i].type))
 					{
-						//assert(dynamic_cast<Function*>(def->args[i].type.getPointer()));
-						//Function* func_type = static_cast<Function*>(def->args[i].type.getPointer());
-
-						//this->target_function_return_type = func_type->return_type;
-
 						this->bound_function = def;
-
 						this->bound_index = i;
 						this->binding_type = Arg;
 						found_binding = true;
+
+						if(!in_current_func_def && payload.func_def_stack.back()->use_captured_vars)
+						{
+							this->captured_var_index = payload.captured_vars.size();
+							this->use_captured_var = true;
+
+							CapturedVar var;
+							var.type = CapturedVar::Arg;
+							var.index = i;
+							payload.captured_vars.push_back(var);
+						}
 					}
+				in_current_func_def = false;
 			}
-			else if(LetBlock* let_block = dynamic_cast<LetBlock*>(stack[i]))
+			else if(LetBlock* let_block = dynamic_cast<LetBlock*>(stack[s]))
 			{
 				for(unsigned int i=0; i<let_block->lets.size(); ++i)
 					if(let_block->lets[i]->variable_name == this->function_name && doesFunctionTypeMatch(let_block->lets[i]->type()))
 					{
 						this->bound_index = i;
 						this->binding_type = Let;
-						// We know this lets_i body is a FunctionDefinition.
-						//FunctionDefinition* let_def = dynamic_cast<FunctionDefinition*>(let_block->lets[i]->expr.getPointer());
-						//assert(let_def);
-						//Function* let_func_type = dynamic_cast<Function*>(def->lets[i]->type().getPointer());
-						//if(!let_func_type)
-						//	throw BaseException(this->function_name + " used in function expression is not a function.");
-						//this->target_function_return_type = let_def->returnType();
-
-						//TypeRef let_type = let_block->lets[i]->type();
-						//assert(dynamic_cast<Function*>(let_type.getPointer()));
-						//Function* func_type = static_cast<Function*>(let_type.getPointer());
-						//this->target_function_return_type = func_type->return_type;
-
-
 						this->bound_let_block = let_block;
 						found_binding = true;
+
+						if(!in_current_func_def && payload.func_def_stack.back()->use_captured_vars)
+						{
+							this->captured_var_index = payload.captured_vars.size();
+							this->use_captured_var = true;
+
+							CapturedVar var;
+							var.type = CapturedVar::Let;
+							var.index = i;
+							var.let_frame_offset = let_frame_offset;
+							payload.captured_vars.push_back(var);
+						}
+
 					}
+				
+				// We only want to count an ancestor let block as an offsetting block if we are not currently in a let clause of it.
+				bool is_this_let_clause = false;
+				if(s + 1 < (int)stack.size())
+					for(size_t z=0; z<let_block->lets.size(); ++z)
+						if(let_block->lets[z].getPointer() == stack[s+1])
+							is_this_let_clause = true;
+				if(!is_this_let_clause)
+					let_frame_offset++;
 			}
 		}
 	}
@@ -992,8 +1137,7 @@ void FunctionExpression::linkFunctions(Linker& linker, std::vector<ASTNode*>& st
 		this->target_function = linker.findMatchingFunction(sig).getPointer();
 		if(this->target_function)
 		{
-			this->binding_type = Bound;
-			//this->target_function_return_type = this->target_function->returnType();
+			this->binding_type = BoundToGlobalDef;
 		}
 		else
 		{
@@ -1022,8 +1166,7 @@ void FunctionExpression::linkFunctions(Linker& linker, std::vector<ASTNode*>& st
 
 				
 				this->target_function = possible_matches[0].getPointer();
-				this->binding_type = Bound;
-				//this->target_function_return_type = this->target_function->returnType();
+				this->binding_type = BoundToGlobalDef;
 			}
 			else if(possible_matches.size() > 1)
 			{
@@ -1079,9 +1222,15 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 
 	stack.pop_back();
 
-	if(payload.operation == TraversalPayload::LinkFunctions)
-		linkFunctions(*payload.linker, stack);
+	if(payload.operation == TraversalPayload::BindVariables) // LinkFunctions)
+	{
+		// If this is a generic function, we can't try and bind function expressions yet,
+		// because the binding depends on argument type due to function overloading, so we have to wait
+		// until we know the concrete type.
 
+		if(!payload.func_def_stack.back()->isGenericFunction())
+			linkFunctions(*payload.linker, payload, stack);
+	}
 }
 
 
@@ -1103,7 +1252,7 @@ void FunctionExpression::print(int depth, std::ostream& s) const
 
 TypeRef FunctionExpression::type() const
 {
-	if(this->binding_type == Bound)
+	if(this->binding_type == BoundToGlobalDef)
 	{
 		assert(this->target_function);
 		return this->target_function->returnType();
@@ -1265,7 +1414,7 @@ Reference<ASTNode> FunctionExpression::clone()
 bool FunctionExpression::isConstant() const
 {
 	// For now, we'll saw a function expression bound to an argument of let var is not constant.
-	if(this->binding_type != Bound)
+	if(this->binding_type != BoundToGlobalDef)
 		return false;
 
 	for(unsigned int i=0; i<argument_expressions.size(); ++i)
@@ -1279,170 +1428,154 @@ bool FunctionExpression::isConstant() const
 
 
 Variable::Variable(const std::string& name_)
-:	//ASTNode(parent),
-	//referenced_var(NULL),
-	name(name_),
-	//argument_offset(-1),
+:	name(name_),
 	bound_index(-1),
 	bound_function(NULL),
-	bound_let_block(NULL)
-	//parent_anon_function(NULL)
+	bound_let_block(NULL),
+	use_captured_var(false),
+	captured_var_index(0)
 {
-/*	ASTNode* c = parent;
-	while(c)
-	{
-		FunctionDefinition* def = dynamic_cast<FunctionDefinition*>(c);
-		if(def != NULL)
-		{
-			for(unsigned int i=0; i<def->lets.size(); ++i)
-				if(def->lets[i]->variable_name == this->name)
-				{
-					this->argument_offset = (int)def->lets.size() - i;
-					this->referenced_var_type = def->args[i].type;
-					this->vartype = LetVariable;
-					return;
-				}
-
-			for(unsigned int i=0; i<def->args.size(); ++i)
-				if(def->args[i].name == this->name)
-				{
-					this->argument_offset = (int)def->args.size() - i;
-					this->referenced_var_type = def->args[i].type;
-					this->vartype = ArgumentVariable;
-					return;
-				}
-
-			if(this->argument_offset == -1)
-				throw BaseException("No such function argument '" + this->name + "'");
-			c = NULL; // Break from while loop
-		}
-		else
-			c = c->getParent();
-	}
-
-	throw BaseException("No such function argument '" + this->name + "'");
-*/
 }
 
 
-void Variable::bindVariables(const std::vector<ASTNode*>& stack)
+void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNode*>& stack)
 {
-	for(int i = (int)stack.size() - 1; i >= 0; --i)
+	bool in_current_func_def = true;
+	int let_frame_offset = 0;
+	for(int s = (int)stack.size() - 1; s >= 0; --s)
 	{
+		if(FunctionDefinition* def = dynamic_cast<FunctionDefinition*>(stack[s]))
 		{
-			if(FunctionDefinition* def = dynamic_cast<FunctionDefinition*>(stack[i]))
-			{
-				//for(unsigned int i=0; i<def->lets.size(); ++i)
-				//	if(def->lets[i]->variable_name == this->name)
-				//	{
-				//		this->argument_index = i;
-				//		//this->argument_offset = (int)def->lets.size() - i;
-				//		//this->referenced_var_type = def->lets[i]->type();
-				//		this->vartype = LetVariable;
-				//		this->parent_function = def;
-				//		return;
-				//	}
+			for(unsigned int i=0; i<def->args.size(); ++i)
+				if(def->args[i].name == this->name)
+				{
+					this->vartype = ArgumentVariable;
+					this->bound_index = i;
+					this->bound_function = def;
 
-				for(unsigned int i=0; i<def->args.size(); ++i)
-					if(def->args[i].name == this->name)
-					{
-						this->vartype = ArgumentVariable;
-						this->bound_index = i;
-						this->bound_function = def;
-						return;
-					}
 
-			}
-			else if(LetBlock* let_block = dynamic_cast<LetBlock*>(stack[i]))
-			{
-				for(unsigned int i=0; i<let_block->lets.size(); ++i)
-					if(let_block->lets[i]->variable_name == this->name)
+					if(!in_current_func_def && payload.func_def_stack.back()->use_captured_vars)
 					{
-						this->vartype = LetVariable;
-						this->bound_index = i;
-						this->bound_let_block = let_block;
-						return;
+						this->captured_var_index = payload.captured_vars.size();
+						this->use_captured_var = true;
+
+						CapturedVar var;
+						var.type = CapturedVar::Arg;
+						var.index = i;
+						payload.captured_vars.push_back(var);
 					}
-			}
-			
+					return;
+				}
+
+			in_current_func_def = false;
 		}
-
-		//if(this->bound_index == -1)
-		//	throw BaseException("No such function argument or let expression '" + this->name + "'");
-
-#if 0
+		else if(LetBlock* let_block = dynamic_cast<LetBlock*>(stack[s]))
 		{
-			AnonFunction* def = dynamic_cast<AnonFunction*>(stack[i]);
-			if(def != NULL)
-			{
-				/*for(unsigned int i=0; i<def->lets.size(); ++i)
-					if(def->lets[i]->variable_name == this->name)
-					{
-						this->argument_index = i;
-						this->argument_offset = (int)def->lets.size() - i;
-						this->referenced_var_type = def->args[i].type;
-						this->vartype = LetVariable;
-						this->parent_function = def;
-						return;
-					}*/
+			for(unsigned int i=0; i<let_block->lets.size(); ++i)
+				if(let_block->lets[i]->variable_name == this->name)
+				{
+					this->vartype = LetVariable;
+					this->bound_index = i;
+					this->bound_let_block = let_block;
 
-				for(unsigned int i=0; i<def->args.size(); ++i)
-					if(def->args[i].name == this->name)
+					if(!in_current_func_def && payload.func_def_stack.back()->use_captured_vars)
 					{
-						this->argument_index = i;
-						//this->argument_offset = (int)def->args.size() - i;
-						this->referenced_var_type = def->args[i].type;
-						this->vartype = ArgumentVariable;
-						this->parent_anon_function = def;
-						return;
+						this->captured_var_index = payload.captured_vars.size();
+						this->use_captured_var = true;
+
+						CapturedVar var;
+						var.type = CapturedVar::Let;
+						var.index = i;
+						var.let_frame_offset = let_frame_offset;
+						payload.captured_vars.push_back(var);
 					}
+		
+					return;
+				}
 
-				if(this->argument_index == -1)
-					throw BaseException("No such function argument '" + this->name + "'");
-			}
+			// We only want to count an ancestor let block as an offsetting block if we are not currently in a let clause of it.
+			bool is_this_let_clause = false;
+			for(size_t z=0; z<let_block->lets.size(); ++z)
+				if(let_block->lets[z].getPointer() == stack[s+1])
+					is_this_let_clause = true;
+			if(!is_this_let_clause)
+				let_frame_offset++;
 		}
-#endif
 	}
-	throw BaseException("Variable::bindVariables(): No such function argument '" + this->name + "'");
+
+	// Try and bind to top level function definition
+//	BufferRoot* root = static_cast<BufferRoot*>(stack[0]);
+//	vector<FunctionDefinitionRef
+//	for(size_t i=0; i<stack[0]->get
+	Frame::NameToFuncMapType::iterator res = payload.top_lvl_frame->name_to_functions_map.find(this->name);
+	if(res != payload.top_lvl_frame->name_to_functions_map.end())
+	{
+		vector<FunctionDefinitionRef>& matching_functions = res->second;
+
+		assert(matching_functions.size() > 0);
+
+		if(matching_functions.size() > 1)
+			throw BaseException("Ambiguous binding for variable '" + this->name + "': multiple functions with name.");
+
+		this->vartype = BoundToGlobalDefVariable;
+		this->bound_function = matching_functions[0].getPointer();
+		return;
+	}
+
+
+	throw BaseException("Variable::bindVariables(): No such function, function argument or let definition '" + this->name + "'");
 }
 
 
 void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
 	if(payload.operation == TraversalPayload::BindVariables)
-		this->bindVariables(stack);
+		this->bindVariables(payload, stack);
 }
 
 
 ValueRef Variable::exec(VMState& vmstate)
 {
-	assert(this->bound_index >= 0);
+	if(use_captured_var)
+	{
+		// Get ref to capturedVars structure of values, will be passed in as last arg to function
+		ValueRef captured_struct = vmstate.argument_stack.back();
+		assert(dynamic_cast<StructureValue*>(captured_struct.getPointer()));
+		StructureValue* s = static_cast<StructureValue*>(captured_struct.getPointer());
+
+		return s->fields[this->captured_var_index];
+	}
+
 
 	if(this->vartype == ArgumentVariable)
 	{
 		return vmstate.argument_stack[vmstate.func_args_start.back() + bound_index];
 	}
-	else
+	else if(this->vartype == LetVariable)
 	{
 		return vmstate.let_stack[vmstate.let_stack_start.back() + bound_index];
+	}
+	else if(this->vartype == BoundToGlobalDefVariable)
+	{
+		StructureValueRef captured_vars(new StructureValue(vector<ValueRef>()));
+		return ValueRef(new FunctionValue(this->bound_function, captured_vars));
+	}
+	else
+	{
+		assert(!"invalid vartype.");
+		return ValueRef(NULL);
 	}
 }
 
 
 TypeRef Variable::type() const
 {
-	assert(this->bound_index >= 0);
-	//assert(referenced_var_type.nonNull());
-
-	//if(!this->referenced_var)
-	//	throw BaseException("referenced_var == NULL");
-	//return this->referenced_var->type();
-	//return this->referenced_var_type;
-
 	if(this->vartype == LetVariable)
 		return this->bound_let_block->lets[this->bound_index]->type();
 	else if(this->vartype == ArgumentVariable)
 		return this->bound_function->args[this->bound_index].type;
+	else if(this->vartype == BoundToGlobalDefVariable)
+		return this->bound_function->type();
 	else
 	{
 		assert(!"invalid vartype.");
@@ -1453,7 +1586,7 @@ TypeRef Variable::type() const
 
 inline static const std::string varType(Variable::VariableType t)
 {
-	return t == Variable::LetVariable ? "Let" : "Arg";
+	return t == Variable::LetVariable ? "Let" : (t == Variable::ArgumentVariable ? "Arg" : "BoundToGlobalDef");
 }
 
 
@@ -1464,12 +1597,6 @@ void Variable::print(int depth, std::ostream& s) const
 }
 
 
-/*static bool shouldPassByValue(const Type& type)
-{
-	return true;
-}*/
-
-
 llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
 #if USE_LLVM
@@ -1477,7 +1604,7 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params) const
 	{
 		return this->bound_let_block->getLetExpressionLLVMValue(params, this->bound_index);
 	}
-	else
+	else if(vartype == ArgumentVariable)
 	{
 		assert(this->bound_function);
 
@@ -1498,6 +1625,10 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params) const
 			);
 
 		}*/
+	}
+	else
+	{
+		return this->bound_function->emitLLVMCode(params);
 	}
 #else
 	return NULL;
@@ -1728,6 +1859,8 @@ bool MapLiteral::isConstant() const
 
 
 //----------------------------------------------------------------------------------------------
+
+
 ArrayLiteral::ArrayLiteral(const std::vector<ASTNodeRef>& elems)
 :	elements(elems)
 {
@@ -1970,16 +2103,6 @@ bool VectorLiteral::isConstant() const
 //------------------------------------------------------------------------------------------
 
 
-/*void MapLiteral::linkFunctions(Linker& linker)
-{
-	for(unsigned int i=0; i<this->items.size(); ++i)
-	{
-		this->items[i].first->linkFunctions(linker);
-		this->items[i].second->linkFunctions(linker);
-	}
-}*/
-
-
 ValueRef StringLiteral::exec(VMState& vmstate)
 {
 	return ValueRef(new StringValue(value));
@@ -2005,6 +2128,7 @@ Reference<ASTNode> StringLiteral::clone()
 }
 
 //-----------------------------------------------------------------------------------------------
+
 
 class AddOp
 {
@@ -2723,7 +2847,6 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 }
 
 
-
 void DivExpression::print(int depth, std::ostream& s) const
 {
 	printMargin(depth, s);
@@ -2803,15 +2926,6 @@ ValueRef UnaryMinusExpression::exec(VMState& vmstate)
 }
 
 
-/*void MulExpression::bindVariables(const std::vector<ASTNode*>& stack)
-{
-	std::vector<ASTNode*> s(stack);
-	s.push_back(this);
-	this->a->bindVariables(s);
-	this->b->bindVariables(s);
-}*/
-
-
 void UnaryMinusExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
 	if(payload.operation == TraversalPayload::ConstantFolding)
@@ -2842,20 +2956,12 @@ void UnaryMinusExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 }
 
 
-
 void UnaryMinusExpression::print(int depth, std::ostream& s) const
 {
 	printMargin(depth, s);
 	s << "Unary Minus Expression\n";
 	this->expr->print(depth+1, s);
 }
-
-
-/*void MulExpression::linkFunctions(Linker& linker)
-{
-	a->linkFunctions(linker);
-	b->linkFunctions(linker);
-}*/
 
 
 llvm::Value* UnaryMinusExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
@@ -2936,20 +3042,6 @@ void LetASTNode::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 }
 
 
-/*void LetASTNode::linkFunctions(Linker& linker)
-{
-	expr->linkFunctions(linker);
-}
-
-
-void LetASTNode::bindVariables(const std::vector<ASTNode*>& stack)
-{
-	std::vector<ASTNode*> s(stack);
-	s.push_back(this);
-	expr->bindVariables(s);
-}*/
-
-
 llvm::Value* LetASTNode::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
 	return expr->emitLLVMCode(params);
@@ -2971,6 +3063,7 @@ bool LetASTNode::isConstant() const
 
 
 //---------------------------------------------------------------------------------
+
 
 template <class T> static bool lt(Value* a, Value* b)
 {
@@ -3161,10 +3254,13 @@ bool ComparisonExpression::isConstant() const
 
 ValueRef LetBlock::exec(VMState& vmstate)
 {
+	const size_t let_stack_size = vmstate.let_stack.size();
+
 	// Evaluate let clauses, which will each push the result onto the let stack
-	vmstate.let_stack_start.push_back(vmstate.let_stack.size()); // Push let frame index
 	for(unsigned int i=0; i<lets.size(); ++i)
 		vmstate.let_stack.push_back(lets[i]->exec(vmstate));
+
+	vmstate.let_stack_start.push_back(let_stack_size); // Push let frame index
 
 	return this->expr->exec(vmstate);
 
@@ -3205,7 +3301,12 @@ void LetBlock::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 	for(unsigned int i=0; i<lets.size(); ++i)
 		lets[i]->traverse(payload, stack);
 
+	//payload.let_block_stack.push_back(this);
+
 	expr->traverse(payload, stack);
+
+	//payload.let_block_stack.pop_back();
+
 	stack.pop_back();
 }
 

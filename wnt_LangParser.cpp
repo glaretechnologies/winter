@@ -439,9 +439,23 @@ a
 ASTNodeRef LangParser::parseVariableExpression(const ParseInfo& p)
 {
 	const std::string name = parseIdentifier("variable name", p);
+	if(isKeyword(name))
+		throw LangParserExcep("Cannot call a variable '" + name + "' - is a keyword.  " +  errorPositionPrevToken(p));
+
 	Variable* var = new Variable(name);
 	return ASTNodeRef(var);
 }
+
+
+bool LangParser::isKeyword(const std::string& name)
+{
+	return 
+		name == "let" ||
+		name == "def" ||
+		name == "in";
+	// TODO: finish
+}
+
 
 
 Reference<FunctionDefinition> LangParser::parseFunctionDefinition(const ParseInfo& p)
@@ -672,7 +686,7 @@ Reference<ASTNode> LangParser::parseLetBlock(const ParseInfo& p)
 		if(in != "in")
 			throw BaseException("Missing 'in' after let expressions.");
 
-		ASTNodeRef main_expr = parseExpression(p);
+		ASTNodeRef main_expr = parseLetBlock(p);
 
 		return ASTNodeRef(new LetBlock(main_expr, lets));
 	}
@@ -1121,7 +1135,9 @@ FunctionDefinitionRef LangParser::parseAnonFunction(const ParseInfo& p)
 
 	const std::string func_name = "anon_func_" + ::toString(p.i);
 
-	const FunctionDefinitionRef def = parseFunctionDefinitionGivenName(func_name, p);
+	FunctionDefinitionRef def = parseFunctionDefinitionGivenName(func_name, p);
+
+	def->use_captured_vars = true;
 
 	// Add this anon function to list of parsed function definitions.
 	p.func_defs.push_back(def);
@@ -1223,6 +1239,19 @@ const std::string LangParser::errorPosition(const std::string& buffer, unsigned 
 	StringUtils::getPosition(buffer, pos, line, col);
 	return "  Line " + toString(line + 1) + ", column " + toString(col + 1);
 }
+
+
+const std::string LangParser::errorPosition(const ParseInfo& p)
+{
+	return errorPosition(p.text_buffer, p.tokens[p.i]->char_index);
+}
+
+
+const std::string LangParser::errorPositionPrevToken(const ParseInfo& p)
+{
+	return errorPosition(p.text_buffer, p.tokens[p.i - 1]->char_index);
+}
+
 
 
 void LangParser::test()

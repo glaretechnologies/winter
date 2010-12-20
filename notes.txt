@@ -1,6 +1,18 @@
 Copyright 2009- Nicholas Chapman
 
 
+
+Frame:
+
+map<string, vector<FunctionDefinitionRef> > name_to_functions_map
+
+
+
+
+
+
+
+
 Helpful things todo:
 ====================
 Allow lets anywhere, particularly inside if statements.
