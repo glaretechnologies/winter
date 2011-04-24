@@ -44,19 +44,21 @@ class BuiltInFunctionImpl;
 class FunctionDefinition;
 class Frame;
 class LetBlock;
+class ASTNode;
 
 
 class CapturedVar
 {
 public:
-	enum Type
+	enum CapturedVarType
 	{
 		Let,
 		Arg
 	};
-	Type type;
+	CapturedVarType vartype;
 	int index;
 	int let_frame_offset;
+	TypeRef type;
 };
 
 
@@ -280,6 +282,11 @@ public:
 		bool hidden_voidptr_arg
 		//std::map<Lang::FunctionSignature, llvm::Function*>& external_functions
 	);
+
+	llvm::Type* getClosureStructLLVMType(llvm::LLVMContext& context) const;
+
+
+	llvm::Type* closure_type;
 
 	llvm::Function* built_llvm_function;
 	void* jitted_function;

@@ -293,7 +293,8 @@ FunctionDefinition::FunctionDefinition(const std::string& name, const std::vecto
 	built_in_func_impl(impl),
 	built_llvm_function(NULL),
 	jitted_function(NULL),
-	use_captured_vars(false)
+	use_captured_vars(false),
+	closure_type(false)
 {
 	sig.name = name;
 	for(unsigned int i=0; i<args_.size(); ++i)
@@ -340,11 +341,11 @@ ValueRef FunctionDefinition::exec(VMState& vmstate)
 	vector<ValueRef> vals;
 	for(size_t i=0; i<this->captured_vars.size(); ++i)
 	{
-		if(this->captured_vars[i].type == CapturedVar::Arg)
+		if(this->captured_vars[i].vartype == CapturedVar::Arg)
 		{
 			vals.push_back(vmstate.argument_stack[vmstate.func_args_start.back() + this->captured_vars[i].index]);
 		}
-		else if(this->captured_vars[i].type == CapturedVar::Let)
+		else if(this->captured_vars[i].vartype == CapturedVar::Let)
 		{
 			const int let_frame_offset = this->captured_vars[i].let_frame_offset;
 			assert(let_frame_offset < (int)vmstate.let_stack_start.size());
@@ -571,20 +572,23 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 	// Load pointer to closure
 	llvm::Value* closure_pointer;
+	closure_pointer = params.builder->CreateAlloca(
+		this->getClosureStructLLVMType(*params.context)
+	);
 
 	// for each captured var
 	for(size_t i=0; i<this->captured_vars.size(); ++i)
 	{
 		llvm::Value* val = NULL;
 		// If arg type
-		if(this->captured_vars[i].type == CapturedVar::Arg)
+		if(this->captured_vars[i].vartype == CapturedVar::Arg)
 		{
 			// Load arg
 			//NOTE: offset if return by ref
 			val = LLVMTypeUtils::getNthArg(params.currently_building_func, this->captured_vars[i].index);
 		}
 		// else if let type
-		else if(this->captured_vars[i].type == CapturedVar::Let)
+		else if(this->captured_vars[i].vartype == CapturedVar::Let)
 		{
 			// Load let:
 			// Walk up AST until we get to the correct let block
@@ -859,6 +863,21 @@ bool FunctionDefinition::isConstant() const
 }
 
 
+llvm::Type* FunctionDefinition::getClosureStructLLVMType(llvm::LLVMContext& context) const
+{
+	vector<const llvm::Type*> field_types(this->captured_vars.size());
+	for(size_t i=0; i<this->captured_vars.size(); ++i)
+	{
+		field_types[i] = this->captured_vars[i].type->LLVMType(context);
+	}
+
+	return llvm::StructType::get(
+		context,
+		field_types
+	);
+}
+
+
 //--------------------------------------------------------------------------------
 
 
@@ -1057,6 +1076,8 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 	bool found_binding = false;
 	bool in_current_func_def = true;
 	int let_frame_offset = 0;
+
+
 	// We want to find a function that matches our argument expression types, and the function name
 
 
@@ -1065,11 +1086,14 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 	for(int s = (int)stack.size() - 1; s >= 0 && !found_binding; --s)
 	{
 		{
-			if(FunctionDefinition* def = dynamic_cast<FunctionDefinition*>(stack[s]))
+			if(FunctionDefinition* def = dynamic_cast<FunctionDefinition*>(stack[s])) // If node is a function definition
 			{
 				for(unsigned int i=0; i<def->args.size(); ++i)
+				{
+					// If the argument is a function, and its name and sig matches our function expression...
 					if(def->args[i].name == this->function_name && doesFunctionTypeMatch(def->args[i].type))
 					{
+						// Then bind this function call to this argument
 						this->bound_function = def;
 						this->bound_index = i;
 						this->binding_type = Arg;
@@ -1080,12 +1104,14 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 							this->captured_var_index = payload.captured_vars.size();
 							this->use_captured_var = true;
 
+							// Add this function argument as a variable that has to be captured for closures.
 							CapturedVar var;
-							var.type = CapturedVar::Arg;
+							var.vartype = CapturedVar::Arg;
 							var.index = i;
 							payload.captured_vars.push_back(var);
 						}
 					}
+				}
 				in_current_func_def = false;
 			}
 			else if(LetBlock* let_block = dynamic_cast<LetBlock*>(stack[s]))
@@ -1103,8 +1129,9 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 							this->captured_var_index = payload.captured_vars.size();
 							this->use_captured_var = true;
 
+							// Add this function argument as a variable that has to be captured for closures.
 							CapturedVar var;
-							var.type = CapturedVar::Let;
+							var.vartype = CapturedVar::Let;
 							var.index = i;
 							var.let_frame_offset = let_frame_offset;
 							payload.captured_vars.push_back(var);
@@ -1442,13 +1469,14 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 {
 	bool in_current_func_def = true;
 	int let_frame_offset = 0;
-	for(int s = (int)stack.size() - 1; s >= 0; --s)
+	for(int s = (int)stack.size() - 1; s >= 0; --s) // Walk up the stack of ancestor nodes
 	{
-		if(FunctionDefinition* def = dynamic_cast<FunctionDefinition*>(stack[s]))
+		if(FunctionDefinition* def = dynamic_cast<FunctionDefinition*>(stack[s])) // If node is a function definition:
 		{
-			for(unsigned int i=0; i<def->args.size(); ++i)
-				if(def->args[i].name == this->name)
+			for(unsigned int i=0; i<def->args.size(); ++i) // For each argument to the function:
+				if(def->args[i].name == this->name) // If the argument name matches this variable name:
 				{
+					// Bind this variable to the argument.
 					this->vartype = ArgumentVariable;
 					this->bound_index = i;
 					this->bound_function = def;
@@ -1459,8 +1487,9 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 						this->captured_var_index = payload.captured_vars.size();
 						this->use_captured_var = true;
 
+						// Add this function argument as a variable that has to be captured for closures.
 						CapturedVar var;
-						var.type = CapturedVar::Arg;
+						var.vartype = CapturedVar::Arg;
 						var.index = i;
 						payload.captured_vars.push_back(var);
 					}
@@ -1483,8 +1512,9 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 						this->captured_var_index = payload.captured_vars.size();
 						this->use_captured_var = true;
 
+						// Add this function argument as a variable that has to be captured for closures.
 						CapturedVar var;
-						var.type = CapturedVar::Let;
+						var.vartype = CapturedVar::Let;
 						var.index = i;
 						var.let_frame_offset = let_frame_offset;
 						payload.captured_vars.push_back(var);

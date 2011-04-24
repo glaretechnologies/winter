@@ -2,6 +2,22 @@ Copyright 2009- Nicholas Chapman
 
 
 
+Closures:
+
+When returning functions from functions, we need to return the captured environment as well (closure)
+The closure will look something like
+
+struct Closure
+{
+	captured_var_1;
+	captured_var_2;
+	...
+	captured_var_N;
+
+	void* function_ptr
+}
+
+
 Frame:
 
 map<string, vector<FunctionDefinitionRef> > name_to_functions_map

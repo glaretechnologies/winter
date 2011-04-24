@@ -40,10 +40,11 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
+				AdditionalOptions="/MP"
 				Optimization="0"
 				AdditionalIncludeDirectories=".;C:\programming\zlib123;C:\programming\indigo\trunk;C:\programming\llvm\llvm_27_cmake_install_32_debug\include"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;USE_LLVM=1;_CRT_SECURE_NO_WARNINGS;_SECURE_SCL=0"
-				MinimalRebuild="true"
+				MinimalRebuild="false"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
 				UsePrecompiledHeader="0"
@@ -117,6 +118,7 @@
 			/>
 			<Tool
 				Name="VCCLCompilerTool"
+				AdditionalOptions="/MP"
 				Optimization="2"
 				EnableIntrinsicFunctions="true"
 				AdditionalIncludeDirectories="C:\programming\zlib123;C:\programming\indigo\trunk;C:\programming\llvm\llvm_27_cmake_install_32\include"
