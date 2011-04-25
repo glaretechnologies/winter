@@ -80,7 +80,8 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 			TypeRef T(new GenericType(0));
 			args[0].type = TypeRef(new Function(
 				vector<TypeRef>(2, T), // arg types
-				T // return type
+				T, // return type
+				vector<TypeRef>() // captured var types
 			));
 			args[0].name = "f";
 			args[1].type = TypeRef(new ArrayType(T));
@@ -856,7 +857,11 @@ TypeRef LangParser::parseFunctionType(const ParseInfo& p, const std::vector<std:
 	for(int i=0; i<(int)types.size() - 1; ++i)
 		arg_types.push_back(types[i]);
 
-	return TypeRef(new Function(arg_types, types.back()));
+	return TypeRef(new Function(
+		arg_types, 
+		types.back(), 
+		vector<TypeRef>() // captured var types
+	));
 }
 
 

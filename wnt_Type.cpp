@@ -148,34 +148,80 @@ const std::string Function::toString() const // { return "function";
 	return s + ">";
 }
 
+/*
 
+
+
+Let's say we have f(int x, int y, int z) x 
+That has captured two vars, and one uncaptured var (z)
+so we have
+struct CapturedVars
+{
+	int x;
+	int y;
+}
+
+void (*FPtr)(int x, int y, int z, CapturedVars* vars);
+
+and finally
+
+struct Closure
+{
+	FPtr func;
+	CapturedVars vars;
+}
+
+*/
 const llvm::Type* Function::LLVMType(llvm::LLVMContext& context) const
 {
+	// Build LLVM CapturedVars struct
+	vector<const llvm::Type*> cap_var_types;
+	
+	for(size_t i=0; i<this->captured_var_types.size(); ++i)
+		cap_var_types.push_back(this->captured_var_types[i]->LLVMType(context));
+
+	const llvm::Type* cap_var_struct = llvm::StructType::get(
+		context,
+		cap_var_types
+	);
+
+
+	// Build vector of function args
 	vector<const llvm::Type*> llvm_arg_types(this->arg_types.size());
 	for(size_t i=0; i<this->arg_types.size(); ++i)
 		llvm_arg_types[i] = this->arg_types[i]->LLVMType(context);
 
-	//TEMP HACK: add hidden void* arg
+	// Add Pointer to captured var struct
+	llvm_arg_types.push_back(LLVMTypeUtils::pointerType(*cap_var_struct));
+
+	//TEMP HACK: add hidden void* arg  NOTE: should only do this when hidden_void_arg is true.
 	llvm_arg_types.push_back(LLVMTypeUtils::voidPtrType(context));
 
+	// Construct the function pointer type
 	const llvm::Type* func_ptr_type = LLVMTypeUtils::pointerType(*llvm::FunctionType::get(
 		this->return_type->LLVMType(context), // result type
 		llvm_arg_types,
 		false // is var arg
 	));
 
-	vector<const llvm::Type*> field_types;
+	//vector<const llvm::Type*> field_types;
 
 	// Add pointer to function type
-	field_types.push_back(func_ptr_type);
+	//field_types.push_back(func_ptr_type);
 
 	//TEMP HACK: no captured vars
 	//for(size_t i=0; i<this->captured_vars.size(); ++i)
 	//	field_types.push_back(this->captured_vars[i].type->LLVMType(context));
 
+	// Make the vector of fields for the closure type
+	vector<const llvm::Type*> closure_field_types;
+	closure_field_types.push_back(func_ptr_type);
+	closure_field_types.push_back(cap_var_struct);
+
+	// Return the closure structure type.
 	return llvm::StructType::get(
 		context,
-		field_types
+		closure_field_types
 	);
 }
 

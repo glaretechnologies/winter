@@ -144,10 +144,13 @@ public:
 class Function : public Type
 {
 public:
-	Function(const std::vector<TypeRef>& arg_types_, TypeRef return_type_) : arg_types(arg_types_), return_type(return_type_) {}
+	Function(const std::vector<TypeRef>& arg_types_, TypeRef return_type_, 
+		const std::vector<TypeRef>& captured_var_types_) 
+		: arg_types(arg_types_), return_type(return_type_), captured_var_types(captured_var_types_) {}
 
 	TypeRef return_type;
 	std::vector<TypeRef> arg_types;
+	std::vector<TypeRef> captured_var_types;
 
 	virtual TypeType getType() const { return FunctionType; }
 	virtual const std::string toString() const; // { return "function"; }

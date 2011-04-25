@@ -50,15 +50,25 @@ class ASTNode;
 class CapturedVar
 {
 public:
+	CapturedVar();
+
 	enum CapturedVarType
 	{
 		Let,
 		Arg
 	};
+
+	TypeRef type() const;
+
+
 	CapturedVarType vartype;
 	int index;
 	int let_frame_offset;
-	TypeRef type;
+	//TypeRef type;
+
+
+	FunctionDefinition* bound_function; // Function for which the variable is an argument of,
+	LetBlock* bound_let_block;
 };
 
 
@@ -93,7 +103,7 @@ public:
 	FrameRef top_lvl_frame;
 
 	//bool capture_variables; // If true, variables and function expressions will capture variable and add to captured_vars
-	vector<CapturedVar> captured_vars; // For when parsing anon functions
+	//vector<CapturedVar> captured_vars; // For when parsing anon functions
 
 	//vector<LetBlock*> let_block_stack;
 	vector<FunctionDefinition*> func_def_stack;
@@ -284,6 +294,13 @@ public:
 	);
 
 	// llvm::Type* getClosureStructLLVMType(llvm::LLVMContext& context) const;
+	TypeRef getCapturedVariablesStructType() const;
+
+	// If the function is return by value, returns winter_index, else returns winter_index + 1
+	// as the zeroth index will be the sret pointer.
+	int getLLVMArgIndex(int winter_index);
+
+	int getCapturedVarStructLLVMArgIndex();
 
 
 	llvm::Type* closure_type;
@@ -354,11 +371,13 @@ public:
 class Variable : public ASTNode
 {
 public:
+	// More accurately, type of binding
 	enum VariableType
 	{
 		LetVariable,
 		ArgumentVariable,
-		BoundToGlobalDefVariable
+		BoundToGlobalDefVariable,
+		CapturedVariable
 	};
 
 	Variable(const std::string& name);
@@ -386,8 +405,9 @@ public:
 	//int argument_offset; // Currently, a variable must be an argument to the enclosing function
 	string name; // variable name.
 
-	bool use_captured_var;
-	int captured_var_index;
+	// bool use_captured_var;
+	// int captured_var_index;
+	int uncaptured_bound_index;
 };
 
 

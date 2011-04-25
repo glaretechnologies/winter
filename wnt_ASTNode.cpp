@@ -209,6 +209,32 @@ T cast(ValueRef& v)
 }
 
 
+CapturedVar::CapturedVar()
+:	bound_function(NULL),
+	bound_let_block(NULL)
+{}
+
+
+TypeRef CapturedVar::type() const
+{
+	if(this->vartype == Let)
+	{
+		assert(this->bound_let_block);
+		return this->bound_let_block->lets[this->index]->type();
+	}
+	else if(this->vartype == Arg)
+	{
+		assert(this->bound_function);
+		return this->bound_function->args[this->index].type;
+	}
+	else
+	{
+		assert(!"Invalid vartype");
+		return TypeRef();
+	}
+}
+
+
 /*
 ASTNode::ASTNode()
 {
@@ -331,7 +357,11 @@ TypeRef FunctionDefinition::type() const
 	for(size_t i=0; i<this->args.size(); ++i)
 		arg_types[i] = this->args[i].type;
 
-	return TypeRef(new Function(arg_types, this->returnType()));
+	vector<TypeRef> captured_var_types;
+	for(size_t i=0; i<this->captured_vars.size(); ++i)
+		captured_var_types.push_back(this->captured_vars[i].type());
+
+	return TypeRef(new Function(arg_types, this->returnType(), captured_var_types));
 }
 
 
@@ -498,6 +528,9 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 	//for(unsigned int i=0; i<lets.size(); ++i)
 	//	lets[i]->traverse(payload, stack);
 
+	if(this->sig.name == "main")
+		int a = 9;//TEMP
+
 	if(this->body.nonNull()) // !this->built_in_func_impl)
 		this->body->traverse(payload, stack);
 
@@ -509,7 +542,13 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 
 	if(payload.operation == TraversalPayload::BindVariables)
 	{
-		this->captured_vars = payload.captured_vars;
+		//this->captured_vars = payload.captured_vars;
+
+		//this->declared_return_type = 
+		if(this->declared_return_type.nonNull() && this->declared_return_type->getType() == Type::FunctionType)
+		{
+			Function* ftype = static_cast<Function*>(this->declared_return_type.getPointer());
+		}
 	}
 
 
@@ -597,6 +636,10 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params) const
 			target_func_type // Type
 		);
 
+		std::cout << "closure_pointer: " << std::endl;
+		//TEMP
+		closure_pointer->dump();
+
 		// Store function pointer in the closure structure
 		vector<llvm::Value*> indices;
 		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))); // array index
@@ -634,7 +677,10 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params) const
 			// Walk up AST until we get to the correct let block
 			const int let_frame_offset = this->captured_vars[i].let_frame_offset;
 
+		
+
 			// TODO: set val
+			assert(0);
 		}
 			
 		// store in captured var structure field
@@ -667,13 +713,28 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	)
 {
 #if USE_LLVM
+	vector<TypeRef> arg_types = this->sig.param_types;
+
+	if(!this->captured_vars.empty())
+	{
+		// This function has captured variables.
+		// So we will make it take a pointer to the closure structure as the last argument.
+		arg_types.push_back(getCapturedVariablesStructType());
+	}
+
+
 	llvm::FunctionType* functype = LLVMTypeUtils::llvmFunctionType(
-		this->sig.param_types, 
+		arg_types, 
 		returnType(), 
 		module->getContext(),
 		hidden_voidptr_arg
 	);
 
+	//TEMP:
+	std::cout << "FunctionDefinition::buildLLVMFunction(): " + this->sig.toString() << std::endl;
+	functype->dump();
+
+#if 0
 	// Make attribute list
 	llvm::AttrListPtr attribute_list;
 	/*if(!this->returnType()->passByValue())
@@ -691,9 +752,9 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 		//function_attr |= llvm::Attribute::ReadNone
 
 		bool has_ptr_arg = false;
-		for(unsigned int i=0; i<this->args.size(); ++i)
+		for(unsigned int i=0; i<arg_types/*this->args*/.size(); ++i)
 		{
-			if(!this->args[i].type->passByValue())
+			if(!arg_types[i]/*this->args[i].type*/->passByValue())
 				has_ptr_arg = true;
 		}
 
@@ -714,7 +775,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 
 	}*/
 
-
+#endif
 
 	
 	llvm::Function* llvm_func = static_cast<llvm::Function*>(module->getOrInsertFunction(
@@ -722,7 +783,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 		functype // Type
 		));
 
-	llvm_func->setAttributes(attribute_list);
+	//TEMP WAS CRASHING    llvm_func->setAttributes(attribute_list);
 
 	// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
 	llvm_func->setCallingConv(llvm::CallingConv::C);
@@ -799,7 +860,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 			//if(*this->returnType() == 
 			if(this->returnType()->getType() == Type::StructureTypeType)
 			{
-				StructureType* struct_type = static_cast<StructureType*>(this->returnType().getPointer());
+				//StructureType* struct_type = static_cast<StructureType*>(this->returnType().getPointer());
 
 				/*for(unsigned int i=0; i<struct_type->component_types.size(); ++i)
 				{
@@ -925,6 +986,67 @@ bool FunctionDefinition::isConstant() const
 //		field_types
 //	);
 //}
+
+TypeRef FunctionDefinition::getCapturedVariablesStructType() const
+{
+	vector<TypeRef> field_types;
+	vector<string> field_names;
+
+	for(size_t i=0; i<this->captured_vars.size(); ++i)
+	{
+		// Get the type of the captured variable.
+		if(this->captured_vars[i].vartype == CapturedVar::Arg)
+		{
+			assert(this->captured_vars[i].bound_function);
+
+			field_types.push_back(
+				this->captured_vars[i].bound_function->args[this->captured_vars[i].index].type
+			);
+		}
+		else if(this->captured_vars[i].vartype == CapturedVar::Let)
+		{
+			assert(this->captured_vars[i].bound_let_block);
+
+			field_types.push_back(
+				this->captured_vars[i].bound_let_block->lets[this->captured_vars[i].index]->type()
+			);
+		}
+		else
+		{
+			assert(!"Invalid vartype for captured var.");
+		}
+
+		field_names.push_back("captured_var_" + toString(i));
+	}
+			
+
+	//NOTE: this is pretty heavyweight.
+	return TypeRef(new StructureType("captured_var_struct", field_types, field_names));
+}
+
+
+// If the function is return by value, returns winter_index, else returns winter_index + 1
+// as the zeroth index will be the sret pointer.
+int FunctionDefinition::getLLVMArgIndex(int winter_index)
+{
+	if(this->returnType()->passByValue())
+		return winter_index;
+	else
+		return winter_index + 1;
+}
+
+
+int FunctionDefinition::getCapturedVarStructLLVMArgIndex()
+{
+	// The pointer to the captured vars struct goes after the 'normal' arguments.
+
+	assert(!this->captured_vars.empty());
+
+	if(this->returnType()->passByValue())
+		return (int)this->args.size();
+	else
+		return (int)this->args.size() + 1; // allow room for sret argument.
+}
 
 
 //--------------------------------------------------------------------------------
@@ -1148,16 +1270,19 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 						this->binding_type = Arg;
 						found_binding = true;
 
-						if(!in_current_func_def && payload.func_def_stack.back()->use_captured_vars)
+						if(!in_current_func_def)//  && payload.func_def_stack.back()->use_captured_vars)
 						{
-							this->captured_var_index = payload.captured_vars.size();
+							this->captured_var_index = payload.func_def_stack.back()->captured_vars.size(); //payload.captured_vars.size();
 							this->use_captured_var = true;
 
 							// Add this function argument as a variable that has to be captured for closures.
 							CapturedVar var;
 							var.vartype = CapturedVar::Arg;
+							var.bound_function = def;
 							var.index = i;
-							payload.captured_vars.push_back(var);
+
+							//payload.captured_vars.push_back(var);
+							payload.func_def_stack.back()->captured_vars.push_back(var);
 						}
 					}
 				}
@@ -1175,15 +1300,17 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 
 						if(!in_current_func_def && payload.func_def_stack.back()->use_captured_vars)
 						{
-							this->captured_var_index = payload.captured_vars.size();
+							this->captured_var_index = payload.func_def_stack.back()->captured_vars.size(); // payload.captured_vars.size();
 							this->use_captured_var = true;
 
 							// Add this function argument as a variable that has to be captured for closures.
 							CapturedVar var;
 							var.vartype = CapturedVar::Let;
+							var.bound_let_block = let_block;
 							var.index = i;
 							var.let_frame_offset = let_frame_offset;
-							payload.captured_vars.push_back(var);
+							//payload.captured_vars.push_back(var);
+							payload.func_def_stack.back()->captured_vars.push_back(var);
 						}
 
 					}
@@ -1395,10 +1522,15 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 	else if(binding_type == Arg)
 	{
 		// If the current function returns its result via pointer, then all args are offset by one.
-		if(params.currently_building_func_def->returnType()->passByValue())
-			closure_pointer = LLVMTypeUtils::getNthArg(params.currently_building_func, this->bound_index);
-		else
-			closure_pointer = LLVMTypeUtils::getNthArg(params.currently_building_func, this->bound_index + 1);
+		//if(params.currently_building_func_def->returnType()->passByValue())
+		//	closure_pointer = LLVMTypeUtils::getNthArg(params.currently_building_func, this->bound_index);
+		//else
+		//	closure_pointer = LLVMTypeUtils::getNthArg(params.currently_building_func, this->bound_index + 1);
+
+		closure_pointer = LLVMTypeUtils::getNthArg(
+			params.currently_building_func,
+			params.currently_building_func_def->getLLVMArgIndex(this->bound_index)
+		);
 
 		//target_llvm_func = dynamic_cast<llvm::Function*>(func);
 
@@ -1547,9 +1679,9 @@ Variable::Variable(const std::string& name_)
 :	name(name_),
 	bound_index(-1),
 	bound_function(NULL),
-	bound_let_block(NULL),
-	use_captured_var(false),
-	captured_var_index(0)
+	bound_let_block(NULL)
+	//use_captured_var(false),
+	//captured_var_index(0)
 {
 }
 
@@ -1565,23 +1697,33 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 			for(unsigned int i=0; i<def->args.size(); ++i) // For each argument to the function:
 				if(def->args[i].name == this->name) // If the argument name matches this variable name:
 				{
-					// Bind this variable to the argument.
-					this->vartype = ArgumentVariable;
-					this->bound_index = i;
-					this->bound_function = def;
-
-
 					if(!in_current_func_def && payload.func_def_stack.back()->use_captured_vars)
 					{
-						this->captured_var_index = payload.captured_vars.size();
-						this->use_captured_var = true;
+						//this->captured_var_index = payload.captured_vars.size();
+						//this->use_captured_var = true;
+						this->vartype = CapturedVariable;
+						this->bound_index = payload.func_def_stack.back()->captured_vars.size(); // payload.captured_vars.size();
+
+						// Save info to get bound function argument, so we can query it for the type of the captured var.
+						this->bound_function = def;
+						this->uncaptured_bound_index = i;
 
 						// Add this function argument as a variable that has to be captured for closures.
 						CapturedVar var;
 						var.vartype = CapturedVar::Arg;
+						var.bound_function = def;
 						var.index = i;
-						payload.captured_vars.push_back(var);
+						//payload.captured_vars.push_back(var);
+						payload.func_def_stack.back()->captured_vars.push_back(var);
 					}
+					else
+					{
+						// Bind this variable to the argument.
+						this->vartype = ArgumentVariable;
+						this->bound_index = i;
+						this->bound_function = def;
+					}
+
 					return;
 				}
 
@@ -1592,21 +1734,31 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 			for(unsigned int i=0; i<let_block->lets.size(); ++i)
 				if(let_block->lets[i]->variable_name == this->name)
 				{
-					this->vartype = LetVariable;
-					this->bound_index = i;
-					this->bound_let_block = let_block;
-
 					if(!in_current_func_def && payload.func_def_stack.back()->use_captured_vars)
 					{
-						this->captured_var_index = payload.captured_vars.size();
-						this->use_captured_var = true;
+						//this->captured_var_index = payload.captured_vars.size();
+						//this->use_captured_var = true;
+						this->vartype = CapturedVariable;
+						this->bound_index = this->bound_index = payload.func_def_stack.back()->captured_vars.size(); // payload.captured_vars.size();
+
+						// Save info to get bound let, so we can query it for the type of the captured var.
+						this->bound_let_block = let_block;
+						this->uncaptured_bound_index = i;
 
 						// Add this function argument as a variable that has to be captured for closures.
 						CapturedVar var;
 						var.vartype = CapturedVar::Let;
+						var.bound_let_block = let_block;
 						var.index = i;
 						var.let_frame_offset = let_frame_offset;
-						payload.captured_vars.push_back(var);
+						//payload.captured_vars.push_back(var);
+						payload.func_def_stack.back()->captured_vars.push_back(var);
+					}
+					else
+					{
+						this->vartype = LetVariable;
+						this->bound_let_block = let_block;
+						this->bound_index = i;
 					}
 		
 					return;
@@ -1655,17 +1807,6 @@ void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 
 ValueRef Variable::exec(VMState& vmstate)
 {
-	if(use_captured_var)
-	{
-		// Get ref to capturedVars structure of values, will be passed in as last arg to function
-		ValueRef captured_struct = vmstate.argument_stack.back();
-		assert(dynamic_cast<StructureValue*>(captured_struct.getPointer()));
-		StructureValue* s = static_cast<StructureValue*>(captured_struct.getPointer());
-
-		return s->fields[this->captured_var_index];
-	}
-
-
 	if(this->vartype == ArgumentVariable)
 	{
 		return vmstate.argument_stack[vmstate.func_args_start.back() + bound_index];
@@ -1678,6 +1819,15 @@ ValueRef Variable::exec(VMState& vmstate)
 	{
 		StructureValueRef captured_vars(new StructureValue(vector<ValueRef>()));
 		return ValueRef(new FunctionValue(this->bound_function, captured_vars));
+	}
+	else if(this->vartype == CapturedVariable)
+	{
+		// Get ref to capturedVars structure of values, will be passed in as last arg to function
+		ValueRef captured_struct = vmstate.argument_stack.back();
+		assert(dynamic_cast<StructureValue*>(captured_struct.getPointer()));
+		StructureValue* s = static_cast<StructureValue*>(captured_struct.getPointer());
+
+		return s->fields[this->bound_index];
 	}
 	else
 	{
@@ -1695,6 +1845,13 @@ TypeRef Variable::type() const
 		return this->bound_function->args[this->bound_index].type;
 	else if(this->vartype == BoundToGlobalDefVariable)
 		return this->bound_function->type();
+	else if(this->vartype == CapturedVariable)
+	{
+		if(this->bound_function != NULL)
+			return this->bound_function->args[this->uncaptured_bound_index].type;
+		else
+			return this->bound_let_block->lets[this->uncaptured_bound_index]->type();
+	}
 	else
 	{
 		assert(!"invalid vartype.");
@@ -1705,7 +1862,19 @@ TypeRef Variable::type() const
 
 inline static const std::string varType(Variable::VariableType t)
 {
-	return t == Variable::LetVariable ? "Let" : (t == Variable::ArgumentVariable ? "Arg" : "BoundToGlobalDef");
+	if(t == Variable::LetVariable)
+		return "Let";
+	else if(t == Variable::ArgumentVariable)
+		return "Arg";
+	else if(t == Variable::BoundToGlobalDefVariable)
+		return "BoundToGlobalDef";
+	else if(t == Variable::CapturedVariable)
+		return "Captured";
+	else
+	{
+		assert(!"invalid var type");
+		return "";
+	}
 }
 
 
@@ -1730,10 +1899,15 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params) const
 		//if(shouldPassByValue(*this->type()))
 		//{
 			// If the current function returns its result via pointer, then all args are offset by one.
-			if(params.currently_building_func_def->returnType()->passByValue())
-				return LLVMTypeUtils::getNthArg(params.currently_building_func, this->bound_index);
-			else
-				return LLVMTypeUtils::getNthArg(params.currently_building_func, this->bound_index + 1);
+			//if(params.currently_building_func_def->returnType()->passByValue())
+			//	return LLVMTypeUtils::getNthArg(params.currently_building_func, this->bound_index);
+			//else
+			//	return LLVMTypeUtils::getNthArg(params.currently_building_func, this->bound_index + 1);
+
+		return LLVMTypeUtils::getNthArg(
+			params.currently_building_func,
+			params.currently_building_func_def->getLLVMArgIndex(this->bound_index)
+		);
 		/*}
 		else
 		{
@@ -1745,9 +1919,42 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 		}*/
 	}
-	else
+	else if(vartype == BoundToGlobalDefVariable)
 	{
 		return this->bound_function->emitLLVMCode(params);
+	}
+	else if(vartype == CapturedVariable)
+	{
+		// Get pointer to captured variables. structure.
+		// This pointer will be passed after the normal arguments to the function.
+
+		llvm::Value* closure_structure = LLVMTypeUtils::getNthArg(
+			params.currently_building_func,
+			params.currently_building_func_def->getCapturedVarStructLLVMArgIndex()
+		);
+
+		// Load the value from the correct field.
+
+		vector<llvm::Value*> indices;
+		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))); // array index
+		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, this->bound_index, true))); // field index
+		
+		//TEMP
+		params.currently_building_func->dump();
+		closure_structure->dump();
+
+		llvm::Value* field_ptr = params.builder->CreateGEP(
+			closure_structure, // ptr
+			indices.begin(),
+			indices.end()
+		);
+
+		return params.builder->CreateLoad(field_ptr);
+	}
+	else
+	{
+		assert(!"invalid vartype");
+		return NULL;
 	}
 #else
 	return NULL;

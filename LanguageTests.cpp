@@ -902,7 +902,14 @@ void LanguageTests::run()
 	//					def main() float :							\n\
 	//						let g = f									\n\
 	//						in									\n\
-	//							g(1.0)", 2.0f);					
+	//							g(1.0)", 2.0f);		
+
+	// Test variable capture: the returned lambda needs to capture the value of x.
+	testMainFloat("	def makeFunc(float x) function<float> : \\() : x      \n\
+					def main() float :                          \n\
+					let f = makeFunc(2.0) in                    \n\
+					f()", 2.0);
+
 
 
 	// Test return of a lambda from a function
