@@ -16,6 +16,7 @@ Copyright 2009 Nicholas Chapman
 #include "TokenBase.h"
 #include "BaseException.h"
 #include "wnt_ASTNode.h"
+#include "wnt_FunctionDefinition.h"
 #include "utils/reference.h"
 #include "wnt_Type.h"
 

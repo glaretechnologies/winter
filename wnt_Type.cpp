@@ -191,8 +191,9 @@ const llvm::Type* Function::LLVMType(llvm::LLVMContext& context) const
 	for(size_t i=0; i<this->arg_types.size(); ++i)
 		llvm_arg_types[i] = this->arg_types[i]->LLVMType(context);
 
-	// Add Pointer to captured var struct
-	llvm_arg_types.push_back(LLVMTypeUtils::pointerType(*cap_var_struct));
+	// Add Pointer to captured var struct, if there are any captured vars
+	if(use_captured_vars)
+		llvm_arg_types.push_back(LLVMTypeUtils::pointerType(*cap_var_struct));
 
 	//TEMP HACK: add hidden void* arg  NOTE: should only do this when hidden_void_arg is true.
 	llvm_arg_types.push_back(LLVMTypeUtils::voidPtrType(context));

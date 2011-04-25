@@ -5,6 +5,7 @@
 #include "wnt_FunctionSignature.h"
 #include "wnt_ExternalFunction.h"
 #include "wnt_ASTNode.h"
+#include "wnt_FunctionDefinition.h"
 #include <map>
 #include <set>
 namespace llvm { class Module; }

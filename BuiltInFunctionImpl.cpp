@@ -4,6 +4,7 @@
 #include "VMState.h"
 #include "Value.h"
 #include "wnt_ASTNode.h"
+#include "wnt_FunctionDefinition.h"
 #include <vector>
 #include "LLVMTypeUtils.h"
 #include "utils/platformutils.h"

@@ -50,7 +50,7 @@
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				DebugInformationFormat="4"
-				DisableSpecificWarnings="4146"
+				DisableSpecificWarnings="4146;4800;4355"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -366,6 +366,14 @@
 		</File>
 		<File
 			RelativePath="..\wnt_Frame.h"
+			>
+		</File>
+		<File
+			RelativePath="..\wnt_FunctionDefinition.cpp"
+			>
+		</File>
+		<File
+			RelativePath="..\wnt_FunctionDefinition.h"
 			>
 		</File>
 		<File

@@ -47,6 +47,9 @@ class LetBlock;
 class ASTNode;
 
 
+
+
+
 class CapturedVar
 {
 public:
@@ -108,6 +111,13 @@ public:
 	//vector<LetBlock*> let_block_stack;
 	vector<FunctionDefinition*> func_def_stack;
 };
+
+
+const std::string indent(VMState& vmstate);
+void printMargin(int depth, std::ostream& s);
+bool isIntExactlyRepresentableAsFloat(int x);
+void checkFoldExpression(Reference<ASTNode>& e, TraversalPayload& payload);
+void convertOverloadedOperators(Reference<ASTNode>& e, TraversalPayload& payload);
 
 class EmitLLVMCodeParams
 {
@@ -215,105 +225,6 @@ public:
 
 };
 
-
-/*class TypeASTNode : public ASTNode
-{
-public:
-	TypeRef type;
-};*/
-
-/*
-e.g.	def f(double a, double b) -> double : a + g(b)
-*/
-class FunctionDefinition : public ASTNode
-{
-public:
-	class FunctionArg
-	{
-	public:
-		FunctionArg(){}
-		FunctionArg(TypeRef type_, const string& n) : type(type_), name(n) {}
-		/*enum TypeKind
-		{
-			GENERIC_TYPE,
-			CONCRETE_TYPE
-		};
-
-		TypeKind type_kind;*/
-		TypeRef type;
-		//int generic_type_param_index;
-		string name;
-	};
-
-
-	FunctionDefinition(const std::string& name, const std::vector<FunctionArg>& args, 
-		//const vector<Reference<LetASTNode> >& lets,
-		const ASTNodeRef& body, 
-		const TypeRef& declared_rettype, // May be null, if return type is to be inferred.
-		BuiltInFunctionImpl* impl);
-	
-	~FunctionDefinition();
-
-	TypeRef returnType() const;
-
-	vector<FunctionArg> args;
-	ASTNodeRef body;
-	TypeRef declared_return_type;
-	//TypeRef function_type;
-	//vector<Reference<LetASTNode> > lets;
-
-	FunctionSignature sig;
-	BuiltInFunctionImpl* built_in_func_impl;
-	ExternalFunctionRef external_function;
-
-	bool use_captured_vars;
-	vector<CapturedVar> captured_vars; // For when parsing anon functions
-
-
-	virtual ValueRef invoke(VMState& vmstate);
-	virtual ValueRef exec(VMState& vmstate);
-	virtual ASTNodeType nodeType() const { return FunctionDefinitionType; }
-	virtual TypeRef type() const;// { return function_type; }
-
-	//virtual void linkFunctions(Linker& linker);
-	//virtual void bindVariables(const std::vector<ASTNode*>& stack);
-	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
-	virtual void print(int depth, std::ostream& s) const;
-	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
-	virtual Reference<ASTNode> clone();
-	virtual bool isConstant() const;
-
-	bool isGenericFunction() const; // true if it is parameterised by type.
-	bool isExternalFunction() const { return external_function.nonNull(); }
-
-	llvm::Function* buildLLVMFunction(
-		llvm::Module* module,
-		const PlatformUtils::CPUInfo& cpu_info,
-		bool hidden_voidptr_arg
-		//std::map<Lang::FunctionSignature, llvm::Function*>& external_functions
-	);
-
-	// llvm::Type* getClosureStructLLVMType(llvm::LLVMContext& context) const;
-	TypeRef getCapturedVariablesStructType() const;
-
-	// If the function is return by value, returns winter_index, else returns winter_index + 1
-	// as the zeroth index will be the sret pointer.
-	int getLLVMArgIndex(int winter_index);
-
-	int getCapturedVarStructLLVMArgIndex();
-
-
-	llvm::Type* closure_type;
-
-	llvm::Function* built_llvm_function;
-	void* jitted_function;
-
-//	llvm::Value* getLetExpressionLLVMValue(EmitLLVMCodeParams& params, unsigned int let_index);
-
-//	std::vector<llvm::Value*> let_exprs_llvm_value;
-};
-
-typedef Reference<FunctionDefinition> FunctionDefinitionRef;
 
 
 /*

@@ -905,18 +905,18 @@ void LanguageTests::run()
 	//							g(1.0)", 2.0f);		
 
 	// Test variable capture: the returned lambda needs to capture the value of x.
-	testMainFloat("	def makeFunc(float x) function<float> : \\() : x      \n\
+	/*testMainFloat("	def makeFunc(float x) function<float> : \\() : x      \n\
 					def main() float :                          \n\
 					let f = makeFunc(2.0) in                    \n\
 					f()", 2.0);
 
+*/
 
-
-	// Test return of a lambda from a function
-	testMainFloat("def makeLambda() : \\(float x) : x*x    \n\
-					def main() float :           \n\
-					let f = makeLambda()  in   \n\
-				  f(2.0)", 4.0f);
+	//// Test return of a lambda from a function
+	//testMainFloat("def makeLambda() : \\(float x) : x*x    \n\
+	//				def main() float :           \n\
+	//				let f = makeLambda()  in   \n\
+	//			  f(2.0)", 4.0f);
 
 	// Test generic lambda!!!
 	//testMainFloat("def makeLambda() : \\<T>(T x) : x*x    \n\
