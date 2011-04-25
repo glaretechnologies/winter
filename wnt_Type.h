@@ -139,6 +139,8 @@ public:
 };
 
 
+// This is the type for function values.
+// Note that the type really consists of the complete closure
 class Function : public Type
 {
 public:
@@ -153,6 +155,8 @@ public:
 #if USE_LLVM
 	virtual const llvm::Type* LLVMType(llvm::LLVMContext& context) const;
 #endif
+	// Pass by reference, because the actual value passed/returned is a closure structure.
+	virtual bool passByValue() const { return false; }
 	virtual bool lessThan(const Type& b) const
 	{
 		if(getType() < b.getType())

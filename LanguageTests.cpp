@@ -835,7 +835,7 @@ void LanguageTests::run()
 	testMainFloat("def overloadedFunc(int x) float : 4.0 \
 				  def overloadedFunc(float x) float : 5.0 \
 				  def main() float: overloadedFunc(1.0)", 5.0f);
-*/
+
 	// Test binding to different overloaded functions based on type parameter to generic function
 	testMainFloat("def overloadedFunc(int x) float : 4.0 \
 				  def overloadedFunc(float x) float : 5.0 \
@@ -863,7 +863,7 @@ void LanguageTests::run()
 				  in \
 					y \
 				  def main() float : f(0.0)", 3.0);
-
+*/
 	// Test two let clauses where one refers to the other.
 	// NOTE: allow this?
 	//testMainFloat("def f() float : \
@@ -883,20 +883,27 @@ void LanguageTests::run()
 	//			  def main() float : f()", 2.0);
 
 	// Test nested let blocks
-	testMainFloat("def f() float : \n\
-				let	\n\
-					x = 2.0 \n\
-				in \n\
-					let           \n\
-						y = x     \n\
-					in               \n\
-						y           \n\
-				def main() float : f()", 2.0);
+	//testMainFloat("def f() float : \n\
+	//			let	\n\
+	//				x = 2.0 \n\
+	//			in \n\
+	//				let           \n\
+	//					y = x     \n\
+	//				in               \n\
+	//					y           \n\
+	//			def main() float : f()", 2.0);
 
 	// Test Lambda in let
-	testMainFloat("def main() float :           \n\
-				  let f = \\(float x) : x*x  in   \n\
-				  f(2.0)", 4.0f);
+	//testMainFloat("def main() float :           \n\
+	//			  let f = \\(float x) : x*x  in   \n\
+	//			  f(2.0)", 4.0f);
+
+	//testMainFloat("	def f(float x) float : x+1.0    \n\
+	//					def main() float :							\n\
+	//						let g = f									\n\
+	//						in									\n\
+	//							g(1.0)", 2.0f);					
+
 
 	// Test return of a lambda from a function
 	testMainFloat("def makeLambda() : \\(float x) : x*x    \n\

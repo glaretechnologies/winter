@@ -283,7 +283,7 @@ public:
 		//std::map<Lang::FunctionSignature, llvm::Function*>& external_functions
 	);
 
-	llvm::Type* getClosureStructLLVMType(llvm::LLVMContext& context) const;
+	// llvm::Type* getClosureStructLLVMType(llvm::LLVMContext& context) const;
 
 
 	llvm::Type* closure_type;

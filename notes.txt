@@ -1,5 +1,45 @@
 Copyright 2009- Nicholas Chapman
 
+  FunctionDef: makeLambda() function<float, float>
+    FunctionDef: anon_func_6(float) float
+      Mul Expression
+        Variable, name=x, Arg, bound_index=0
+        Variable, name=x, Arg, bound_index=0
+
+  FunctionDef: main() float (Declared ret type: float)
+    Let Block.  lets:
+      Let, var_name = 'f'
+        FunctionExpr; target: makeLambda()
+    in:
+      FunctionExpr; runtime bound to let index 0
+        Float literal, value=2
+
+
+
+Function expressions:
+Bound to a global function definition:
+-------------------------------------
+e.g.
+
+def f(int x) int : x+1		# Global function f
+def main() int : f(1)		# call to f
+
+In this case we know that the global func def doesn't capture any variables.
+So it doesn't need a closure.  So we will just emit a call instruction to it directly.
+
+Bound to an argument or let clause
+----------------------------------
+e.g.
+
+def f(int x) int : x+1		# Global function f
+def main() int :			
+	let g = f				# assign f to g
+	in
+		g(1)				# Call g
+
+In this case the target function may have captured some variables, so we will assume that the value
+returned will be a closure.
+
 
 
 Closures:
@@ -9,12 +49,11 @@ The closure will look something like
 
 struct Closure
 {
+	void* function_ptr;	
 	captured_var_1;
 	captured_var_2;
 	...
 	captured_var_N;
-
-	void* function_ptr
 }
 
 

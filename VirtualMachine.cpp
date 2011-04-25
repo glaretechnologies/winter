@@ -292,6 +292,8 @@ void VirtualMachine::build()
 {
 	//return;//TEMP NO LLVM
 
+	this->rootref->print(0, std::cout); // TEMP
+
 	linker.buildLLVMCode(this->llvm_module);
 
 	// Verify module

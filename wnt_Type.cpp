@@ -158,11 +158,25 @@ const llvm::Type* Function::LLVMType(llvm::LLVMContext& context) const
 	//TEMP HACK: add hidden void* arg
 	llvm_arg_types.push_back(LLVMTypeUtils::voidPtrType(context));
 
-	return LLVMTypeUtils::pointerType(*llvm::FunctionType::get(
+	const llvm::Type* func_ptr_type = LLVMTypeUtils::pointerType(*llvm::FunctionType::get(
 		this->return_type->LLVMType(context), // result type
 		llvm_arg_types,
 		false // is var arg
 	));
+
+	vector<const llvm::Type*> field_types;
+
+	// Add pointer to function type
+	field_types.push_back(func_ptr_type);
+
+	//TEMP HACK: no captured vars
+	//for(size_t i=0; i<this->captured_vars.size(); ++i)
+	//	field_types.push_back(this->captured_vars[i].type->LLVMType(context));
+
+	return llvm::StructType::get(
+		context,
+		field_types
+	);
 }
 
 

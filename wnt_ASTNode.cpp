@@ -565,6 +565,11 @@ void FunctionDefinition::print(int depth, std::ostream& s) const
 
 llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
+	if(this->captured_vars.empty())
+	{
+
+	}
+
 	// This will be called for lambda expressions.
 	// Capture variables at this point, by getting them off the arg and let stack.
 
@@ -573,8 +578,43 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params) const
 	// Load pointer to closure
 	llvm::Value* closure_pointer;
 	closure_pointer = params.builder->CreateAlloca(
-		this->getClosureStructLLVMType(*params.context)
+		//this->getClosureStructLLVMType(*params.context)
+		this->type()->LLVMType(*params.context)
 	);
+
+	{
+		// Get type of this function
+		llvm::FunctionType* target_func_type = LLVMTypeUtils::llvmFunctionType(
+			this->sig.param_types, 
+			this->returnType(), 
+			*params.context,
+			params.hidden_voidptr_arg
+		);
+
+		// Get pointer to this function
+		llvm::Constant* func = params.module->getOrInsertFunction(
+			this->sig.toString(), // Name
+			target_func_type // Type
+		);
+
+		// Store function pointer in the closure structure
+		vector<llvm::Value*> indices;
+		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))); // array index
+		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))); // field index
+		
+		llvm::Value* field_ptr = params.builder->CreateGEP(
+			closure_pointer, // ptr
+			indices.begin(),
+			indices.end()
+		);
+
+		// Do the store.
+		params.builder->CreateStore(
+			func, // value
+			field_ptr // ptr
+		);
+
+	}
 
 	// for each captured var
 	for(size_t i=0; i<this->captured_vars.size(); ++i)
@@ -593,6 +633,8 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params) const
 			// Load let:
 			// Walk up AST until we get to the correct let block
 			const int let_frame_offset = this->captured_vars[i].let_frame_offset;
+
+			// TODO: set val
 		}
 			
 		// store in captured var structure field
@@ -613,19 +655,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params) const
 		);
 	}
 
-	
-
-	llvm::FunctionType* target_func_type = LLVMTypeUtils::llvmFunctionType(
-		this->sig.param_types, 
-		this->returnType(), 
-		*params.context,
-		params.hidden_voidptr_arg
-	);
-
-	return /*static_cast<llvm::Function*>(*/params.module->getOrInsertFunction(
-		this->sig.toString(), // Name
-		target_func_type // Type
-	);
+	return closure_pointer;
 }
 
 
@@ -810,6 +840,21 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 					return_val_ptr // ptr
 				);
 			}
+			else if(this->returnType()->getType() == Type::FunctionType)
+			{
+				// Structure types are also passed by ref.
+
+				// Load value through body_code pointer.
+				llvm::Value* struct_val = params.builder->CreateLoad(
+					body_code
+				);
+
+				// Save value out to return_val ptr.
+				params.builder->CreateStore(
+					struct_val, // value
+					return_val_ptr // ptr
+				);
+			}
 			else
 			{
 				assert(0);
@@ -863,19 +908,23 @@ bool FunctionDefinition::isConstant() const
 }
 
 
-llvm::Type* FunctionDefinition::getClosureStructLLVMType(llvm::LLVMContext& context) const
-{
-	vector<const llvm::Type*> field_types(this->captured_vars.size());
-	for(size_t i=0; i<this->captured_vars.size(); ++i)
-	{
-		field_types[i] = this->captured_vars[i].type->LLVMType(context);
-	}
-
-	return llvm::StructType::get(
-		context,
-		field_types
-	);
-}
+//llvm::Type* FunctionDefinition::getClosureStructLLVMType(llvm::LLVMContext& context) const
+//{
+//	vector<const llvm::Type*> field_types;
+//
+//	// Add pointer to function type
+//	field_types.push_back(this->type()->LLVMType(context));
+//
+//	for(size_t i=0; i<this->captured_vars.size(); ++i)
+//	{
+//		field_types.push_back(this->captured_vars[i].type->LLVMType(context));
+//	}
+//
+//	return llvm::StructType::get(
+//		context,
+//		field_types
+//	);
+//}
 
 
 //--------------------------------------------------------------------------------
@@ -1321,24 +1370,53 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 	llvm::Value* target_llvm_func = NULL;
 	TypeRef target_ret_type = this->type(); //this->target_function_return_type;
 
+	llvm::Value* closure_pointer = NULL;
+
 	if(binding_type == Let)
 	{
-		target_llvm_func = this->bound_let_block->getLetExpressionLLVMValue(params, bound_index);
+		//target_llvm_func = this->bound_let_block->getLetExpressionLLVMValue(params, bound_index);
 
-		//target_llvm_func = dynamic_cast<llvm::Function*>(func);
+		closure_pointer = this->bound_let_block->getLetExpressionLLVMValue(params, bound_index);
 
+		// Load function pointer from closure.
+
+		vector<llvm::Value*> indices;
+		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))); // array index
+		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))); // field index
+		
+		llvm::Value* field_ptr = params.builder->CreateGEP(
+			closure_pointer, // ptr
+			indices.begin(),
+			indices.end()
+		);
+
+		target_llvm_func = params.builder->CreateLoad(field_ptr);
 	}
 	else if(binding_type == Arg)
 	{
 		// If the current function returns its result via pointer, then all args are offset by one.
 		if(params.currently_building_func_def->returnType()->passByValue())
-			target_llvm_func = LLVMTypeUtils::getNthArg(params.currently_building_func, this->bound_index);
+			closure_pointer = LLVMTypeUtils::getNthArg(params.currently_building_func, this->bound_index);
 		else
-			target_llvm_func = LLVMTypeUtils::getNthArg(params.currently_building_func, this->bound_index + 1);
+			closure_pointer = LLVMTypeUtils::getNthArg(params.currently_building_func, this->bound_index + 1);
 
 		//target_llvm_func = dynamic_cast<llvm::Function*>(func);
+
+		// Load function pointer from closure.
+
+		vector<llvm::Value*> indices;
+		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))); // array index
+		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))); // field index
+		
+		llvm::Value* field_ptr = params.builder->CreateGEP(
+			closure_pointer, // ptr
+			indices.begin(),
+			indices.end()
+		);
+
+		target_llvm_func = params.builder->CreateLoad(field_ptr);
 	}
-	else
+	else if(binding_type == BoundToGlobalDef)
 	{
 		// Lookup LLVM function, which should already be created and added to the module.
 		/*llvm::Function* target_llvm_func = params.module->getFunction(
@@ -1359,7 +1437,18 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 			target_sig.toString(), // Name
 			target_func_type // Type
 		);
+
+		//closure_pointer = this->target_function->emitLLVMCode(params);
+		//assert(closure_pointer);
 	}
+	else
+	{
+		assert(0);
+	}
+
+	//assert(closure_pointer);
+
+
 	assert(target_llvm_func);
 
 
@@ -3306,7 +3395,10 @@ ValueRef LetBlock::exec(VMState& vmstate)
 void LetBlock::print(int depth, std::ostream& s) const
 {
 	printMargin(depth, s);
-	s << "Let Block\n";
+	s << "Let Block.  lets:\n";
+	for(size_t i=0; i<lets.size(); ++i)
+		lets[i]->print(depth + 1, s);
+	printMargin(depth, s); s << "in:\n";
 	this->expr->print(depth+1, s);
 }
 
