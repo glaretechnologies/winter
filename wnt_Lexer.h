@@ -6,14 +6,14 @@ Code By Nicholas Chapman.
 
 Copyright 2009 Nicholas Chapman
 =====================================================================*/
-#ifndef __LEXER_H_666_
-#define __LEXER_H_666_
+#pragma once
 
 
 #include <string>
 #include <vector>
 #include "TokenBase.h"
 #include "BaseException.h"
+#include "wnt_SourceBuffer.h"
 #include "utils/reference.h"
 class Parser;
 
@@ -49,25 +49,21 @@ public:
 
 	~Lexer();
 
-	static void process(const std::string& buffer, std::vector<Reference<TokenBase> >& tokens_out);
+	static void process(const SourceBufferRef& src, std::vector<Reference<TokenBase> >& tokens_out);
 
 	static void test();
 
 private:
-	static const std::string errorPosition(const std::string& buffer, unsigned int pos);
-	static void parseStringLiteral(Parser& parser, std::vector<Reference<TokenBase> >& tokens_out);
-	static void parseNumericLiteral(Parser& parser, std::vector<Reference<TokenBase> >& tokens_out);
-	static void parseIdentifier(Parser& parser, std::vector<Reference<TokenBase> >& tokens_out);
-	static void parseComment(Parser& parser);
+	static const std::string errorPosition(const SourceBufferRef& buffer, unsigned int pos);
+	static void parseStringLiteral(const SourceBufferRef& buffer, Parser& parser, std::vector<Reference<TokenBase> >& tokens_out);
+	static void parseNumericLiteral(const SourceBufferRef& buffer, Parser& parser, std::vector<Reference<TokenBase> >& tokens_out);
+	static void parseIdentifier(const SourceBufferRef& buffer, Parser& parser, std::vector<Reference<TokenBase> >& tokens_out);
+	static void parseComment(const SourceBufferRef& buffer, Parser& parser);
 };
 
 
 
 } //end namespace Lang
-
-
-#endif //__LEXER_H_666_
-
 
 
 

@@ -6,8 +6,7 @@ Code By Nicholas Chapman.
 
 Copyright 2009 Nicholas Chapman
 =====================================================================*/
-#ifndef __LANGPARSER_H_666_
-#define __LANGPARSER_H_666_
+#pragma once
 
 
 #include <string>
@@ -19,6 +18,7 @@ Copyright 2009 Nicholas Chapman
 #include "wnt_FunctionDefinition.h"
 #include "utils/reference.h"
 #include "wnt_Type.h"
+#include "wnt_SourceBuffer.h"
 
 
 namespace Winter
@@ -41,7 +41,9 @@ public:
 		vector<FunctionDefinitionRef>& func_defs_) 
 		: i(i_), tokens(t), named_types(named_types_), func_defs(func_defs_) {}
 	const std::vector<Reference<TokenBase> >& tokens;
-	const char* text_buffer;
+	//const char* text_buffer;
+	//const std::string* text_buffer;
+	const SourceBuffer* text_buffer;
 	unsigned int& i;
 	std::map<std::string, TypeRef>& named_types;
 	vector<FunctionDefinitionRef>& func_defs;
@@ -60,13 +62,15 @@ public:
 
 	~LangParser();
 
-	Reference<ASTNode> parseBuffer(const std::vector<Reference<TokenBase> >& tokens, const char* text_buffer,
-		vector<FunctionDefinitionRef>& func_defs_out);
+	Reference<ASTNode> parseBuffer(const std::vector<Reference<TokenBase> >& tokens, 
+		const SourceBufferRef& source_buffer,
+		vector<FunctionDefinitionRef>& func_defs_out, 
+		std::map<std::string, TypeRef>& named_types);
 
 	static void test();
 
 private:
-	const std::string errorPosition(const std::string& buffer, unsigned int pos);
+	const std::string errorPosition(const SourceBuffer& buffer, unsigned int pos);
 	const std::string errorPosition(const ParseInfo& parseinfo);
 	const std::string errorPositionPrevToken(const ParseInfo& parseinfo);
 
@@ -102,6 +106,7 @@ private:
 	ASTNodeRef parseUnaryExpression(const ParseInfo& parseinfo);
 	ASTNodeRef parseAddSubExpression(const ParseInfo& parseinfo);
 	ASTNodeRef parseMulDivExpression(const ParseInfo& parseinfo);
+	ASTNodeRef parseBinaryLogicalExpression(const ParseInfo& parseinfo);
 	ASTNodeRef parseParenExpression(const ParseInfo& parseinfo);
 	ASTNodeRef parseMapLiteralExpression(const ParseInfo& parseinfo);
 	ASTNodeRef parseArrayOrVectorLiteralExpression(const ParseInfo& parseinfo);
@@ -116,7 +121,5 @@ private:
 };
 
 
-} //end namespace Lang
+}
 
-
-#endif //__LANGPARSER_H_666_

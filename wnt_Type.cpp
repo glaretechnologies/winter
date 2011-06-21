@@ -6,6 +6,7 @@
 #include "llvm/Constants.h"
 #include "LLVMTypeUtils.h"
 #include <vector>
+#include <iostream>
 
 
 using namespace std;
@@ -174,20 +175,20 @@ struct Closure
 */
 const llvm::Type* Function::LLVMType(llvm::LLVMContext& context) const
 {
-	// Build LLVM CapturedVars struct
-	vector<const llvm::Type*> cap_var_types;
+	// Build Empty LLVM CapturedVars struct
+	//vector<const llvm::Type*> cap_var_types;
 	
-	for(size_t i=0; i<this->captured_var_types.size(); ++i)
-		cap_var_types.push_back(this->captured_var_types[i]->LLVMType(context));
+	//for(size_t i=0; i<this->captured_var_types.size(); ++i)
+	//	cap_var_types.push_back(this->captured_var_types[i]->LLVMType(context));
 
-	const llvm::Type* cap_var_struct = llvm::StructType::get(
+	/*const llvm::Type* cap_var_struct = llvm::StructType::get(
 		context,
 		cap_var_types
-	);
+	);*/
 
 
 	// Build vector of function args
-	vector<const llvm::Type*> llvm_arg_types(this->arg_types.size());
+	/*vector<const llvm::Type*> llvm_arg_types(this->arg_types.size());
 	for(size_t i=0; i<this->arg_types.size(); ++i)
 		llvm_arg_types[i] = this->arg_types[i]->LLVMType(context);
 
@@ -203,6 +204,14 @@ const llvm::Type* Function::LLVMType(llvm::LLVMContext& context) const
 		this->return_type->LLVMType(context), // result type
 		llvm_arg_types,
 		false // is var arg
+	));*/
+
+	const llvm::Type* func_ptr_type = LLVMTypeUtils::pointerType(*LLVMTypeUtils::llvmFunctionType(
+		arg_types,
+		true, // use captured var struct ptr arg
+		return_type,
+		context,
+		true // hidden voidptr arg TEMP HACK
 	));
 
 	//vector<const llvm::Type*> field_types;
@@ -216,14 +225,23 @@ const llvm::Type* Function::LLVMType(llvm::LLVMContext& context) const
 
 	// Make the vector of fields for the closure type
 	vector<const llvm::Type*> closure_field_types;
+	closure_field_types.push_back(TypeRef(new Int())->LLVMType(context)); // Ref count field
 	closure_field_types.push_back(func_ptr_type);
-	closure_field_types.push_back(cap_var_struct);
+	closure_field_types.push_back(LLVMTypeUtils::getBaseCapturedVarStructType(context)); // cap_var_struct);
 
 	// Return the closure structure type.
-	return llvm::StructType::get(
+	llvm::StructType* closure_struct_type = llvm::StructType::get(
 		context,
 		closure_field_types
 	);
+
+	std::cout << "closure_struct_type: " << std::endl;
+	closure_struct_type->dump();
+	std::cout << std::endl;
+	
+
+	// Return pointer to structure type.
+	return LLVMTypeUtils::pointerType(*closure_struct_type);
 }
 
 

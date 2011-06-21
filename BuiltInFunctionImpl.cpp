@@ -734,4 +734,42 @@ llvm::Value* CosBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 }
 
 
+//----------------------------------------------------------------------------------------------
+
+
+ValueRef TruncateToIntBuiltInFunc::invoke(VMState& vmstate)
+{
+	const FloatValue* a = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+
+	return ValueRef(new IntValue((int)a->value));
+}
+
+
+llvm::Value* TruncateToIntBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	return params.builder->CreateFPToSI(
+		LLVMTypeUtils::getNthArg(params.currently_building_func, 0), 
+		llvm::IntegerType::get(*params.context, 32)
+	);
+}
+
+
+//----------------------------------------------------------------------------------------------
+
+
+//ValueRef AllocateRefCountedStructure::invoke(VMState& vmstate)
+//{
+//	assert(0);
+//	return ValueRef();
+//	//const FloatValue* a = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+//
+//	//return ValueRef(new FloatValue(std::cos(a->value)));
+//}
+//
+//AllocateRefCountedStructure::emitLLVMCode(EmitLLVMCodeParams& params) const
+//{
+//	//return emitFloatFloatIntrinsic(params, llvm::Intrinsic::cos);
+//}
+
+
 }

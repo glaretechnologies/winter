@@ -26,7 +26,18 @@ wnt_ExternalFunction
 class ExternalFunction : public RefCounted
 {
 public:
+	typedef ValueRef (* INTERPRETED_FUNC)(const std::vector<ValueRef>& arg_values);
+
 	ExternalFunction();
+	ExternalFunction(void* func_, INTERPRETED_FUNC interpreted_func_, const FunctionSignature& sig_,
+		TypeRef& return_type_, bool takes_hidden_voidptr_arg_)
+	:	func(func_),
+		interpreted_func(interpreted_func_),
+		sig(sig_),
+		return_type(return_type_),
+		takes_hidden_voidptr_arg(takes_hidden_voidptr_arg_)
+	{}
+
 	~ExternalFunction();
 
 	void* func;
@@ -34,6 +45,8 @@ public:
 
 	FunctionSignature sig;
 	TypeRef return_type;
+
+	bool takes_hidden_voidptr_arg;
 private:
 
 };

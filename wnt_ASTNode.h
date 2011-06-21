@@ -6,8 +6,7 @@ Code By Nicholas Chapman.
 
 Copyright 2009 Nicholas Chapman
 =====================================================================*/
-#ifndef __ASTNODE_H_666_
-#define __ASTNODE_H_666_
+#pragma once
 
 
 #include <string>
@@ -16,6 +15,7 @@ using std::string;
 using std::vector;
 #include "utils/refcounted.h"
 #include "utils/reference.h"
+#include "utils/platform.h"
 #include "wnt_Type.h"
 #include "wnt_FunctionSignature.h"
 #include "wnt_ExternalFunction.h"
@@ -30,6 +30,7 @@ namespace llvm { class Function; };
 namespace llvm { class Value; };
 namespace llvm { class Module; };
 namespace llvm { class LLVMContext; };
+namespace llvm { class TargetData; };
 namespace PlatformUtils { class CPUInfo; }
 
 namespace Winter
@@ -45,9 +46,7 @@ class FunctionDefinition;
 class Frame;
 class LetBlock;
 class ASTNode;
-
-
-
+class SourceBuffer;
 
 
 class CapturedVar
@@ -118,6 +117,8 @@ void printMargin(int depth, std::ostream& s);
 bool isIntExactlyRepresentableAsFloat(int x);
 void checkFoldExpression(Reference<ASTNode>& e, TraversalPayload& payload);
 void convertOverloadedOperators(Reference<ASTNode>& e, TraversalPayload& payload);
+const std::string errorContext(const ASTNode& n);
+const std::string errorContext(const ASTNode& n, TraversalPayload& payload);
 
 class EmitLLVMCodeParams
 {
@@ -130,8 +131,26 @@ public:
 	llvm::Module* module;
 	llvm::Function* currently_building_func;
 	llvm::LLVMContext* context;
+	const llvm::TargetData* target_data;
 #endif
 	vector<ASTNode*> node_stack;
+	vector<LetBlock*> let_block_stack;
+};
+
+
+class SrcLocation
+{
+public:
+	SrcLocation(uint32 char_index_, /*uint32 line_, uint32 column_, */const SourceBuffer* buf) : 
+	  char_index(char_index_), /*line(line_), column(column_),*/ source_buffer(buf) {}
+	//uint32 line;
+	//uint32 column;
+
+	static const SrcLocation invalidLocation() { return SrcLocation(4000000000, NULL); }
+
+	uint32 char_index;
+	//const std::string* text_buffer;
+	const SourceBuffer* source_buffer;
 };
 
 
@@ -143,7 +162,7 @@ Abstract syntax tree node.
 class ASTNode : public RefCounted
 {
 public:
-	ASTNode(/*ASTNode* p*/) /*: parent(p)*/ {}
+	ASTNode(const SrcLocation& loc_) : location(loc_) {}
 	virtual ~ASTNode() {}
 
 	virtual ValueRef exec(VMState& vmstate) = 0;
@@ -165,6 +184,7 @@ public:
 		SubtractionExpressionType,
 		MulExpressionType,
 		DivExpressionType,
+		BinaryBooleanType,
 		UnaryMinusExpressionType,
 		LetType,
 		ComparisonExpressionType,
@@ -188,6 +208,7 @@ public:
 	// True iff the expression does not depend on any variables
 	virtual bool isConstant() const = 0;
 
+	const SrcLocation& srcLocation() const { return location; }
 protected:
 	static llvm::Value* emitExternalLinkageCall(const std::string& target_name, EmitLLVMCodeParams& params);
 
@@ -195,11 +216,14 @@ protected:
 	//void setParent(ASTNode* p) { parent = p; }
 private:
 	//ASTNode* parent;
+	SrcLocation location;
 };
 
 typedef Reference<ASTNode> ASTNodeRef;
 
 
+bool shouldFoldExpression(ASTNodeRef& e, TraversalPayload& payload);
+ASTNodeRef foldExpression(ASTNodeRef& e, TraversalPayload& payload);
 class FunctionDefinition;
 class LetBlock;
 
@@ -207,7 +231,7 @@ class LetBlock;
 class BufferRoot : public ASTNode
 {
 public:
-	BufferRoot()// : ASTNode(NULL) 
+	BufferRoot(const SrcLocation& loc) : ASTNode(loc) 
 	{}
 	vector<Reference<FunctionDefinition> > func_defs;
 
@@ -226,59 +250,6 @@ public:
 };
 
 
-
-/*
-e.g.   f(a, 1)
-*/
-class FunctionExpression : public ASTNode
-{
-public:
-	FunctionExpression();
-	FunctionExpression(const std::string& func_name, const ASTNodeRef& arg0, const ASTNodeRef& arg1); // 2-arg function
-
-	bool doesFunctionTypeMatch(TypeRef& type);
-
-	virtual ValueRef exec(VMState& vmstate);
-	virtual ASTNodeType nodeType() const { return FunctionExpressionType; }
-	virtual TypeRef type() const;
-
-	virtual void linkFunctions(Linker& linker, TraversalPayload& payload, std::vector<ASTNode*>& stack);
-	//virtual void bindVariables(const std::vector<ASTNode*>& stack);
-	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
-	virtual void print(int depth, std::ostream& s) const;
-	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
-	virtual Reference<ASTNode> clone();
-	virtual bool isConstant() const;
-	FunctionDefinition* runtimeBind(VMState& vmstate, FunctionValue*& function_value_out);
-
-	///////
-
-	string function_name;
-	vector<Reference<ASTNode> > argument_expressions;
-
-	//Reference<ASTNode> target_function;
-	//ASTNode* target_function;
-	FunctionDefinition* target_function; // May be NULL
-	//Reference<ExternalFunction> target_external_function; // May be NULL
-	int bound_index;
-	FunctionDefinition* bound_function; // Function for which the variable is an argument of,
-	LetBlock* bound_let_block;
-	//int argument_offset; // Currently, a variable must be an argument to the enclosing function
-	enum BindingType
-	{
-		Unbound,
-		Let,
-		Arg,
-		BoundToGlobalDef
-	};
-	BindingType binding_type;
-
-	//TypeRef target_function_return_type;
-	bool use_captured_var;
-	int captured_var_index;
-};
-
-
 class Variable : public ASTNode
 {
 public:
@@ -291,7 +262,7 @@ public:
 		CapturedVariable
 	};
 
-	Variable(const std::string& name);
+	Variable(const std::string& name, const SrcLocation& loc);
 
 	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return VariableASTNodeType; }
@@ -316,6 +287,9 @@ public:
 	//int argument_offset; // Currently, a variable must be an argument to the enclosing function
 	string name; // variable name.
 
+	// Offset of zero means use the latest/deepest set of let values.  Offset 1 means the next oldest, etc.
+	int let_frame_offset;
+
 	// bool use_captured_var;
 	// int captured_var_index;
 	int uncaptured_bound_index;
@@ -325,7 +299,7 @@ public:
 class FloatLiteral : public ASTNode
 {
 public:
-	FloatLiteral(/*ASTNode* parent, */float v) : /*ASTNode(parent), */ value(v) {}
+	FloatLiteral(float v, const SrcLocation& loc) : ASTNode(loc), value(v) {}
 
 	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return FloatLiteralType; }
@@ -342,7 +316,7 @@ public:
 class IntLiteral : public ASTNode
 {
 public:
-	IntLiteral(/*ASTNode* parent, */int v) : /*ASTNode(parent),*/ value(v) {}
+	IntLiteral(int v, const SrcLocation& loc) : ASTNode(loc), value(v) {}
 	int value;
 
 	virtual ValueRef exec(VMState& vmstate);
@@ -358,7 +332,7 @@ public:
 class StringLiteral : public ASTNode
 {
 public:
-	StringLiteral(/*ASTNode* parent, */const std::string& v) : /*ASTNode(parent), */value(v) {}
+	StringLiteral(const std::string& v, const SrcLocation& loc) : ASTNode(loc), value(v) {}
 	string value;
 
 	virtual ValueRef exec(VMState& vmstate);
@@ -374,7 +348,7 @@ public:
 class BoolLiteral : public ASTNode
 {
 public:
-	BoolLiteral(/*ASTNode* parent, */bool v) : /*ASTNode(parent), */value(v) {}
+	BoolLiteral(bool v, const SrcLocation& loc) : ASTNode(loc), value(v) {}
 	bool value;
 
 	virtual ValueRef exec(VMState& vmstate);
@@ -390,7 +364,7 @@ public:
 class MapLiteral : public ASTNode
 {
 public:
-	MapLiteral(/*ASTNode* parent*/) /*: ASTNode(parent)*/ {}
+	MapLiteral(const SrcLocation& loc) : ASTNode(loc) {}
 
 	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return MapLiteralType; }
@@ -413,7 +387,7 @@ public:
 class ArrayLiteral : public ASTNode
 {
 public:
-	ArrayLiteral(const std::vector<ASTNodeRef>& elems);
+	ArrayLiteral(const std::vector<ASTNodeRef>& elems, const SrcLocation& loc);
 
 	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return ArrayLiteralType; }
@@ -435,7 +409,7 @@ private:
 class VectorLiteral : public ASTNode
 {
 public:
-	VectorLiteral(const std::vector<ASTNodeRef>& elems);
+	VectorLiteral(const std::vector<ASTNodeRef>& elems, const SrcLocation& loc);
 
 	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return VectorLiteralType; }
@@ -454,7 +428,7 @@ private:
 class AdditionExpression : public ASTNode
 {
 public:
-	AdditionExpression(/*ASTNode* parent*/) /*: ASTNode(parent)*/ {}
+	AdditionExpression(const SrcLocation& loc) : ASTNode(loc) {}
 
 	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return AdditionExpressionType; }
@@ -475,7 +449,7 @@ public:
 class SubtractionExpression : public ASTNode
 {
 public:
-	SubtractionExpression(/*ASTNode* parent*/) /*: ASTNode(parent)*/ {}
+	SubtractionExpression(const SrcLocation& loc) : ASTNode(loc) {}
 
 	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return SubtractionExpressionType; }
@@ -496,7 +470,7 @@ public:
 class MulExpression : public ASTNode
 {
 public:
-	MulExpression(/*ASTNode* parent*/) /*: ASTNode(parent)*/ {}
+	MulExpression(const SrcLocation& loc) : ASTNode(loc) {}
 
 	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return MulExpressionType; }
@@ -517,7 +491,7 @@ public:
 class DivExpression : public ASTNode
 {
 public:
-	DivExpression()  {}
+	DivExpression(const SrcLocation& loc) : ASTNode(loc) {}
 
 	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return DivExpressionType; }
@@ -533,10 +507,37 @@ public:
 };
 
 
+class BinaryBooleanExpr : public ASTNode
+{
+public:
+	enum Type
+	{
+		AND,
+		OR
+	};
+
+	BinaryBooleanExpr(Type t, const ASTNodeRef& a, const ASTNodeRef& b, const SrcLocation& loc);
+
+	virtual ValueRef exec(VMState& vmstate);
+	virtual ASTNodeType nodeType() const { return BinaryBooleanType; }
+	virtual TypeRef type() const { return a->type(); }
+	virtual void print(int depth, std::ostream& s) const;
+	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+	virtual Reference<ASTNode> clone();
+	virtual bool isConstant() const;
+
+	Type t;
+	ASTNodeRef a;
+	ASTNodeRef b;
+};
+
+
+
 class UnaryMinusExpression : public ASTNode
 {
 public:
-	UnaryMinusExpression() {}
+	UnaryMinusExpression(const SrcLocation& loc) : ASTNode(loc) {}
 
 	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return UnaryMinusExpressionType; }
@@ -554,8 +555,8 @@ public:
 class LetASTNode : public ASTNode
 {
 public:
-	LetASTNode(/*ASTNode* parent, */const std::string var_name) : 
-	  /*ASTNode(parent), */ variable_name(var_name) {}
+	LetASTNode(const std::string& var_name, const SrcLocation& loc) : 
+	  ASTNode(loc), variable_name(var_name) {}
 
 	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return LetType; }
@@ -576,8 +577,8 @@ public:
 class ComparisonExpression : public ASTNode
 {
 public:
-	ComparisonExpression(Reference<TokenBase>& token_, ASTNodeRef a_, ASTNodeRef b_) : 
-	  token(token_), a(a_), b(b_) {}
+	ComparisonExpression(Reference<TokenBase>& token_, ASTNodeRef a_, ASTNodeRef b_, const SrcLocation& loc) : 
+	  ASTNode(loc), token(token_), a(a_), b(b_) {}
 
 	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return ComparisonExpressionType; }
@@ -588,6 +589,8 @@ public:
 	virtual Reference<ASTNode> clone();
 	virtual bool isConstant() const;
 
+	const std::string getOverloadedFuncName() const; // returns e.g. op_lt, op_gt   etc..
+
 	Reference<TokenBase> token;
 	ASTNodeRef a;
 	ASTNodeRef b;
@@ -597,7 +600,9 @@ public:
 class LetBlock : public ASTNode
 {
 public:
-	LetBlock(ASTNodeRef& e, vector<Reference<LetASTNode> > lets_) : expr(e), lets(lets_) {
+	LetBlock(ASTNodeRef& e, vector<Reference<LetASTNode> > lets_, const SrcLocation& loc) : 
+	  ASTNode(loc), expr(e), lets(lets_) 
+	{
 		let_exprs_llvm_value = vector<llvm::Value*>(lets_.size(), NULL); }
 
 	virtual ValueRef exec(VMState& vmstate);
@@ -641,5 +646,3 @@ public:
 
 } //end namespace Lang
 
-
-#endif //__ASTNODE_H_666_

@@ -6,8 +6,7 @@ Code By Nicholas Chapman.
 
 Copyright 2009 Nicholas Chapman
 =====================================================================*/
-#ifndef __TOKENBASE_H_666_
-#define __TOKENBASE_H_666_
+#pragma once
 
 
 #include "utils/refcounted.h"
@@ -146,6 +145,3 @@ private:
 
 
 } //end namespace Lang
-
-
-#endif //__TOKENBASE_H_666_

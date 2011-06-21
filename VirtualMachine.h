@@ -8,6 +8,7 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 
 
 #include "wnt_ExternalFunction.h"
+#include "wnt_SourceBuffer.h"
 #include "utils/reference.h"
 #include "wnt_ASTNode.h"
 #include "Linker.h"
@@ -41,7 +42,7 @@ class VMConstructionArgs
 public:
 	VMConstructionArgs() : env(NULL) {}
 	std::vector<ExternalFunctionRef> external_functions;
-	std::vector<std::string> source_buffers;
+	std::vector<SourceBufferRef> source_buffers;
 	void* env;
 };
 
@@ -60,12 +61,13 @@ public:
 	void* getJittedFunctionByName(const std::string& name);
 
 private:
-	void loadSource(const std::string& s);
+	void loadSource(const std::vector<SourceBufferRef>& s);
 	void build();
 	void addExternalFunction(const ExternalFunctionRef& f, llvm::LLVMContext& context, llvm::Module& module);
+	void compileToNativeAssembly(llvm::Module* mod, const std::string& filename);
 
 	std::vector<ExternalFunctionRef> external_functions;
-	ASTNodeRef rootref;
+	//ASTNodeRef rootref;
 	Linker linker;
 	llvm::LLVMContext* llvm_context;
 	llvm::Module* llvm_module;

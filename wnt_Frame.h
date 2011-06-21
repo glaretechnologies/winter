@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "wnt_ASTNode.h"
+//#include "wnt_ASTNode.h"
 #include "utils/refcounted.h"
 #include <vector>
 

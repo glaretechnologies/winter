@@ -66,7 +66,26 @@ const llvm::Type* voidPtrType(llvm::LLVMContext& context)
 }
 
 
-llvm::FunctionType* llvmFunctionType(const vector<TypeRef>& arg_types, TypeRef return_type, llvm::LLVMContext& context,
+const llvm::Type* getBaseCapturedVarStructType(llvm::LLVMContext& context)
+{
+	const std::vector<const llvm::Type*> params;
+	return llvm::StructType::get(
+		context,
+		params // params
+	);
+}
+
+
+const llvm::Type* getPtrToBaseCapturedVarStructType(llvm::LLVMContext& context)
+{
+	return pointerType(*getBaseCapturedVarStructType(context));
+}
+
+
+llvm::FunctionType* llvmFunctionType(const vector<TypeRef>& arg_types, 
+									 bool captured_var_struct_ptr_arg,
+									 TypeRef return_type, 
+									 llvm::LLVMContext& context,
 									 bool hidden_voidptr_arg)
 {
 	if(return_type->passByValue())
@@ -75,6 +94,9 @@ llvm::FunctionType* llvmFunctionType(const vector<TypeRef>& arg_types, TypeRef r
 
 		for(unsigned int i=0; i<arg_types.size(); ++i)
 			llvm_arg_types.push_back(arg_types[i]->passByValue() ? arg_types[i]->LLVMType(context) : LLVMTypeUtils::pointerType(*arg_types[i]->LLVMType(context)));
+
+		if(captured_var_struct_ptr_arg)
+			llvm_arg_types.push_back(getPtrToBaseCapturedVarStructType(context));
 
 		if(hidden_voidptr_arg)
 			llvm_arg_types.push_back(voidPtrType(context));
@@ -96,6 +118,9 @@ llvm::FunctionType* llvmFunctionType(const vector<TypeRef>& arg_types, TypeRef r
 		for(unsigned int i=0; i<arg_types.size(); ++i)
 			llvm_arg_types.push_back(arg_types[i]->passByValue() ? arg_types[i]->LLVMType(context) : LLVMTypeUtils::pointerType(*arg_types[i]->LLVMType(context)));
 
+		if(captured_var_struct_ptr_arg)
+			llvm_arg_types.push_back(getPtrToBaseCapturedVarStructType(context));
+
 		if(hidden_voidptr_arg)
 			llvm_arg_types.push_back(voidPtrType(context));
 
@@ -107,6 +132,25 @@ llvm::FunctionType* llvmFunctionType(const vector<TypeRef>& arg_types, TypeRef r
 			);
 	}
 }
+
+
+llvm::Value* createFieldLoad(llvm::Value* structure_ptr, int field_index, 
+							 llvm::IRBuilder<>* builder, llvm::LLVMContext& context, const llvm::Twine& Name)
+{
+	vector<llvm::Value*> indices;
+	indices.push_back(llvm::ConstantInt::get(context, llvm::APInt(32, 0, true))); // array index
+	indices.push_back(llvm::ConstantInt::get(context, llvm::APInt(32, field_index, true))); // field index
+		
+	llvm::Value* field_ptr = builder->CreateGEP(
+		structure_ptr, // ptr
+		indices.begin(),
+		indices.end(),
+		"field_ptr"
+	);
+
+	return builder->CreateLoad(field_ptr, Name);
+}
+
 
 
 }; // end namespace LLVMTypeUtils

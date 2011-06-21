@@ -8,7 +8,7 @@
 #include "wnt_FunctionDefinition.h"
 #include <map>
 #include <set>
-namespace llvm { class Module; }
+namespace llvm { class Module; class TargetData; }
 
 
 namespace Winter
@@ -31,13 +31,13 @@ public:
 
 	//void linkFunctions(BufferRoot& root);
 
-	ExternalFunctionRef findMatchingExternalFunction(const FunctionSignature& sig);
+	//ExternalFunctionRef findMatchingExternalFunction(const FunctionSignature& sig);
 	FunctionDefinitionRef findMatchingFunction(const FunctionSignature& sig);
 	//FunctionDefinitionRef findMatchingFunctionByName(const std::string& name); // NOTE: rather unsafe
 
 	void getFuncsWithMatchingName(const std::string& name, vector<FunctionDefinitionRef>& funcs_out);
 
-	void buildLLVMCode(llvm::Module* module);
+	void buildLLVMCode(llvm::Module* module, const llvm::TargetData* target_data);
 
 	vector<FunctionDefinitionRef> concrete_funcs;
 private:

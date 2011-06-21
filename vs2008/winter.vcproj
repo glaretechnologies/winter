@@ -377,6 +377,14 @@
 			>
 		</File>
 		<File
+			RelativePath="..\wnt_FunctionExpression.cpp"
+			>
+		</File>
+		<File
+			RelativePath="..\wnt_FunctionExpression.h"
+			>
+		</File>
+		<File
 			RelativePath="..\wnt_FunctionSignature.cpp"
 			>
 		</File>

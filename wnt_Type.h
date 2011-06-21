@@ -145,14 +145,15 @@ class Function : public Type
 {
 public:
 	Function(const std::vector<TypeRef>& arg_types_, TypeRef return_type_, 
-		const std::vector<TypeRef>& captured_var_types_,
+		//const std::vector<TypeRef>& captured_var_types_,
 		bool use_captured_vars_) 
-		:	arg_types(arg_types_), return_type(return_type_), captured_var_types(captured_var_types_), 
+		:	arg_types(arg_types_), return_type(return_type_), 
+		//captured_var_types(captured_var_types_), 
 			use_captured_vars(use_captured_vars_){}
 
 	TypeRef return_type;
 	std::vector<TypeRef> arg_types;
-	std::vector<TypeRef> captured_var_types;
+	//std::vector<TypeRef> captured_var_types;
 	bool use_captured_vars;
 
 	virtual TypeType getType() const { return FunctionType; }
@@ -162,7 +163,7 @@ public:
 	virtual const llvm::Type* LLVMType(llvm::LLVMContext& context) const;
 #endif
 	// Pass by reference, because the actual value passed/returned is a closure structure.
-	virtual bool passByValue() const { return false; }
+	virtual bool passByValue() const { return true; }
 	virtual bool lessThan(const Type& b) const
 	{
 		if(getType() < b.getType())
@@ -282,7 +283,7 @@ public:
 	: name(name_), component_types(component_types_), component_names(component_names_) {}
 
 	virtual TypeType getType() const { return StructureTypeType; }
-	virtual const std::string toString() const { return "struct " + name; }
+	virtual const std::string toString() const { return /*"struct " + */name; }
 	virtual bool lessThan(const Type& b) const
 	{
 		if(getType() < b.getType())

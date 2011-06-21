@@ -40,7 +40,7 @@ public:
 	};
 
 	
-	FunctionDefinition(const std::string& name, const std::vector<FunctionArg>& args, 
+	FunctionDefinition(const SrcLocation& src_loc, const std::string& name, const std::vector<FunctionArg>& args, 
 		//const vector<Reference<LetASTNode> >& lets,
 		const ASTNodeRef& body, 
 		const TypeRef& declared_rettype, // May be null, if return type is to be inferred.
@@ -83,16 +83,23 @@ public:
 	llvm::Function* buildLLVMFunction(
 		llvm::Module* module,
 		const PlatformUtils::CPUInfo& cpu_info,
-		bool hidden_voidptr_arg
+		bool hidden_voidptr_arg, 
+		const llvm::TargetData* target_data
 		//std::map<Lang::FunctionSignature, llvm::Function*>& external_functions
 	);
 
 	llvm::Function* getOrInsertFunction(
 		llvm::Module* module,
+		bool use_cap_var_struct_ptr,
 		bool hidden_voidptr_arg
 	) const;
 
+
+	// NOTE: type() returns the 
+
+
 	// llvm::Type* getClosureStructLLVMType(llvm::LLVMContext& context) const;
+	TypeRef getFullClosureType() const;
 	TypeRef getCapturedVariablesStructType() const;
 
 	// If the function is return by value, returns winter_index, else returns winter_index + 1
@@ -107,9 +114,12 @@ public:
 	llvm::Function* built_llvm_function;
 	void* jitted_function;
 
+	// If anon func is true, then we don't want to try and traverse to it by itself, but only when it's embedded
+	// in the AST, so that vars can succesfully bind to the parent function.
+	bool is_anon_func;
 
 private:
-
+	FunctionDefinition* alloc_func; // NOTE: make this just a ptr?
 };
 
 

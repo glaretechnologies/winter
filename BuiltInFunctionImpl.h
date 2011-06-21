@@ -198,4 +198,29 @@ public:
 private:
 };
 
+
+class TruncateToIntBuiltInFunc : public BuiltInFunctionImpl
+{
+public:
+	TruncateToIntBuiltInFunc() {}
+	virtual ~TruncateToIntBuiltInFunc(){}
+
+	virtual ValueRef invoke(VMState& vmstate);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+private:
+};
+
+
+//class AllocateRefCountedStructure : public BuiltInFunctionImpl
+//{
+//public:
+//	AllocateRefCountedStructure() {}
+//	virtual ~AllocateRefCountedStructure(){}
+//
+//	virtual ValueRef invoke(VMState& vmstate);
+//	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+//private:
+//};
+
+
 }

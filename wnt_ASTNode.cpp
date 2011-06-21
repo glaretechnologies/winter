@@ -9,6 +9,9 @@ Copyright 2009 Nicholas Chapman
 #include "wnt_ASTNode.h"
 
 
+#include "wnt_FunctionExpression.h"
+#include "wnt_SourceBuffer.h"
+#include "wnt_Diagnostics.h"
 #include "VMState.h"
 #include "Value.h"
 #include "Linker.h"
@@ -39,11 +42,12 @@ namespace Winter
 {
 
 
-	void printMargin(int depth, std::ostream& s)
+void printMargin(int depth, std::ostream& s)
 {
 	for(int i=0; i<depth; ++i)
 		s << "  ";
 }
+
 
 bool isIntExactlyRepresentableAsFloat(int x)
 {
@@ -70,7 +74,7 @@ static bool expressionIsWellTyped(ASTNodeRef& e, TraversalPayload& payload_)
 }
 
 
-static bool shouldFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
+bool shouldFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
 {
 	return	e.nonNull() &&
 			e->isConstant() && 
@@ -85,7 +89,7 @@ static bool shouldFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
 }
 	
 
-static ASTNodeRef foldExpression(ASTNodeRef& e, TraversalPayload& payload)
+ASTNodeRef foldExpression(ASTNodeRef& e, TraversalPayload& payload)
 {
 	VMState vmstate(payload.hidden_voidptr_arg);
 	vmstate.func_args_start.push_back(0);
@@ -103,21 +107,21 @@ static ASTNodeRef foldExpression(ASTNodeRef& e, TraversalPayload& payload)
 		assert(dynamic_cast<FloatValue*>(retval.getPointer()));
 		FloatValue* val = static_cast<FloatValue*>(retval.getPointer());
 
-		return ASTNodeRef(new FloatLiteral(val->value));
+		return ASTNodeRef(new FloatLiteral(val->value, e->srcLocation()));
 	}
 	else if(e->type()->getType() == Type::IntType)
 	{
 		assert(dynamic_cast<IntValue*>(retval.getPointer()));
 		IntValue* val = static_cast<IntValue*>(retval.getPointer());
 
-		return ASTNodeRef(new IntLiteral(val->value));
+		return ASTNodeRef(new IntLiteral(val->value, e->srcLocation()));
 	}
 	else if(e->type()->getType() == Type::BoolType)
 	{
 		assert(dynamic_cast<BoolValue*>(retval.getPointer()));
 		BoolValue* val = static_cast<BoolValue*>(retval.getPointer());
 
-		return ASTNodeRef(new BoolLiteral(val->value));
+		return ASTNodeRef(new BoolLiteral(val->value, e->srcLocation()));
 	}
 	else
 	{
@@ -148,11 +152,13 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload)
 	{
 		AdditionExpression* expr = static_cast<AdditionExpression*>(e.getPointer());
 		if(expr->a->type().nonNull() && expr->b->type().nonNull())
-			if(*expr->a->type() == *expr->b->type()) // If a and b have the same types
+			//if(*expr->a->type() == *expr->b->type()) // If a and b have the same types
+			if(	expr->a->type()->getType() == Type::StructureTypeType ||
+				expr->b->type()->getType() == Type::StructureTypeType)
 				if(expr->a->type()->getType() == Type::StructureTypeType)
 				{
 					// Replace expr with an op_add function call.
-					e = ASTNodeRef(new FunctionExpression("op_add", expr->a, expr->b));
+					e = ASTNodeRef(new FunctionExpression(expr->srcLocation(), "op_add", expr->a, expr->b));
 					payload.tree_changed = true;
 				}
 		break;
@@ -161,11 +167,13 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload)
 	{
 		SubtractionExpression* expr = static_cast<SubtractionExpression*>(e.getPointer());
 		if(expr->a->type().nonNull() && expr->b->type().nonNull())
-			if(*expr->a->type() == *expr->b->type()) // If a and b have the same types
+			//if(*expr->a->type() == *expr->b->type()) // If a and b have the same types
+			if(	expr->a->type()->getType() == Type::StructureTypeType ||
+				expr->b->type()->getType() == Type::StructureTypeType)
 				if(expr->a->type()->getType() == Type::StructureTypeType)
 				{
 					// Replace expr with an op_add function call.
-					e = ASTNodeRef(new FunctionExpression("op_sub", expr->a, expr->b));
+					e = ASTNodeRef(new FunctionExpression(expr->srcLocation(), "op_sub", expr->a, expr->b));
 					payload.tree_changed = true;
 				}
 		break;
@@ -174,11 +182,12 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload)
 	{
 		MulExpression* expr = static_cast<MulExpression*>(e.getPointer());
 		if(expr->a->type().nonNull() && expr->b->type().nonNull())
-			if(*expr->a->type() == *expr->b->type()) // If a and b have the same types
-				if(expr->a->type()->getType() == Type::StructureTypeType)
+			//if(*expr->a->type() == *expr->b->type()) // If a and b have the same types
+				if(	expr->a->type()->getType() == Type::StructureTypeType ||
+					expr->b->type()->getType() == Type::StructureTypeType)
 				{
 					// Replace expr with an op_add function call.
-					e = ASTNodeRef(new FunctionExpression("op_mul", expr->a, expr->b));
+					e = ASTNodeRef(new FunctionExpression(expr->srcLocation(), "op_mul", expr->a, expr->b));
 					payload.tree_changed = true;
 				}
 		break;
@@ -187,14 +196,28 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload)
 	{
 		DivExpression* expr = static_cast<DivExpression*>(e.getPointer());
 		if(expr->a->type().nonNull() && expr->b->type().nonNull())
-			if(*expr->a->type() == *expr->b->type()) // If a and b have the same types
-				if(expr->a->type()->getType() == Type::StructureTypeType)
+			//if(*expr->a->type() == *expr->b->type()) // If a and b have the same types
+			if(	expr->a->type()->getType() == Type::StructureTypeType ||
+				expr->b->type()->getType() == Type::StructureTypeType)
 				{
 					// Replace expr with an op_add function call.
-					e = ASTNodeRef(new FunctionExpression("op_div", expr->a, expr->b));
+					e = ASTNodeRef(new FunctionExpression(expr->srcLocation(), "op_div", expr->a, expr->b));
 					payload.tree_changed = true;
 				}
 		break;
+	}
+	case ASTNode::ComparisonExpressionType:
+	{
+		ComparisonExpression* expr = static_cast<ComparisonExpression*>(e.getPointer());
+		if(expr->a->type().nonNull() && expr->b->type().nonNull())
+			if(	expr->a->type()->getType() == Type::StructureTypeType ||
+				expr->b->type()->getType() == Type::StructureTypeType)
+			{
+				// Replace expr with an op_add function call.
+				e = ASTNodeRef(new FunctionExpression(expr->srcLocation(), expr->getOverloadedFuncName(), expr->a, expr->b));
+				payload.tree_changed = true;
+			}
+			break;
 	}
 	};
 }
@@ -305,691 +328,34 @@ bool BufferRoot::isConstant() const
 
 
 //----------------------------------------------------------------------------------
-
-//--------------------------------------------------------------------------------
-
-
-FunctionExpression::FunctionExpression() 
-:	target_function(NULL),
-	bound_index(-1),
-	binding_type(Unbound),
-	bound_let_block(NULL),
-	bound_function(NULL),
-	use_captured_var(false),
-	captured_var_index(0)
+const std::string errorContext(const ASTNode& n)
 {
+	//if(!payload.func_def_stack.empty())
+	//	return "In function " + payload.func_def_stack[payload.func_def_stack.size() - 1]->sig.toString();
+	//return "";
+
+	/*for(int i=(int)payload.func_def_stack.size() - 1; i >= 0; --i)
+	{
+	s +=  "In function " + payload.func_def_stack[i]->sig.toString();
+	}*/
+
+	const SourceBuffer* source_buffer = n.srcLocation().source_buffer;
+	if(source_buffer == NULL)
+		return "Invalid Location";
+
+	return Diagnostics::positionString(*source_buffer, n.srcLocation().char_index);
 }
 
 
-FunctionExpression::FunctionExpression(const std::string& func_name, const ASTNodeRef& arg0, const ASTNodeRef& arg1) // 2-arg function
-:	target_function(NULL),
-	bound_index(-1),
-	binding_type(Unbound),
-	bound_let_block(NULL),
-	bound_function(NULL),
-	use_captured_var(false),
-	captured_var_index(0)
+const std::string errorContext(const ASTNode& n, TraversalPayload& payload)
 {
-	function_name = func_name;
-	argument_expressions.push_back(arg0);
-	argument_expressions.push_back(arg1);
+	return errorContext(n);
 }
 
 
-FunctionDefinition* FunctionExpression::runtimeBind(VMState& vmstate, FunctionValue*& function_value_out)
-{
-	if(use_captured_var)
-	{
-		// Get ref to capturedVars structure of values, will be passed in as last arg to function
-		ValueRef captured_struct = vmstate.argument_stack.back();
-		assert(dynamic_cast<StructureValue*>(captured_struct.getPointer()));
-		StructureValue* s = static_cast<StructureValue*>(captured_struct.getPointer());
-
-		ValueRef func_val = s->fields[this->captured_var_index];
-
-		assert(dynamic_cast<FunctionValue*>(func_val.getPointer()));
-
-		FunctionValue* function_val = static_cast<FunctionValue*>(func_val.getPointer());
-
-		function_value_out = function_val;
-
-		return function_val->func_def;
-	}
-
-
-	if(target_function)
-	{
-		function_value_out = NULL;
-		return target_function;
-	}
-	else if(this->binding_type == Arg)
-	{
-		ValueRef arg = vmstate.argument_stack[vmstate.func_args_start.back() + this->bound_index];
-		assert(dynamic_cast<FunctionValue*>(arg.getPointer()));
-		FunctionValue* function_value = dynamic_cast<FunctionValue*>(arg.getPointer());
-		function_value_out = function_value;
-		return function_value->func_def;
-	}
-	else
-	{
-		assert(this->binding_type == Let);
-
-		ValueRef arg = vmstate.let_stack[vmstate.let_stack_start.back() + this->bound_index];
-		assert(dynamic_cast<FunctionValue*>(arg.getPointer()));
-		FunctionValue* function_value = dynamic_cast<FunctionValue*>(arg.getPointer());
-		function_value_out = function_value;
-		return function_value->func_def;
-	}
-}
-
-
-ValueRef FunctionExpression::exec(VMState& vmstate)
-{
-	if(VERBOSE_EXEC) std::cout << indent(vmstate) << "FunctionExpression, target_name=" << this->function_name << "\n";
-	
-	//assert(target_function);
-	if(this->target_function != NULL && this->target_function->external_function.nonNull())
-	{
-		vector<ValueRef> args;
-		for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
-			args.push_back(this->argument_expressions[i]->exec(vmstate));
-
-		if(vmstate.hidden_voidptr_arg)
-			args.push_back(vmstate.argument_stack.back());
-
-		ValueRef result = this->target_function->external_function->interpreted_func(args);
-
-		return result;
-	}
-
-	// Get target function.  The target function is resolved at runtime, because it may be a function 
-	// passed in as a variable to this function.
-	FunctionValue* function_value = NULL;
-	FunctionDefinition* use_target_func = runtimeBind(vmstate, function_value);
-
-	// Push arguments onto argument stack
-	const unsigned int initial_arg_stack_size = (unsigned int)vmstate.argument_stack.size();
-
-	for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
-	{
-		vmstate.argument_stack.push_back(this->argument_expressions[i]->exec(vmstate));
-		if(VERBOSE_EXEC) 
-		{
-			//std::cout << indent(vmstate) << "Pushed arg " << vmstate.argument_stack.back()->toString() << "\n";
-			//printStack(vmstate);
-		}
-	}
-
-	if(vmstate.hidden_voidptr_arg)
-		vmstate.argument_stack.push_back(vmstate.argument_stack[initial_arg_stack_size - 1]);
-
-	// If the target function is an anon function and has captured values, push that onto the stack
-	if(use_target_func->use_captured_vars)
-	{
-		assert(function_value);
-		vmstate.argument_stack.push_back(ValueRef(function_value->captured_vars.getPointer()));
-	}
-
-
-	//assert(vmstate.argument_stack.size() == initial_arg_stack_size + this->argument_expressions.size());
-
-	if(VERBOSE_EXEC)
-		std::cout << indent(vmstate) << "Calling " << this->function_name << ", func_args_start: " << vmstate.func_args_start.back() << "\n";
-
-	// Execute target function
-	vmstate.func_args_start.push_back(initial_arg_stack_size);
-	ValueRef ret = use_target_func->invoke(vmstate);
-	vmstate.func_args_start.pop_back();
-
-	// Remove arguments from stack
-	while(vmstate.argument_stack.size() > initial_arg_stack_size) //for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
-	{
-		//delete vmstate.argument_stack.back();
-		vmstate.argument_stack.pop_back();
-	}
-	assert(vmstate.argument_stack.size() == initial_arg_stack_size);
-
-	return ret;
-}
-
-
-bool FunctionExpression::doesFunctionTypeMatch(TypeRef& type)
-{
-	if(type->getType() != Type::FunctionType)
-		return false;
-
-	Function* func = dynamic_cast<Function*>(type.getPointer());
-	assert(func);
-
-	std::vector<TypeRef> arg_types(this->argument_expressions.size());
-	for(unsigned int i=0; i<arg_types.size(); ++i)
-		arg_types[i] = this->argument_expressions[i]->type();
-
-	if(arg_types.size() != func->arg_types.size())
-		return false;
-
-	for(unsigned int i=0; i<arg_types.size(); ++i)
-		if(!(*(arg_types[i]) == *(func->arg_types[i])))
-			return false;
-	return true;
-}
-
-
-static bool couldCoerceFunctionCall(vector<ASTNodeRef>& argument_expressions, FunctionDefinitionRef func)
-{
-	if(func->args.size() != argument_expressions.size())
-		return false;
-	
-
-	for(size_t i=0; i<argument_expressions.size(); ++i)
-	{
-		if(*func->args[i].type == *argument_expressions[i]->type())
-		{
-		}
-		else if(	func->args[i].type->getType() == Type::FloatType &&
-			argument_expressions[i]->nodeType() == ASTNode::IntLiteralType &&
-			isIntExactlyRepresentableAsFloat(static_cast<IntLiteral*>(argument_expressions[i].getPointer())->value))
-		{
-		}
-		else
-			return false;
-	}
-
-	return true;
-}
-
-
-void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload, std::vector<ASTNode*>& stack)
-{
-	bool found_binding = false;
-	bool in_current_func_def = true;
-	int let_frame_offset = 0;
-
-
-	// We want to find a function that matches our argument expression types, and the function name
-
-
-
-	// First, walk up tree, and see if such a target function has been given a name with a let.
-	for(int s = (int)stack.size() - 1; s >= 0 && !found_binding; --s)
-	{
-		{
-			if(FunctionDefinition* def = dynamic_cast<FunctionDefinition*>(stack[s])) // If node is a function definition
-			{
-				for(unsigned int i=0; i<def->args.size(); ++i)
-				{
-					// If the argument is a function, and its name and sig matches our function expression...
-					if(def->args[i].name == this->function_name && doesFunctionTypeMatch(def->args[i].type))
-					{
-						// Then bind this function call to this argument
-						this->bound_function = def;
-						this->bound_index = i;
-						this->binding_type = Arg;
-						found_binding = true;
-
-						if(!in_current_func_def)//  && payload.func_def_stack.back()->use_captured_vars)
-						{
-							this->captured_var_index = payload.func_def_stack.back()->captured_vars.size(); //payload.captured_vars.size();
-							this->use_captured_var = true;
-
-							// Add this function argument as a variable that has to be captured for closures.
-							CapturedVar var;
-							var.vartype = CapturedVar::Arg;
-							var.bound_function = def;
-							var.index = i;
-
-							//payload.captured_vars.push_back(var);
-							payload.func_def_stack.back()->captured_vars.push_back(var);
-						}
-					}
-				}
-				in_current_func_def = false;
-			}
-			else if(LetBlock* let_block = dynamic_cast<LetBlock*>(stack[s]))
-			{
-				for(unsigned int i=0; i<let_block->lets.size(); ++i)
-					if(let_block->lets[i]->variable_name == this->function_name && doesFunctionTypeMatch(let_block->lets[i]->type()))
-					{
-						this->bound_index = i;
-						this->binding_type = Let;
-						this->bound_let_block = let_block;
-						found_binding = true;
-
-						if(!in_current_func_def && payload.func_def_stack.back()->use_captured_vars)
-						{
-							this->captured_var_index = payload.func_def_stack.back()->captured_vars.size(); // payload.captured_vars.size();
-							this->use_captured_var = true;
-
-							// Add this function argument as a variable that has to be captured for closures.
-							CapturedVar var;
-							var.vartype = CapturedVar::Let;
-							var.bound_let_block = let_block;
-							var.index = i;
-							var.let_frame_offset = let_frame_offset;
-							//payload.captured_vars.push_back(var);
-							payload.func_def_stack.back()->captured_vars.push_back(var);
-						}
-
-					}
-				
-				// We only want to count an ancestor let block as an offsetting block if we are not currently in a let clause of it.
-				bool is_this_let_clause = false;
-				if(s + 1 < (int)stack.size())
-					for(size_t z=0; z<let_block->lets.size(); ++z)
-						if(let_block->lets[z].getPointer() == stack[s+1])
-							is_this_let_clause = true;
-				if(!is_this_let_clause)
-					let_frame_offset++;
-			}
-		}
-	}
-
-	if(!found_binding)
-	{
-		vector<TypeRef> argtypes;
-		for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
-			argtypes.push_back(this->argument_expressions[i]->type());
-
-
-		FunctionSignature sig(this->function_name, argtypes);
-
-		// Try and resolve to internal function.
-		this->target_function = linker.findMatchingFunction(sig).getPointer();
-		if(this->target_function)
-		{
-			this->binding_type = BoundToGlobalDef;
-		}
-		else
-		{
-			// Try and promote integer args to float args.
-			vector<FunctionDefinitionRef> funcs;
-			linker.getFuncsWithMatchingName(sig.name, funcs);
-
-			vector<FunctionDefinitionRef> possible_matches;
-
-			for(size_t z=0; z<funcs.size(); ++z)
-				if(couldCoerceFunctionCall(argument_expressions, funcs[z]))
-					possible_matches.push_back(funcs[z]);
-
-			if(possible_matches.size() == 1)
-			{
-				for(size_t i=0; i<argument_expressions.size(); ++i)
-				{
-					if(	possible_matches[0]->args[i].type->getType() == Type::FloatType &&
-						argument_expressions[i]->nodeType() == ASTNode::IntLiteralType &&
-						isIntExactlyRepresentableAsFloat(static_cast<IntLiteral*>(argument_expressions[i].getPointer())->value))
-					{
-						// Replace int literal with float literal
-						this->argument_expressions[i] = ASTNodeRef(new FloatLiteral((float)static_cast<IntLiteral*>(argument_expressions[i].getPointer())->value));
-					}
-				}
-
-				
-				this->target_function = possible_matches[0].getPointer();
-				this->binding_type = BoundToGlobalDef;
-			}
-			else if(possible_matches.size() > 1)
-			{
-				string s = "Found more than one possible match for overloaded function: \n";
-				for(size_t z=0; z<possible_matches.size(); ++z)
-					s += possible_matches[z]->sig.toString() + "\n";
-				throw BaseException(s);
-			}
-		}
-
-		if(this->binding_type == Unbound)
-			throw BaseException("Failed to find function '" + sig.toString() + "'");
-	}
-}
-
-
-/*void FunctionExpression::bindVariables(const std::vector<ASTNode*>& stack)
-{
-	std::vector<ASTNode*> s(stack);
-	s.push_back(this);
-
-	for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
-		this->argument_expressions[i]->bindVariables(s);
-}*/
-
-
-void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
-{
-	if(payload.operation == TraversalPayload::ConstantFolding)
-	{
-		for(size_t i=0; i<argument_expressions.size(); ++i)
-			if(shouldFoldExpression(argument_expressions[i], payload))
-			{
-				argument_expressions[i] = foldExpression(argument_expressions[i], payload);
-				payload.tree_changed = true;
-			}
-	}
-	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
-	{
-		for(size_t i=0; i<argument_expressions.size(); ++i)
-			convertOverloadedOperators(argument_expressions[i], payload);
-	}
-
-
-
-	// NOTE: we want to do a post-order traversal here.
-	// Thhis is because we want our argument expressions to be linked first.
-
-	stack.push_back(this);
-
-	for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
-		this->argument_expressions[i]->traverse(payload, stack);
-
-	stack.pop_back();
-
-	if(payload.operation == TraversalPayload::BindVariables) // LinkFunctions)
-	{
-		// If this is a generic function, we can't try and bind function expressions yet,
-		// because the binding depends on argument type due to function overloading, so we have to wait
-		// until we know the concrete type.
-
-		if(!payload.func_def_stack.back()->isGenericFunction())
-			linkFunctions(*payload.linker, payload, stack);
-	}
-}
-
-
-void FunctionExpression::print(int depth, std::ostream& s) const
-{
-	printMargin(depth, s);
-	s << "FunctionExpr";
-	if(this->target_function)
-		s << "; target: " << this->target_function->sig.toString();
-	else if(this->binding_type == Arg)
-		s << "; runtime bound to arg index " << this->bound_index;
-	else if(this->binding_type == Let)
-		s << "; runtime bound to let index " << this->bound_index;
-	s << "\n";
-	for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
-		this->argument_expressions[i]->print(depth + 1, s);
-}
-
-
-TypeRef FunctionExpression::type() const
-{
-	if(this->binding_type == BoundToGlobalDef)
-	{
-		assert(this->target_function);
-		return this->target_function->returnType();
-	}
-	else if(this->binding_type == Let)
-	{
-		TypeRef t = this->bound_let_block->lets[this->bound_index]->type();
-		Function* func_type = static_cast<Function*>(t.getPointer());
-		return func_type->return_type;
-	}
-	else if(this->binding_type == Arg)
-	{
-		Function* func_type = static_cast<Function*>(this->bound_function->args[this->bound_index].type.getPointer());
-		return func_type->return_type;
-	}
-
-	assert(0);
-	return TypeRef(NULL);
-
-	//if(target_function_return_type.nonNull())
-	//	return target_function_return_type;
-	//else
-	//{
-	//	return this->target_function ? this->target_function->returnType() : TypeRef(NULL);
-	//}
-/*
-	if(!target_function)
-	{
-		assert(0);
-		throw BaseException("Tried to get type from an unlinked function expression.");
-	}
-	return this->target_function->type();*/
-}
-
-
-llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
-{
-#if USE_LLVM
-	llvm::Value* target_llvm_func = NULL;
-	TypeRef target_ret_type = this->type(); //this->target_function_return_type;
-
-	llvm::Value* captured_var_struct_ptr = NULL;
-
-	if(binding_type == Let)
-	{
-		//target_llvm_func = this->bound_let_block->getLetExpressionLLVMValue(params, bound_index);
-
-		llvm::Value* closure_pointer = this->bound_let_block->getLetExpressionLLVMValue(params, bound_index);
-
-		
-		//TEMP:
-		std::cout << "closure_pointer: \n";
-		closure_pointer->dump();
-
-		// Load function pointer from closure.
-
-		{
-		vector<llvm::Value*> indices;
-		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))); // array index
-		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))); // field index
-		
-		llvm::Value* func_ptr_ptr = params.builder->CreateGEP(
-			closure_pointer, // ptr
-			indices.begin(),
-			indices.end(),
-			"func_ptr_ptr"
-		);
-
-		target_llvm_func = params.builder->CreateLoad(func_ptr_ptr, "func_ptr");
-		}
-
-		{
-		vector<llvm::Value*> indices;
-		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))); // array index
-		// NOTE: index 1 should hold the captured vars struct.
-		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1, true))); // field index
-		
-		captured_var_struct_ptr = params.builder->CreateGEP(
-			closure_pointer, // ptr
-			indices.begin(),
-			indices.end(),
-			"captured_var_struct_ptr"
-		);
-		}
-	}
-	else if(binding_type == Arg)
-	{
-		// If the current function returns its result via pointer, then all args are offset by one.
-		//if(params.currently_building_func_def->returnType()->passByValue())
-		//	closure_pointer = LLVMTypeUtils::getNthArg(params.currently_building_func, this->bound_index);
-		//else
-		//	closure_pointer = LLVMTypeUtils::getNthArg(params.currently_building_func, this->bound_index + 1);
-
-		llvm::Value* closure_pointer = LLVMTypeUtils::getNthArg(
-			params.currently_building_func,
-			params.currently_building_func_def->getLLVMArgIndex(this->bound_index)
-		);
-
-		//target_llvm_func = dynamic_cast<llvm::Function*>(func);
-
-		// Load function pointer from closure.
-
-		{
-		vector<llvm::Value*> indices;
-		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))); // array index
-		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))); // field index
-		
-		llvm::Value* field_ptr = params.builder->CreateGEP(
-			closure_pointer, // ptr
-			indices.begin(),
-			indices.end(),
-			"func_ptr_ptr"
-		);
-
-		target_llvm_func = params.builder->CreateLoad(field_ptr, "func_ptr");
-		}
-
-		{
-		vector<llvm::Value*> indices;
-		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))); // array index
-		// NOTE: index 1 should hold the captured vars struct.
-		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1, true))); // field index
-		
-		captured_var_struct_ptr = params.builder->CreateGEP(
-			closure_pointer, // ptr
-			indices.begin(),
-			indices.end(),
-			"captured_var_struct_ptr"
-		);
-		}
-	}
-	else if(binding_type == BoundToGlobalDef)
-	{
-		// Lookup LLVM function, which should already be created and added to the module.
-		/*llvm::Function* target_llvm_func = params.module->getFunction(
-			this->target_function->sig.toString() //internalFuncName(call_target_sig)
-			);
-		assert(target_llvm_func);*/
-
-		/*FunctionSignature target_sig = this->target_function->sig;
-
-		llvm::FunctionType* target_func_type = LLVMTypeUtils::llvmFunctionType(
-			target_sig.param_types, 
-			target_ret_type, 
-			*params.context,
-			params.hidden_voidptr_arg
-		);
-
-		target_llvm_func = params.module->getOrInsertFunction(
-			target_sig.toString(), // Name
-			target_func_type // Type
-		);*/
-
-		target_llvm_func = this->target_function->getOrInsertFunction(
-			params.module,
-			params.hidden_voidptr_arg
-		);
-
-		//closure_pointer = this->target_function->emitLLVMCode(params);
-		//assert(closure_pointer);
-	}
-	else
-	{
-		assert(0);
-	}
-
-	//assert(closure_pointer);
-
-
-	assert(target_llvm_func);
-
-	//TEMP:
-	std::cout << "target_llvm_func: \n";
-	target_llvm_func->dump();
-
-
-	//------------------
-	// Build args list
-
-	if(target_ret_type->passByValue())
-	{
-		vector<llvm::Value*> args;
-
-		for(unsigned int i=0; i<argument_expressions.size(); ++i)
-			args.push_back(argument_expressions[i]->emitLLVMCode(params));
-
-		// Append pointer to Captured var struct, if this function was from a closure, and there are captured vars.
-		if(captured_var_struct_ptr != NULL)
-			args.push_back(captured_var_struct_ptr);
-
-		// Set hidden voidptr argument
-		if(params.hidden_voidptr_arg)
-			args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));
-
-		llvm::CallInst* call_inst = params.builder->CreateCall(target_llvm_func, args.begin(), args.end());
-
-		// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
-		call_inst->setCallingConv(llvm::CallingConv::C);
-
-		return call_inst;
-	}
-	else
-	{
-		//llvm::Value* return_val_addr = NULL;
-		//if(parent->passByValue())
-		//{
-
-		// Allocate return value on stack
-		llvm::Value* return_val_addr = params.builder->Insert(new llvm::AllocaInst(
-			target_ret_type->LLVMType(*params.context), // type
-			NULL, // ArraySize
-			16, // alignment
-			"return_val_addr" // target_sig.toString() + " return_val_addr"
-		));
-
-		vector<llvm::Value*> args(1, return_val_addr);
-
-		for(unsigned int i=0; i<argument_expressions.size(); ++i)
-			args.push_back(argument_expressions[i]->emitLLVMCode(params));
-
-		// Append pointer to Captured var struct, if this function was from a closure.
-		if(captured_var_struct_ptr != NULL)
-			args.push_back(captured_var_struct_ptr);
-
-		// Set hidden voidptr argument
-		if(params.hidden_voidptr_arg)
-			args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));
-
-		llvm::CallInst* call_inst = params.builder->CreateCall(target_llvm_func, args.begin(), args.end());
-		
-		// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
-		call_inst->setCallingConv(llvm::CallingConv::C);
-
-		return return_val_addr;
-	}
-#else
-	return NULL;
-#endif
-}
-
-
-Reference<ASTNode> FunctionExpression::clone()
-{
-	FunctionExpression* e = new FunctionExpression();
-	e->function_name = this->function_name;
-
-	for(unsigned int i=0; i<argument_expressions.size(); ++i)
-		e->argument_expressions.push_back(argument_expressions[i]->clone());
-	
-	e->target_function = this->target_function;
-	e->bound_index = this->bound_index;
-	e->bound_function = this->bound_function;
-	e->bound_let_block = this->bound_let_block;
-	e->binding_type = this->binding_type;
-
-	return ASTNodeRef(e);
-}
-
-
-bool FunctionExpression::isConstant() const
-{
-	// For now, we'll saw a function expression bound to an argument of let var is not constant.
-	if(this->binding_type != BoundToGlobalDef)
-		return false;
-
-	for(unsigned int i=0; i<argument_expressions.size(); ++i)
-		if(!argument_expressions[i]->isConstant())
-			return false;
-	return true;
-}
-
-
-//-----------------------------------------------------------------------------------
-
-
-Variable::Variable(const std::string& name_)
-:	name(name_),
+Variable::Variable(const std::string& name_, const SrcLocation& loc)
+:	ASTNode(loc),
+	name(name_),
 	bound_index(-1),
 	bound_function(NULL),
 	bound_let_block(NULL)
@@ -1002,7 +368,7 @@ Variable::Variable(const std::string& name_)
 void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNode*>& stack)
 {
 	bool in_current_func_def = true;
-	int let_frame_offset = 0;
+	int use_let_frame_offset = 0;
 	for(int s = (int)stack.size() - 1; s >= 0; --s) // Walk up the stack of ancestor nodes
 	{
 		if(FunctionDefinition* def = dynamic_cast<FunctionDefinition*>(stack[s])) // If node is a function definition:
@@ -1015,7 +381,7 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 						//this->captured_var_index = payload.captured_vars.size();
 						//this->use_captured_var = true;
 						this->vartype = CapturedVariable;
-						this->bound_index = payload.func_def_stack.back()->captured_vars.size(); // payload.captured_vars.size();
+						this->bound_index = (int)payload.func_def_stack.back()->captured_vars.size(); // payload.captured_vars.size();
 
 						// Save info to get bound function argument, so we can query it for the type of the captured var.
 						this->bound_function = def;
@@ -1052,7 +418,7 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 						//this->captured_var_index = payload.captured_vars.size();
 						//this->use_captured_var = true;
 						this->vartype = CapturedVariable;
-						this->bound_index = this->bound_index = payload.func_def_stack.back()->captured_vars.size(); // payload.captured_vars.size();
+						this->bound_index = (int)payload.func_def_stack.back()->captured_vars.size(); // payload.captured_vars.size();
 
 						// Save info to get bound let, so we can query it for the type of the captured var.
 						this->bound_let_block = let_block;
@@ -1063,7 +429,7 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 						var.vartype = CapturedVar::Let;
 						var.bound_let_block = let_block;
 						var.index = i;
-						var.let_frame_offset = let_frame_offset;
+						var.let_frame_offset = use_let_frame_offset;
 						//payload.captured_vars.push_back(var);
 						payload.func_def_stack.back()->captured_vars.push_back(var);
 					}
@@ -1072,18 +438,19 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 						this->vartype = LetVariable;
 						this->bound_let_block = let_block;
 						this->bound_index = i;
+						this->let_frame_offset = use_let_frame_offset;
 					}
 		
 					return;
 				}
 
 			// We only want to count an ancestor let block as an offsetting block if we are not currently in a let clause of it.
-			bool is_this_let_clause = false;
+			/*bool is_this_let_clause = false;
 			for(size_t z=0; z<let_block->lets.size(); ++z)
 				if(let_block->lets[z].getPointer() == stack[s+1])
 					is_this_let_clause = true;
-			if(!is_this_let_clause)
-				let_frame_offset++;
+			if(!is_this_let_clause)*/
+				use_let_frame_offset++;
 		}
 	}
 
@@ -1099,7 +466,8 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 		assert(matching_functions.size() > 0);
 
 		if(matching_functions.size() > 1)
-			throw BaseException("Ambiguous binding for variable '" + this->name + "': multiple functions with name.");
+			throw BaseException("Ambiguous binding for variable '" + this->name + "': multiple functions with name." + 
+				errorContext(*this, payload));
 
 		this->vartype = BoundToGlobalDefVariable;
 		this->bound_function = matching_functions[0].getPointer();
@@ -1107,7 +475,8 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 	}
 
 
-	throw BaseException("Variable::bindVariables(): No such function, function argument or let definition '" + this->name + "'");
+	throw BaseException("Variable::bindVariables(): No such function, function argument or let definition '" + this->name + "'." + 
+		errorContext(*this, payload));
 }
 
 
@@ -1126,7 +495,9 @@ ValueRef Variable::exec(VMState& vmstate)
 	}
 	else if(this->vartype == LetVariable)
 	{
-		return vmstate.let_stack[vmstate.let_stack_start.back() + bound_index];
+		const int let_stack_start = (int)vmstate.let_stack_start[vmstate.let_stack_start.size() - 1 - this->let_frame_offset];
+
+		return vmstate.let_stack[let_stack_start + this->bound_index];
 	}
 	else if(this->vartype == BoundToGlobalDefVariable)
 	{
@@ -1241,9 +612,28 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params) const
 		// Get pointer to captured variables. structure.
 		// This pointer will be passed after the normal arguments to the function.
 
-		llvm::Value* closure_structure = LLVMTypeUtils::getNthArg(
+		llvm::Value* base_cap_var_structure = LLVMTypeUtils::getNthArg(
 			params.currently_building_func,
 			params.currently_building_func_def->getCapturedVarStructLLVMArgIndex()
+		);
+
+		//std::cout << "base_cap_var_structure: " << std::endl;
+		//base_cap_var_structure->dump();
+		//std::cout << std::endl;
+		
+
+		const llvm::Type* full_cap_var_type = LLVMTypeUtils::pointerType(
+			*params.currently_building_func_def->getCapturedVariablesStructType()->LLVMType(*params.context)
+		);
+
+		//std::cout << "full_cap_var_type: " << std::endl;
+		//full_cap_var_type->dump();
+		//std::cout << std::endl;
+
+		llvm::Value* cap_var_structure = params.builder->CreateBitCast(
+			base_cap_var_structure,
+			full_cap_var_type, // destination type
+			"cap_var_structure" // name
 		);
 
 		// Load the value from the correct field.
@@ -1253,11 +643,12 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params) const
 		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, this->bound_index, true))); // field index
 		
 		//TEMP
-		params.currently_building_func->dump();
-		closure_structure->dump();
+		//params.currently_building_func->dump();
+		//base_cap_var_structure->dump();
+		//cap_var_structure->dump();
 
 		llvm::Value* field_ptr = params.builder->CreateGEP(
-			closure_structure, // ptr
+			cap_var_structure, // ptr
 			indices.begin(),
 			indices.end()
 		);
@@ -1480,7 +871,7 @@ llvm::Value* MapLiteral::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 Reference<ASTNode> MapLiteral::clone()
 {
-	MapLiteral* m = new MapLiteral();
+	MapLiteral* m = new MapLiteral(srcLocation());
 	m->maptype = this->maptype;
 	for(size_t i=0; i<items.size(); ++i)
 		m->items.push_back(std::make_pair(items[0].first->clone(), items[0].second->clone()));
@@ -1500,12 +891,13 @@ bool MapLiteral::isConstant() const
 //----------------------------------------------------------------------------------------------
 
 
-ArrayLiteral::ArrayLiteral(const std::vector<ASTNodeRef>& elems)
-:	elements(elems)
+ArrayLiteral::ArrayLiteral(const std::vector<ASTNodeRef>& elems, const SrcLocation& loc)
+:	ASTNode(loc),
+	elements(elems)
 {
 	//this->t
 	if(elems.empty())
-		throw BaseException("Array literal can't be empty.");
+		throw BaseException("Array literal can't be empty." + errorContext(*this));
 }
 
 
@@ -1574,7 +966,8 @@ void ArrayLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 		const TypeRef elem_type = this->elements[0]->type();
 		for(unsigned int i=0; i<this->elements.size(); ++i)
 			if(*elem_type != *this->elements[i]->type())
-				throw BaseException("Array element " + ::toString(i) + " did not have required type " + elem_type->toString() + ".");
+				throw BaseException("Array element " + ::toString(i) + " did not have required type " + elem_type->toString() + "." + 
+				errorContext(*this, payload));
 	}
 }
 
@@ -1590,7 +983,7 @@ Reference<ASTNode> ArrayLiteral::clone()
 	std::vector<ASTNodeRef> elems(this->elements.size());
 	for(size_t i=0; i<elements.size(); ++i)
 		elems[i] = this->elements[i]->clone();
-	return ASTNodeRef(new ArrayLiteral(elems));
+	return ASTNodeRef(new ArrayLiteral(elems, srcLocation()));
 }
 
 
@@ -1606,11 +999,12 @@ bool ArrayLiteral::isConstant() const
 //------------------------------------------------------------------------------------------
 
 
-VectorLiteral::VectorLiteral(const std::vector<ASTNodeRef>& elems)
-:	elements(elems)
+VectorLiteral::VectorLiteral(const std::vector<ASTNodeRef>& elems, const SrcLocation& loc)
+:	ASTNode(loc),
+	elements(elems)
 {
 	if(elems.empty())
-		throw BaseException("Array literal can't be empty.");
+		throw BaseException("Vector literal can't be empty." + errorContext(*this));
 }
 
 
@@ -1679,7 +1073,7 @@ void VectorLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 		const TypeRef elem_type = this->elements[0]->type();
 		for(unsigned int i=0; i<this->elements.size(); ++i)
 			if(*elem_type != *this->elements[i]->type())
-				throw BaseException("Vector element " + ::toString(i) + " did not have required type " + elem_type->toString() + ".");
+				throw BaseException("Vector element " + ::toString(i) + " did not have required type " + elem_type->toString() + "." + errorContext(*this, payload));
 	}
 }
 
@@ -1726,7 +1120,7 @@ Reference<ASTNode> VectorLiteral::clone()
 	std::vector<ASTNodeRef> elems(this->elements.size());
 	for(size_t i=0; i<elements.size(); ++i)
 		elems[i] = this->elements[i]->clone();
-	return ASTNodeRef(new VectorLiteral(elems));
+	return ASTNodeRef(new VectorLiteral(elems, srcLocation()));
 }
 
 
@@ -1966,7 +1360,7 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 			IntLiteral* b_lit = static_cast<IntLiteral*>(b.getPointer());
 			if(isIntExactlyRepresentableAsFloat(b_lit->value))
 			{
-				b = ASTNodeRef(new FloatLiteral((float)b_lit->value));
+				b = ASTNodeRef(new FloatLiteral((float)b_lit->value, b->srcLocation()));
 				payload.tree_changed = true;
 			}
 		}
@@ -1977,7 +1371,7 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 			IntLiteral* a_lit = static_cast<IntLiteral*>(a.getPointer());
 			if(isIntExactlyRepresentableAsFloat(a_lit->value))
 			{
-				a = ASTNodeRef(new FloatLiteral((float)a_lit->value));
+				a = ASTNodeRef(new FloatLiteral((float)a_lit->value, a->srcLocation()));
 				payload.tree_changed = true;
 			}
 		}
@@ -1988,7 +1382,7 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 		if(this->type()->getType() == Type::GenericTypeType || *this->type() == Int() || *this->type() == Float())
 		{
 			if(*a->type() != *b->type())
-				throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'");
+				throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
 		}
 		else if(a->type()->getType() == Type::VectorTypeType && b->type()->getType() == Type::VectorTypeType)
 		{
@@ -1998,7 +1392,7 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 		}
 		else
 		{
-			throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'");
+			throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
 		}
 	}
 }
@@ -2020,7 +1414,7 @@ llvm::Value* AdditionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 Reference<ASTNode> AdditionExpression::clone()
 {
-	AdditionExpression* e = new AdditionExpression();
+	AdditionExpression* e = new AdditionExpression(this->srcLocation());
 	e->a = this->a->clone();
 	e->b = this->b->clone();
 	return ASTNodeRef(e);
@@ -2147,7 +1541,7 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 			IntLiteral* b_lit = static_cast<IntLiteral*>(b.getPointer());
 			if(isIntExactlyRepresentableAsFloat(b_lit->value))
 			{
-				b = ASTNodeRef(new FloatLiteral((float)b_lit->value));
+				b = ASTNodeRef(new FloatLiteral((float)b_lit->value, b->srcLocation()));
 				payload.tree_changed = true;
 			}
 		}
@@ -2158,7 +1552,7 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 			IntLiteral* a_lit = static_cast<IntLiteral*>(a.getPointer());
 			if(isIntExactlyRepresentableAsFloat(a_lit->value))
 			{
-				a = ASTNodeRef(new FloatLiteral((float)a_lit->value));
+				a = ASTNodeRef(new FloatLiteral((float)a_lit->value, a->srcLocation()));
 				payload.tree_changed = true;
 			}
 		}
@@ -2169,7 +1563,7 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 		if(this->type()->getType() == Type::GenericTypeType || *this->type() == Int() || *this->type() == Float())
 		{
 			if(*a->type() != *b->type())
-				throw BaseException("Binary operator '-' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'");
+				throw BaseException("Binary operator '-' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
 		}
 		else if(a->type()->getType() == Type::VectorTypeType && b->type()->getType() == Type::VectorTypeType)
 		{
@@ -2179,7 +1573,7 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 		}
 		else
 		{
-			throw BaseException("Binary operator '-' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'");
+			throw BaseException("Binary operator '-' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
 		}
 	}
 
@@ -2202,7 +1596,7 @@ llvm::Value* SubtractionExpression::emitLLVMCode(EmitLLVMCodeParams& params) con
 
 Reference<ASTNode> SubtractionExpression::clone()
 {
-	SubtractionExpression* e = new SubtractionExpression();
+	SubtractionExpression* e = new SubtractionExpression(this->srcLocation());
 	e->a = this->a->clone();
 	e->b = this->b->clone();
 	return ASTNodeRef(e);
@@ -2301,7 +1695,7 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 			IntLiteral* b_lit = static_cast<IntLiteral*>(b.getPointer());
 			if(isIntExactlyRepresentableAsFloat(b_lit->value))
 			{
-				b = ASTNodeRef(new FloatLiteral((float)b_lit->value));
+				b = ASTNodeRef(new FloatLiteral((float)b_lit->value, b->srcLocation()));
 				payload.tree_changed = true;
 			}
 		}
@@ -2312,7 +1706,7 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 			IntLiteral* a_lit = static_cast<IntLiteral*>(a.getPointer());
 			if(isIntExactlyRepresentableAsFloat(a_lit->value))
 			{
-				a = ASTNodeRef(new FloatLiteral((float)a_lit->value));
+				a = ASTNodeRef(new FloatLiteral((float)a_lit->value, a->srcLocation()));
 				payload.tree_changed = true;
 			}
 		}
@@ -2324,7 +1718,7 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 		if(this->type()->getType() == Type::GenericTypeType || *this->type() == Int() || *this->type() == Float())
 		{
 			if(*a->type() != *b->type())
-				throw BaseException("Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'");
+				throw BaseException("Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
 		}
 		else if(a->type()->getType() == Type::VectorTypeType && b->type()->getType() == Type::VectorTypeType)
 		{
@@ -2334,7 +1728,7 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 		}
 		else
 		{
-			throw BaseException("Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'");
+			throw BaseException("Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
 		}
 	}
 }
@@ -2372,7 +1766,7 @@ llvm::Value* MulExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 Reference<ASTNode> MulExpression::clone()
 {
-	MulExpression* e = new MulExpression();
+	MulExpression* e = new MulExpression(this->srcLocation());
 	e->a = this->a->clone();
 	e->b = this->b->clone();
 	return ASTNodeRef(e);
@@ -2447,7 +1841,7 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 			IntLiteral* b_lit = static_cast<IntLiteral*>(b.getPointer());
 			if(isIntExactlyRepresentableAsFloat(b_lit->value) && (b_lit->value != 0))
 			{
-				b = ASTNodeRef(new FloatLiteral((float)b_lit->value));
+				b = ASTNodeRef(new FloatLiteral((float)b_lit->value, b->srcLocation()));
 				payload.tree_changed = true;
 			}
 		}
@@ -2458,7 +1852,7 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 			IntLiteral* a_lit = static_cast<IntLiteral*>(a.getPointer());
 			if(isIntExactlyRepresentableAsFloat(a_lit->value))
 			{
-				a = ASTNodeRef(new FloatLiteral((float)a_lit->value));
+				a = ASTNodeRef(new FloatLiteral((float)a_lit->value, a->srcLocation()));
 				payload.tree_changed = true;
 			}
 		}
@@ -2470,7 +1864,7 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 		if(this->type()->getType() == Type::GenericTypeType || *this->type() == Int() || *this->type() == Float())
 		{
 			if(*a->type() != *b->type())
-				throw BaseException("Binary operator '/' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'");
+				throw BaseException("Binary operator '/' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
 		}
 		else if(a->type()->getType() == Type::VectorTypeType && b->type()->getType() == Type::VectorTypeType)
 		{
@@ -2480,7 +1874,7 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 		}
 		else
 		{
-			throw BaseException("Binary operator '/' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'");
+			throw BaseException("Binary operator '/' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
 		}
 	}
 }
@@ -2528,7 +1922,7 @@ llvm::Value* DivExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 Reference<ASTNode> DivExpression::clone()
 {
-	DivExpression* e = new DivExpression();
+	DivExpression* e = new DivExpression(this->srcLocation());
 	e->a = this->a->clone();
 	e->b = this->b->clone();
 	return ASTNodeRef(e);
@@ -2536,6 +1930,140 @@ Reference<ASTNode> DivExpression::clone()
 
 
 bool DivExpression::isConstant() const
+{
+	return a->isConstant() && b->isConstant();
+}
+
+
+//-------------------------------------------------------------------------------------------------------
+
+
+BinaryBooleanExpr::BinaryBooleanExpr(Type t_, const ASTNodeRef& a_, const ASTNodeRef& b_, const SrcLocation& loc)
+:	ASTNode(loc),
+	t(t_), a(a_), b(b_)
+{
+}
+
+
+ValueRef BinaryBooleanExpr::exec(VMState& vmstate)
+{
+	ValueRef aval = a->exec(vmstate);
+	ValueRef bval = b->exec(vmstate);
+	ValueRef retval;
+
+	if(t == OR)
+	{
+		return ValueRef(new BoolValue(
+			static_cast<BoolValue*>(aval.getPointer())->value || 
+			static_cast<BoolValue*>(bval.getPointer())->value
+		));
+	}
+	else if(t == AND)
+	{
+		return ValueRef(new BoolValue(
+			static_cast<BoolValue*>(aval.getPointer())->value &&
+			static_cast<BoolValue*>(bval.getPointer())->value
+		));
+	}
+	else
+	{
+		assert(!"invalid t");
+		return ValueRef();
+	}
+}
+
+
+void BinaryBooleanExpr::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
+{
+	if(payload.operation == TraversalPayload::ConstantFolding)
+	{
+		if(shouldFoldExpression(a, payload))
+		{
+			a = foldExpression(a, payload);
+			payload.tree_changed = true;
+		}
+		if(shouldFoldExpression(b, payload))
+		{
+			b = foldExpression(b, payload);
+			payload.tree_changed = true;
+		}
+	}
+	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	{
+		convertOverloadedOperators(a, payload);
+		convertOverloadedOperators(b, payload);
+	}
+
+	stack.push_back(this);
+	a->traverse(payload, stack);
+	b->traverse(payload, stack);
+	stack.pop_back();
+
+	
+	if(payload.operation == TraversalPayload::TypeCheck)
+	{
+		if(a->type()->getType() != Winter::Type::BoolType)
+			throw BaseException("First child does not have boolean type." + errorContext(*this, payload));
+
+		if(b->type()->getType() != Winter::Type::BoolType)
+			throw BaseException("Second child does not have boolean type." + errorContext(*this, payload));
+	}
+}
+
+
+void BinaryBooleanExpr::print(int depth, std::ostream& s) const
+{
+	printMargin(depth, s);
+	s << "Binary boolean Expression ";
+	if(t == OR)
+		s << " (OR)";
+	else if(t == AND)
+		s << " (AND)";
+	s << "\n";
+
+	this->a->print(depth+1, s);
+	this->b->print(depth+1, s);
+}
+
+
+llvm::Value* BinaryBooleanExpr::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+#if USE_LLVM
+	if(t == AND)
+	{
+		return params.builder->CreateBinOp(
+			llvm::Instruction::And, 
+			a->emitLLVMCode(params), 
+			b->emitLLVMCode(params)
+			);
+	}
+	else if(t == OR)
+	{
+		return params.builder->CreateBinOp(
+			llvm::Instruction::Or, 
+			a->emitLLVMCode(params), 
+			b->emitLLVMCode(params)
+			);
+	}
+	else
+	{
+		assert(!"t type invalid!");
+		return NULL;
+	}
+
+#else
+	return NULL;
+#endif
+}
+
+
+Reference<ASTNode> BinaryBooleanExpr::clone()
+{
+	return ASTNodeRef(new BinaryBooleanExpr(t, a, b, srcLocation()));
+}
+
+
+bool BinaryBooleanExpr::isConstant() const
 {
 	return a->isConstant() && b->isConstant();
 }
@@ -2631,7 +2159,7 @@ llvm::Value* UnaryMinusExpression::emitLLVMCode(EmitLLVMCodeParams& params) cons
 
 Reference<ASTNode> UnaryMinusExpression::clone()
 {
-	UnaryMinusExpression* e = new UnaryMinusExpression();
+	UnaryMinusExpression* e = new UnaryMinusExpression(this->srcLocation());
 	e->expr = this->expr->clone();
 	return ASTNodeRef(e);
 }
@@ -2689,7 +2217,7 @@ llvm::Value* LetASTNode::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 Reference<ASTNode> LetASTNode::clone()
 {
-	LetASTNode* e = new LetASTNode(this->variable_name);
+	LetASTNode* e = new LetASTNode(this->variable_name, this->srcLocation());
 	e->expr = this->expr->clone();
 	return ASTNodeRef(e);
 }
@@ -2779,8 +2307,11 @@ ValueRef ComparisonExpression::exec(VMState& vmstate)
 	case Type::IntType:
 		retval = ValueRef(compare<IntValue>(this->token->getType(), aval.getPointer(), bval.getPointer()));
 		break;
+	case Type::BoolType:
+		retval = ValueRef(compare<BoolValue>(this->token->getType(), aval.getPointer(), bval.getPointer()));
+		break;
 	default:
-		assert(!"SubtractionExpression type invalid!");
+		assert(!"ComparisonExpression type invalid!");
 	}
 
 	return retval;
@@ -2824,11 +2355,11 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 
 	if(payload.operation == TraversalPayload::TypeCheck)
 	{
-		if(a->type()->getType() == Type::GenericTypeType || a->type()->getType() == Type::IntType || a->type()->getType() == Type::FloatType)
+		if(a->type()->getType() == Type::GenericTypeType || a->type()->getType() == Type::IntType || a->type()->getType() == Type::FloatType || a->type()->getType() == Type::BoolType)
 		{}
 		else
 		{
-			throw BaseException("Child type '" + this->type()->toString() + "' does not define Comparison operators. '*'.");
+			throw BaseException("Child type '" + this->type()->toString() + "' does not define Comparison operators. (First child type: " + a->type()->toString() + ")." + errorContext(*this, payload));
 		}
 	}
 }
@@ -2851,7 +2382,7 @@ llvm::Value* ComparisonExpression::emitLLVMCode(EmitLLVMCodeParams& params) cons
 			case NOT_EQUALS_TOKEN: return params.builder->CreateFCmpONE(a_code, b_code);
 			case LESS_EQUAL_TOKEN: return params.builder->CreateFCmpOLE(a_code, b_code);
 			case GREATER_EQUAL_TOKEN: return params.builder->CreateFCmpOGE(a_code, b_code);
-			default: assert(0); throw BaseException("Unsupported token type for comparison");
+			default: assert(0); throw BaseException("Unsupported token type for comparison.");
 			}
 		}
 		break;
@@ -2869,6 +2400,16 @@ llvm::Value* ComparisonExpression::emitLLVMCode(EmitLLVMCodeParams& params) cons
 			}
 		}
 		break;
+	case Type::BoolType:
+		{
+			switch(this->token->getType())
+			{
+			case DOUBLE_EQUALS_TOKEN: return params.builder->CreateICmpEQ(a_code, b_code);
+			case NOT_EQUALS_TOKEN: return params.builder->CreateICmpNE(a_code, b_code);
+			default: assert(0); throw BaseException("Unsupported token type for comparison");
+			}
+		}
+		break;
 	default:
 		assert(!"ComparisonExpression type invalid!");
 		throw BaseException("ComparisonExpression type invalid");
@@ -2878,7 +2419,7 @@ llvm::Value* ComparisonExpression::emitLLVMCode(EmitLLVMCodeParams& params) cons
 
 Reference<ASTNode> ComparisonExpression::clone()
 {
-	return Reference<ASTNode>(new ComparisonExpression(token, a, b));
+	return Reference<ASTNode>(new ComparisonExpression(token, a, b, this->srcLocation()));
 }
 
 
@@ -2888,20 +2429,35 @@ bool ComparisonExpression::isConstant() const
 }
 
 
+const std::string ComparisonExpression::getOverloadedFuncName() const // returns e.g. op_lt, op_gt   etc..
+{
+	switch(this->token->getType())
+	{
+	case LEFT_ANGLE_BRACKET_TOKEN: return "op_lt";
+	case RIGHT_ANGLE_BRACKET_TOKEN: return "op_gt";
+	case DOUBLE_EQUALS_TOKEN: return "op_eq";
+	case NOT_EQUALS_TOKEN: return "op_neq";
+	case LESS_EQUAL_TOKEN: return "op_lte";
+	case GREATER_EQUAL_TOKEN: return "op_gte";
+	default: assert(0); throw BaseException("Unsupported token type for comparison");
+	}
+}
+
+
 //----------------------------------------------------------------------------------------
 
 
 ValueRef LetBlock::exec(VMState& vmstate)
 {
 	const size_t let_stack_size = vmstate.let_stack.size();
+	vmstate.let_stack_start.push_back(let_stack_size); // Push let frame index
 
 	// Evaluate let clauses, which will each push the result onto the let stack
 	for(unsigned int i=0; i<lets.size(); ++i)
 		vmstate.let_stack.push_back(lets[i]->exec(vmstate));
 
-	vmstate.let_stack_start.push_back(let_stack_size); // Push let frame index
 
-	return this->expr->exec(vmstate);
+	ValueRef retval = this->expr->exec(vmstate);
 
 	// Pop things off let stack
 	for(unsigned int i=0; i<lets.size(); ++i)
@@ -2909,6 +2465,8 @@ ValueRef LetBlock::exec(VMState& vmstate)
 	
 	// Pop let frame index
 	vmstate.let_stack_start.pop_back();
+
+	return retval;
 }
 
 
@@ -2955,7 +2513,12 @@ void LetBlock::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 
 llvm::Value* LetBlock::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
+	params.let_block_stack.push_back(const_cast<LetBlock*>(this));
+
 	return expr->emitLLVMCode(params);
+
+	params.let_block_stack.pop_back();
+
 }
 
 
@@ -2964,7 +2527,7 @@ Reference<ASTNode> LetBlock::clone()
 	vector<Reference<LetASTNode> > new_lets(lets.size());
 	for(size_t i=0; i<new_lets.size(); ++i)
 		new_lets[i] = Reference<LetASTNode>(static_cast<LetASTNode*>(lets[i]->clone().getPointer()));
-	return ASTNodeRef(new LetBlock(this->expr->clone(), new_lets));
+	return ASTNodeRef(new LetBlock(this->expr->clone(), new_lets, this->srcLocation()));
 }
 
 

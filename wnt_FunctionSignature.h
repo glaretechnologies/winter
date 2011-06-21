@@ -6,8 +6,7 @@ Code By Nicholas Chapman.
 
 Copyright 2009 Nicholas Chapman
 =====================================================================*/
-#ifndef __FUNCTIONSIGNATURE_H_666_
-#define __FUNCTIONSIGNATURE_H_666_
+#pragma once
 
 
 #include "wnt_Type.h"
@@ -72,10 +71,4 @@ inline bool operator < (const FunctionSignature& a, const FunctionSignature& b)
 
 
 } //end namespace Lang
-
-
-#endif //__FUNCTIONSIGNATURE_H_666_
-
-
-
 

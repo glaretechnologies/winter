@@ -9,6 +9,7 @@ Copyright 2009 Nicholas Chapman
 #include "wnt_Lexer.h"
 
 
+#include "wnt_Diagnostics.h"
 #include "utils/Parser.h"
 #include "indigo/TestUtils.h"
 #include "maths/mathstypes.h"
@@ -28,7 +29,7 @@ Lexer::~Lexer()
 }
 
 
-void Lexer::parseStringLiteral(Parser& parser, std::vector<Reference<TokenBase> >& tokens_out)
+void Lexer::parseStringLiteral(const SourceBufferRef& buffer, Parser& parser, std::vector<Reference<TokenBase> >& tokens_out)
 {
 	assert(parser.notEOF());
 	assert(parser.current() == '"');
@@ -41,7 +42,7 @@ void Lexer::parseStringLiteral(Parser& parser, std::vector<Reference<TokenBase> 
 	while(1)
 	{
 		if(parser.eof())
-			throw LexerExcep("End of input while parsing string literal." + errorPosition(parser.getText(), parser.currentPos()));
+			throw LexerExcep("End of input while parsing string literal." + errorPosition(buffer, parser.currentPos()));
 
 		if(parser.current() == '"')
 		{
@@ -57,13 +58,13 @@ void Lexer::parseStringLiteral(Parser& parser, std::vector<Reference<TokenBase> 
 }
 
 
-static void parseWhiteSpace(Parser& parser, std::vector<Reference<TokenBase> >& tokens_out)
+static void parseWhiteSpace(const SourceBufferRef& buffer, Parser& parser, std::vector<Reference<TokenBase> >& tokens_out)
 {
 	parser.parseWhiteSpace();
 }
 
 
-void Lexer::parseNumericLiteral(Parser& parser, std::vector<Reference<TokenBase> >& tokens_out)
+void Lexer::parseNumericLiteral(const SourceBufferRef& buffer, Parser& parser, std::vector<Reference<TokenBase> >& tokens_out)
 {
 	assert(parser.notEOF());
 	
@@ -73,7 +74,7 @@ void Lexer::parseNumericLiteral(Parser& parser, std::vector<Reference<TokenBase>
 	{
 		double x;
 		if(!parser.parseDouble(x))
-			throw LexerExcep("Failed to parse real." + errorPosition(parser.getText(), parser.currentPos()));
+			throw LexerExcep("Failed to parse real." + errorPosition(buffer, parser.currentPos()));
 
 		tokens_out.push_back(Reference<TokenBase>(new FloatLiteralToken((float)x, char_index)));
 	}
@@ -85,7 +86,7 @@ void Lexer::parseNumericLiteral(Parser& parser, std::vector<Reference<TokenBase>
 			const unsigned int pos = parser.currentPos();
 			std::string next_token;
 			parser.parseNonWSToken(next_token);
-			throw LexerExcep("Failed to parse int.  (Next chars '" + next_token + "')" + errorPosition(parser.getText(), pos));
+			throw LexerExcep("Failed to parse int.  (Next chars '" + next_token + "')" + errorPosition(buffer, pos));
 		}
 
 		tokens_out.push_back(Reference<TokenBase>(new IntLiteralToken(x, char_index)));
@@ -93,7 +94,7 @@ void Lexer::parseNumericLiteral(Parser& parser, std::vector<Reference<TokenBase>
 }
 
 
-void Lexer::parseIdentifier(Parser& parser, std::vector<Reference<TokenBase> >& tokens_out)
+void Lexer::parseIdentifier(const SourceBufferRef& buffer, Parser& parser, std::vector<Reference<TokenBase> >& tokens_out)
 {
 	assert(parser.notEOF());
 	assert(::isAlphabetic(parser.current()));
@@ -116,7 +117,7 @@ void Lexer::parseIdentifier(Parser& parser, std::vector<Reference<TokenBase> >& 
 }
 
 
-void Lexer::parseComment(Parser& parser)
+void Lexer::parseComment(const SourceBufferRef& buffer, Parser& parser)
 {
 	assert(parser.notEOF());
 	assert(parser.current() == '#');
@@ -125,15 +126,15 @@ void Lexer::parseComment(Parser& parser)
 }
 
 
-void Lexer::process(const std::string& buffer, std::vector<Reference<TokenBase> >& tokens_out)
+void Lexer::process(const SourceBufferRef& src, std::vector<Reference<TokenBase> >& tokens_out)
 {
-	Parser parser(buffer.c_str(), (unsigned int)buffer.length());
+	Parser parser(src->source.c_str(), (unsigned int)src->source.length());
 
 	while(parser.notEOF())
 	{
 		if(parser.current() == '"')
 		{
-			parseStringLiteral(parser, tokens_out);
+			parseStringLiteral(src, parser, tokens_out);
 		}
 		else if(parser.current() == '-' /*|| parser.current() == '+'*/ /*|| parser.current() == '.'*/ || ::isNumeric(parser.current()))
 		{
@@ -148,7 +149,7 @@ void Lexer::process(const std::string& buffer, std::vector<Reference<TokenBase> 
 					if(::isNumeric(parser.next()))
 					{
 						// This is a negative numeric literal like '-3.0f'
-						parseNumericLiteral(parser, tokens_out);
+						parseNumericLiteral(src, parser, tokens_out);
 					}
 					else
 					{
@@ -158,7 +159,7 @@ void Lexer::process(const std::string& buffer, std::vector<Reference<TokenBase> 
 				}
 				else
 				{
-					parseNumericLiteral(parser, tokens_out);
+					parseNumericLiteral(src, parser, tokens_out);
 				}
 
 				/*if((parser.current() == '-' || parser.current() == '+') && 
@@ -189,11 +190,11 @@ void Lexer::process(const std::string& buffer, std::vector<Reference<TokenBase> 
 		}
 		else if(::isWhitespace(parser.current()))
 		{
-			parseWhiteSpace(parser, tokens_out);
+			parseWhiteSpace(src, parser, tokens_out);
 		}
 		else if(::isAlphabetic(parser.current()))
 		{
-			parseIdentifier(parser, tokens_out);
+			parseIdentifier(src, parser, tokens_out);
 		}
 		else if(parser.current() == ',')
 		{
@@ -237,7 +238,7 @@ void Lexer::process(const std::string& buffer, std::vector<Reference<TokenBase> 
 		}
 		else if(parser.current() == '#')
 		{
-			parseComment(parser);
+			parseComment(src, parser);
 		}
 		else if(parser.current() == '+')
 		{
@@ -281,7 +282,7 @@ void Lexer::process(const std::string& buffer, std::vector<Reference<TokenBase> 
 		{
 			tokens_out.push_back(Reference<TokenBase>(new NOT_EQUALS_Token(parser.currentPos())));
 			if(!parser.parseString("!="))
-				throw LexerExcep("Error while parsing '!='" + errorPosition(buffer, parser.currentPos()));
+				throw LexerExcep("Error while parsing '!='" + errorPosition(src, parser.currentPos()));
 		}
 		else if(parser.current() == '.')
 		{
@@ -292,13 +293,13 @@ void Lexer::process(const std::string& buffer, std::vector<Reference<TokenBase> 
 		{
 			tokens_out.push_back(Reference<TokenBase>(new OR_Token(parser.currentPos())));
 			if(!parser.parseString("||"))
-				throw LexerExcep("Error while parsing '||'" + errorPosition(buffer, parser.currentPos()));
+				throw LexerExcep("Error while parsing '||'" + errorPosition(src, parser.currentPos()));
 		}
 		else if(parser.current() == '&')
 		{
 			tokens_out.push_back(Reference<TokenBase>(new AND_Token(parser.currentPos())));
 			if(!parser.parseString("&&"))
-				throw LexerExcep("Error while parsing '&&'" + errorPosition(buffer, parser.currentPos()));
+				throw LexerExcep("Error while parsing '&&'" + errorPosition(src, parser.currentPos()));
 		}
 		else if(parser.current() == '<')
 		{
@@ -322,25 +323,25 @@ void Lexer::process(const std::string& buffer, std::vector<Reference<TokenBase> 
 		}
 		else
 		{
-			throw LexerExcep("Invalid character '" + std::string(1, parser.current()) + "'." + errorPosition(buffer, parser.currentPos()));
+			throw LexerExcep("Invalid character '" + std::string(1, parser.current()) + "'." + errorPosition(src, parser.currentPos()));
 		}
 	}
 }
 
 
-const std::string Lexer::errorPosition(const std::string& buffer, unsigned int pos)
+const std::string Lexer::errorPosition(const SourceBufferRef& buffer, unsigned int pos)
 {
-	unsigned int line, col;
-	StringUtils::getPosition(buffer, pos, line, col);
-	return "  Line " + toString(line + 1) + ", column " + toString(col + 1);
+	return Diagnostics::positionString(*buffer, pos);
 }
 
 
 void Lexer::test()
 {
 	const std::string s = "-34.546e2 \"hello\" whats_up123 \t \"meh\"123:(false";
+	SourceBufferRef buffer(new SourceBuffer("buffer", s));
+
 	std::vector<Reference<TokenBase> > t;
-	process(s, t);
+	process(buffer, t);
 
 	testAssert(t.size() == 8);
 

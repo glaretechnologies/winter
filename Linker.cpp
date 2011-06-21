@@ -64,9 +64,9 @@ void Linker::addExternalFunctions(vector<ExternalFunctionRef>& funcs)
 			args.push_back(FunctionDefinition::FunctionArg(f->sig.param_types[z], "arg_" + ::toString(z)));
 
 		Reference<FunctionDefinition> def(new FunctionDefinition(
+			SrcLocation::invalidLocation(),
 			f->sig.name,
 			args,
-			//vector<Reference<LetASTNode>>(),
 			ASTNodeRef(NULL), // body
 			f->return_type, // declared return type
 			NULL
@@ -82,7 +82,7 @@ void Linker::addExternalFunctions(vector<ExternalFunctionRef>& funcs)
 }
 
 
-void Linker::buildLLVMCode(llvm::Module* module)
+void Linker::buildLLVMCode(llvm::Module* module, const llvm::TargetData* target_data)
 {
 	PlatformUtils::CPUInfo cpu_info;
 	PlatformUtils::getCPUInfo(cpu_info);
@@ -93,7 +93,7 @@ void Linker::buildLLVMCode(llvm::Module* module)
 
 		if(!f.isGenericFunction() && !f.isExternalFunction())
 		{
-			f.buildLLVMFunction(module, cpu_info, hidden_voidptr_arg);
+			f.buildLLVMFunction(module, cpu_info, hidden_voidptr_arg, target_data);
 		}
 	}
 
@@ -102,7 +102,7 @@ void Linker::buildLLVMCode(llvm::Module* module)
 	{
 		assert(!concrete_funcs[i]->isGenericFunction());
 
-		concrete_funcs[i]->buildLLVMFunction(module, cpu_info, hidden_voidptr_arg);
+		concrete_funcs[i]->buildLLVMFunction(module, cpu_info, hidden_voidptr_arg, target_data);
 	}
 }
 
@@ -114,7 +114,7 @@ void Linker::linkFunctions(BufferRoot& root)
 }*/
 
 
-ExternalFunctionRef Linker::findMatchingExternalFunction(const FunctionSignature& sig)
+/*ExternalFunctionRef Linker::findMatchingExternalFunction(const FunctionSignature& sig)
 {
 	ExternalFuncMapType::iterator res = external_functions.find(sig);
 	if(res != external_functions.end())
@@ -122,7 +122,7 @@ ExternalFunctionRef Linker::findMatchingExternalFunction(const FunctionSignature
 		return res->second;
 	}
 	return ExternalFunctionRef();
-}
+}*/
 
 
 Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignature& sig)
@@ -158,44 +158,47 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 			if(sig.param_types.size() != 1)
 				throw BaseException("eN() functions must take one argument.");
 
-			if(sig.param_types[0]->getType() != Type::VectorTypeType)
-				throw BaseException("eN() functions must take a vector as their argument.  Call: " + sig.name + ", found arg type: " + sig.param_types[0]->toString());
-
-
-			Reference<VectorType> vec_type(
-				(VectorType*)(sig.param_types[0].getPointer()) // NOTE: dirty cast
-				);
-
-			if(index >= (int)vec_type->num)
-				throw BaseException("eN function has N >= vector size.");
-
-
-			vector<FunctionDefinition::FunctionArg> args(1,
-				FunctionDefinition::FunctionArg(
-					sig.param_types[0], //TypeRef(new Int()), // type
-					"vec" // name
-				)
-			);
-			
-			FunctionDefinitionRef new_func_def(new FunctionDefinition(
-				sig.name, // name
-				args,
-				//vector<Reference<LetASTNode> >(), // lets
-				ASTNodeRef(NULL), // body expr
-				vec_type->t, // declared return type
-				new GetVectorElement(
-					vec_type,
-					index
-				)// built in func impl
-			));
-
-			if(sig_to_function_map.find(sig) == sig_to_function_map.end())
+			//if(sig.param_types[0]->getType() != Type::VectorTypeType)
+			//	throw BaseException("eN() functions must take a vector as their argument.  Call: " + sig.name + ", found arg type: " + sig.param_types[0]->toString());
+			if(sig.param_types[0]->getType() == Type::VectorTypeType)
 			{
-				/*sig_to_function_map.insert(std::make_pair(
-					sig,
-					new_func_def
-				));*/
-				addFunction(new_func_def);
+
+				Reference<VectorType> vec_type(
+					(VectorType*)(sig.param_types[0].getPointer()) // NOTE: dirty cast
+					);
+
+				if(index >= (int)vec_type->num)
+					throw BaseException("eN function has N >= vector size.");
+
+
+				vector<FunctionDefinition::FunctionArg> args(1,
+					FunctionDefinition::FunctionArg(
+						sig.param_types[0], //TypeRef(new Int()), // type
+						"vec" // name
+					)
+				);
+			
+				FunctionDefinitionRef new_func_def(new FunctionDefinition(
+					SrcLocation::invalidLocation(),
+					sig.name, // name
+					args,
+					//vector<Reference<LetASTNode> >(), // lets
+					ASTNodeRef(NULL), // body expr
+					vec_type->t, // declared return type
+					new GetVectorElement(
+						vec_type,
+						index
+					)// built in func impl
+				));
+
+				if(sig_to_function_map.find(sig) == sig_to_function_map.end())
+				{
+					/*sig_to_function_map.insert(std::make_pair(
+						sig,
+						new_func_def
+					));*/
+					addFunction(new_func_def);
+				}
 			}
 		}
 	}
@@ -376,6 +379,7 @@ Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDef
 
 
 	FunctionDefinition* def = new FunctionDefinition(
+		generic_func->srcLocation(), // Use the generic function's location in src for the location
 		generic_func->sig.name, // name
 		args, // args
 		//vector<Reference<LetASTNode> >(), // lets
