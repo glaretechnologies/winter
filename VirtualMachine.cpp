@@ -40,13 +40,13 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/StandardPasses.h"
 
-#include "llvm/System/Host.h"
+/*#include "llvm/System/Host.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Target/TargetRegistry.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/raw_os_ostream.h"
 #include "llvm/Support/FormattedStream.h"
-#include "llvm/Target/TargetMachine.h"
+#include "llvm/Target/TargetMachine.h"*/
 #endif
 
 
