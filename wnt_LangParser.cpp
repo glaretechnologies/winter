@@ -776,7 +776,7 @@ ASTNodeRef LangParser::parseExpression(const ParseInfo& p)
 	{
 		throw LangParserExcep("Expected literal or identifier in expression.");
 	}*/
-	return parseBinaryLogicalExpression(p); // parseAddSubExpression(p);
+	return parseBinaryLogicalExpression(p);
 }
 
 
@@ -1023,7 +1023,7 @@ a + b + c = (a + b) + c
 
 ASTNodeRef LangParser::parseMulDivExpression(const ParseInfo& p)
 {
-	ASTNodeRef left = parseComparisonExpression(p);
+	ASTNodeRef left = parseUnaryExpression(p);
 	while(1)
 	{
 		SrcLocation loc = locationForParseInfo(p);
@@ -1034,7 +1034,7 @@ ASTNodeRef LangParser::parseMulDivExpression(const ParseInfo& p)
 
 			MulExpression* expr = new MulExpression(loc);
 			expr->a = left;
-			expr->b = parseComparisonExpression(p);
+			expr->b = parseUnaryExpression(p);
 			left = ASTNodeRef(expr);
 		}
 		else if(isTokenCurrent(FORWARDS_SLASH_TOKEN, p))
@@ -1043,7 +1043,7 @@ ASTNodeRef LangParser::parseMulDivExpression(const ParseInfo& p)
 
 			DivExpression* expr = new DivExpression(loc);
 			expr->a = left;
-			expr->b = parseComparisonExpression(p);
+			expr->b = parseUnaryExpression(p);
 			left = ASTNodeRef(expr);
 		}
 		else
@@ -1056,7 +1056,7 @@ ASTNodeRef LangParser::parseBinaryLogicalExpression(const ParseInfo& p)
 {
 	SrcLocation loc = locationForParseInfo(p);
 
-	ASTNodeRef left = parseAddSubExpression(p);
+	ASTNodeRef left = parseComparisonExpression(p);
 	while(1)
 	{
 		if(isTokenCurrent(AND_TOKEN, p))
@@ -1066,7 +1066,7 @@ ASTNodeRef LangParser::parseBinaryLogicalExpression(const ParseInfo& p)
 			left = ASTNodeRef(new BinaryBooleanExpr(
 				BinaryBooleanExpr::AND,
 				left,
-				parseAddSubExpression(p),
+				parseComparisonExpression(p),
 				loc
 			));
 		}
@@ -1077,7 +1077,7 @@ ASTNodeRef LangParser::parseBinaryLogicalExpression(const ParseInfo& p)
 			left = ASTNodeRef(new BinaryBooleanExpr(
 				BinaryBooleanExpr::OR,
 				left,
-				parseAddSubExpression(p),
+				parseComparisonExpression(p),
 				loc
 			));
 		}
@@ -1089,7 +1089,7 @@ ASTNodeRef LangParser::parseBinaryLogicalExpression(const ParseInfo& p)
 
 ASTNodeRef LangParser::parseComparisonExpression(const ParseInfo& p)
 {
-	ASTNodeRef left = parseUnaryExpression(p);
+	ASTNodeRef left = parseAddSubExpression(p);
 
 	for(unsigned int i=0; i<comparison_tokens.size(); ++i)
 	{
@@ -1103,7 +1103,7 @@ ASTNodeRef LangParser::parseComparisonExpression(const ParseInfo& p)
 			ComparisonExpression* expr = new ComparisonExpression(
 				makeTokenObject(token, p.tokens[p.i - 1]->char_index), 
 				left, 
-				parseUnaryExpression(p),
+				parseAddSubExpression(p),
 				loc
 			);
 			return ASTNodeRef(expr);

@@ -46,6 +46,7 @@ unsigned long long hexStringTo64UInt(const std::string& s);
 //const std::string toHexString(unsigned int i);//32 bit integers
 const std::string toHexString(unsigned long long i);//for 64 bit integers
 const std::string intToString(int i);
+const std::string uIntToString(uint32 i);
 const std::string floatToString(float f);
 const std::string doubleToString(double d, int num_decimal_places = 5);
 const std::string doubleToStringScientific(double d, int num_decimal_places = 5);
@@ -127,7 +128,7 @@ int getNumMatches(const std::string& s, char target);
 
 void tokenise(const std::string& text, std::vector<std::string>& tokens_out);
 
-bool containsString(const std::string& text, const std::string& target_string);
+//bool containsString(const std::string& text, const std::string& target_string);
 
 // Can handle multiple words in quotes
 void readInToken(std::istream& stream, std::string& str_out);
@@ -169,7 +170,7 @@ inline const std::string appendChar(const std::string& s, char c)
 }
 
 // If first_char_index is >= s.size(), then returns ""
-const std::string getTailSubString(const std::string& s, unsigned int first_char_index);
+const std::string getTailSubString(const std::string& s, size_t first_char_index);
 
 const std::string forceCopyString(const std::string& s);
 
@@ -200,6 +201,7 @@ const std::string join(const T& iterable, const std::string joinstring)
 
 // Returns 0-based index of line and column of character indexed by charindex
 void getPosition(const std::string& str, unsigned int charindex, unsigned int& line_num_out, unsigned int& column_out);
+const std::string getLineFromBuffer(const std::string& str, unsigned int charindex);
 
 
 #if defined(WIN32) || defined(WIN64)

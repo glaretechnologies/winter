@@ -37,7 +37,7 @@ int main(int argc, char** argv)
 		FileUtils::readEntireFile(argv[1], filecontents);
 
 		VMConstructionArgs vm_args;
-		vm_args.source_buffers.push_back(filecontents);
+		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer(argv[1], filecontents)));
 		VirtualMachine vm(vm_args);
 
 

@@ -1,5 +1,41 @@
 Copyright 2009- Nicholas Chapman
 
+
+Precedence
+----------
+Highest precedence at top.
+
+()  (Parentheses)
+
+
+-   (Unary minus)
+
+
+* / (mult and div)
+
+
++ - (add and sub)
+
+
+< <= > >=   (comparison)
+== != (eq / neq)
+
+
+&& ||   (logical and / or)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   FunctionDef: makeLambda() function<float, float>
     FunctionDef: anon_func_6(float) float
       Mul Expression

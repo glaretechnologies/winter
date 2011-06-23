@@ -42,7 +42,7 @@
 				Name="VCCLCompilerTool"
 				AdditionalOptions="/MP"
 				Optimization="0"
-				AdditionalIncludeDirectories=".;C:\programming\zlib123;C:\programming\indigo\trunk;C:\programming\llvm\llvm_27_cmake_install_32_debug\include"
+				AdditionalIncludeDirectories=".;C:\programming\zlib123;C:\programming\llvm\llvm_27_cmake_install_32_debug\include;..\indigo_core_code"
 				PreprocessorDefinitions="WIN32;_DEBUG;_CONSOLE;USE_LLVM=1;_CRT_SECURE_NO_WARNINGS;_SECURE_SCL=0"
 				MinimalRebuild="false"
 				BasicRuntimeChecks="3"
@@ -183,71 +183,71 @@
 				Name="Indigo"
 				>
 				<File
-					RelativePath="..\utils\clock.cpp"
+					RelativePath="..\indigo_core_code\utils\clock.cpp"
 					>
 				</File>
 				<File
-					RelativePath="..\utils\clock.h"
+					RelativePath="..\indigo_core_code\utils\clock.h"
 					>
 				</File>
 				<File
-					RelativePath="..\utils\fileutils.cpp"
+					RelativePath="..\indigo_core_code\utils\fileutils.cpp"
 					>
 				</File>
 				<File
-					RelativePath="..\utils\fileutils.h"
+					RelativePath="..\indigo_core_code\utils\fileutils.h"
 					>
 				</File>
 				<File
-					RelativePath="..\utils\Parser.cpp"
+					RelativePath="..\indigo_core_code\utils\Parser.cpp"
 					>
 				</File>
 				<File
-					RelativePath="..\utils\Parser.h"
+					RelativePath="..\indigo_core_code\utils\Parser.h"
 					>
 				</File>
 				<File
-					RelativePath="..\utils\platform.h"
+					RelativePath="..\indigo_core_code\utils\platform.h"
 					>
 				</File>
 				<File
-					RelativePath="..\utils\platformutils.cpp"
+					RelativePath="..\indigo_core_code\utils\platformutils.cpp"
 					>
 				</File>
 				<File
-					RelativePath="..\utils\platformutils.h"
+					RelativePath="..\indigo_core_code\utils\platformutils.h"
 					>
 				</File>
 				<File
-					RelativePath="..\utils\refcounted.cpp"
+					RelativePath="..\indigo_core_code\utils\refcounted.cpp"
 					>
 				</File>
 				<File
-					RelativePath="..\utils\refcounted.h"
+					RelativePath="..\indigo_core_code\utils\refcounted.h"
 					>
 				</File>
 				<File
-					RelativePath="..\utils\reference.cpp"
+					RelativePath="..\indigo_core_code\utils\reference.cpp"
 					>
 				</File>
 				<File
-					RelativePath="..\utils\reference.h"
+					RelativePath="..\indigo_core_code\utils\reference.h"
 					>
 				</File>
 				<File
-					RelativePath="..\utils\stringutils.cpp"
+					RelativePath="..\indigo_core_code\utils\stringutils.cpp"
 					>
 				</File>
 				<File
-					RelativePath="..\utils\stringutils.h"
+					RelativePath="..\indigo_core_code\utils\stringutils.h"
 					>
 				</File>
 				<File
-					RelativePath="..\utils\timer.cpp"
+					RelativePath="..\indigo_core_code\utils\timer.cpp"
 					>
 				</File>
 				<File
-					RelativePath="..\utils\timer.h"
+					RelativePath="..\indigo_core_code\utils\timer.h"
 					>
 				</File>
 			</Filter>
@@ -353,6 +353,14 @@
 			>
 		</File>
 		<File
+			RelativePath="..\wnt_Diagnostics.cpp"
+			>
+		</File>
+		<File
+			RelativePath="..\wnt_Diagnostics.h"
+			>
+		</File>
+		<File
 			RelativePath="..\wnt_ExternalFunction.cpp"
 			>
 		</File>
@@ -406,6 +414,14 @@
 		</File>
 		<File
 			RelativePath="..\wnt_Lexer.h"
+			>
+		</File>
+		<File
+			RelativePath="..\wnt_SourceBuffer.cpp"
+			>
+		</File>
+		<File
+			RelativePath="..\wnt_SourceBuffer.h"
 			>
 		</File>
 		<File
