@@ -1368,6 +1368,7 @@ const std::string LangParser::errorPositionPrevToken(const ParseInfo& p)
 }
 
 
+#if BUILD_TESTS
 
 void LangParser::test()
 {
@@ -1421,6 +1422,8 @@ void LangParser::test()
 		testAssert(false);
 	}
 }
+
+#endif
 
 
 } //end namespace Winter
