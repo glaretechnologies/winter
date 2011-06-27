@@ -413,13 +413,13 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
 		for(size_t i=0; i<argument_expressions.size(); ++i)
-			convertOverloadedOperators(argument_expressions[i], payload);
+			convertOverloadedOperators(argument_expressions[i], payload, stack);
 	}
 
 
 
 	// NOTE: we want to do a post-order traversal here.
-	// Thhis is because we want our argument expressions to be linked first.
+	// This is because we want our argument expressions to be linked first.
 
 	stack.push_back(this);
 
@@ -475,6 +475,7 @@ TypeRef FunctionExpression::type() const
 		return func_type->return_type;
 	}
 
+	// If got there, binding type is probably unbound.
 	assert(0);
 	return TypeRef(NULL);
 

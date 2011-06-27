@@ -337,6 +337,7 @@ const std::string Lexer::errorPosition(const SourceBufferRef& buffer, unsigned i
 
 #if BUILD_TESTS
 
+
 void Lexer::test()
 {
 	const std::string s = "-34.546e2 \"hello\" whats_up123 \t \"meh\"123:(false";
@@ -369,6 +370,7 @@ void Lexer::test()
 	testAssert(t[7]->getType() == BOOL_LITERAL_TOKEN);
 	testAssert(t[7]->getBoolLiteralValue() == false);
 }
+
 
 #endif
 

@@ -4,8 +4,8 @@
 
 #include <vector>
 #include <string>
-#include "utils/reference.h"
-#include "utils/refcounted.h"
+#include <utils/reference.h>
+#include <utils/refcounted.h>
 
 namespace llvm { class Type; class Constant; }
 #if USE_LLVM

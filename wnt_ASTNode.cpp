@@ -141,7 +141,7 @@ void checkFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
 }
 
 
-void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload)
+void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
 	if(e.isNull())
 		return;
@@ -152,7 +152,6 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload)
 	{
 		AdditionExpression* expr = static_cast<AdditionExpression*>(e.getPointer());
 		if(expr->a->type().nonNull() && expr->b->type().nonNull())
-			//if(*expr->a->type() == *expr->b->type()) // If a and b have the same types
 			if(	expr->a->type()->getType() == Type::StructureTypeType ||
 				expr->b->type()->getType() == Type::StructureTypeType)
 				if(expr->a->type()->getType() == Type::StructureTypeType)
@@ -160,6 +159,14 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload)
 					// Replace expr with an op_add function call.
 					e = ASTNodeRef(new FunctionExpression(expr->srcLocation(), "op_add", expr->a, expr->b));
 					payload.tree_changed = true;
+
+					// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
+					// This is needed now because we need to know the type of op_X, which is only available once bound.
+					TraversalPayload new_payload(TraversalPayload::BindVariables, payload.hidden_voidptr_arg, payload.env);
+					new_payload.top_lvl_frame = payload.top_lvl_frame;
+					new_payload.linker = payload.linker;
+					new_payload.func_def_stack = payload.func_def_stack;
+					e->traverse(new_payload, stack);
 				}
 		break;
 	}
@@ -167,42 +174,64 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload)
 	{
 		SubtractionExpression* expr = static_cast<SubtractionExpression*>(e.getPointer());
 		if(expr->a->type().nonNull() && expr->b->type().nonNull())
-			//if(*expr->a->type() == *expr->b->type()) // If a and b have the same types
 			if(	expr->a->type()->getType() == Type::StructureTypeType ||
 				expr->b->type()->getType() == Type::StructureTypeType)
 				if(expr->a->type()->getType() == Type::StructureTypeType)
 				{
-					// Replace expr with an op_add function call.
+					// Replace expr with an op_sub function call.
 					e = ASTNodeRef(new FunctionExpression(expr->srcLocation(), "op_sub", expr->a, expr->b));
 					payload.tree_changed = true;
+
+					// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
+					// This is needed now because we need to know the type of op_X, which is only available once bound.
+					TraversalPayload new_payload(TraversalPayload::BindVariables, payload.hidden_voidptr_arg, payload.env);
+					new_payload.top_lvl_frame = payload.top_lvl_frame;
+					new_payload.linker = payload.linker;
+					new_payload.func_def_stack = payload.func_def_stack;
+					e->traverse(new_payload, stack);
 				}
 		break;
 	}
 	case ASTNode::MulExpressionType:
 	{
 		MulExpression* expr = static_cast<MulExpression*>(e.getPointer());
+		assert(expr->a->type().nonNull() && expr->b->type().nonNull());
 		if(expr->a->type().nonNull() && expr->b->type().nonNull())
-			//if(*expr->a->type() == *expr->b->type()) // If a and b have the same types
-				if(	expr->a->type()->getType() == Type::StructureTypeType ||
-					expr->b->type()->getType() == Type::StructureTypeType)
-				{
-					// Replace expr with an op_add function call.
-					e = ASTNodeRef(new FunctionExpression(expr->srcLocation(), "op_mul", expr->a, expr->b));
-					payload.tree_changed = true;
-				}
+			if(	expr->a->type()->getType() == Type::StructureTypeType ||
+				expr->b->type()->getType() == Type::StructureTypeType)
+			{
+				// Replace expr with an op_mul function call.
+				e = ASTNodeRef(new FunctionExpression(expr->srcLocation(), "op_mul", expr->a, expr->b));
+				payload.tree_changed = true;
+
+				// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
+				// This is needed now because we need to know the type of op_X, which is only available once bound.
+				TraversalPayload new_payload(TraversalPayload::BindVariables, payload.hidden_voidptr_arg, payload.env);
+				new_payload.top_lvl_frame = payload.top_lvl_frame;
+				new_payload.linker = payload.linker;
+				new_payload.func_def_stack = payload.func_def_stack;
+				e->traverse(new_payload, stack);
+			}
 		break;
 	}
 	case ASTNode::DivExpressionType:
 	{
 		DivExpression* expr = static_cast<DivExpression*>(e.getPointer());
 		if(expr->a->type().nonNull() && expr->b->type().nonNull())
-			//if(*expr->a->type() == *expr->b->type()) // If a and b have the same types
 			if(	expr->a->type()->getType() == Type::StructureTypeType ||
 				expr->b->type()->getType() == Type::StructureTypeType)
 				{
-					// Replace expr with an op_add function call.
+					// Replace expr with an op_div function call.
 					e = ASTNodeRef(new FunctionExpression(expr->srcLocation(), "op_div", expr->a, expr->b));
 					payload.tree_changed = true;
+
+					// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
+					// This is needed now because we need to know the type of op_X, which is only available once bound.
+					TraversalPayload new_payload(TraversalPayload::BindVariables, payload.hidden_voidptr_arg, payload.env);
+					new_payload.top_lvl_frame = payload.top_lvl_frame;
+					new_payload.linker = payload.linker;
+					new_payload.func_def_stack = payload.func_def_stack;
+					e->traverse(new_payload, stack);
 				}
 		break;
 	}
@@ -213,9 +242,17 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload)
 			if(	expr->a->type()->getType() == Type::StructureTypeType ||
 				expr->b->type()->getType() == Type::StructureTypeType)
 			{
-				// Replace expr with an op_add function call.
+				// Replace expr with a function call.
 				e = ASTNodeRef(new FunctionExpression(expr->srcLocation(), expr->getOverloadedFuncName(), expr->a, expr->b));
 				payload.tree_changed = true;
+
+				// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
+				// This is needed now because we need to know the type of op_X, which is only available once bound.
+				TraversalPayload new_payload(TraversalPayload::BindVariables, payload.hidden_voidptr_arg, payload.env);
+				new_payload.top_lvl_frame = payload.top_lvl_frame;
+				new_payload.linker = payload.linker;
+				new_payload.func_def_stack = payload.func_def_stack;
+				e->traverse(new_payload, stack);
 			}
 			break;
 	}
@@ -847,8 +884,8 @@ void MapLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 	{
 		for(size_t i=0; i<items.size(); ++i)
 		{
-			convertOverloadedOperators(items[i].first, payload);
-			convertOverloadedOperators(items[i].second, payload);
+			convertOverloadedOperators(items[i].first, payload, stack);
+			convertOverloadedOperators(items[i].second, payload, stack);
 		}
 	}
 
@@ -949,7 +986,7 @@ void ArrayLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
 		for(size_t i=0; i<elements.size(); ++i)
-			convertOverloadedOperators(elements[i], payload);
+			convertOverloadedOperators(elements[i], payload, stack);
 	}
 
 
@@ -1056,7 +1093,7 @@ void VectorLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
 		for(size_t i=0; i<elements.size(); ++i)
-			convertOverloadedOperators(elements[i], payload);
+			convertOverloadedOperators(elements[i], payload, stack);
 	}
 
 
@@ -1341,8 +1378,8 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 	}
 	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
-		convertOverloadedOperators(a, payload);
-		convertOverloadedOperators(b, payload);
+		convertOverloadedOperators(a, payload, stack);
+		convertOverloadedOperators(b, payload, stack);
 	}
 
 
@@ -1522,8 +1559,8 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 	}
 	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
-		convertOverloadedOperators(a, payload);
-		convertOverloadedOperators(b, payload);
+		convertOverloadedOperators(a, payload, stack);
+		convertOverloadedOperators(b, payload, stack);
 	}
 
 
@@ -1676,8 +1713,8 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	}
 	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
-		convertOverloadedOperators(a, payload);
-		convertOverloadedOperators(b, payload);
+		convertOverloadedOperators(a, payload, stack);
+		convertOverloadedOperators(b, payload, stack);
 	}
 
 
@@ -1685,6 +1722,13 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	a->traverse(payload, stack);
 	b->traverse(payload, stack);
 	stack.pop_back();
+
+	// NEW: moved to after child traversal
+	/*if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	{
+		convertOverloadedOperators(a, payload, stack);
+		convertOverloadedOperators(b, payload, stack);
+	}*/
 
 	if(payload.operation == TraversalPayload::TypeCoercion)
 	{
@@ -1822,8 +1866,8 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	}
 	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
-		convertOverloadedOperators(a, payload);
-		convertOverloadedOperators(b, payload);
+		convertOverloadedOperators(a, payload, stack);
+		convertOverloadedOperators(b, payload, stack);
 	}
 
 	stack.push_back(this);
@@ -1990,8 +2034,8 @@ void BinaryBooleanExpr::traverse(TraversalPayload& payload, std::vector<ASTNode*
 	}
 	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
-		convertOverloadedOperators(a, payload);
-		convertOverloadedOperators(b, payload);
+		convertOverloadedOperators(a, payload, stack);
+		convertOverloadedOperators(b, payload, stack);
 	}
 
 	stack.push_back(this);
@@ -2105,7 +2149,7 @@ void UnaryMinusExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 	}
 	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
-		convertOverloadedOperators(expr, payload);
+		convertOverloadedOperators(expr, payload, stack);
 	}
 
 	stack.push_back(this);
@@ -2200,7 +2244,7 @@ void LetASTNode::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 	}
 	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
-		convertOverloadedOperators(expr, payload);
+		convertOverloadedOperators(expr, payload, stack);
 	}
 
 	stack.push_back(this);
@@ -2344,8 +2388,8 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 	}
 	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
-		convertOverloadedOperators(a, payload);
-		convertOverloadedOperators(b, payload);
+		convertOverloadedOperators(a, payload, stack);
+		convertOverloadedOperators(b, payload, stack);
 	}
 
 	stack.push_back(this);
@@ -2493,7 +2537,7 @@ void LetBlock::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 	}
 	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
-		convertOverloadedOperators(expr, payload);
+		convertOverloadedOperators(expr, payload, stack);
 	}
 
 	stack.push_back(this);

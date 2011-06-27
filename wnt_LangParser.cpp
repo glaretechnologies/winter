@@ -1372,6 +1372,8 @@ const std::string LangParser::errorPositionPrevToken(const ParseInfo& p)
 
 void LangParser::test()
 {
+
+#if BUILD_TESTS
 	const std::string s = "def lerp(real a, real b, real t) real : add(mul(a, sub(1.0, t)), mul(b, t))";
 	SourceBufferRef buffer(new SourceBuffer("buffer", s));
 	//const std::string s = "def lerp(real a, real b, real t) real : add(a, b, t())";
@@ -1421,6 +1423,7 @@ void LangParser::test()
 		conPrint("LangParserExcep: " + e.what());
 		testAssert(false);
 	}
+#endif
 }
 
 #endif

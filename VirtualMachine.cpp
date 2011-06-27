@@ -255,6 +255,11 @@ void VirtualMachine::loadSource(const std::vector<SourceBufferRef>& source_buffe
 	{
 		std::vector<ASTNode*> stack;
 		TraversalPayload payload(TraversalPayload::OperatorOverloadConversion, hidden_voidptr_arg, env);
+		
+		// Add linker info, so we can bind new functions such as op_add immediately.
+		payload.top_lvl_frame = top_lvl_frame;
+		payload.linker = &linker;
+
 		for(size_t i=0; i<func_defs.size(); ++i)
 			if(!func_defs[i]->is_anon_func)
 				func_defs[i]->traverse(payload, stack);

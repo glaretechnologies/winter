@@ -13,9 +13,9 @@ Copyright 2009 Nicholas Chapman
 #include <vector>
 using std::string;
 using std::vector;
-#include "utils/refcounted.h"
-#include "utils/reference.h"
-#include "utils/platform.h"
+#include <utils/refcounted.h>
+#include <utils/reference.h>
+#include <utils/platform.h>
 #include "wnt_Type.h"
 #include "wnt_FunctionSignature.h"
 #include "wnt_ExternalFunction.h"
@@ -116,7 +116,7 @@ const std::string indent(VMState& vmstate);
 void printMargin(int depth, std::ostream& s);
 bool isIntExactlyRepresentableAsFloat(int x);
 void checkFoldExpression(Reference<ASTNode>& e, TraversalPayload& payload);
-void convertOverloadedOperators(Reference<ASTNode>& e, TraversalPayload& payload);
+void convertOverloadedOperators(Reference<ASTNode>& e, TraversalPayload& payload, std::vector<ASTNode*>& stack);
 const std::string errorContext(const ASTNode& n);
 const std::string errorContext(const ASTNode& n, TraversalPayload& payload);
 

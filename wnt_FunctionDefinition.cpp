@@ -230,7 +230,11 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 	}
 	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
-		convertOverloadedOperators(body, payload);
+		payload.func_def_stack.push_back(this);
+		stack.push_back(this);
+		convertOverloadedOperators(body, payload, stack);
+		stack.pop_back();
+		payload.func_def_stack.pop_back();
 	}
 
 	if(payload.operation == TraversalPayload::TypeCheck)
