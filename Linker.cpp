@@ -61,7 +61,7 @@ void Linker::addExternalFunctions(vector<ExternalFunctionRef>& funcs)
 
 		vector<FunctionDefinition::FunctionArg> args;
 		for(size_t z=0; z<f->sig.param_types.size(); ++z)
-			args.push_back(FunctionDefinition::FunctionArg(f->sig.param_types[z], "arg_" + ::toString(z)));
+			args.push_back(FunctionDefinition::FunctionArg(f->sig.param_types[z], "arg_" + ::toString((uint64)z)));
 
 		Reference<FunctionDefinition> def(new FunctionDefinition(
 			SrcLocation::invalidLocation(),
@@ -395,8 +395,9 @@ Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDef
 		TraversalPayload payload(TraversalPayload::BindVariables, hidden_voidptr_arg, env);
 		payload.func_def_stack.push_back(def);
 		payload.linker = this;
+		std::vector<ASTNode*> stack(1, def);
 		body->traverse(payload, 
-			std::vector<ASTNode*>(1, def) // stack
+			stack // stack
 		);
 		}
 
@@ -411,9 +412,10 @@ Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDef
 
 		// Type check again
 		{
+			std::vector<ASTNode*> stack(1, def);
 			TraversalPayload payload(TraversalPayload::TypeCheck, hidden_voidptr_arg, env);
 			body->traverse(payload, 
-				std::vector<ASTNode*>(1, def) // stack
+				stack // stack
 			);
 		}
 	}

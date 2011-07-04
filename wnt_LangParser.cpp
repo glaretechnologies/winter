@@ -1100,8 +1100,10 @@ ASTNodeRef LangParser::parseComparisonExpression(const ParseInfo& p)
 		{
 			parseToken(token, p);
 
+			Reference<TokenBase> token_ref = makeTokenObject(token, p.tokens[p.i - 1]->char_index);
+
 			ComparisonExpression* expr = new ComparisonExpression(
-				makeTokenObject(token, p.tokens[p.i - 1]->char_index), 
+				token_ref,
 				left, 
 				parseAddSubExpression(p),
 				loc

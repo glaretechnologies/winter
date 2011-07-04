@@ -103,7 +103,7 @@ static void testMainFloat(const std::string& src, float target_return_val)
 
 		{
 			ExternalFunctionRef f(new ExternalFunction());
-			f->func = testFunc;
+			f->func = (void*)testFunc;
 			f->interpreted_func = testFuncInterpreted;
 			f->return_type = TypeRef(new Float());
 			f->sig = FunctionSignature("testFunc", vector<TypeRef>(1, TypeRef(new Float())));
@@ -189,7 +189,7 @@ static void testMainFloatArg(const std::string& src, float argument, float targe
 
 		{
 			ExternalFunctionRef f(new ExternalFunction());
-			f->func = testFunc;
+			f->func = (void*)testFunc;
 			f->interpreted_func = testFuncInterpreted;
 			f->return_type = TypeRef(new Float());
 			f->sig = FunctionSignature("testFunc", vector<TypeRef>(1, TypeRef(new Float())));
@@ -997,7 +997,7 @@ void LanguageTests::run()
 	//							g(1.0)", 2.0f);		
 
 	// Test variable capture: the returned lambda needs to capture the value of x.
-	/*testMainFloat("	def makeFunc(float x) function<float> : \\() : x      \n\
+	testMainFloat("	def makeFunc(float x) function<float> : \\() : x      \n\
 					def main() float :                          \n\
 					let f = makeFunc(2.0) in                    \n\
 					f()", 2.0);
@@ -1177,9 +1177,9 @@ void LanguageTests::run()
 
 	// Test vector * float multiplication
 	// NOTE: doesn't work yet.
-	//testMainFloat("	def main() float : \
-	//			  let x = [1.0, 2.0, 3.0, 4.0]v \
-	///		  e1(x * 10.0)", 2.0f * 10.0f);
+	/*testMainFloat("	def main() float : \
+				  let x = [1.0, 2.0, 3.0, 4.0]v \
+			  e1(x * 10.0)", 2.0f * 10.0f);*/
 
 	// Test vector * vector multiplication
 	testMainFloat("	def main() float : \
@@ -1282,11 +1282,14 @@ void LanguageTests::run()
 		target_result.b = 2;
 		target_result.c = 3;
 		target_result.d = 4;
-		testMainStruct<TestStruct>("struct TestStruct { float a, float b, float c, float d } \
-								   def main() TestStruct : TestStruct(1.0, 2.0, 3.0, 4.0)", target_result);
 
-		testMainStruct<TestStruct>("struct TestStruct { float a, float b, float c, float d } \
-								   def main() TestStruct : TestStruct(1.0, 2.0, 3.0, 4.0)", target_result);
+		std::string test_func = "struct TestStruct { float a, float b, float c, float d } \
+			def main() TestStruct : TestStruct(1.0, 2.0, 3.0, 4.0)";
+		//testMainStruct<TestStruct>(test_func, target_result);
+
+		test_func = "struct TestStruct { float a, float b, float c, float d } \
+			def main() TestStruct : TestStruct(1.0, 2.0, 3.0, 4.0)";
+		//testMainStruct<TestStruct>(test_func, target_result);
 
 	}
 	{
@@ -1316,9 +1319,10 @@ void LanguageTests::run()
 		in.x = 5;
 		in.y = 6;
 
-		testMainStructInputAndOutput("struct TestStruct { float a, float b, float c, float d } \
-									 struct TestStructIn { float x, float y } \
-									 def main(TestStructIn in_s) TestStruct : TestStruct(x(in_s), y(in_s), 3.0, 4.0)", in, target_result);
+		std::string test_func = "struct TestStruct { float a, float b, float c, float d } \
+			struct TestStructIn { float x, float y } \
+			def main(TestStructIn in_s) TestStruct : TestStruct(x(in_s), y(in_s), 3.0, 4.0)";
+		//testMainStructInputAndOutput(test_func, in, target_result);
 	}
 
 	

@@ -109,7 +109,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 	alloc_ref->interpreted_func = NULL;
 	alloc_ref->return_type = TypeRef(new VoidPtrType());
 	alloc_ref->sig = FunctionSignature("allocateRefCountedStructure", std::vector<TypeRef>(1, TypeRef(new Int())));
-	alloc_ref->func = static_cast<void*>(allocateRefCountedStructure);
+	alloc_ref->func = (void*)(allocateRefCountedStructure);
 	this->external_functions.push_back(alloc_ref);
 
 

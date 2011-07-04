@@ -916,7 +916,7 @@ TypeRef FunctionDefinition::getCapturedVariablesStructType() const
 			assert(!"Invalid vartype for captured var.");
 		}
 
-		field_names.push_back("captured_var_" + toString(i));
+		field_names.push_back("captured_var_" + toString((uint64)i));
 	}
 			
 

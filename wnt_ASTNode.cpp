@@ -2571,7 +2571,8 @@ Reference<ASTNode> LetBlock::clone()
 	vector<Reference<LetASTNode> > new_lets(lets.size());
 	for(size_t i=0; i<new_lets.size(); ++i)
 		new_lets[i] = Reference<LetASTNode>(static_cast<LetASTNode*>(lets[i]->clone().getPointer()));
-	return ASTNodeRef(new LetBlock(this->expr->clone(), new_lets, this->srcLocation()));
+	Winter::ASTNodeRef clone = this->expr->clone();
+	return ASTNodeRef(new LetBlock(clone, new_lets, this->srcLocation()));
 }
 
 

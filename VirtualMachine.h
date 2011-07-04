@@ -29,7 +29,11 @@ class FunctionSignature;
 class FunctionDefinition;
 
 
+#if (defined(WIN32) || defined(WIN64))
 #define WINTER_JIT_CALLING_CONV __cdecl
+#else 
+#define WINTER_JIT_CALLING_CONV
+#endif
 
 
 /*=====================================================================

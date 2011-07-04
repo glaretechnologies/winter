@@ -289,7 +289,9 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 			else if(LetBlock* let_block = dynamic_cast<LetBlock*>(stack[s]))
 			{
 				for(unsigned int i=0; i<let_block->lets.size(); ++i)
-					if(let_block->lets[i]->variable_name == this->function_name && doesFunctionTypeMatch(let_block->lets[i]->type()))
+				{
+					TypeRef type_ref = let_block->lets[i]->type();
+					if(let_block->lets[i]->variable_name == this->function_name && doesFunctionTypeMatch(type_ref))
 					{
 						this->bound_index = i;
 						this->binding_type = Let;
@@ -314,6 +316,8 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 
 					}
 				
+				}
+
 				// We only want to count an ancestor let block as an offsetting block if we are not currently in a let clause of it.
 				// TODO: remove this stuff
 				//bool is_this_let_clause = false;
