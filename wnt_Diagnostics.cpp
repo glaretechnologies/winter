@@ -35,8 +35,15 @@ const std::string positionString(const SourceBuffer& source_buffer, uint32 char_
 	// Note that line is zero-based, so convert to 1-based line number 
 	s += source_buffer.name + ", line " + toString(line + 1) + ":\n";
 	s += linestr + "\n";
+	col = col < (unsigned int)linestr.size() ? col : (unsigned int)linestr.size();
 	for(unsigned int i=0; i<col; ++i)
-		s += "-";
+	{
+		// If the source line has a tab, we need to use a tab for spacing as well, to match the position correctly.
+		if(linestr[i] == '\t')
+			s += "\t";
+		else
+			s += " ";
+	}
 
 	s += "^";
 

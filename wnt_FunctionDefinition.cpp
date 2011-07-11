@@ -228,14 +228,14 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 		if(!this->isGenericFunction())
 			checkFoldExpression(body, payload);
 	}
-	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	/*else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
 		payload.func_def_stack.push_back(this);
 		stack.push_back(this);
 		convertOverloadedOperators(body, payload, stack);
 		stack.pop_back();
 		payload.func_def_stack.pop_back();
-	}
+	}*/
 
 	if(payload.operation == TraversalPayload::TypeCheck)
 	{
@@ -311,6 +311,18 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 
 	if(payload.operation == TraversalPayload::BindVariables)
 	{
+		// Do operator overloading for body AST node.
+		if(this->body.nonNull()) // Body is NULL for built in functions
+		{
+			payload.func_def_stack.push_back(this);
+			stack.push_back(this);
+			convertOverloadedOperators(body, payload, stack);
+			stack.pop_back();
+			payload.func_def_stack.pop_back();
+		}
+
+
+		// NOTE: wtf is this code doing?
 		//this->captured_vars = payload.captured_vars;
 
 		//this->declared_return_type = 

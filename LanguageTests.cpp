@@ -620,7 +620,13 @@ float test()
 
 void LanguageTests::run()
 {
-	// Test comparison vs addition precedence
+
+
+
+	//testMainFloatArg("def lt(real x, real y) real : x < y   \n\
+	//				 def main(float x) float : x + 1.0", 1.0f, 2.0f);
+	
+	// Test comparison vs addition precedence: addition should have higher precedence.
 	testMainFloatArg("def main(float x) float : if(x < 1.0 + 2.0, 5.0, 6.0)", 1.0f, 5.0f);
 
 
@@ -640,6 +646,11 @@ void LanguageTests::run()
 	testMainFloat(" def main() float : if(true && false, 1.0, 2.0)", 2.0f);
 	testMainFloat(" def main() float : if(true || false, 1.0, 2.0)", 1.0f);
 	testMainFloat(" def main() float : if(false || false, 1.0, 2.0)", 2.0f);
+
+
+	// =================================================================== 
+	// Test Operator Overloading 
+	// ===================================================================
 
 	// test op_add
 	testMainFloat("struct s { float x, float y } \n\
@@ -661,6 +672,34 @@ void LanguageTests::run()
 				  def op_div(s a, s b) : s(a.x / b.x, a.y / b.y) \n\
 				  def main() float : x(s(2, 3) / s(3, 4))", 2.0f / 3.0f);
 
+	// ===================================================================
+	// Test Operator Overloading with two different structures
+	// ===================================================================
+	
+	// op_add returning S
+	testMainFloat("struct S { float x, float y }					\n\
+				  struct T { float z, float w }					\n\
+				  def op_add(S a, T b) S : S(a.x + b.z, a.y + b.w)	\n\
+				  def main() float : x(S(1, 2) + T(3, 4))", 4.0f);
+
+	// op_add returning T
+	testMainFloat("struct S { float x, float y }					\n\
+				  struct T { float z, float w }					\n\
+				  def op_add(S a, T b) T : T(a.x + b.z, a.y + b.w)	\n\
+				  def main() float : z(S(1, 2) + T(3, 4))", 4.0f);
+
+	// ===================================================================
+	// Test Operator Overloading within a generic function
+	// ===================================================================
+	testMainFloat("struct s { float x, float y }						\n\
+				  def op_add(s a, s b) : s(a.x + b.x, a.y + b.y)		\n\
+				  def f<T>(T a, T b) : a + b							\n\
+				  def main() float : x(f(s(1, 2), s(3, 4)))", 4.0f);
+
+
+
+
+
 	// sqrt
 	testMainFloat("def main() float : sqrt(9.0)", std::sqrt(9.0f));
 
@@ -678,7 +717,11 @@ void LanguageTests::run()
 	testMainFloat("def f(float x, float y) float : 1.0f   \n\
 				  def f(float x, int y) float : 2.0f   \n\
 				  def main() float : f(1.0, 2)", 2.0);
-	// Test implicit conversion from int to float in addition operation
+
+	// ===================================================================
+	// Test implicit conversions from int to float
+	// ===================================================================
+
 	testMainFloat("def main() float : 3.0 + 4", 7.0);
 	testMainFloat("def main() float : 3 + 4.0", 7.0);
 

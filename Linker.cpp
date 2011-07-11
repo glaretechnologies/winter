@@ -378,49 +378,43 @@ Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDef
 	}
 
 
-	FunctionDefinition* def = new FunctionDefinition(
+	Reference<FunctionDefinition> def(new FunctionDefinition(
 		generic_func->srcLocation(), // Use the generic function's location in src for the location
 		generic_func->sig.name, // name
 		args, // args
-		//vector<Reference<LetASTNode> >(), // lets
 		body,
 		concrete_declared_ret_type, // return type
 		built_in_impl // built in func impl
-	);
+	));
 
 	if(body.nonNull())
 	{
 		// Rebind variables to get new type.
 		{
-		TraversalPayload payload(TraversalPayload::BindVariables, hidden_voidptr_arg, env);
-		payload.func_def_stack.push_back(def);
-		payload.linker = this;
-		std::vector<ASTNode*> stack(1, def);
-		body->traverse(payload, 
-			stack // stack
-		);
+			TraversalPayload payload(TraversalPayload::BindVariables, hidden_voidptr_arg, env);
+			payload.func_def_stack.push_back(def.getPointer());
+			payload.linker = this;
+			
+			std::vector<ASTNode*> stack;
+			def->traverse(
+				payload,
+				stack
+			);
 		}
-
-		//// Relink, now that conrete types are known
-		//{
-		//TraversalPayload payload(TraversalPayload::LinkFunctions, hidden_voidptr_arg, env);
-		//payload.linker = this;
-		//body->traverse(payload, 
-		//	std::vector<ASTNode*>(1, def) // stack
-		//);
-		//}
 
 		// Type check again
 		{
-			std::vector<ASTNode*> stack(1, def);
 			TraversalPayload payload(TraversalPayload::TypeCheck, hidden_voidptr_arg, env);
-			body->traverse(payload, 
-				stack // stack
+			
+			std::vector<ASTNode*> stack;
+			def->traverse(
+				payload,
+				stack
 			);
 		}
 	}
 
-	return Reference<FunctionDefinition>(def);
+	return def;
 }
 
 

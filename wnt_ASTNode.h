@@ -474,7 +474,7 @@ public:
 
 	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return MulExpressionType; }
-	virtual TypeRef type() const { return a->type(); }
+	virtual TypeRef type() const;
 	virtual void print(int depth, std::ostream& s) const;
 	//virtual void linkFunctions(Linker& linker);
 	//virtual void bindVariables(const std::vector<ASTNode*>& stack);

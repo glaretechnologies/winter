@@ -1376,11 +1376,11 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 			payload.tree_changed = true;
 		}
 	}
-	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	/*else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
 		convertOverloadedOperators(a, payload, stack);
 		convertOverloadedOperators(b, payload, stack);
-	}
+	}*/
 
 
 	stack.push_back(this);
@@ -1388,7 +1388,12 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 	b->traverse(payload, stack);
 	stack.pop_back();
 
-	if(payload.operation == TraversalPayload::TypeCoercion)
+	if(payload.operation == TraversalPayload::BindVariables)
+	{
+		convertOverloadedOperators(a, payload, stack);
+		convertOverloadedOperators(b, payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::TypeCoercion)
 	{
 		// implicit conversion from int to float in addition operation:
 		// 3.0 + 4
@@ -1413,8 +1418,7 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 			}
 		}
 	}
-
-	if(payload.operation == TraversalPayload::TypeCheck)
+	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
 		if(this->type()->getType() == Type::GenericTypeType || *this->type() == Int() || *this->type() == Float())
 		{
@@ -1557,11 +1561,11 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 			payload.tree_changed = true;
 		}
 	}
-	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	/*else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
 		convertOverloadedOperators(a, payload, stack);
 		convertOverloadedOperators(b, payload, stack);
-	}
+	}*/
 
 
 	stack.push_back(this);
@@ -1569,7 +1573,12 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 	b->traverse(payload, stack);
 	stack.pop_back();
 
-	if(payload.operation == TraversalPayload::TypeCoercion)
+	if(payload.operation == TraversalPayload::BindVariables)
+	{
+		convertOverloadedOperators(a, payload, stack);
+		convertOverloadedOperators(b, payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::TypeCoercion)
 	{
 		// implicit conversion from int to float
 		// 3.0 - 4
@@ -1687,6 +1696,12 @@ ValueRef MulExpression::exec(VMState& vmstate)
 }
 
 
+TypeRef MulExpression::type() const
+{
+	return a->type();
+}
+
+
 /*void MulExpression::bindVariables(const std::vector<ASTNode*>& stack)
 {
 	std::vector<ASTNode*> s(stack);
@@ -1711,17 +1726,18 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 			payload.tree_changed = true;
 		}
 	}
-	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	/*else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
 		convertOverloadedOperators(a, payload, stack);
 		convertOverloadedOperators(b, payload, stack);
-	}
+	}*/
 
 
 	stack.push_back(this);
 	a->traverse(payload, stack);
 	b->traverse(payload, stack);
 	stack.pop_back();
+
 
 	// NEW: moved to after child traversal
 	/*if(payload.operation == TraversalPayload::OperatorOverloadConversion)
@@ -1730,7 +1746,12 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 		convertOverloadedOperators(b, payload, stack);
 	}*/
 
-	if(payload.operation == TraversalPayload::TypeCoercion)
+	if(payload.operation == TraversalPayload::BindVariables)
+	{
+		convertOverloadedOperators(a, payload, stack);
+		convertOverloadedOperators(b, payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::TypeCoercion)
 	{
 		// implicit conversion from int to float
 		// 3.0 * 4
@@ -1755,9 +1776,7 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 			}
 		}
 	}
-
-
-	if(payload.operation == TraversalPayload::TypeCheck)
+	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
 		if(this->type()->getType() == Type::GenericTypeType || *this->type() == Int() || *this->type() == Float())
 		{
@@ -1864,18 +1883,23 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 			payload.tree_changed = true;
 		}
 	}
-	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	/*else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
 		convertOverloadedOperators(a, payload, stack);
 		convertOverloadedOperators(b, payload, stack);
-	}
+	}*/
 
 	stack.push_back(this);
 	a->traverse(payload, stack);
 	b->traverse(payload, stack);
 	stack.pop_back();
 
-	if(payload.operation == TraversalPayload::TypeCoercion)
+	if(payload.operation == TraversalPayload::BindVariables)
+	{
+		convertOverloadedOperators(a, payload, stack);
+		convertOverloadedOperators(b, payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::TypeCoercion)
 	{
 		// implicit conversion from int to float
 		// 3.0 / 4
@@ -1901,9 +1925,7 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 			}
 		}
 	}
-
-
-	if(payload.operation == TraversalPayload::TypeCheck)
+	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
 		if(this->type()->getType() == Type::GenericTypeType || *this->type() == Int() || *this->type() == Float())
 		{
@@ -2032,11 +2054,11 @@ void BinaryBooleanExpr::traverse(TraversalPayload& payload, std::vector<ASTNode*
 			payload.tree_changed = true;
 		}
 	}
-	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	/*else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
 		convertOverloadedOperators(a, payload, stack);
 		convertOverloadedOperators(b, payload, stack);
-	}
+	}*/
 
 	stack.push_back(this);
 	a->traverse(payload, stack);
@@ -2044,7 +2066,12 @@ void BinaryBooleanExpr::traverse(TraversalPayload& payload, std::vector<ASTNode*
 	stack.pop_back();
 
 	
-	if(payload.operation == TraversalPayload::TypeCheck)
+	if(payload.operation == TraversalPayload::BindVariables)
+	{
+		convertOverloadedOperators(a, payload, stack);
+		convertOverloadedOperators(b, payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
 		if(a->type()->getType() != Winter::Type::BoolType)
 			throw BaseException("First child does not have boolean type." + errorContext(*this, payload));
@@ -2147,10 +2174,10 @@ void UnaryMinusExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 			payload.tree_changed = true;
 		}
 	}
-	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	/*else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
 		convertOverloadedOperators(expr, payload, stack);
-	}
+	}*/
 
 	stack.push_back(this);
 	expr->traverse(payload, stack);
@@ -2164,6 +2191,11 @@ void UnaryMinusExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 			throw BaseException("Child type '" + this->type()->toString() + "' does not define binary operator '*'.");
 		}
 	*/
+
+	if(payload.operation == TraversalPayload::BindVariables)
+	{
+		convertOverloadedOperators(expr, payload, stack);
+	}
 }
 
 
@@ -2242,14 +2274,19 @@ void LetASTNode::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 			payload.tree_changed = true;
 		}
 	}
-	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	/*else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
 		convertOverloadedOperators(expr, payload, stack);
-	}
+	}*/
 
 	stack.push_back(this);
 	expr->traverse(payload, stack);
 	stack.pop_back();
+
+	if(payload.operation == TraversalPayload::BindVariables)
+	{
+		convertOverloadedOperators(expr, payload, stack);
+	}
 }
 
 
@@ -2386,18 +2423,23 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 			payload.tree_changed = true;
 		}
 	}
-	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	/*else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
 		convertOverloadedOperators(a, payload, stack);
 		convertOverloadedOperators(b, payload, stack);
-	}
+	}*/
 
 	stack.push_back(this);
 	a->traverse(payload, stack);
 	b->traverse(payload, stack);
 	stack.pop_back();
 
-	if(payload.operation == TraversalPayload::TypeCheck)
+	if(payload.operation == TraversalPayload::BindVariables)
+	{
+		convertOverloadedOperators(a, payload, stack);
+		convertOverloadedOperators(b, payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
 		if(a->type()->getType() == Type::GenericTypeType || a->type()->getType() == Type::IntType || a->type()->getType() == Type::FloatType || a->type()->getType() == Type::BoolType)
 		{}
@@ -2535,10 +2577,10 @@ void LetBlock::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 			payload.tree_changed = true;
 		}
 	}
-	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	/*else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
 		convertOverloadedOperators(expr, payload, stack);
-	}
+	}*/
 
 	stack.push_back(this);
 
@@ -2552,6 +2594,11 @@ void LetBlock::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 	//payload.let_block_stack.pop_back();
 
 	stack.pop_back();
+
+	if(payload.operation == TraversalPayload::BindVariables)
+	{
+		convertOverloadedOperators(expr, payload, stack);
+	}
 }
 
 

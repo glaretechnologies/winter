@@ -1,2 +1,4 @@
+TODO: operator overloading doesn't work in template bodies.
+
 TODO: def lt(real x, real y) real : x < y  Doesn't give error even though return type is wrong.
 

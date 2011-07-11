@@ -46,7 +46,7 @@ public:
 	FunctionExpression(const SrcLocation& src_loc);
 	FunctionExpression(const SrcLocation& src_loc, const std::string& func_name, const ASTNodeRef& arg0, const ASTNodeRef& arg1); // 2-arg function
 
-	bool doesFunctionTypeMatch(TypeRef& type);
+	bool doesFunctionTypeMatch(const TypeRef& type);
 
 	virtual ValueRef exec(VMState& vmstate);
 	virtual ASTNodeType nodeType() const { return FunctionExpressionType; }

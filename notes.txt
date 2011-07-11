@@ -2,7 +2,7 @@ Copyright 2009- Nicholas Chapman
 
 
 Precedence
-----------
+=============
 Highest precedence at top.
 
 ()  (Parentheses)
@@ -26,7 +26,16 @@ Highest precedence at top.
 
 
 
+Operator Overloading
+=================================
 
+Take the case:
+
+def f(S s, T t) float :  g(s + t)
+
+We don't know the type of s + t until we replace s + t with op_add(s, t).
+Since we need that to bind g, that means that the operator overloading replacement needs to be done
+immediately after binding s and t, and before trying to bind g.
 
 
 
@@ -406,7 +415,7 @@ zr = re(z)
 With syntactic sugar:
 zr = z.re
 
-Operator overloading:
+Operator overloadin
 def + (Complex a, Complex b) Complex : Complex(a.re + b.re, a.im + b.im)
 or
 def add(Complex a, Complex b) Complex : Complex(a.re + b.re, a.im + b.im)

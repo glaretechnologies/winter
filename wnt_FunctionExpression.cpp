@@ -194,12 +194,12 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 }
 
 
-bool FunctionExpression::doesFunctionTypeMatch(TypeRef& type)
+bool FunctionExpression::doesFunctionTypeMatch(const TypeRef& type)
 {
 	if(type->getType() != Type::FunctionType)
 		return false;
 
-	Function* func = dynamic_cast<Function*>(type.getPointer());
+	const Function* func = static_cast<const Function*>(type.getPointer());
 	assert(func);
 
 	std::vector<TypeRef> arg_types(this->argument_expressions.size());
@@ -290,8 +290,8 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 			{
 				for(unsigned int i=0; i<let_block->lets.size(); ++i)
 				{
-					TypeRef type_ref = let_block->lets[i]->type();
-					if(let_block->lets[i]->variable_name == this->function_name && doesFunctionTypeMatch(type_ref))
+					//TypeRef type_ref = let_block->lets[i]->type();
+					if(let_block->lets[i]->variable_name == this->function_name && doesFunctionTypeMatch(let_block->lets[i]->type()))
 					{
 						this->bound_index = i;
 						this->binding_type = Let;
@@ -414,11 +414,11 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 				payload.tree_changed = true;
 			}
 	}
-	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	/*else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
 		for(size_t i=0; i<argument_expressions.size(); ++i)
 			convertOverloadedOperators(argument_expressions[i], payload, stack);
-	}
+	}*/
 
 
 
@@ -434,6 +434,11 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 
 	if(payload.operation == TraversalPayload::BindVariables) // LinkFunctions)
 	{
+		// TEMP NEW: Do operator overloading now:
+		for(size_t i=0; i<argument_expressions.size(); ++i)
+			convertOverloadedOperators(argument_expressions[i], payload, stack);
+
+
 		// If this is a generic function, we can't try and bind function expressions yet,
 		// because the binding depends on argument type due to function overloading, so we have to wait
 		// until we know the concrete type.
