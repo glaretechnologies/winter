@@ -38,7 +38,9 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "llvm/Target/TargetSelect.h"
 #include "llvm/LLVMContext.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/StandardPasses.h"
+//#include "llvm/VMCore/StandardPasses.h"
+#include "llvm/Transforms/IPO/PassManagerBuilder.h"
+//#include "llvm/Support/PassManagerBuilder.h"
 
 /*#include "llvm/System/Host.h"
 #include "llvm/ADT/Triple.h"
@@ -391,14 +393,20 @@ void VirtualMachine::build()
 		// target lays out data structures.
 		fpm.add(new llvm::TargetData(*this->llvm_exec_engine->getTargetData()));
 
+		llvm::PassManager pm;
 
-		llvm::createStandardFunctionPasses(
+		llvm::PassManagerBuilder builder;
+		builder.OptLevel = 2;
+		builder.populateFunctionPassManager(fpm);
+		builder.populateModulePassManager(pm);
+
+		/*llvm::createStandardFunctionPasses(
 			&fpm,
 			2
 			);
 
 
-		llvm::PassManager pm;
+		
 
 		llvm::Pass* inlining_pass = llvm::createFunctionInliningPass();
 
@@ -412,7 +420,7 @@ void VirtualMachine::build()
 			false, // have exceptions
 			inlining_pass // inlining pass
 			);
-
+			*/
 
 
 		/*		// Build list of functions with external linkage (entry points)

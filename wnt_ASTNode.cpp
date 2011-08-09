@@ -659,7 +659,7 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params) const
 		//std::cout << std::endl;
 		
 
-		const llvm::Type* full_cap_var_type = LLVMTypeUtils::pointerType(
+		llvm::Type* full_cap_var_type = LLVMTypeUtils::pointerType(
 			*params.currently_building_func_def->getCapturedVariablesStructType()->LLVMType(*params.context)
 		);
 
@@ -686,8 +686,7 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 		llvm::Value* field_ptr = params.builder->CreateGEP(
 			cap_var_structure, // ptr
-			indices.begin(),
-			indices.end()
+			indices
 		);
 
 		return params.builder->CreateLoad(field_ptr);
@@ -1129,13 +1128,21 @@ llvm::Value* VectorLiteral::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 	// Create an initial constant vector with default values.
 	llvm::Value* v = llvm::ConstantVector::get(
-		llvm_vec_type, 
+		//llvm_vec_type, 
 		std::vector<llvm::Constant*>(
 			this->elements.size(),
 			this->elements[0]->type()->defaultLLVMValue(*params.context)
 			//llvm::ConstantFP::get(*params.context, llvm::APFloat(0.0))
 		)
 	);
+	/*llvm::Value* v = llvm::ConstantVector::get(
+		llvm_vec_type, 
+		std::vector<llvm::Constant*>(
+			this->elements.size(),
+			this->elements[0]->type()->defaultLLVMValue(*params.context)
+			//llvm::ConstantFP::get(*params.context, llvm::APFloat(0.0))
+		)
+	);*/
 
 	llvm::Value* vec = v;
 	for(unsigned int i=0; i<this->elements.size(); ++i)
@@ -1442,11 +1449,26 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 llvm::Value* AdditionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
 #if USE_LLVM
-	return params.builder->CreateBinOp(
-		llvm::Instruction::Add, 
-		a->emitLLVMCode(params), 
-		b->emitLLVMCode(params)
-	);
+	if(this->type()->getType() == Type::VectorTypeType || this->type()->getType() == Type::FloatType)
+	{
+		return params.builder->CreateBinOp(
+			llvm::Instruction::FAdd, 
+			a->emitLLVMCode(params), 
+			b->emitLLVMCode(params)
+		);
+	}
+	else if(this->type()->getType() == Type::IntType)
+	{
+		return params.builder->CreateBinOp(
+			llvm::Instruction::Add, 
+			a->emitLLVMCode(params), 
+			b->emitLLVMCode(params)
+		);
+	}
+	else
+	{
+		throw BaseException("Unknown type for AdditionExpression code emission");
+	}
 #else
 	return NULL;
 #endif
@@ -1629,11 +1651,26 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 llvm::Value* SubtractionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
 #if USE_LLVM
-	return params.builder->CreateBinOp(
-		llvm::Instruction::Sub, 
-		a->emitLLVMCode(params), 
-		b->emitLLVMCode(params)
-	);
+	if(this->type()->getType() == Type::VectorTypeType || this->type()->getType() == Type::FloatType)
+	{
+		return params.builder->CreateBinOp(
+			llvm::Instruction::FSub, 
+			a->emitLLVMCode(params), 
+			b->emitLLVMCode(params)
+		);
+	}
+	else if(this->type()->getType() == Type::IntType)
+	{
+		return params.builder->CreateBinOp(
+			llvm::Instruction::Sub, 
+			a->emitLLVMCode(params), 
+			b->emitLLVMCode(params)
+		);
+	}
+	else
+	{
+		throw BaseException("Unknown type for AdditionExpression code emission");
+	}
 #else
 	return NULL;
 #endif
@@ -1816,11 +1853,26 @@ void MulExpression::print(int depth, std::ostream& s) const
 llvm::Value* MulExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
 #if USE_LLVM
-	return params.builder->CreateBinOp(
-		llvm::Instruction::Mul, 
-		a->emitLLVMCode(params), 
-		b->emitLLVMCode(params)
-	);
+	if(this->type()->getType() == Type::VectorTypeType || this->type()->getType() == Type::FloatType)
+	{
+		return params.builder->CreateBinOp(
+			llvm::Instruction::FMul, 
+			a->emitLLVMCode(params), 
+			b->emitLLVMCode(params)
+		);
+	}
+	else if(this->type()->getType() == Type::IntType)
+	{
+		return params.builder->CreateBinOp(
+			llvm::Instruction::Mul, 
+			a->emitLLVMCode(params), 
+			b->emitLLVMCode(params)
+		);
+	}
+	else
+	{
+		throw BaseException("Unknown type for MulExpression code emission");
+	}
 #else
 	return NULL;
 #endif

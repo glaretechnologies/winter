@@ -557,8 +557,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 		
 		captured_var_struct_ptr = params.builder->CreateGEP(
 			closure_pointer, // ptr
-			indices.begin(),
-			indices.end(),
+			indices,
 			"captured_var_struct_ptr"
 		);
 		}
@@ -612,8 +611,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 		
 		captured_var_struct_ptr = params.builder->CreateGEP(
 			closure_pointer, // ptr
-			indices.begin(),
-			indices.end(),
+			indices,
 			"captured_var_struct_ptr"
 		);
 		}
@@ -689,7 +687,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 		if(target_takes_voidptr_arg) // params.hidden_voidptr_arg)
 			args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));
 
-		llvm::CallInst* call_inst = params.builder->CreateCall(target_llvm_func, args.begin(), args.end());
+		llvm::CallInst* call_inst = params.builder->CreateCall(target_llvm_func, args);
 
 		// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
 		call_inst->setCallingConv(llvm::CallingConv::C);
@@ -723,7 +721,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 		if(target_takes_voidptr_arg) // params.hidden_voidptr_arg)
 			args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));
 
-		llvm::CallInst* call_inst = params.builder->CreateCall(target_llvm_func, args.begin(), args.end());
+		llvm::CallInst* call_inst = params.builder->CreateCall(target_llvm_func, args);
 		
 		// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
 		call_inst->setCallingConv(llvm::CallingConv::C);

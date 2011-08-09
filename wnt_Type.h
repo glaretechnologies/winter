@@ -45,7 +45,7 @@ public:
 	virtual bool lessThan(const Type& b) const = 0;
 	virtual bool matchTypes(const Type& b, std::vector<Reference<Type> >& type_mapping) const = 0;
 #if USE_LLVM
-	virtual const llvm::Type* LLVMType(llvm::LLVMContext& context) const = 0;
+	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const = 0;
 	virtual llvm::Constant* defaultLLVMValue(llvm::LLVMContext& context);
 	virtual bool passByValue() const { return true; }
 #endif
@@ -64,7 +64,7 @@ public:
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 #if USE_LLVM
-	virtual const llvm::Type* LLVMType(llvm::LLVMContext& context) const { return llvm::Type::getFloatTy(context); }
+	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const { return llvm::Type::getFloatTy(context); }
 	virtual llvm::Constant* defaultLLVMValue(llvm::LLVMContext& context);
 #endif
 };
@@ -79,7 +79,7 @@ public:
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 #if USE_LLVM
-	virtual const llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
 #endif
 	const int genericTypeParamIndex() const { return generic_type_param_index; }
 private:
@@ -95,7 +95,7 @@ public:
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 #if USE_LLVM
-	virtual const llvm::Type* LLVMType(llvm::LLVMContext& context) const { return llvm::Type::getInt32Ty(context); }
+	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const { return llvm::Type::getInt32Ty(context); }
 #endif
 };
 
@@ -108,7 +108,7 @@ public:
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 #if USE_LLVM
-	virtual const llvm::Type* LLVMType(llvm::LLVMContext& context) const { return llvm::Type::getInt1Ty(context); }
+	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const { return llvm::Type::getInt1Ty(context); }
 #endif
 };
 
@@ -133,7 +133,7 @@ public:
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 #if USE_LLVM
-	virtual const llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
 	virtual bool passByValue() const { return false; }
 #endif
 };
@@ -160,7 +160,7 @@ public:
 	virtual const std::string toString() const; // { return "function"; }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 #if USE_LLVM
-	virtual const llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
 #endif
 	// Pass by reference, because the actual value passed/returned is a closure structure.
 	virtual bool passByValue() const { return true; }
@@ -235,7 +235,7 @@ public:
 	}
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 #if USE_LLVM
-	virtual const llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
 	virtual bool passByValue() const { return false; }
 #endif
 
@@ -267,7 +267,7 @@ public:
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 
 #if USE_LLVM
-	virtual const llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
 	virtual bool passByValue() const { return false; }
 #endif
 
@@ -301,7 +301,7 @@ public:
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 
 #if USE_LLVM
-	virtual const llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
 	virtual bool passByValue() const { return false; }
 #endif
 
@@ -341,7 +341,7 @@ public:
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 
 #if USE_LLVM
-	virtual const llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
 #endif
 
 	TypeRef t;
@@ -371,7 +371,7 @@ public:
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 
 #if USE_LLVM
-	virtual const llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
 #endif
 };
 

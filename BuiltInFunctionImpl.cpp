@@ -54,7 +54,8 @@ ValueRef Constructor::invoke(VMState& vmstate)
 llvm::Value* Constructor::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
 	//TEMP: add type alias for structure type to the module while we're at it.
-	params.module->addTypeName(this->struct_type->name, this->struct_type->LLVMType(*params.context));
+	//TEMP not accepted as of llvm 3.0 
+	//params.module->addTypeName(this->struct_type->name, this->struct_type->LLVMType(*params.context));
 
 	if(this->struct_type->passByValue())
 	{
@@ -92,8 +93,7 @@ llvm::Value* Constructor::emitLLVMCode(EmitLLVMCodeParams& params) const
 			
 			llvm::Value* field_ptr = params.builder->CreateGEP(
 				struct_ptr, // ptr
-				indices.begin(),
-				indices.end()
+				indices
 			);
 
 			// Store it in the appropriate field in the structure.
@@ -166,8 +166,7 @@ llvm::Value* GetField::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 			llvm::Value* field_ptr = params.builder->CreateGEP(
 				struct_ptr, // ptr
-				indices.begin(),
-				indices.end()
+				indices
 				);
 
 			return params.builder->CreateLoad(
@@ -188,8 +187,7 @@ llvm::Value* GetField::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 			llvm::Value* field_ptr = params.builder->CreateGEP(
 				struct_ptr, // ptr
-				indices.begin(),
-				indices.end()
+				indices
 			);
 
 			llvm::Value* field_val = params.builder->CreateLoad(
@@ -425,6 +423,7 @@ llvm::Value* IfBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	params.builder->SetInsertPoint(MergeBB);
 	llvm::PHINode *PN = params.builder->CreatePHI(
 		this->T->passByValue() ? this->T->LLVMType(*params.context) : LLVMTypeUtils::pointerType(*this->T->LLVMType(*params.context)),
+		0, // num reserved values
 		"iftmp"
 	);
 
@@ -494,7 +493,7 @@ llvm::Value* DotProductBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) con
 		llvm::Function* dot_func = llvm::Intrinsic::getDeclaration(params.module, llvm::Intrinsic::x86_sse41_dpps);
 
 		// dot product intrinsic returns a 4-vector.
-		llvm::Value* vector_res = params.builder->CreateCall(dot_func, args.begin(), args.end(), "Vector_res");
+		llvm::Value* vector_res = params.builder->CreateCall(dot_func, args, "Vector_res");
 
 		return params.builder->CreateExtractElement(
 			vector_res, // vec
@@ -509,7 +508,7 @@ llvm::Value* DotProductBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) con
 
 		// x = a[0] * b[0]
 		llvm::Value* x = params.builder->CreateBinOp(
-			llvm::Instruction::Mul, 
+			llvm::Instruction::FMul, 
 			params.builder->CreateExtractElement(a, llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0))),
 			params.builder->CreateExtractElement(b, llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0)))
 		);
@@ -518,14 +517,14 @@ llvm::Value* DotProductBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) con
 		{
 			// y = a[i] * b[i]
 			llvm::Value* y = params.builder->CreateBinOp(
-				llvm::Instruction::Mul, 
+				llvm::Instruction::FMul, 
 				params.builder->CreateExtractElement(a, llvm::ConstantInt::get(*params.context, llvm::APInt(32, i))),
 				params.builder->CreateExtractElement(b, llvm::ConstantInt::get(*params.context, llvm::APInt(32, i)))
 			);
 
 			// x = x + y
 			x = params.builder->CreateBinOp(
-				llvm::Instruction::Add, 
+				llvm::Instruction::FAdd, 
 				x,
 				y
 			);
@@ -574,7 +573,7 @@ llvm::Value* VectorMinBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 
 		llvm::Function* minps_func = llvm::Intrinsic::getDeclaration(params.module, llvm::Intrinsic::x86_sse_min_ps);
 
-		return params.builder->CreateCall(minps_func, args.begin(), args.end());
+		return params.builder->CreateCall(minps_func, args);
 	}
 	else
 	{
@@ -622,7 +621,7 @@ llvm::Value* VectorMaxBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 
 		llvm::Function* maxps_func = llvm::Intrinsic::getDeclaration(params.module, llvm::Intrinsic::x86_sse_max_ps);
 
-		return params.builder->CreateCall(maxps_func, args.begin(), args.end());
+		return params.builder->CreateCall(maxps_func, args);
 	}
 	else
 	{
@@ -650,18 +649,17 @@ llvm::Value* PowBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	args.push_back(LLVMTypeUtils::getNthArg(params.currently_building_func, 0));
 	args.push_back(LLVMTypeUtils::getNthArg(params.currently_building_func, 1));
 
-	vector<const llvm::Type*> types;
+	vector<llvm::Type*> types;
 	types.push_back(TypeRef(new Float())->LLVMType(*params.context));
 
-	llvm::Function* func = llvm::Intrinsic::getDeclaration(params.module, llvm::Intrinsic::pow, &types[0], types.size());
+	llvm::Function* func = llvm::Intrinsic::getDeclaration(params.module, llvm::Intrinsic::pow, types);
 
 	assert(func);
 	assert(func->isIntrinsic());
 
 	return params.builder->CreateCall(
 		func,
-		args.begin(), 
-		args.end()
+		args
 	);
 }
 
@@ -674,15 +672,14 @@ static llvm::Value* emitFloatFloatIntrinsic(EmitLLVMCodeParams& params, llvm::In
 	vector<llvm::Value*> args;
 	args.push_back(LLVMTypeUtils::getNthArg(params.currently_building_func, 0));
 
-	vector<const llvm::Type*> types;
+	vector<llvm::Type*> types;
 	types.push_back(TypeRef(new Float())->LLVMType(*params.context));
 
-	llvm::Function* func = llvm::Intrinsic::getDeclaration(params.module, id, &types[0], types.size());
+	llvm::Function* func = llvm::Intrinsic::getDeclaration(params.module, id, types);
 
 	return params.builder->CreateCall(
 		func,
-		args.begin(), 
-		args.end()
+		args
 	);
 }
 

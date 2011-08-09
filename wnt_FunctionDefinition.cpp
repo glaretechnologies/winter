@@ -414,7 +414,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 	/////////////////// Create function pointer type /////////////////////
 	// Build vector of function args
-	vector<const llvm::Type*> llvm_arg_types(this->args.size());
+	vector<llvm::Type*> llvm_arg_types(this->args.size());
 	for(size_t i=0; i<this->args.size(); ++i)
 		llvm_arg_types[i] = this->args[i].type->LLVMType(*params.context);
 
@@ -426,7 +426,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params) const
 	llvm_arg_types.push_back(LLVMTypeUtils::voidPtrType(*params.context));
 
 	// Construct the function pointer type
-	const llvm::Type* func_ptr_type = LLVMTypeUtils::pointerType(*llvm::FunctionType::get(
+	llvm::Type* func_ptr_type = LLVMTypeUtils::pointerType(*llvm::FunctionType::get(
 		this->returnType()->LLVMType(*params.context), // result type
 		llvm_arg_types,
 		false // is var arg
@@ -434,17 +434,17 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 
 	/////////////////////// Get full captured var struct type ///////////////
-	const llvm::Type* cap_var_type_ = this->getCapturedVariablesStructType()->LLVMType(*params.context);
-	const llvm::StructType* cap_var_type = static_cast<const llvm::StructType*>(cap_var_type_);
+	llvm::Type* cap_var_type_ = this->getCapturedVariablesStructType()->LLVMType(*params.context);
+	llvm::StructType* cap_var_type = static_cast<llvm::StructType*>(cap_var_type_);
 
 
 	
 	///////////////// Create closure type //////////////////////////////
-	vector<const llvm::Type*> closure_field_types(3);
+	vector<llvm::Type*> closure_field_types(3);
 	closure_field_types[0] = llvm::Type::getInt32Ty(*params.context); // Int 32 reference count
 	closure_field_types[1] = func_ptr_type;
 	closure_field_types[2] = cap_var_type;
-	const llvm::StructType* closure_type = llvm::StructType::get(
+	llvm::StructType* closure_type = llvm::StructType::get(
 		*params.context,
 		closure_field_types
 	);
@@ -464,7 +464,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params) const
 	//target_llvm_func->dump();
 
 	// Call our allocateRefCountedStructure function
-	llvm::Value* closure_void_pointer = params.builder->CreateCall(alloc_llvm_func, args.begin(), args.end());
+	llvm::Value* closure_void_pointer = params.builder->CreateCall(alloc_llvm_func, args);
 
 	llvm::Value* closure_pointer = params.builder->CreateBitCast(
 		closure_void_pointer,
@@ -492,8 +492,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params) const
 		
 		llvm::Value* func_field_ptr = params.builder->CreateGEP(
 			closure_pointer, // ptr
-			indices.begin(),
-			indices.end()
+			indices
 		);
 
 		// Do the store.
@@ -511,8 +510,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params) const
 		
 	captured_var_struct_ptr = params.builder->CreateGEP(
 		closure_pointer, // ptr
-		indices.begin(),
-		indices.end()
+		indices
 	);
 	}
 
@@ -553,8 +551,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params) const
 		
 		llvm::Value* field_ptr = params.builder->CreateGEP(
 			captured_var_struct_ptr, // ptr
-			indices.begin(),
-			indices.end()
+			indices
 		);
 
 		//TEMP:
@@ -570,7 +567,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params) const
 	}
 
 	// Bitcast the closure pointer down to the 'base' closure type.
-	const llvm::Type* base_closure_type = this->type()->LLVMType(*params.context);
+	llvm::Type* base_closure_type = this->type()->LLVMType(*params.context);
 
 	return params.builder->CreateBitCast(
 		closure_pointer,

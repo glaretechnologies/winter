@@ -71,7 +71,7 @@ bool GenericType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) 
 }
 
 
-const llvm::Type* GenericType::LLVMType(llvm::LLVMContext& context) const
+llvm::Type* GenericType::LLVMType(llvm::LLVMContext& context) const
 {
 	assert(0);
 	return NULL;
@@ -105,7 +105,7 @@ bool String::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
 }
 
 
-const llvm::Type* String::LLVMType(llvm::LLVMContext& context) const
+llvm::Type* String::LLVMType(llvm::LLVMContext& context) const
 {
 	return pointerToVoidLLVMType(context);
 }
@@ -173,7 +173,7 @@ struct Closure
 }
 
 */
-const llvm::Type* Function::LLVMType(llvm::LLVMContext& context) const
+llvm::Type* Function::LLVMType(llvm::LLVMContext& context) const
 {
 	// Build Empty LLVM CapturedVars struct
 	//vector<const llvm::Type*> cap_var_types;
@@ -206,7 +206,7 @@ const llvm::Type* Function::LLVMType(llvm::LLVMContext& context) const
 		false // is var arg
 	));*/
 
-	const llvm::Type* func_ptr_type = LLVMTypeUtils::pointerType(*LLVMTypeUtils::llvmFunctionType(
+	llvm::Type* func_ptr_type = LLVMTypeUtils::pointerType(*LLVMTypeUtils::llvmFunctionType(
 		arg_types,
 		true, // use captured var struct ptr arg
 		return_type,
@@ -224,7 +224,7 @@ const llvm::Type* Function::LLVMType(llvm::LLVMContext& context) const
 	//	field_types.push_back(this->captured_vars[i].type->LLVMType(context));
 
 	// Make the vector of fields for the closure type
-	vector<const llvm::Type*> closure_field_types;
+	vector<llvm::Type*> closure_field_types;
 	closure_field_types.push_back(TypeRef(new Int())->LLVMType(context)); // Ref count field
 	closure_field_types.push_back(func_ptr_type);
 	closure_field_types.push_back(LLVMTypeUtils::getBaseCapturedVarStructType(context)); // cap_var_struct);
@@ -259,7 +259,7 @@ bool ArrayType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) co
 }
 
 
-const llvm::Type* ArrayType::LLVMType(llvm::LLVMContext& context) const
+llvm::Type* ArrayType::LLVMType(llvm::LLVMContext& context) const
 {
 	return pointerToVoidLLVMType(context);
 }
@@ -274,7 +274,7 @@ bool Map::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
 }
 
 
-const llvm::Type* Map::LLVMType(llvm::LLVMContext& context) const
+llvm::Type* Map::LLVMType(llvm::LLVMContext& context) const
 {
 	return pointerToVoidLLVMType(context);
 }
@@ -307,10 +307,10 @@ bool StructureType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping
 }
 
 
-const llvm::Type* StructureType::LLVMType(llvm::LLVMContext& context) const
+llvm::Type* StructureType::LLVMType(llvm::LLVMContext& context) const
 {
 	//return pointerToVoidLLVMType(context);
-	vector<const llvm::Type*> field_types(this->component_types.size());
+	vector<llvm::Type*> field_types(this->component_types.size());
 	for(size_t i=0; i<this->component_types.size(); ++i)
 	{
 		field_types[i] = this->component_types[i]->LLVMType(context);
@@ -363,7 +363,7 @@ bool VectorType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) c
 }
 
 
-const llvm::Type* VectorType::LLVMType(llvm::LLVMContext& context) const
+llvm::Type* VectorType::LLVMType(llvm::LLVMContext& context) const
 {
 	return llvm::VectorType::get(
 		this->t->LLVMType(context),
@@ -388,7 +388,7 @@ bool VoidPtrType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) 
 }
 
 
-const llvm::Type* VoidPtrType::LLVMType(llvm::LLVMContext& context) const
+llvm::Type* VoidPtrType::LLVMType(llvm::LLVMContext& context) const
 {
 	return LLVMTypeUtils::voidPtrType(context);
 }

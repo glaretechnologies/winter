@@ -30,12 +30,12 @@ namespace LLVMTypeUtils
 llvm::Value* getNthArg(llvm::Function *func, int n);
 llvm::Value* getLastArg(llvm::Function *func);
 
-const llvm::Type* pointerType(const llvm::Type& type);
+llvm::Type* pointerType(llvm::Type& type);
 
-const llvm::Type* voidPtrType(llvm::LLVMContext& context);
+llvm::Type* voidPtrType(llvm::LLVMContext& context);
 
-const llvm::Type* getBaseCapturedVarStructType(llvm::LLVMContext& context);
-const llvm::Type* getPtrToBaseCapturedVarStructType(llvm::LLVMContext& context);
+llvm::Type* getBaseCapturedVarStructType(llvm::LLVMContext& context);
+llvm::Type* getPtrToBaseCapturedVarStructType(llvm::LLVMContext& context);
 
 llvm::FunctionType* llvmFunctionType(const std::vector<TypeRef>& arg_types, 
 									 bool captured_var_struct_ptr_arg,

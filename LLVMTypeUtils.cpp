@@ -50,7 +50,7 @@ llvm::Value* getLastArg(llvm::Function *func)
 }
 
 
-const llvm::Type* pointerType(const llvm::Type& type)
+llvm::Type* pointerType(llvm::Type& type)
 {
 	return llvm::PointerType::get(
 		&type, 
@@ -59,16 +59,16 @@ const llvm::Type* pointerType(const llvm::Type& type)
 }
 
 
-const llvm::Type* voidPtrType(llvm::LLVMContext& context)
+llvm::Type* voidPtrType(llvm::LLVMContext& context)
 {
 	// Not sure if LLVM has a pointer to void type, so just use a pointer to int32.
 	return llvm::Type::getInt32PtrTy(context);
 }
 
 
-const llvm::Type* getBaseCapturedVarStructType(llvm::LLVMContext& context)
+llvm::Type* getBaseCapturedVarStructType(llvm::LLVMContext& context)
 {
-	const std::vector<const llvm::Type*> params;
+	const std::vector<llvm::Type*> params;
 	return llvm::StructType::get(
 		context,
 		params // params
@@ -76,7 +76,7 @@ const llvm::Type* getBaseCapturedVarStructType(llvm::LLVMContext& context)
 }
 
 
-const llvm::Type* getPtrToBaseCapturedVarStructType(llvm::LLVMContext& context)
+llvm::Type* getPtrToBaseCapturedVarStructType(llvm::LLVMContext& context)
 {
 	return pointerType(*getBaseCapturedVarStructType(context));
 }
@@ -90,7 +90,7 @@ llvm::FunctionType* llvmFunctionType(const vector<TypeRef>& arg_types,
 {
 	if(return_type->passByValue())
 	{
-		vector<const llvm::Type*> llvm_arg_types;
+		vector<llvm::Type*> llvm_arg_types;
 
 		for(unsigned int i=0; i<arg_types.size(); ++i)
 			llvm_arg_types.push_back(arg_types[i]->passByValue() ? arg_types[i]->LLVMType(context) : LLVMTypeUtils::pointerType(*arg_types[i]->LLVMType(context)));
@@ -111,7 +111,7 @@ llvm::FunctionType* llvmFunctionType(const vector<TypeRef>& arg_types,
 	{
 		// The return value is passed by reference, so that means the zero-th argument will be a pointer to memory where the return value will be placed.
 
-		vector<const llvm::Type*> llvm_arg_types;
+		vector<llvm::Type*> llvm_arg_types;
 		llvm_arg_types.push_back(LLVMTypeUtils::pointerType(*return_type->LLVMType(context)));
 
 		// Append normal arguments
@@ -143,8 +143,7 @@ llvm::Value* createFieldLoad(llvm::Value* structure_ptr, int field_index,
 		
 	llvm::Value* field_ptr = builder->CreateGEP(
 		structure_ptr, // ptr
-		indices.begin(),
-		indices.end(),
+		indices,
 		"field_ptr"
 	);
 

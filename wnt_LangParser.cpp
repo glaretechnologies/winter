@@ -338,10 +338,10 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 
 				// Make constructor function for this structure
 				vector<FunctionDefinition::FunctionArg> args(t->component_types.size());
-				for(unsigned int i=0; i<args.size(); ++i)
+				for(unsigned int z=0; z<args.size(); ++z)
 				{
-					args[i].name = t->component_names[i];
-					args[i].type = t->component_types[i];
+					args[z].name = t->component_names[z];
+					args[z].type = t->component_types[z];
 				}
 
 				FunctionDefinition* cons = new FunctionDefinition(
