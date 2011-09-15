@@ -35,7 +35,7 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Support/IRBuilder.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
-#include "llvm/Target/TargetSelect.h"
+#include "llvm/Support/TargetSelect.h"
 #include "llvm/LLVMContext.h"
 #include "llvm/Support/raw_ostream.h"
 //#include "llvm/VMCore/StandardPasses.h"

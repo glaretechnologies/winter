@@ -331,7 +331,7 @@ static void bleh(StructType* s)
 
 
 
-#if defined(WIN32) || defined(WIN64)
+#if defined(_WIN32) || defined(_WIN64)
 #define SSE_ALIGN _MM_ALIGN16
 #define SSE_CLASS_ALIGN _MM_ALIGN16 class
 #else

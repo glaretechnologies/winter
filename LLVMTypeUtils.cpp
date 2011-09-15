@@ -18,7 +18,7 @@ Generated at Wed Oct 20 15:22:37 +1300 2010
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Support/IRBuilder.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
-#include "llvm/Target/TargetSelect.h"
+#include "llvm/Support/TargetSelect.h"
 #include "llvm/LLVMContext.h"
 #include "llvm/Support/raw_ostream.h"
 #endif
