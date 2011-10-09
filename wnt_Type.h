@@ -174,7 +174,7 @@ public:
 		{
 			// Else b is a function as well.
 
-			const Function& b_func = dynamic_cast<const Function&>(b);
+			const Function& b_func = static_cast<const Function&>(b);
 			
 			if(return_type->lessThan(*b_func.return_type))
 				return true;
@@ -219,7 +219,7 @@ public:
 			return false;
 		else
 		{
-			const Map& bmap = dynamic_cast<const Map&>(b);
+			const Map& bmap = static_cast<const Map&>(b);
 
 			// else b is a map as well
 			if(from_type->lessThan(*bmap.from_type))
@@ -259,7 +259,7 @@ public:
 		else
 		{
 			// else b is a structure as well
-			const ArrayType& b_array = dynamic_cast<const ArrayType&>(b);
+			const ArrayType& b_array = static_cast<const ArrayType&>(b);
 
 			return this->t->lessThan(*b_array.t);
 		}
@@ -293,7 +293,7 @@ public:
 		else
 		{
 			// else b is a structure as well
-			const StructureType& b_struct = dynamic_cast<const StructureType&>(b);
+			const StructureType& b_struct = static_cast<const StructureType&>(b);
 
 			return this->name < b_struct.name;
 		}
@@ -328,7 +328,7 @@ public:
 		else
 		{
 			// else b is a VectorType as well
-			const VectorType& b_vector = dynamic_cast<const VectorType&>(b);
+			const VectorType& b_vector = static_cast<const VectorType&>(b);
 
 			if(this->num < b_vector.num)
 				return true;

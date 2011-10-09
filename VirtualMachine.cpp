@@ -228,6 +228,10 @@ void VirtualMachine::loadSource(const std::vector<SourceBufferRef>& source_buffe
 	linker.addExternalFunctions(this->external_functions);
 	linker.addFunctions(func_defs);
 
+	// TEMP: print out functions
+	//for(size_t i=0; i<func_defs.size(); ++i)
+	//	func_defs[i]->print(0, std::cout);
+
 	// Bind variables
 	{
 		std::vector<ASTNode*> stack;
@@ -296,7 +300,8 @@ void VirtualMachine::loadSource(const std::vector<SourceBufferRef>& source_buffe
 	}
 
 
-//	rootref->print(0, std::cout);
+	//for(size_t i=0; i<func_defs.size(); ++i)
+	//	func_defs[i]->print(0, std::cout);
 
 	
 	while(true)

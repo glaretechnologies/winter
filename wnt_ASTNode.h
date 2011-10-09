@@ -256,6 +256,7 @@ public:
 	// More accurately, type of binding
 	enum VariableType
 	{
+		UnboundVariable,
 		LetVariable,
 		ArgumentVariable,
 		BoundToGlobalDefVariable,

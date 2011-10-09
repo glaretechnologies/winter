@@ -119,7 +119,7 @@ bool Function::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) con
 	if(this->getType() != b.getType())
 		return false;
 	// So b is a Function as well.
-	const Function* b_ = dynamic_cast<const Function*>(&b);
+	const Function* b_ = static_cast<const Function*>(&b);
 	if(this->arg_types.size() != b_->arg_types.size())
 		return false;
 
@@ -253,7 +253,7 @@ bool ArrayType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) co
 	if(this->getType() != b.getType())
 		return false;
 	// So b is an Array as well.
-	const ArrayType* b_ = dynamic_cast<const ArrayType*>(&b);
+	const ArrayType* b_ = static_cast<const ArrayType*>(&b);
 
 	return this->t->matchTypes(*b_->t, type_mapping);
 }
@@ -288,7 +288,7 @@ bool StructureType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping
 	if(this->getType() != b.getType())
 		return false;
 	// So b is a StructureType as well.
-	const StructureType* b_ = dynamic_cast<const StructureType*>(&b);
+	const StructureType* b_ = static_cast<const StructureType*>(&b);
 
 	if(this->name != b_->name)
 		return false;
@@ -357,7 +357,7 @@ bool VectorType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) c
 		return false;
 
 	// So b is a VectorType as well.
-	const VectorType* b_ = dynamic_cast<const VectorType*>(&b);
+	const VectorType* b_ = static_cast<const VectorType*>(&b);
 
 	return this->num == b_->num && this->t->matchTypes(*b_->t, type_mapping);
 }

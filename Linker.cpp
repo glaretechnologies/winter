@@ -318,8 +318,8 @@ Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDef
 		// If generic_func's arg i is generic
 		if(generic_func->args[i].type->getType() == Type::GenericTypeType)
 		{
-			GenericType* gt = dynamic_cast<GenericType*>(generic_func->args[i].type.getPointer());
-			assert(gt);
+			assert(generic_func->args[i].type->getType() == Type::GenericTypeType);
+			GenericType* gt = static_cast<GenericType*>(generic_func->args[i].type.getPointer());
 			
 			// Then replace with the bound concrete type.
 			args[i].type = type_mappings[gt->genericTypeParamIndex()];
@@ -368,7 +368,7 @@ Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDef
 	{
 		if(generic_func->declared_return_type->getType() == Type::GenericTypeType)
 		{
-			GenericType* gt = dynamic_cast<GenericType*>(generic_func->declared_return_type.getPointer());
+			GenericType* gt = static_cast<GenericType*>(generic_func->declared_return_type.getPointer());
 
 			//TODO: check mapping exists
 			concrete_declared_ret_type = type_mappings[gt->genericTypeParamIndex()];

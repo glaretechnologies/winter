@@ -97,7 +97,7 @@ FunctionDefinition* FunctionExpression::runtimeBind(VMState& vmstate, FunctionVa
 	{
 		ValueRef arg = vmstate.argument_stack[vmstate.func_args_start.back() + this->bound_index];
 		assert(dynamic_cast<FunctionValue*>(arg.getPointer()));
-		FunctionValue* function_value = dynamic_cast<FunctionValue*>(arg.getPointer());
+		FunctionValue* function_value = static_cast<FunctionValue*>(arg.getPointer());
 		function_value_out = function_value;
 		return function_value->func_def;
 	}
@@ -110,7 +110,7 @@ FunctionDefinition* FunctionExpression::runtimeBind(VMState& vmstate, FunctionVa
 
 		//ValueRef arg = vmstate.let_stack[vmstate.let_stack_start.back() + this->bound_index];
 		assert(dynamic_cast<FunctionValue*>(arg.getPointer()));
-		FunctionValue* function_value = dynamic_cast<FunctionValue*>(arg.getPointer());
+		FunctionValue* function_value = static_cast<FunctionValue*>(arg.getPointer());
 		function_value_out = function_value;
 		return function_value->func_def;
 	}
@@ -255,8 +255,10 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 	for(int s = (int)stack.size() - 1; s >= 0 && !found_binding; --s)
 	{
 		{
-			if(FunctionDefinition* def = dynamic_cast<FunctionDefinition*>(stack[s])) // If node is a function definition
+			if(stack[s]->nodeType() == ASTNode::FunctionDefinitionType) // If node is a function definition
 			{
+				FunctionDefinition* def = static_cast<FunctionDefinition*>(stack[s]);
+
 				for(unsigned int i=0; i<def->args.size(); ++i)
 				{
 					// If the argument is a function, and its name and sig matches our function expression...
@@ -286,8 +288,10 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 				}
 				in_current_func_def = false;
 			}
-			else if(LetBlock* let_block = dynamic_cast<LetBlock*>(stack[s]))
+			else if(stack[s]->nodeType() == ASTNode::LetBlockType)
 			{
+				LetBlock* let_block = static_cast<LetBlock*>(stack[s]);
+
 				for(unsigned int i=0; i<let_block->lets.size(); ++i)
 				{
 					//TypeRef type_ref = let_block->lets[i]->type();
@@ -430,7 +434,7 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 	for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
 		this->argument_expressions[i]->traverse(payload, stack);
 
-	stack.pop_back();
+	
 
 	if(payload.operation == TraversalPayload::BindVariables) // LinkFunctions)
 	{
@@ -446,6 +450,8 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 		if(!payload.func_def_stack.back()->isGenericFunction())
 			linkFunctions(*payload.linker, payload, stack);
 	}
+
+	stack.pop_back();
 }
 
 

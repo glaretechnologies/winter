@@ -392,6 +392,7 @@ const std::string errorContext(const ASTNode& n, TraversalPayload& payload)
 
 Variable::Variable(const std::string& name_, const SrcLocation& loc)
 :	ASTNode(loc),
+	vartype(UnboundVariable),
 	name(name_),
 	bound_index(-1),
 	bound_function(NULL),
@@ -408,8 +409,10 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 	int use_let_frame_offset = 0;
 	for(int s = (int)stack.size() - 1; s >= 0; --s) // Walk up the stack of ancestor nodes
 	{
-		if(FunctionDefinition* def = dynamic_cast<FunctionDefinition*>(stack[s])) // If node is a function definition:
+		if(stack[s]->nodeType() == ASTNode::FunctionDefinitionType) // If node is a function definition:
 		{
+			FunctionDefinition* def = static_cast<FunctionDefinition*>(stack[s]);
+
 			for(unsigned int i=0; i<def->args.size(); ++i) // For each argument to the function:
 				if(def->args[i].name == this->name) // If the argument name matches this variable name:
 				{
@@ -445,8 +448,10 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 
 			in_current_func_def = false;
 		}
-		else if(LetBlock* let_block = dynamic_cast<LetBlock*>(stack[s]))
+		else if(stack[s]->nodeType() == ASTNode::LetBlockType)
 		{
+			LetBlock* let_block = static_cast<LetBlock*>(stack[s]);
+
 			for(unsigned int i=0; i<let_block->lets.size(); ++i)
 				if(let_block->lets[i]->variable_name == this->name)
 				{
@@ -583,7 +588,9 @@ TypeRef Variable::type() const
 
 inline static const std::string varType(Variable::VariableType t)
 {
-	if(t == Variable::LetVariable)
+	if(t == Variable::UnboundVariable)
+		return "Unbound";
+	else if(t == Variable::LetVariable)
 		return "Let";
 	else if(t == Variable::ArgumentVariable)
 		return "Arg";
@@ -1294,50 +1301,6 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 ValueRef AdditionExpression::exec(VMState& vmstate)
 {
 	return execBinaryOp(vmstate, a, b, AddOp());
-/*
-	Value* aval = a->exec(vmstate).getPointer();
-	Value* bval = b->exec(vmstate).getPointer();
-
-	ValueRef retval;
-
-	switch(this->type()->getType())
-	{
-	case Type::FloatType:
-		retval = ValueRef(new FloatValue(static_cast<FloatValue*>(aval)->value + static_cast<FloatValue*>(bval)->value));
-		break;
-	case Type::IntType:
-		retval = ValueRef(new IntValue(static_cast<IntValue*>(aval)->value + static_cast<IntValue*>(bval)->value));
-		break;
-	case Type::VectorTypeType:
-		{
-		TypeRef this_type = this->type();
-		VectorType* vectype = static_cast<VectorType*>(this_type.getPointer());
-
-		VectorValue* aval_vec = static_cast<VectorValue*>(aval);
-		VectorValue* bval_vec = static_cast<VectorValue*>(bval);
-		vector<ValueRef> elem_values(aval_vec->e.size());
-		switch(vectype->t->getType())
-		{
-		case Type::FloatType:
-			for(unsigned int i=0; i<elem_values.size(); ++i)
-				elem_values[i] = ValueRef(new FloatValue(static_cast<FloatValue*>(aval_vec->e[i].getPointer())->value + static_cast<FloatValue*>(bval_vec->e[i].getPointer())->value));
-			break;
-		case Type::IntType:
-			for(unsigned int i=0; i<elem_values.size(); ++i)
-				elem_values[i] = ValueRef(new IntValue(static_cast<IntValue*>(aval_vec->e[i].getPointer())->value + static_cast<IntValue*>(bval_vec->e[i].getPointer())->value));
-			break;
-		default:
-			assert(!"additionexpression vector field type invalid!");
-		};
-		retval = ValueRef(new VectorValue(elem_values));
-		break;
-		}
-	default:
-		assert(!"additionexpression type invalid!");
-	}
-
-	return retval;
-	*/
 }
 
 
@@ -1383,17 +1346,12 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 			payload.tree_changed = true;
 		}
 	}
-	/*else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
-	{
-		convertOverloadedOperators(a, payload, stack);
-		convertOverloadedOperators(b, payload, stack);
-	}*/
 
 
 	stack.push_back(this);
 	a->traverse(payload, stack);
 	b->traverse(payload, stack);
-	stack.pop_back();
+	
 
 	if(payload.operation == TraversalPayload::BindVariables)
 	{
@@ -1443,6 +1401,8 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 			throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
 		}
 	}
+
+	stack.pop_back();
 }
 
 
@@ -1496,50 +1456,6 @@ bool AdditionExpression::isConstant() const
 ValueRef SubtractionExpression::exec(VMState& vmstate)
 {
 	return execBinaryOp(vmstate, a, b, SubOp());
-/*
-	Value* aval = a->exec(vmstate).getPointer();
-	Value* bval = b->exec(vmstate).getPointer();
-
-	ValueRef retval;
-
-	switch(this->type()->getType())
-	{
-	case Type::FloatType:
-		retval = ValueRef(new FloatValue(static_cast<FloatValue*>(aval)->value - static_cast<FloatValue*>(bval)->value));
-		break;
-	case Type::IntType:
-		retval = ValueRef(new IntValue(static_cast<IntValue*>(aval)->value - static_cast<IntValue*>(bval)->value));
-		break;
-	case Type::VectorTypeType:
-		{
-		TypeRef this_type = this->type();
-		VectorType* vectype = static_cast<VectorType*>(this_type.getPointer());
-
-		VectorValue* aval_vec = static_cast<VectorValue*>(aval);
-		VectorValue* bval_vec = static_cast<VectorValue*>(bval);
-		vector<ValueRef> elem_values(aval_vec->e.size());
-		switch(vectype->t->getType())
-		{
-		case Type::FloatType:
-			for(unsigned int i=0; i<elem_values.size(); ++i)
-				elem_values[i] = ValueRef(new FloatValue(static_cast<FloatValue*>(aval_vec->e[i].getPointer())->value - static_cast<FloatValue*>(bval_vec->e[i].getPointer())->value));
-			break;
-		case Type::IntType:
-			for(unsigned int i=0; i<elem_values.size(); ++i)
-				elem_values[i] = ValueRef(new IntValue(static_cast<IntValue*>(aval_vec->e[i].getPointer())->value - static_cast<IntValue*>(bval_vec->e[i].getPointer())->value));
-			break;
-		default:
-			assert(!"SubtractionExpression vector field type invalid!");
-		};
-		retval = ValueRef(new VectorValue(elem_values));
-		break;
-		}
-	default:
-		assert(!"SubtractionExpression type invalid!");
-	}
-
-	return retval;
-	*/
 }
 
 
@@ -1583,17 +1499,12 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 			payload.tree_changed = true;
 		}
 	}
-	/*else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
-	{
-		convertOverloadedOperators(a, payload, stack);
-		convertOverloadedOperators(b, payload, stack);
-	}*/
 
 
 	stack.push_back(this);
 	a->traverse(payload, stack);
 	b->traverse(payload, stack);
-	stack.pop_back();
+	
 
 	if(payload.operation == TraversalPayload::BindVariables)
 	{
@@ -1645,6 +1556,7 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 		}
 	}
 
+	stack.pop_back();
 }
 
 
@@ -1698,38 +1610,6 @@ bool SubtractionExpression::isConstant() const
 ValueRef MulExpression::exec(VMState& vmstate)
 {
 	return execBinaryOp(vmstate, a, b, MulOp());
-	/*
-	Value* aval = a->exec(vmstate).getPointer();
-	Value* bval = b->exec(vmstate).getPointer();
-	ValueRef retval;
-
-	if(this->type()->getType() == Type::FloatType)
-	{
-		retval = ValueRef(new FloatValue(static_cast<FloatValue*>(aval)->value * static_cast<FloatValue*>(bval)->value));
-	}
-	else if(this->type()->getType() == Type::IntType)
-	{
-		retval = ValueRef(new IntValue(static_cast<IntValue*>(aval)->value * static_cast<IntValue*>(bval)->value));
-	}
-	else if(this->type()->getType() == Type::VectorTypeType)
-	{
-		VectorValue* aval_vec = static_cast<VectorValue*>(aval);
-		VectorValue* bval_vec = static_cast<VectorValue*>(bval);
-
-		vector<ValueRef> elem_values(aval_vec->e.size());
-		for(unsigned int i=0; i<elem_values.size(); ++i)
-		{
-			elem_values[i] = ValueRef(new FloatValue(static_cast<FloatValue*>(aval_vec->e[i].getPointer())->value * static_cast<FloatValue*>(bval_vec->e[i].getPointer())->value));
-		}
-
-		retval = ValueRef(new VectorValue(elem_values));
-	}
-	else
-	{
-		assert(!"mulexpression type invalid!");
-	}
-	return retval;
-	*/
 }
 
 
@@ -1763,25 +1643,11 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 			payload.tree_changed = true;
 		}
 	}
-	/*else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
-	{
-		convertOverloadedOperators(a, payload, stack);
-		convertOverloadedOperators(b, payload, stack);
-	}*/
-
 
 	stack.push_back(this);
 	a->traverse(payload, stack);
 	b->traverse(payload, stack);
-	stack.pop_back();
-
-
-	// NEW: moved to after child traversal
-	/*if(payload.operation == TraversalPayload::OperatorOverloadConversion)
-	{
-		convertOverloadedOperators(a, payload, stack);
-		convertOverloadedOperators(b, payload, stack);
-	}*/
+	
 
 	if(payload.operation == TraversalPayload::BindVariables)
 	{
@@ -1831,6 +1697,8 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 			throw BaseException("Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
 		}
 	}
+
+	stack.pop_back();
 }
 
 
@@ -1935,16 +1803,11 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 			payload.tree_changed = true;
 		}
 	}
-	/*else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
-	{
-		convertOverloadedOperators(a, payload, stack);
-		convertOverloadedOperators(b, payload, stack);
-	}*/
 
 	stack.push_back(this);
 	a->traverse(payload, stack);
 	b->traverse(payload, stack);
-	stack.pop_back();
+	
 
 	if(payload.operation == TraversalPayload::BindVariables)
 	{
@@ -1995,6 +1858,8 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 			throw BaseException("Binary operator '/' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
 		}
 	}
+
+	stack.pop_back();
 }
 
 
@@ -2106,16 +1971,11 @@ void BinaryBooleanExpr::traverse(TraversalPayload& payload, std::vector<ASTNode*
 			payload.tree_changed = true;
 		}
 	}
-	/*else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
-	{
-		convertOverloadedOperators(a, payload, stack);
-		convertOverloadedOperators(b, payload, stack);
-	}*/
 
 	stack.push_back(this);
 	a->traverse(payload, stack);
 	b->traverse(payload, stack);
-	stack.pop_back();
+	
 
 	
 	if(payload.operation == TraversalPayload::BindVariables)
@@ -2131,6 +1991,8 @@ void BinaryBooleanExpr::traverse(TraversalPayload& payload, std::vector<ASTNode*
 		if(b->type()->getType() != Winter::Type::BoolType)
 			throw BaseException("Second child does not have boolean type." + errorContext(*this, payload));
 	}
+
+	stack.pop_back();
 }
 
 
@@ -2233,7 +2095,7 @@ void UnaryMinusExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 
 	stack.push_back(this);
 	expr->traverse(payload, stack);
-	stack.pop_back();
+	
 
 	/*if(payload.operation == TraversalPayload::TypeCheck)
 		if(this->type()->getType() == Type::GenericTypeType || *this->type() == Int() || *this->type() == Float())
@@ -2248,6 +2110,8 @@ void UnaryMinusExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 	{
 		convertOverloadedOperators(expr, payload, stack);
 	}
+
+	stack.pop_back();
 }
 
 
@@ -2333,12 +2197,13 @@ void LetASTNode::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 
 	stack.push_back(this);
 	expr->traverse(payload, stack);
-	stack.pop_back();
 
 	if(payload.operation == TraversalPayload::BindVariables)
 	{
 		convertOverloadedOperators(expr, payload, stack);
 	}
+
+	stack.pop_back();
 }
 
 
@@ -2475,16 +2340,11 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 			payload.tree_changed = true;
 		}
 	}
-	/*else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
-	{
-		convertOverloadedOperators(a, payload, stack);
-		convertOverloadedOperators(b, payload, stack);
-	}*/
+
 
 	stack.push_back(this);
 	a->traverse(payload, stack);
 	b->traverse(payload, stack);
-	stack.pop_back();
 
 	if(payload.operation == TraversalPayload::BindVariables)
 	{
@@ -2500,6 +2360,8 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 			throw BaseException("Child type '" + this->type()->toString() + "' does not define Comparison operators. (First child type: " + a->type()->toString() + ")." + errorContext(*this, payload));
 		}
 	}
+
+	stack.pop_back();
 }
 
 
@@ -2629,10 +2491,6 @@ void LetBlock::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 			payload.tree_changed = true;
 		}
 	}
-	/*else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
-	{
-		convertOverloadedOperators(expr, payload, stack);
-	}*/
 
 	stack.push_back(this);
 
@@ -2645,12 +2503,16 @@ void LetBlock::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 
 	//payload.let_block_stack.pop_back();
 
-	stack.pop_back();
-
+	
+	// Convert overloaded operators before we pop this node off the stack.
+	// This node needs to be on the node stack if an operator overloading substitution is made,
+	// as the new op_X function will need to have a bind variables pass run on it.
 	if(payload.operation == TraversalPayload::BindVariables)
 	{
 		convertOverloadedOperators(expr, payload, stack);
 	}
+
+	stack.pop_back();
 }
 
 

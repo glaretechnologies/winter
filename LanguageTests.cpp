@@ -621,8 +621,33 @@ float test()
 void LanguageTests::run()
 {
 
+	// Test operator overloading (op_add) in a let block.
+	testMainFloatArg("								\n\
+		struct vec3 { float x, float y, float z }	\n\
+		def vec3(float v) vec3 : vec3(v, v, v)		\n\
+		def op_add(vec3 a, vec3 b) vec3 : vec3(a.x+b.x, a.y+b.y, a.z+b.z)	\n\
+		def eval(vec3 pos) vec3 :					\n\
+			let											\n\
+				scale = 20.0							\n\
+			in											\n\
+				vec3(scale) + vec3(0.2)					\n\
+		def main(float x) float: x(eval(vec3(x, x, x)))",
+		1.0f, 20.2f);	
 
+	// Test operator overloading (op_mul) in a let block.
+	testMainFloatArg("								\n\
+		struct vec3 { float x, float y, float z }	\n\
+		def vec3(float v) vec3 : vec3(v, v, v)		\n\
+		def op_mul(vec3 a, float b) vec3 : vec3(a.x*b, a.y*b, a.z*b)	\n\
+		def eval(vec3 pos) vec3 :					\n\
+			let											\n\
+				actualpos = vec3(pos.x, pos.y, pos.z + 10.0)				\n\
+			in											\n\
+				actualpos * 10000.0						\n\
+		def main(float x) float: x(eval(vec3(x, x, x)))",
+		1.0f, 10000.0f);	
 
+	
 	//testMainFloatArg("def lt(real x, real y) real : x < y   \n\
 	//				 def main(float x) float : x + 1.0", 1.0f, 2.0f);
 	
@@ -733,8 +758,8 @@ void LanguageTests::run()
 
 	testMainFloat("def main() float : 12.0 / 4", 3.0);
 	testMainFloat("def main() float : 12 / 4.0", 3.0);
-
-//TEMP FAILING FIXME testMainFloat("def f(float x) float : x*x      def main() float : 14 / (f(2.0) + 3)", 2.0);
+	
+//TEMP FAILING FIXME 	testMainFloat("def f(float x) float : x*x      def main() float : 14 / (f(2.0) + 3)", 2.0);
 //TEMP FAILING FIXME 	testMainFloat("def f(float x) float : x*x      def main() float : 14 / (f(2) + 3)", 2.0);
 //TEMP FAILING FIXME 	testMainFloat("def f(int x) int : x*x      def main() float : 14 / (f(2) + 3)", 2.0);
 //TEMP FAILING FIXME 	testMainFloat("def f<T>(T x) T : x*x      def main() float : 14 / (f(2) + 3)", 2.0);
@@ -743,15 +768,15 @@ void LanguageTests::run()
 	// Test promotion to match function return type:
 	testMainFloat("def main() float : 3", 3.0);
 
-//TEMP FAILING FIXME 	testMainFloat("def main() float : 1.0 + (2 + 3)", 6.0);
-
-//TEMP FAILING FIXME 	testMainFloat("def main() float : 1.0 + 2 + 3", 6.0);
+	testMainFloat("def main() float : 1.0 + (2 + 3)", 6.0);
+	
+	testMainFloat("def main() float : 1.0 + 2 + 3", 6.0);
 
 	// Test implicit conversion from int to float in addition operation with a function call
 //TEMP FAILING FIXME 	testMainFloat("def f(int x) : x*x    def main() float : 1.0 + f(2) + 3", 8.0);
 
-//TEMP FAILING FIXME 	testMainFloat("def main() float : (1.0 + 2.0) + (3 + 4)", 10.0);
-//TEMP FAILING FIXME 	testMainFloat("def main() float : (1.0 + 2) + (3 + 4)", 10.0);
+	testMainFloat("def main() float : (1.0 + 2.0) + (3 + 4)", 10.0);
+	testMainFloat("def main() float : (1.0 + 2) + (3 + 4)", 10.0);
 
 
 	// Integer comparisons:

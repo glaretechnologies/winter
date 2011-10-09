@@ -291,21 +291,18 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 
 
 	payload.func_def_stack.push_back(this);
-
 	stack.push_back(this);
 
 	//for(unsigned int i=0; i<lets.size(); ++i)
 	//	lets[i]->traverse(payload, stack);
 
-	if(this->sig.name == "main")
-		int a = 9;//TEMP
+	//if(this->sig.name == "main")
+	//	int a = 9;//TEMP
 
 	if(this->body.nonNull()) // !this->built_in_func_impl)
 		this->body->traverse(payload, stack);
 
-	stack.pop_back();
-
-	payload.func_def_stack.pop_back();
+	
 
 	//payload.capture_variables = old_use_captured_vars;
 
@@ -314,11 +311,11 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 		// Do operator overloading for body AST node.
 		if(this->body.nonNull()) // Body is NULL for built in functions
 		{
-			payload.func_def_stack.push_back(this);
-			stack.push_back(this);
+			//payload.func_def_stack.push_back(this);
+			//stack.push_back(this);
 			convertOverloadedOperators(body, payload, stack);
-			stack.pop_back();
-			payload.func_def_stack.pop_back();
+			//stack.pop_back();
+			//payload.func_def_stack.pop_back();
 		}
 
 
@@ -352,6 +349,8 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 
 	}
 
+	stack.pop_back();
+	payload.func_def_stack.pop_back();
 }
 
 
