@@ -46,7 +46,7 @@ llvm::Value* getNthArg(llvm::Function *func, int n)
 
 llvm::Value* getLastArg(llvm::Function *func)
 {
-	return getNthArg(func, func->arg_size() - 1);
+	return getNthArg(func, (int)func->arg_size() - 1);
 }
 
 
