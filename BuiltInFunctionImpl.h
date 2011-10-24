@@ -3,6 +3,7 @@
 
 #include "wnt_Type.h"
 #include "Value.h"
+namespace llvm { class Value; }
 
 
 namespace Winter

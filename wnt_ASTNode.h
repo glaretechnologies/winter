@@ -146,7 +146,7 @@ public:
 	//uint32 line;
 	//uint32 column;
 
-	static const SrcLocation invalidLocation() { return SrcLocation(4000000000, NULL); }
+	static const SrcLocation invalidLocation() { return SrcLocation(4000000000u, NULL); }
 
 	uint32 char_index;
 	//const std::string* text_buffer;

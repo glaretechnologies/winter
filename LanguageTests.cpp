@@ -38,6 +38,12 @@ LanguageTests::~LanguageTests()
 {}
 
 
+static bool epsEqual(float x, float y)
+{
+	return std::fabs(x - y) < 1.0e-5f;
+}
+
+
 struct TestEnv
 {
 	float val;
@@ -136,7 +142,7 @@ static void testMainFloat(const std::string& src, float target_return_val)
 
 
 		// Check JIT'd result.
-		if(jitted_result != target_return_val)
+		if(!epsEqual(jitted_result, target_return_val))
 		{
 			std::cerr << "Test failed: JIT'd main returned " << jitted_result << ", target was " << target_return_val << std::endl;
 			exit(1);
@@ -158,7 +164,7 @@ static void testMainFloat(const std::string& src, float target_return_val)
 			exit(1);
 		}
 
-		if(val->value != target_return_val)
+		if(!epsEqual(val->value, target_return_val))
 		{
 			std::cerr << "Test failed: main returned " << val->value << ", target was " << target_return_val << std::endl;
 			exit(1);
@@ -218,7 +224,7 @@ static void testMainFloatArg(const std::string& src, float argument, float targe
 		const float jitted_result = f(argument, &test_env);
 
 		// Check JIT'd result.
-		if(jitted_result != target_return_val)
+		if(!epsEqual(jitted_result, target_return_val))
 		{
 			std::cerr << "Test failed: JIT'd main returned " << jitted_result << ", target was " << target_return_val << std::endl;
 			exit(1);
@@ -239,7 +245,7 @@ static void testMainFloatArg(const std::string& src, float argument, float targe
 			exit(1);
 		}
 
-		if(val->value != target_return_val)
+		if(!epsEqual(val->value, target_return_val))
 		{
 			std::cerr << "Test failed: main returned " << val->value << ", target was " << target_return_val << std::endl;
 			exit(1);
@@ -648,8 +654,10 @@ void LanguageTests::run()
 		1.0f, 10000.0f);	
 
 	
-	//testMainFloatArg("def lt(real x, real y) real : x < y   \n\
-	//				 def main(float x) float : x + 1.0", 1.0f, 2.0f);
+	/*
+	testMainFloatArg("def lt(real x, real y) real : x < y   \n\
+					 def main(float x) float : x + 1.0", 1.0f, 2.0f);
+	*/
 	
 	// Test comparison vs addition precedence: addition should have higher precedence.
 	testMainFloatArg("def main(float x) float : if(x < 1.0 + 2.0, 5.0, 6.0)", 1.0f, 5.0f);
