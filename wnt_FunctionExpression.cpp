@@ -745,7 +745,7 @@ Reference<ASTNode> FunctionExpression::clone()
 	FunctionExpression* e = new FunctionExpression(srcLocation());
 	e->function_name = this->function_name;
 
-	for(unsigned int i=0; i<argument_expressions.size(); ++i)
+	for(size_t i=0; i<argument_expressions.size(); ++i)
 		e->argument_expressions.push_back(argument_expressions[i]->clone());
 	
 	e->target_function = this->target_function;

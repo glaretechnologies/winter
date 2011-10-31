@@ -711,7 +711,17 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 Reference<ASTNode> Variable::clone()
 {
-	return ASTNodeRef(new Variable(*this));
+	Variable* v = new Variable(name, srcLocation());
+	v->vartype = vartype;
+	v->bound_function = bound_function;
+	v->bound_let_block = bound_let_block;
+	v->bound_index = bound_index;
+	v->let_frame_offset = let_frame_offset;
+	v->uncaptured_bound_index = uncaptured_bound_index;
+	return ASTNodeRef(v);
+
+	// NOTE: this direct copy seems to leak mem on Linux.
+	//return ASTNodeRef(new Variable(*this));
 }
 
 
