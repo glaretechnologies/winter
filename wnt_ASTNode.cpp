@@ -2361,10 +2361,38 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 		convertOverloadedOperators(a, payload, stack);
 		convertOverloadedOperators(b, payload, stack);
 	}
+	else if(payload.operation == TraversalPayload::TypeCoercion)
+	{
+		// implicit conversion from int to float
+		// 3.0 > 4      =>       3.0 > 4.0
+		if(a->nodeType() == ASTNode::FloatLiteralType && b->nodeType() == ASTNode::IntLiteralType)
+		{
+			IntLiteral* b_lit = static_cast<IntLiteral*>(b.getPointer());
+			if(isIntExactlyRepresentableAsFloat(b_lit->value))
+			{
+				b = ASTNodeRef(new FloatLiteral((float)b_lit->value, b->srcLocation()));
+				payload.tree_changed = true;
+			}
+		}
+
+		// 3 > 4.0      =>        3.0 > 4.0
+		if(b->nodeType() == ASTNode::FloatLiteralType && a->nodeType() == ASTNode::IntLiteralType)
+		{
+			IntLiteral* a_lit = static_cast<IntLiteral*>(a.getPointer());
+			if(isIntExactlyRepresentableAsFloat(a_lit->value))
+			{
+				a = ASTNodeRef(new FloatLiteral((float)a_lit->value, a->srcLocation()));
+				payload.tree_changed = true;
+			}
+		}
+	}
 	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
 		if(a->type()->getType() == Type::GenericTypeType || a->type()->getType() == Type::IntType || a->type()->getType() == Type::FloatType || a->type()->getType() == Type::BoolType)
-		{}
+		{
+			if(a->type()->getType() != b->type()->getType())
+				throw BaseException("Comparison operand types must be the same.  Left operand type: " + a->type()->toString() + ", right operand type: " + b->type()->toString() + "." + errorContext(*this, payload));
+		}
 		else
 		{
 			throw BaseException("Child type '" + this->type()->toString() + "' does not define Comparison operators. (First child type: " + a->type()->toString() + ")." + errorContext(*this, payload));
