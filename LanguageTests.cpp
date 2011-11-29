@@ -849,6 +849,8 @@ void LanguageTests::run()
 	// ===================================================================
 	// Test implicit conversions from int to float in comparisons
 	// ===================================================================
+	// Comparison between two literals:
+
 	// Test a comparison that returns true
 	testMainFloat("def main() float : if(1.0 <= 2, 10.0, 20.0)", 10.0);
 	testMainFloat("def main() float : if(1 <= 2.0, 10.0, 20.0)", 10.0);
@@ -856,6 +858,13 @@ void LanguageTests::run()
 	// Test a comparison that returns false
 	testMainFloat("def main() float : if(3 <= 1.0, 10.0, 20.0)", 20.0);
 	testMainFloat("def main() float : if(3.0 <= 1, 10.0, 20.0)", 20.0);
+
+	// Comparison between a variable and a literal:
+	// Doesn't work yet.
+	// testMainFloatArg("def main(float x) float : if(x <= 2, 10.0, 20.0)", 1.0, 10.0);
+	// testMainFloatArg("def main(float x) float : if(1 <= x, 10.0, 20.0)", 1.0, 10.0);
+
+
 
 
 	// Test 'if'

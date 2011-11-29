@@ -2365,6 +2365,7 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 	{
 		// implicit conversion from int to float
 		// 3.0 > 4      =>       3.0 > 4.0
+		// TODO: Make this work for arbitrary expressions and not just literals.
 		if(a->nodeType() == ASTNode::FloatLiteralType && b->nodeType() == ASTNode::IntLiteralType)
 		{
 			IntLiteral* b_lit = static_cast<IntLiteral*>(b.getPointer());
