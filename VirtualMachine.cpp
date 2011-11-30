@@ -401,6 +401,9 @@ void VirtualMachine::build()
 		llvm::PassManager pm;
 
 		llvm::PassManagerBuilder builder;
+
+		builder.Inliner = llvm::createFunctionInliningPass();
+
 		builder.OptLevel = 2;
 		builder.populateFunctionPassManager(fpm);
 		builder.populateModulePassManager(pm);
@@ -495,10 +498,10 @@ void VirtualMachine::build()
 		"module.txt",
 		errorinfo
 		);
-		this->llvm_module->print(f, NULL);*/
+		this->llvm_module->print(f, NULL);
 
 		//TEMP:
-		this->compileToNativeAssembly(this->llvm_module, "module_assembly.txt");
+		this->compileToNativeAssembly(this->llvm_module, "module_assembly.txt");*/
 	}
 }
 
