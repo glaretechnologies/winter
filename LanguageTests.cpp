@@ -626,6 +626,24 @@ float test()
 
 void LanguageTests::run()
 {
+	// Test avoidance of circular variable definition: the x(pos) expression was attempting to get the type of the 'x =' let node,
+	// which was not known yet as was being computed.  The solution adopted is to not try to bind to let variables that are ancestors of the current variable.
+	// Another solution could be to not try to bind to unbound variables.
+	testMainFloatArg("									\n\
+		struct vec3 { float x, float y, float z }		\n\
+		def vec3(float v) vec3 : vec3(v, v, v)			\n\
+		def eval(vec3 pos) vec3 :						\n\
+			let											\n\
+				x = sin(x(pos) * 1000.0)				\n\
+			in											\n\
+				vec3(0.1)								\n\
+		def main(float t) float: x(eval(vec3(t, t, t)))",
+		1.0f,
+		0.1f
+	);
+
+
+
 
 	// Test operator overloading (op_add) in a let block.
 	testMainFloatArg("								\n\

@@ -240,6 +240,15 @@ static bool couldCoerceFunctionCall(vector<ASTNodeRef>& argument_expressions, Fu
 }
 
 
+static bool isNodeAncestor(const std::vector<ASTNode*>& stack, const ASTNode* node)
+{
+	for(size_t i=0; i<stack.size(); ++i)
+		if(node == stack[i])
+			return true;
+	return false;
+}
+
+
 void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
 	bool found_binding = false;
@@ -294,8 +303,11 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 
 				for(unsigned int i=0; i<let_block->lets.size(); ++i)
 				{
-					//TypeRef type_ref = let_block->lets[i]->type();
-					if(let_block->lets[i]->variable_name == this->function_name && doesFunctionTypeMatch(let_block->lets[i]->type()))
+					if(let_block->lets[i]->variable_name == this->function_name && 
+						!isNodeAncestor(stack, let_block->lets[i].getPointer()) && // Don't try to bind to ancestor let variables, because their type will not be computed yet.
+																					// Also binding to such a variable would result in a circular definition of the form
+																					// let  x = x()
+						doesFunctionTypeMatch(let_block->lets[i]->type()))
 					{
 						this->bound_index = i;
 						this->binding_type = Let;
@@ -490,7 +502,7 @@ TypeRef FunctionExpression::type() const
 		return func_type->return_type;
 	}
 
-	// If got there, binding type is probably unbound.
+	// If got here, binding type is probably unbound.
 	assert(0);
 	return TypeRef(NULL);
 
