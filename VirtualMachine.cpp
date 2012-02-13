@@ -38,6 +38,7 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/LLVMContext.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/ManagedStatic.h"
 //#include "llvm/VMCore/StandardPasses.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 //#include "llvm/Support/PassManagerBuilder.h"
@@ -149,6 +150,12 @@ VirtualMachine::~VirtualMachine()
 	delete this->llvm_exec_engine;
 
 	delete llvm_context;
+}
+
+
+void VirtualMachine::shutdown() // Calls llvm_shutdown()
+{
+	llvm::llvm_shutdown();
 }
 
 
