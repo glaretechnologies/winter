@@ -51,7 +51,7 @@ FunctionDefinition::FunctionDefinition(const SrcLocation& src_loc, const std::st
 	built_llvm_function(NULL),
 	jitted_function(NULL),
 	use_captured_vars(false),
-	closure_type(false),
+	closure_type(NULL),
 	alloc_func(NULL),
 	is_anon_func(false)
 {

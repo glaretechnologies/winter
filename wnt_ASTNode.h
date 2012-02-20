@@ -197,8 +197,8 @@ public:
 
 	//virtual linearise(std::vector<Reference<ASTNode> >& nodes_out) = 0;
 
-	virtual void linkFunctions(Linker& linker){}
-	virtual void bindVariables(const std::vector<ASTNode*>& stack){}
+	//virtual void linkFunctions(Linker& linker){}
+	//virtual void bindVariables(const std::vector<ASTNode*>& stack){}
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack) {}
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const = 0;
 	virtual Reference<ASTNode> clone() = 0;
@@ -293,6 +293,7 @@ public:
 
 	// bool use_captured_var;
 	// int captured_var_index;
+
 	int uncaptured_bound_index;
 };
 

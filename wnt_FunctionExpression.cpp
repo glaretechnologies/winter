@@ -120,11 +120,6 @@ FunctionDefinition* FunctionExpression::runtimeBind(VMState& vmstate, FunctionVa
 ValueRef FunctionExpression::exec(VMState& vmstate)
 {
 	if(VERBOSE_EXEC) std::cout << indent(vmstate) << "FunctionExpression, target_name=" << this->function_name << "\n";
-	if(this->function_name == "sin")
-		int a = 9; // TEMP
-
-	
-
 
 	//assert(target_function);
 	if(this->target_function != NULL && this->target_function->external_function.nonNull())
