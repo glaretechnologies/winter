@@ -317,6 +317,25 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 
 			root->func_defs.push_back(Reference<FunctionDefinition>(def));
 		}
+
+		// Create 'toFloat' built-in function
+		{
+			vector<FunctionDefinition::FunctionArg> args(1);
+			args[0].name = "x";
+			args[0].type = TypeRef(new Int());
+
+			FunctionDefinition* def = new FunctionDefinition(
+				SrcLocation::invalidLocation(),
+				"toFloat", // name
+				args, // args
+				ASTNodeRef(NULL), // body expr
+				TypeRef(new Float()), // return type
+				new ToFloatBuiltInFunc() // built in impl.
+				);
+
+			root->func_defs.push_back(Reference<FunctionDefinition>(def));
+		}
+
 		func_defs_out = root->func_defs;
 
 		//Reference<ASTNode> root( new BufferRoot() );
@@ -478,7 +497,42 @@ a
 }
 
 
+ASTNodeRef LangParser::parseVariableOrIfExpression(const ParseInfo& p)
+{
+	if(p.tokens[p.i]->getType() == IDENTIFIER_TOKEN)
+	{
+		if(p.tokens[p.i]->getIdentifierValue() == "if")
+			return parseIfExpression(p);
+		else
+			return parseVariableExpression(p);
+	}
+	
+	assert(0);
+	throw LangParserExcep("Internal error: expected identifier.");
+}
+		
 
+ASTNodeRef LangParser::parseIfExpression(const ParseInfo& p)
+{
+	const SrcLocation loc = locationForParseInfo(p);
+
+	const std::string name = parseIdentifier("if", p);
+	if(name != "if")
+	{
+		assert(0);
+		throw LangParserExcep("Internal error: expected identifier 'if'.");
+	}
+
+	// Parse condition
+
+	// Parse if(true) expression
+
+	// Parse if(false) expression
+	//parseExpression(p);
+
+	assert(0);
+	return ASTNodeRef();
+}
 
 
 ASTNodeRef LangParser::parseVariableExpression(const ParseInfo& p)

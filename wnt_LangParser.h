@@ -94,6 +94,8 @@ private:
 
 	ASTNodeRef parseFieldExpression(const ParseInfo& parseinfo);
 	ASTNodeRef parseVariableExpression(const ParseInfo& parseinfo);
+	ASTNodeRef parseIfExpression(const ParseInfo& parseinfo);
+	ASTNodeRef parseVariableOrIfExpression(const ParseInfo& parseinfo);
 
 	TypeRef parseType(const ParseInfo& parseinfo, const std::vector<std::string>& generic_type_params);
 	TypeRef parseMapType(const ParseInfo& parseinfo, const std::vector<std::string>& generic_type_params);

@@ -754,6 +754,26 @@ llvm::Value* TruncateToIntBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) 
 //----------------------------------------------------------------------------------------------
 
 
+ValueRef ToFloatBuiltInFunc::invoke(VMState& vmstate)
+{
+	const IntValue* a = static_cast<const IntValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+
+	return ValueRef(new FloatValue((float)a->value));
+}
+
+
+llvm::Value* ToFloatBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	return params.builder->CreateSIToFP(
+		LLVMTypeUtils::getNthArg(params.currently_building_func, 0), 
+		llvm::Type::getFloatTy(*params.context) // dest type
+	);
+}
+
+
+//----------------------------------------------------------------------------------------------
+
+
 //ValueRef AllocateRefCountedStructure::invoke(VMState& vmstate)
 //{
 //	assert(0);

@@ -212,6 +212,18 @@ private:
 };
 
 
+class ToFloatBuiltInFunc : public BuiltInFunctionImpl
+{
+public:
+	ToFloatBuiltInFunc() {}
+	virtual ~ToFloatBuiltInFunc(){}
+
+	virtual ValueRef invoke(VMState& vmstate);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+private:
+};
+
+
 //class AllocateRefCountedStructure : public BuiltInFunctionImpl
 //{
 //public:
