@@ -3,7 +3,7 @@
 
 
 #include "wnt_Type.h"
-#include <utils/refcounted.h>
+#include <utils/RefCounted.h>
 #include <string>
 #include <vector>
 #include <map>

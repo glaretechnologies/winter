@@ -9,8 +9,8 @@ Generated at Wed Oct 27 16:44:39 +1300 2010
 
 #include "wnt_Type.h"
 #include "wnt_FunctionSignature.h"
-#include <utils/refcounted.h>
-#include <utils/reference.h>
+#include <utils/Reference.h>
+#include <utils/RefCounted.h>
 #include "Value.h"
 
 

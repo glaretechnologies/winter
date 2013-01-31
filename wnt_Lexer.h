@@ -14,7 +14,7 @@ Copyright 2009 Nicholas Chapman
 #include "TokenBase.h"
 #include "BaseException.h"
 #include "wnt_SourceBuffer.h"
-#include <utils/reference.h>
+#include <utils/Reference.h>
 class Parser;
 
 

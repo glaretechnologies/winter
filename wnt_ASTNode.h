@@ -1,5 +1,5 @@
 /*=====================================================================
-ASTNode.h`
+ASTNode.h
 ---------
 File created by ClassTemplate on Wed Jun 11 03:55:25 2008
 Code By Nicholas Chapman.
@@ -13,8 +13,8 @@ Copyright 2009 Nicholas Chapman
 #include <vector>
 using std::string;
 using std::vector;
-#include <utils/refcounted.h>
-#include <utils/reference.h>
+#include <utils/Reference.h>
+#include <utils/RefCounted.h>
 #include <utils/platform.h>
 #include "wnt_Type.h"
 #include "wnt_FunctionSignature.h"
@@ -24,6 +24,7 @@ using std::vector;
 #include "TokenBase.h"
 #include "Value.h"
 #if USE_LLVM
+//#include <llvm/IRBuilder.h>
 #include <llvm/Support/IRBuilder.h>
 #endif
 namespace llvm { class Function; };
@@ -131,7 +132,7 @@ public:
 	llvm::Module* module;
 	llvm::Function* currently_building_func;
 	llvm::LLVMContext* context;
-	const llvm::TargetData* target_data;
+	const llvm::/*DataLayout*/TargetData* target_data;
 #endif
 	vector<ASTNode*> node_stack;
 	vector<LetBlock*> let_block_stack;

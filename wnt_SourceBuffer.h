@@ -8,8 +8,8 @@ Generated at 2011-06-11 19:19:16 +0100
 
 
 #include <string>
-#include <utils/refcounted.h>
-#include <utils/reference.h>
+#include <utils/Reference.h>
+#include <utils/RefCounted.h>
 
 
 namespace Winter

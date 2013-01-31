@@ -16,7 +16,7 @@ Copyright 2009 Nicholas Chapman
 #include "BaseException.h"
 #include "wnt_ASTNode.h"
 #include "wnt_FunctionDefinition.h"
-#include <utils/reference.h>
+#include <utils/Reference.h>
 #include "wnt_Type.h"
 #include "wnt_SourceBuffer.h"
 

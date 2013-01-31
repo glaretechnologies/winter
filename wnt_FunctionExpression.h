@@ -11,8 +11,8 @@ Generated at 2011-04-30 18:53:38 +0100
 #include <vector>
 using std::string;
 using std::vector;
-#include <utils/refcounted.h>
-#include <utils/reference.h>
+#include <utils/Reference.h>
+#include <utils/RefCounted.h>
 #include "wnt_Type.h"
 #include "wnt_ASTNode.h"
 #include "wnt_FunctionSignature.h"
