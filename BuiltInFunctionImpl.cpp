@@ -20,7 +20,7 @@
 #include "llvm/ExecutionEngine/GenericValue.h"
 #include "llvm/Support/raw_ostream.h"
 #include <llvm/CallingConv.h>
-#include <llvm/IRBuilder.h>
+#include <llvm/Support/IRBuilder.h>
 #include <llvm/Intrinsics.h>
 #endif
 
