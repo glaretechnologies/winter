@@ -22,7 +22,7 @@ using std::vector;
 #include "TokenBase.h"
 #include "Value.h"
 #if USE_LLVM
-#include <llvm/Support/IRBuilder.h>
+#include <llvm/IRBuilder.h>
 #endif
 namespace llvm { class Function; };
 namespace llvm { class Value; };

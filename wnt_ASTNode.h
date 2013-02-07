@@ -24,8 +24,8 @@ using std::vector;
 #include "TokenBase.h"
 #include "Value.h"
 #if USE_LLVM
-//#include <llvm/IRBuilder.h>
-#include <llvm/Support/IRBuilder.h>
+#include <llvm/IRBuilder.h>
+//#include <llvm/Support/IRBuilder.h>
 #endif
 namespace llvm { class Function; };
 namespace llvm { class Value; };
@@ -132,7 +132,7 @@ public:
 	llvm::Module* module;
 	llvm::Function* currently_building_func;
 	llvm::LLVMContext* context;
-	const llvm::/*DataLayout*/TargetData* target_data;
+	const llvm::DataLayout/*TargetData*/* target_data;
 #endif
 	vector<ASTNode*> node_stack;
 	vector<LetBlock*> let_block_stack;

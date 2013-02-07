@@ -82,7 +82,7 @@ void Linker::addExternalFunctions(vector<ExternalFunctionRef>& funcs)
 }
 
 
-void Linker::buildLLVMCode(llvm::Module* module, const llvm::TargetData* target_data)
+void Linker::buildLLVMCode(llvm::Module* module, const llvm::DataLayout/*TargetData*/* target_data)
 {
 	PlatformUtils::CPUInfo cpu_info;
 	PlatformUtils::getCPUInfo(cpu_info);

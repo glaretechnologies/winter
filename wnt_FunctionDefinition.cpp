@@ -25,9 +25,11 @@ Generated at 2011-04-25 19:15:40 +0100
 #include "llvm/ExecutionEngine/GenericValue.h"
 #include "llvm/Support/raw_ostream.h"
 #include <llvm/CallingConv.h>
-#include <llvm/Support/IRBuilder.h>
+#include <llvm/IRBuilder.h>
 #include <llvm/Intrinsics.h>
-#include <llvm/Target/TargetData.h>
+#include <llvm/Attributes.h>
+//#include <llvm/Target/TargetData.h>
+#include <llvm/DataLayout.h>
 #endif
 
 
@@ -608,7 +610,7 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 	//std::cout << std::endl;
 
 	// Make attribute list
-	llvm::AttrListPtr attribute_list;
+	//llvm::AttrListPtr attribute_list;
 	/*if(!this->returnType()->passByValue())
 	{
 		// Add sret attribute to zeroth argument
@@ -618,7 +620,9 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 		);
 	}*/
 
-	llvm::Attributes function_attr = llvm::Attribute::NoUnwind; // Does not throw exceptions
+	//llvm::Attributes function_attr = llvm::Attributes::NoUnwind; // Does not throw exceptions
+	llvm::AttrBuilder function_attr_builder;
+	function_attr_builder.addAttribute(llvm::Attributes::NoUnwind); // Does not throw exceptions
 	if(this->returnType()->passByValue())
 	{
 		//function_attr |= llvm::Attribute::ReadNone
@@ -631,13 +635,15 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 		}
 
 		if(has_ptr_arg)
-			function_attr |= llvm::Attribute::ReadOnly; // This attribute indicates that the function does not write through any pointer arguments etc..
+			function_attr_builder.addAttribute(llvm::Attributes::ReadOnly);
+			//function_attr |= llvm::Attribute::ReadOnly; // This attribute indicates that the function does not write through any pointer arguments etc..
 		else
-			function_attr |= llvm::Attribute::ReadNone; // Function computes its result based strictly on its arguments, without dereferencing any pointer arguments etc..
+			function_attr_builder.addAttribute(llvm::Attributes::ReadNone);
+			//function_attr |= llvm::Attribute::ReadNone; // Function computes its result based strictly on its arguments, without dereferencing any pointer arguments etc..
 	}
 
 
-	attribute_list = attribute_list.addAttr(4294967295U, function_attr);
+	//attribute_list = attribute_list.addAttr(4294967295U, function_attr);
 	/*{
 		SmallVector<AttributeWithIndex, 4> Attrs;
 		AttributeWithIndex PAWI;
@@ -653,12 +659,17 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 		);
 
 	//llvm_func_constant->dump();
-	assert(dynamic_cast<llvm::Function*>(llvm_func_constant) != NULL);
+	//assert(dynamic_cast<llvm::Function*>(llvm_func_constant) != NULL);
 
 	
 	llvm::Function* llvm_func = static_cast<llvm::Function*>(llvm_func_constant);
 
-	llvm_func->setAttributes(attribute_list);
+	llvm::Attributes attributes = llvm::Attributes::get(module->getContext(), function_attr_builder);
+
+	llvm::AttrListPtr attribute_list = llvm_func->getAttributes();
+	llvm::AttrListPtr attribute_list_new = attribute_list.addAttr(module->getContext(), llvm::AttrListPtr::FunctionIndex, attributes);
+
+	llvm_func->setAttributes(attribute_list_new);
 
 	// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
 	llvm_func->setCallingConv(llvm::CallingConv::C);
@@ -700,7 +711,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	llvm::Module* module,
 	const PlatformUtils::CPUInfo& cpu_info,
 	bool hidden_voidptr_arg, 
-	const llvm::TargetData* target_data
+	const llvm::DataLayout/*TargetData*/* target_data
 	//std::map<Lang::FunctionSignature, llvm::Function*>& external_functions
 	)
 {

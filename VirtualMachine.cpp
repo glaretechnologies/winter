@@ -30,10 +30,11 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "llvm/PassManager.h"
 #include "llvm/Module.h"
 #include "llvm/PassManager.h"
-#include "llvm/Target/TargetData.h"
+//#include "llvm/Target/TargetData.h"
+#include "llvm/DataLayout.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/IPO.h"
-#include "llvm/Support/IRBuilder.h"
+#include "llvm/IRBuilder.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/LLVMContext.h"
@@ -370,7 +371,8 @@ void VirtualMachine::build()
 
 	linker.buildLLVMCode(
 		this->llvm_module,
-		this->llvm_exec_engine->getTargetData()
+		//this->llvm_exec_engine->getTargetData()
+		this->llvm_exec_engine->getDataLayout()
 	);
 
 	// Verify module
@@ -403,7 +405,8 @@ void VirtualMachine::build()
 
 		// Set up the optimizer pipeline.  Start with registering info about how the
 		// target lays out data structures.
-		fpm.add(new llvm::TargetData(*this->llvm_exec_engine->getTargetData()));
+		//fpm.add(new llvm::TargetData(*this->llvm_exec_engine->getTargetData()));
+		fpm.add(new llvm::DataLayout(*this->llvm_exec_engine->getDataLayout()));
 
 		llvm::PassManager pm;
 
@@ -498,17 +501,17 @@ void VirtualMachine::build()
 
 	{
 		// Dump to stdout
-		//this->llvm_module->dump();
+		/*this->llvm_module->dump();
 
-		/*std::string errorinfo;
+		std::string errorinfo;
 		llvm::raw_fd_ostream f(
 		"module.txt",
 		errorinfo
 		);
 		this->llvm_module->print(f, NULL);
-
+		*/
 		//TEMP:
-		this->compileToNativeAssembly(this->llvm_module, "module_assembly.txt");*/
+		//this->compileToNativeAssembly(this->llvm_module, "module_assembly.txt");
 	}
 }
 

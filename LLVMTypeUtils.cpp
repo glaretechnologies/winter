@@ -13,10 +13,11 @@ Generated at Wed Oct 20 15:22:37 +1300 2010
 #include "llvm/PassManager.h"
 #include "llvm/Module.h"
 #include "llvm/PassManager.h"
-#include "llvm/Target/TargetData.h"
+//#include <llvm/Target/TargetData.h>
+#include <llvm/DataLayout.h>
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/IPO.h"
-#include "llvm/Support/IRBuilder.h"
+#include <llvm/IRBuilder.h>
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 //#include "llvm/Support/TargetSelect.h"
 #include "llvm/LLVMContext.h"

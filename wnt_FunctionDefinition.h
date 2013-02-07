@@ -84,7 +84,7 @@ public:
 		llvm::Module* module,
 		const PlatformUtils::CPUInfo& cpu_info,
 		bool hidden_voidptr_arg, 
-		const llvm::TargetData* target_data
+		const llvm::DataLayout/*TargetData*/* target_data
 		//std::map<Lang::FunctionSignature, llvm::Function*>& external_functions
 	);
 

@@ -8,7 +8,7 @@
 #include "wnt_FunctionDefinition.h"
 #include <map>
 #include <set>
-namespace llvm { class Module; class TargetData; }
+namespace llvm { class Module; /*class TargetData; */class DataLayout; }
 
 
 namespace Winter
@@ -37,7 +37,7 @@ public:
 
 	void getFuncsWithMatchingName(const std::string& name, vector<FunctionDefinitionRef>& funcs_out);
 
-	void buildLLVMCode(llvm::Module* module, const llvm::TargetData* target_data);
+	void buildLLVMCode(llvm::Module* module, const llvm::DataLayout/*TargetData*/* target_data);
 
 	vector<FunctionDefinitionRef> concrete_funcs;
 private:
