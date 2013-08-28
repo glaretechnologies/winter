@@ -2570,10 +2570,11 @@ llvm::Value* LetBlock::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
 	params.let_block_stack.push_back(const_cast<LetBlock*>(this));
 
-	return expr->emitLLVMCode(params);
+	llvm::Value* result = expr->emitLLVMCode(params);
 
 	params.let_block_stack.pop_back();
 
+	return result;
 }
 
 
