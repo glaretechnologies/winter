@@ -181,6 +181,39 @@ static void testMainFloat(const std::string& src, float target_return_val)
 }
 
 
+static void testMainFloatArgInvalidProgram(const std::string& src, float argument, float target_return_val)
+{
+	std::cout << "===================== Winter testMainFloatArgInvalidProgram() =====================" << std::endl;
+	try
+	{
+		TestEnv test_env;
+		test_env.val = 10;
+
+		VMConstructionArgs vm_args;
+		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
+		vm_args.env = &test_env;
+
+		const FunctionSignature mainsig("main", std::vector<TypeRef>(1, TypeRef(new Float())));
+
+		VirtualMachine vm(vm_args);
+
+		// Get main function
+		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
+
+		float(WINTER_JIT_CALLING_CONV*f)(float, void*) = (float(WINTER_JIT_CALLING_CONV*)(float, void*))vm.getJittedFunction(mainsig);
+
+
+		std::cerr << "Test failed: Expected compilation failure." << std::endl;
+		exit(1);
+	}
+	catch(Winter::BaseException& e)
+	{
+		// Expected.
+		std::cout << "Expected exception occurred: " << e.what() << std::endl;
+	}
+}
+
+
 static void testMainFloatArg(const std::string& src, float argument, float target_return_val)
 {
 	std::cout << "============================== Winter testMainFloat() ============================" << std::endl;
@@ -1074,6 +1107,28 @@ void LanguageTests::run()
 				  in \
 					y \
 				  def main() float : f()", 2.0);
+
+	// Test avoidance of circular let definition: 
+	testMainFloatArgInvalidProgram("									\n\
+		def main(float y) float :		\n\
+			let							\n\
+				x = x					\n\
+			in							\n\
+				x						",
+		2.0f,
+		2.0f
+	);
+
+	// Test avoidance of circular let definition
+	testMainFloatArgInvalidProgram("									\n\
+		def main(float y) float :		\n\
+			let							\n\
+				x = 1.0 + x				\n\
+			in							\n\
+				x						",
+		2.0f,
+		2.0f
+	);
 
 	// Test two let clauses where one refers to the other (reverse order)
 	/*testMainFloat("def f() float : \

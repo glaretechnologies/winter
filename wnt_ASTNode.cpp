@@ -455,35 +455,46 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 			for(unsigned int i=0; i<let_block->lets.size(); ++i)
 				if(let_block->lets[i]->variable_name == this->name)
 				{
-					if(!in_current_func_def && payload.func_def_stack.back()->use_captured_vars)
+					// If 'this' is in the let expression for the current Let Block, then don't bind to it's variable name
+					// In cases like
+					// let
+					//   x = x
+					// This avoids the x expression on the right binding to the x Let node on the left.
+					if((s + 1 < stack.size()) && (stack[s+1]->nodeType() == ASTNode::LetType) && (let_block->lets[i].getPointer() == stack[s+1]))
 					{
-						//this->captured_var_index = payload.captured_vars.size();
-						//this->use_captured_var = true;
-						this->vartype = CapturedVariable;
-						this->bound_index = (int)payload.func_def_stack.back()->captured_vars.size(); // payload.captured_vars.size();
-
-						// Save info to get bound let, so we can query it for the type of the captured var.
-						this->bound_let_block = let_block;
-						this->uncaptured_bound_index = i;
-
-						// Add this function argument as a variable that has to be captured for closures.
-						CapturedVar var;
-						var.vartype = CapturedVar::Let;
-						var.bound_let_block = let_block;
-						var.index = i;
-						var.let_frame_offset = use_let_frame_offset;
-						//payload.captured_vars.push_back(var);
-						payload.func_def_stack.back()->captured_vars.push_back(var);
 					}
 					else
 					{
-						this->vartype = LetVariable;
-						this->bound_let_block = let_block;
-						this->bound_index = i;
-						this->let_frame_offset = use_let_frame_offset;
-					}
+						if(!in_current_func_def && payload.func_def_stack.back()->use_captured_vars)
+						{
+							//this->captured_var_index = payload.captured_vars.size();
+							//this->use_captured_var = true;
+							this->vartype = CapturedVariable;
+							this->bound_index = (int)payload.func_def_stack.back()->captured_vars.size(); // payload.captured_vars.size();
+
+							// Save info to get bound let, so we can query it for the type of the captured var.
+							this->bound_let_block = let_block;
+							this->uncaptured_bound_index = i;
+
+							// Add this function argument as a variable that has to be captured for closures.
+							CapturedVar var;
+							var.vartype = CapturedVar::Let;
+							var.bound_let_block = let_block;
+							var.index = i;
+							var.let_frame_offset = use_let_frame_offset;
+							//payload.captured_vars.push_back(var);
+							payload.func_def_stack.back()->captured_vars.push_back(var);
+						}
+						else
+						{
+							this->vartype = LetVariable;
+							this->bound_let_block = let_block;
+							this->bound_index = i;
+							this->let_frame_offset = use_let_frame_offset;
+						}
 		
-					return;
+						return;
+					}
 				}
 
 			// We only want to count an ancestor let block as an offsetting block if we are not currently in a let clause of it.
