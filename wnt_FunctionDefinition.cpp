@@ -31,6 +31,7 @@ Generated at 2011-04-25 19:15:40 +0100
 //#include <llvm/Target/TargetData.h>
 #include <llvm/DataLayout.h>
 #endif
+#include <iostream>
 
 
 namespace Winter

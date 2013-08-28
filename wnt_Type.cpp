@@ -6,7 +6,6 @@
 #include "llvm/Constants.h"
 #include "LLVMTypeUtils.h"
 #include <vector>
-#include <iostream>
 
 
 using namespace std;
@@ -235,9 +234,9 @@ llvm::Type* Function::LLVMType(llvm::LLVMContext& context) const
 		closure_field_types
 	);
 
-	std::cout << "closure_struct_type: " << std::endl;
+	//std::cout << "closure_struct_type: " << std::endl;
 	closure_struct_type->dump();
-	std::cout << std::endl;
+	//std::cout << std::endl;
 	
 
 	// Return pointer to structure type.

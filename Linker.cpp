@@ -3,7 +3,6 @@
 
 
 #include "BuiltInFunctionImpl.h"
-#include <iostream>
 #include "utils/stringutils.h"
 #include "utils/platformutils.h"
 #include "wnt_ExternalFunction.h"

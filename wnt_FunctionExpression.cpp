@@ -29,6 +29,7 @@ Generated at 2011-04-30 18:53:38 +0100
 #include <llvm/IRBuilder.h>
 #include <llvm/Intrinsics.h>
 #endif
+#include <iostream>
 
 
 namespace Winter

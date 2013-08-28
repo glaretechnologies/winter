@@ -631,7 +631,7 @@ FunctionDefinitionRef LangParser::parseFunctionDefinitionGivenName(const std::st
 		// Parse function body
 		ASTNodeRef body = parseLetBlock(p); //parseExpression(p);
 
-		Reference<FunctionDefinition> def(new FunctionDefinition(
+		Reference<FunctionDefinition> def = new FunctionDefinition(
 			loc,
 			func_name,
 			args,
@@ -639,7 +639,7 @@ FunctionDefinitionRef LangParser::parseFunctionDefinitionGivenName(const std::st
 			body,
 			return_type, // declared return type
 			NULL // built in func impl
-			));
+			);
 
 		return def;
 	}
