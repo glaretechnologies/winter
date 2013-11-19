@@ -87,60 +87,76 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 		true, // hidden_voidptr_arg
 		args.env
 	),
-	env(args.env)
+	env(args.env),
+	llvm_context(NULL),
+	llvm_module(NULL),
+	llvm_exec_engine(NULL)
 {
 	hidden_voidptr_arg = true;
 
-	this->llvm_context = new llvm::LLVMContext();
+	try
+	{
+		this->llvm_context = new llvm::LLVMContext();
 	
-	this->llvm_module = new llvm::Module("WinterModule", *this->llvm_context);
+		this->llvm_module = new llvm::Module("WinterModule", *this->llvm_context);
 
-	llvm::InitializeNativeTarget();
+		llvm::InitializeNativeTarget();
 
-	// NOTE: ExecutionEngine takes ownership of the module if createJIT is successful.
-	std::string error_str;
-	this->llvm_exec_engine = llvm::ExecutionEngine::createJIT(
-		this->llvm_module, 
-		&error_str
-	);
+		// NOTE: ExecutionEngine takes ownership of the module if createJIT is successful.
+		std::string error_str;
+		this->llvm_exec_engine = llvm::ExecutionEngine::createJIT(
+			this->llvm_module, 
+			&error_str
+		);
 
-	this->llvm_exec_engine->DisableLazyCompilation();
-	this->llvm_exec_engine->DisableSymbolSearching();
+		this->llvm_exec_engine->DisableLazyCompilation();
+		this->llvm_exec_engine->DisableSymbolSearching();
 
-	this->external_functions = args.external_functions;
+		this->external_functions = args.external_functions;
 
-	ExternalFunctionRef alloc_ref(new ExternalFunction());
-	alloc_ref->interpreted_func = NULL;
-	alloc_ref->return_type = TypeRef(new VoidPtrType());
-	alloc_ref->sig = FunctionSignature("allocateRefCountedStructure", std::vector<TypeRef>(1, TypeRef(new Int())));
-	alloc_ref->func = (void*)(allocateRefCountedStructure);
-	this->external_functions.push_back(alloc_ref);
-
-
-	//TEMP: add some more external functions
-
-	// Add powf
-	/*{
-		ExternalFunctionRef f(new ExternalFunction());
-		f->func = (void*)(float(*)(float, float))std::powf;
-		f->interpreted_func = powWrapper;
-		f->return_type = TypeRef(new Float());
-		f->sig = FunctionSignature("pow", vector<TypeRef>(2, TypeRef(new Float())));
-		this->external_functions.push_back(f);
-	}*/
-
-	for(unsigned int i=0; i<this->external_functions.size(); ++i)
-		addExternalFunction(this->external_functions[i], *this->llvm_context, *this->llvm_module);
+		ExternalFunctionRef alloc_ref(new ExternalFunction());
+		alloc_ref->interpreted_func = NULL;
+		alloc_ref->return_type = TypeRef(new VoidPtrType());
+		alloc_ref->sig = FunctionSignature("allocateRefCountedStructure", std::vector<TypeRef>(1, TypeRef(new Int())));
+		alloc_ref->func = (void*)(allocateRefCountedStructure);
+		this->external_functions.push_back(alloc_ref);
 
 
-	assert(this->llvm_exec_engine);
-	assert(error_str.empty());
+		//TEMP: add some more external functions
 
-	// Load source buffers
-	//for(unsigned int i=0; i<args.source_buffers.size(); ++i)
-		loadSource(args.source_buffers);//[i]);
+		// Add powf
+		/*{
+			ExternalFunctionRef f(new ExternalFunction());
+			f->func = (void*)(float(*)(float, float))std::powf;
+			f->interpreted_func = powWrapper;
+			f->return_type = TypeRef(new Float());
+			f->sig = FunctionSignature("pow", vector<TypeRef>(2, TypeRef(new Float())));
+			this->external_functions.push_back(f);
+		}*/
 
-	this->build();
+		for(unsigned int i=0; i<this->external_functions.size(); ++i)
+			addExternalFunction(this->external_functions[i], *this->llvm_context, *this->llvm_module);
+
+
+		assert(this->llvm_exec_engine);
+		assert(error_str.empty());
+
+		// Load source buffers
+		//for(unsigned int i=0; i<args.source_buffers.size(); ++i)
+			loadSource(args.source_buffers);//[i]);
+
+		this->build();
+	}
+	catch(BaseException& e)
+	{
+		// Since we threw an exception in the constructor, the destructor will not be run.
+		// So we need to delete these objects now.
+		delete this->llvm_exec_engine;
+
+		delete llvm_context;
+
+		throw e; // Re-throw exception
+	}
 }
 
 
