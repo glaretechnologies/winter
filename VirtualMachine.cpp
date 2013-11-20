@@ -235,7 +235,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 
 		// Add allocateString
 		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
-			allocateString,
+			(void*)allocateString,
 			allocateStringInterpreted, // interpreted func
 			FunctionSignature("allocateString", vector<TypeRef>(1, new VoidPtrType())),
 			new String(), // return type
@@ -244,7 +244,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 
 		// Add freeString
 		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
-			freeString,
+			(void*)freeString,
 			NULL, // interpreted func TEMP
 			FunctionSignature("freeString", vector<TypeRef>(1, new String())),
 			new Int(), // return type
@@ -254,7 +254,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 
 		// Add stringLength
 		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
-			stringLength,
+			(void*)stringLength,
 			stringLengthInterpreted, // interpreted func
 			FunctionSignature("stringLength", vector<TypeRef>(1, new String())),
 			new Int(), // return type
@@ -263,7 +263,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 
 		// Add concatStrings
 		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
-			concatStrings,
+			(void*)concatStrings,
 			concatStringsInterpreted, // interpreted func
 			FunctionSignature("concatStrings", vector<TypeRef>(2, new String())),
 			new String(), // return type
