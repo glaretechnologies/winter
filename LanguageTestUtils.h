@@ -478,6 +478,15 @@ static void bleh(StructType* s)
 #endif
 
 
+#if defined(_WIN32) || defined(_WIN64)
+#define ALIGN_32 _CRT_ALIGN(32)
+#define CLASS_ALIGN_32 _CRT_ALIGN(32) class
+#else
+#define ALIGN_32 __attribute__ ((aligned (32)))
+#define CLASS_ALIGN_32 class __attribute__ ((aligned (32)))
+#endif
+
+
 
 
 
@@ -723,7 +732,7 @@ public:
 };
 
 
-SSE_CLASS_ALIGN float8
+CLASS_ALIGN_32 float8
 {
 public:
 	float e[8];
@@ -743,7 +752,7 @@ public:
 };
 
 
-SSE_CLASS_ALIGN Float8Struct
+CLASS_ALIGN_32 Float8Struct
 {
 public:
 	float8 v;
