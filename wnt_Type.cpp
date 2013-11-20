@@ -244,9 +244,9 @@ llvm::Type* Function::LLVMType(llvm::LLVMContext& context) const
 			true // hidden voidptr arg TEMP HACK
 		));
 
-		std::cout << "Function::LLVMType: " << std::endl;
-		t->dump();
-		std::cout << std::endl;
+		//std::cout << "Function::LLVMType: " << std::endl;
+		//t->dump();
+		//std::cout << std::endl;
 		return t;
 	}
 
