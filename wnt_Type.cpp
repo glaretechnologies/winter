@@ -1,10 +1,11 @@
 #include "wnt_Type.h"
 
 
-#include "utils/stringutils.h"
+#include "Value.h"
 #include "BaseException.h"
-#include "llvm/Constants.h"
+#include "llvm/IR/Constants.h"
 #include "LLVMTypeUtils.h"
+#include "utils/stringutils.h"
 #include <vector>
 
 
@@ -18,20 +19,16 @@ namespace Winter
 //==========================================================================
 
 
-static llvm::Type* pointerToVoidLLVMType(llvm::LLVMContext& context)
-{
-	return llvm::PointerType::get(llvm::Type::getInt32Ty(context), 0);
-}
-
-
-
-//==========================================================================
-
-
-llvm::Constant* Type::defaultLLVMValue(llvm::LLVMContext& context)
+Reference<Value> Type::getInvalidValue() const // For array out-of-bounds
 {
 	assert(0);
 	return NULL;
+}
+
+
+llvm::Value* Type::getInvalidLLVMValue(llvm::LLVMContext& context) const // For array out-of-bounds
+{
+	return llvm::UndefValue::get(this->LLVMType(context));
 }
 
 
@@ -44,10 +41,20 @@ bool Float::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
 }
 
 
-llvm::Constant* Float::defaultLLVMValue(llvm::LLVMContext& context)
+Reference<Value> Float::getInvalidValue() const // For array out-of-bounds
 {
-	return llvm::ConstantFP::get(context, llvm::APFloat(0.0f));
+	return new FloatValue(std::numeric_limits<float>::quiet_NaN());
 }
+
+
+llvm::Value* Float::getInvalidLLVMValue(llvm::LLVMContext& context) const // For array out-of-bounds
+{
+	return llvm::ConstantFP::get(
+		context, 
+		llvm::APFloat::getSNaN(llvm::APFloat::IEEEsingle)
+	);
+}
+
 
 //==========================================================================
 
@@ -80,9 +87,35 @@ llvm::Type* GenericType::LLVMType(llvm::LLVMContext& context) const
 //==========================================================================
 
 
+llvm::Type* Int::LLVMType(llvm::LLVMContext& context) const
+{ 
+	// Note that integer types in LLVM just specify a bit-width, but not if they are signed or not.
+	return llvm::Type::getInt32Ty(context);
+}
+
+
 bool Int::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
 {
 	return this->getType() == b.getType();
+}
+
+
+llvm::Value* Int::getInvalidLLVMValue(llvm::LLVMContext& context) const // For array out-of-bounds
+{
+	return llvm::ConstantInt::get(
+		context, 
+		llvm::APInt(
+			32, // num bits
+			0, // value
+			true // signed
+		)
+	);
+}
+
+
+Reference<Value> Int::getInvalidValue() const // For array out-of-bounds
+{
+	return new IntValue(0);
 }
 
 
@@ -106,7 +139,31 @@ bool String::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
 
 llvm::Type* String::LLVMType(llvm::LLVMContext& context) const
 {
-	return pointerToVoidLLVMType(context);
+	llvm::Type* field_types[] = {
+		llvm::Type::getInt64Ty(context) // Reference count field
+	};
+
+	return LLVMTypeUtils::pointerType(*llvm::StructType::get(
+		context,
+		llvm::makeArrayRef(field_types, 1)
+	));
+
+	//return LLVMTypeUtils::voidPtrType(context);
+}
+
+
+//==========================================================================
+
+
+bool CharType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
+{
+	return this->getType() == b.getType();
+}
+
+
+llvm::Type* CharType::LLVMType(llvm::LLVMContext& context) const
+{
+	return llvm::Type::getInt32Ty(context);
 }
 
 
@@ -174,6 +231,27 @@ struct Closure
 */
 llvm::Type* Function::LLVMType(llvm::LLVMContext& context) const
 {
+	//TEMP: this need to be in sync with FunctionDefinition::emitLLVMCode()
+	const bool simple_func_ptr = true;
+	if(simple_func_ptr)
+	{
+		// Looks like we're not allowed to pass functions directly as args, have to be pointer-to-funcs
+		llvm::Type* t = LLVMTypeUtils::pointerType(*LLVMTypeUtils::llvmFunctionType(
+			arg_types,
+			false, // use captured var struct ptr arg
+			return_type,
+			context,
+			true // hidden voidptr arg TEMP HACK
+		));
+
+		std::cout << "Function::LLVMType: " << std::endl;
+		t->dump();
+		std::cout << std::endl;
+		return t;
+	}
+
+
+
 	// Build Empty LLVM CapturedVars struct
 	//vector<const llvm::Type*> cap_var_types;
 	
@@ -247,6 +325,12 @@ llvm::Type* Function::LLVMType(llvm::LLVMContext& context) const
 //==========================================================================
 
 
+const std::string ArrayType::toString() const
+{ 
+	return "array<" + elem_type->toString() + ", " + ::toString(num_elems) + ">";
+}
+
+
 bool ArrayType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
 {
 	if(this->getType() != b.getType())
@@ -254,13 +338,19 @@ bool ArrayType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) co
 	// So b is an Array as well.
 	const ArrayType* b_ = static_cast<const ArrayType*>(&b);
 
-	return this->t->matchTypes(*b_->t, type_mapping);
+	return this->elem_type->matchTypes(*b_->elem_type, type_mapping);
 }
 
 
 llvm::Type* ArrayType::LLVMType(llvm::LLVMContext& context) const
 {
-	return pointerToVoidLLVMType(context);
+	// Since Array is pass-by-pointer, return the element value type here.
+	// Then Array will be passed as pointer to this type.
+	//return this->t->LLVMType(context); //pointerToVoidLLVMType(context);
+	return llvm::ArrayType::get(
+		this->elem_type->LLVMType(context), // Element type
+		this->num_elems // Num elements
+	);
 }
 
 
@@ -275,7 +365,7 @@ bool Map::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
 
 llvm::Type* Map::LLVMType(llvm::LLVMContext& context) const
 {
-	return pointerToVoidLLVMType(context);
+	return LLVMTypeUtils::voidPtrType(context);
 }
 
 
@@ -308,7 +398,6 @@ bool StructureType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping
 
 llvm::Type* StructureType::LLVMType(llvm::LLVMContext& context) const
 {
-	//return pointerToVoidLLVMType(context);
 	vector<llvm::Type*> field_types(this->component_types.size());
 	for(size_t i=0; i<this->component_types.size(); ++i)
 	{
@@ -346,7 +435,7 @@ llvm::Type* StructureType::LLVMType(llvm::LLVMContext& context) const
 
 const std::string VectorType::toString() const
 {
-	return "vector<" + this->t->toString() + ", " + ::toString(this->num) + ">";
+	return "vector<" + this->elem_type->toString() + ", " + ::toString(this->num) + ">";
 }
 
 
@@ -358,14 +447,14 @@ bool VectorType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) c
 	// So b is a VectorType as well.
 	const VectorType* b_ = static_cast<const VectorType*>(&b);
 
-	return this->num == b_->num && this->t->matchTypes(*b_->t, type_mapping);
+	return this->num == b_->num && this->elem_type->matchTypes(*b_->elem_type, type_mapping);
 }
 
 
 llvm::Type* VectorType::LLVMType(llvm::LLVMContext& context) const
 {
 	return llvm::VectorType::get(
-		this->t->LLVMType(context),
+		this->elem_type->LLVMType(context),
 		this->num
 	);
 }
@@ -383,13 +472,93 @@ const std::string VoidPtrType::toString() const
 bool VoidPtrType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
 {
 	//NOTE: This right?
-	return (this->getType() == b.getType());
+	return this->getType() == b.getType();
 }
 
 
 llvm::Type* VoidPtrType::LLVMType(llvm::LLVMContext& context) const
 {
 	return LLVMTypeUtils::voidPtrType(context);
+}
+
+
+//==========================================================================
+
+
+const std::string SumType::toString() const
+{
+	std::vector<std::string> typenames(this->types.size());
+	for(size_t i=0; i<this->types.size(); ++i)
+		typenames[i] = this->types[i]->toString();
+
+	return StringUtils::join(typenames, " | ");
+}
+
+
+bool SumType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
+{
+	if(this->getType() != b.getType())
+		return false;
+
+	// So b is a SumType as well.
+	const SumType* b_ = static_cast<const SumType*>(&b);
+
+	assert(0);
+	// TODO
+
+	//return this->num == b_->num && this->elem_type->matchTypes(*b_->elem_type, type_mapping);
+	return false;
+}
+
+
+llvm::Type* SumType::LLVMType(llvm::LLVMContext& context) const
+{
+	std::vector<llvm::Type*> elem_types(1 + this->types.size());
+
+	// Type discriminator field first.
+	elem_types[0] = llvm::Type::getInt32Ty(context);
+
+	for(size_t i=0; i<this->types.size(); ++i)
+		elem_types[i + 1] = this->types[i]->LLVMType(context);
+
+	return llvm::StructType::get(
+		context,
+		elem_types
+	);
+}
+
+
+//===============================================================================
+
+
+const std::string ErrorType::toString() const
+{
+	return "error";
+}
+
+
+bool ErrorType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
+{
+	//NOTE: This right?
+	return this->getType() == b.getType();
+}
+
+
+llvm::Type* ErrorType::LLVMType(llvm::LLVMContext& context) const
+{
+	return llvm::Type::getVoidTy(context);
+}
+
+
+//===============================================================================
+
+
+TypeRef errorTypeSum(const TypeRef& t)
+{
+	vector<TypeRef> elem_types(2);
+	elem_types[0] = t;
+	elem_types[1] = new ErrorType();
+	return new SumType(elem_types);
 }
 
 

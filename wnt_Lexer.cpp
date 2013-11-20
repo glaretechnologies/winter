@@ -58,6 +58,35 @@ void Lexer::parseStringLiteral(const SourceBufferRef& buffer, Parser& parser, st
 }
 
 
+void Lexer::parseCharLiteral(const SourceBufferRef& buffer, Parser& parser, std::vector<Reference<TokenBase> >& tokens_out)
+{
+	assert(parser.notEOF());
+	assert(parser.current() == '\'');
+	
+	const unsigned int char_index = parser.currentPos();
+
+	parser.advance();
+
+	std::string s = "";
+	while(1)
+	{
+		if(parser.eof())
+			throw LexerExcep("End of input while parsing char literal." + errorPosition(buffer, parser.currentPos()));
+
+		if(parser.current() == '\'')
+		{
+			parser.advance();
+			break;
+		}
+
+		s = ::appendChar(s, parser.current());
+		parser.advance();
+	}
+
+	tokens_out.push_back(Reference<TokenBase>(new CharLiteralToken(s, char_index)));
+}
+
+
 static void parseWhiteSpace(const SourceBufferRef& buffer, Parser& parser, std::vector<Reference<TokenBase> >& tokens_out)
 {
 	parser.parseWhiteSpace();
@@ -135,6 +164,10 @@ void Lexer::process(const SourceBufferRef& src, std::vector<Reference<TokenBase>
 		if(parser.current() == '"')
 		{
 			parseStringLiteral(src, parser, tokens_out);
+		}
+		else if(parser.current() == '\'')
+		{
+			parseCharLiteral(src, parser, tokens_out);
 		}
 		else if(parser.current() == '-' /*|| parser.current() == '+'*/ /*|| parser.current() == '.'*/ || ::isNumeric(parser.current()))
 		{

@@ -10,7 +10,7 @@ Generated at Wed Oct 20 15:22:37 +1300 2010
 
 namespace llvm { class Function; class FunctionType; class Type; class LLVMContext; class Twine; }
 //#if USE_LLVM
-#include <llvm/IRBuilder.h>
+#include <llvm/IR/IRBuilder.h>
 //#endif
 #include "wnt_Type.h"
 

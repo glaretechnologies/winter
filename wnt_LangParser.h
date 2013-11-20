@@ -39,7 +39,7 @@ class ParseInfo
 public:
 	ParseInfo(unsigned int& i_, const std::vector<Reference<TokenBase> >& t, std::map<std::string, TypeRef>& named_types_,
 		vector<FunctionDefinitionRef>& func_defs_) 
-		: i(i_), tokens(t), named_types(named_types_), func_defs(func_defs_) {}
+		: i(i_), tokens(t), named_types(named_types_), func_defs(func_defs_), else_token_present(false) {}
 	const std::vector<Reference<TokenBase> >& tokens;
 	//const char* text_buffer;
 	//const std::string* text_buffer;
@@ -47,6 +47,7 @@ public:
 	unsigned int& i;
 	std::map<std::string, TypeRef>& named_types;
 	vector<FunctionDefinitionRef>& func_defs;
+	bool else_token_present;
 };
 
 
@@ -98,6 +99,8 @@ private:
 	ASTNodeRef parseVariableOrIfExpression(const ParseInfo& parseinfo);
 
 	TypeRef parseType(const ParseInfo& parseinfo, const std::vector<std::string>& generic_type_params);
+	TypeRef parseSumType(const ParseInfo& parseinfo, const std::vector<std::string>& generic_type_params);
+	TypeRef parseElementaryType(const ParseInfo& parseinfo, const std::vector<std::string>& generic_type_params);
 	TypeRef parseMapType(const ParseInfo& parseinfo, const std::vector<std::string>& generic_type_params);
 	TypeRef parseArrayType(const ParseInfo& parseinfo, const std::vector<std::string>& generic_type_params);
 	TypeRef parseFunctionType(const ParseInfo& p, const std::vector<std::string>& generic_type_params);
@@ -111,7 +114,7 @@ private:
 	ASTNodeRef parseBinaryLogicalExpression(const ParseInfo& parseinfo);
 	ASTNodeRef parseParenExpression(const ParseInfo& parseinfo);
 	ASTNodeRef parseMapLiteralExpression(const ParseInfo& parseinfo);
-	ASTNodeRef parseArrayOrVectorLiteralExpression(const ParseInfo& parseinfo);
+	ASTNodeRef parseArrayOrVectorLiteralOrArraySubscriptExpression(const ParseInfo& parseinfo);
 	Reference<LetASTNode> parseLet(const ParseInfo& parseinfo);
 	FunctionDefinitionRef parseAnonFunction(const ParseInfo& parseinfo);
 	void parseParameterList(const ParseInfo& parseinfo, const std::vector<std::string>& generic_type_params, std::vector<FunctionDefinition::FunctionArg>& args_out);

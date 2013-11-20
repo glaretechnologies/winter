@@ -66,14 +66,15 @@ public:
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual ValueRef exec(VMState& vmstate);
-	virtual ASTNodeType nodeType() const { return FunctionDefinitionType; }
 	virtual TypeRef type() const;// { return function_type; }
 
 	//virtual void linkFunctions(Linker& linker);
 	//virtual void bindVariables(const std::vector<ASTNode*>& stack);
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual void print(int depth, std::ostream& s) const;
-	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+	virtual std::string sourceString() const;
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
+	//virtual llvm::Value* getConstantLLVMValue(EmitLLVMCodeParams& params) const;
 	virtual Reference<ASTNode> clone();
 	virtual bool isConstant() const;
 
@@ -84,7 +85,8 @@ public:
 		llvm::Module* module,
 		const PlatformUtils::CPUInfo& cpu_info,
 		bool hidden_voidptr_arg, 
-		const llvm::DataLayout/*TargetData*/* target_data
+		const llvm::DataLayout/*TargetData*/* target_data,
+		const CommonFunctions& common_functions
 		//std::map<Lang::FunctionSignature, llvm::Function*>& external_functions
 	);
 

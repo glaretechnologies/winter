@@ -7,6 +7,7 @@ Generated at 2011-04-25 19:15:40 +0100
 #include "wnt_FunctionDefinition.h"
 
 
+#include "wnt_ASTNode.h"
 #include "VMState.h"
 #include "Value.h"
 #include "Linker.h"
@@ -14,22 +15,22 @@ Generated at 2011-04-25 19:15:40 +0100
 #include "LLVMTypeUtils.h"
 #include "utils/stringutils.h"
 #if USE_LLVM
-#include "llvm/Type.h"
-#include "llvm/Module.h"
-#include "llvm/DerivedTypes.h"
-#include "llvm/Constants.h"
-#include "llvm/Instructions.h"
+#include "llvm/IR/Type.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/Analysis/Verifier.h"
 #include "llvm/ExecutionEngine/JIT.h"
 #include "llvm/ExecutionEngine/Interpreter.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
 #include "llvm/Support/raw_ostream.h"
-#include <llvm/CallingConv.h>
-#include <llvm/IRBuilder.h>
-#include <llvm/Intrinsics.h>
-#include <llvm/Attributes.h>
+#include <llvm/IR/CallingConv.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/Intrinsics.h>
+#include <llvm/IR/Attributes.h>
 //#include <llvm/Target/TargetData.h>
-#include <llvm/DataLayout.h>
+#include <llvm/IR/DataLayout.h>
 #endif
 #include <iostream>
 
@@ -45,7 +46,7 @@ FunctionDefinition::FunctionDefinition(const SrcLocation& src_loc, const std::st
 									   //const vector<Reference<LetASTNode> >& lets_,
 									   const ASTNodeRef& body_, const TypeRef& declared_rettype, 
 									   BuiltInFunctionImpl* impl)
-:	ASTNode(src_loc),
+:	ASTNode(FunctionDefinitionType, src_loc),
 	args(args_),
 	//lets(lets_),
 	body(body_),
@@ -371,7 +372,7 @@ void FunctionDefinition::print(int depth, std::ostream& s) const
 	if(this->built_in_func_impl)
 	{
 		printMargin(depth+1, s);
-		s << "Built in Implementation.";
+		s << "Built in Implementation.\n";
 	}
 	else if(body.nonNull())
 	{
@@ -380,12 +381,29 @@ void FunctionDefinition::print(int depth, std::ostream& s) const
 	else
 	{
 		printMargin(depth+1, s);
-		s << "Null body.";
+		s << "Null body.\n";
 	}
 }
 
 
-llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params) const
+std::string FunctionDefinition::sourceString() const
+{
+	std::string s = "def " + sig.name + "(";
+	for(unsigned int i=0; i<args.size(); ++i)
+	{
+		s += args[i].type->toString() + " " + args[i].name;
+		if(i + 1 < args.size())
+			s += ", ";
+	}
+	s += ") ";
+	if(this->declared_return_type.nonNull())
+		s += this->declared_return_type->toString() + " ";
+	s += ": ";
+	return s + body->sourceString();
+}
+
+
+llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
 	// This will be called for lambda expressions.
 	// Capture variables at this point, by getting them off the arg and let stack.
@@ -403,6 +421,19 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params) const
 		*params.context,
 		vector<const llvm::Type*>()
 	);*/
+
+	//TEMP: this needs to be in sync with Function::LLVMType()
+	const bool simple_func_ptr = true;
+	if(simple_func_ptr)
+	{
+		llvm::Function* func = this->getOrInsertFunction(
+			params.module,
+			false, // use_cap_var_struct_ptr: Since we're storing a func ptr, it will be passed the captured var struct on usage.
+			params.hidden_voidptr_arg
+		);
+
+		return func;
+	}
 
 
 	assert(this->alloc_func);
@@ -422,7 +453,9 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 	// Add Pointer to captured var struct, if there are any captured vars
 	//TEMP since we are returning a closure, the functions will always be passed captured vars.  if(use_captured_vars)
-		llvm_arg_types.push_back(LLVMTypeUtils::getPtrToBaseCapturedVarStructType(*params.context)); //LLVMTypeUtils::pointerType(*base_cap_var_type));
+	
+//TEMP HACK NO CAPTURED VAR  STURCT ARG
+//	llvm_arg_types.push_back(LLVMTypeUtils::getPtrToBaseCapturedVarStructType(*params.context)); //LLVMTypeUtils::pointerType(*base_cap_var_type));
 
 	//TEMP HACK: add hidden void* arg  NOTE: should only do this when hidden_void_arg is true.
 	llvm_arg_types.push_back(LLVMTypeUtils::voidPtrType(*params.context));
@@ -538,12 +571,17 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params) const
 			const int let_frame_offset = this->captured_vars[i].let_frame_offset;
 
 			// TEMP HACK USING 2 instead of 1.
-			LetBlock* let_block = params.let_block_stack[params.let_block_stack.size() - 1 - let_frame_offset];
+			const int let_index = params.let_block_stack.size() - 1 - let_frame_offset;
+			LetBlock* let_block = params.let_block_stack[let_index];
 	
-			val = let_block->getLetExpressionLLVMValue(
-				params,
-				this->captured_vars[i].index
-			);
+			//val = let_block->getLetExpressionLLVMValue(
+			//	params,
+			//	this->captured_vars[i].index,
+			//	ret_space_ptr // TEMP
+			//);
+
+			assert(params.let_block_let_values.find(let_block) != params.let_block_let_values.end());
+			val = params.let_block_let_values[let_block][let_index];
 		}
 			
 		// store in captured var structure field
@@ -577,6 +615,19 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params) const
 		"base_closure_ptr"
 	);
 }
+
+
+//llvm::Value* FunctionDefinition::getConstantLLVMValue(EmitLLVMCodeParams& params) const
+//{
+//	if(this->built_in_func_impl)
+//	{
+//		return this->built_in_func_impl->getConstantLLVMValue(params);
+//	}
+//	else
+//	{
+//		return this->body->getConstantLLVMValue(params);
+//	}
+//}
 
 
 llvm::Function* FunctionDefinition::getOrInsertFunction(
@@ -621,61 +672,58 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 		);
 	}*/
 
-	//llvm::Attributes function_attr = llvm::Attributes::NoUnwind; // Does not throw exceptions
+
+#if 0
+	
+#else
+
+	// NOTE: Check this code works somehow!
+
 	llvm::AttrBuilder function_attr_builder;
-	function_attr_builder.addAttribute(llvm::Attributes::NoUnwind); // Does not throw exceptions
+	function_attr_builder.addAttribute(llvm::Attribute::NoUnwind); // Does not throw exceptions
 	if(this->returnType()->passByValue())
 	{
-		//function_attr |= llvm::Attribute::ReadNone
-
 		bool has_ptr_arg = false;
-		for(unsigned int i=0; i<arg_types/*this->args*/.size(); ++i)
-		{
-			if(!arg_types[i]/*this->args[i].type*/->passByValue())
+		for(unsigned int i=0; i<arg_types.size(); ++i)
+			if(!arg_types[i]->passByValue())
 				has_ptr_arg = true;
-		}
 
-		if(has_ptr_arg)
-			function_attr_builder.addAttribute(llvm::Attributes::ReadOnly);
-			//function_attr |= llvm::Attribute::ReadOnly; // This attribute indicates that the function does not write through any pointer arguments etc..
+		if(external_function.nonNull() && external_function->has_side_effects)
+		{}
 		else
-			function_attr_builder.addAttribute(llvm::Attributes::ReadNone);
-			//function_attr |= llvm::Attribute::ReadNone; // Function computes its result based strictly on its arguments, without dereferencing any pointer arguments etc..
+		{
+			if(has_ptr_arg)
+				function_attr_builder.addAttribute(llvm::Attribute::ReadOnly); // This attribute indicates that the function does not write through any pointer arguments etc..
+			else
+				function_attr_builder.addAttribute(llvm::Attribute::ReadNone); // Function computes its result based strictly on its arguments, without dereferencing any pointer arguments etc..
+		}
 	}
 
-
-	//attribute_list = attribute_list.addAttr(4294967295U, function_attr);
-	/*{
-		SmallVector<AttributeWithIndex, 4> Attrs;
-		AttributeWithIndex PAWI;
-		PAWI.Index = 4294967295U; PAWI.Attrs = 0  | Attribute::NoUnwind | Attribute::ReadNone;
-		Attrs.push_back(PAWI);
-		func_f_PAL = AttrListPtr::get(Attrs.begin(), Attrs.end());
-
-	}*/
+	//TEMP:
+	function_attr_builder.addAttribute(llvm::Attribute::AlwaysInline);
 
 	llvm::Constant* llvm_func_constant = module->getOrInsertFunction(
 		this->sig.toString(), // Name
 		functype // Type
-		);
+	);
 
 	//llvm_func_constant->dump();
-	//assert(dynamic_cast<llvm::Function*>(llvm_func_constant) != NULL);
 
-	
 	llvm::Function* llvm_func = static_cast<llvm::Function*>(llvm_func_constant);
 
-	llvm::Attributes attributes = llvm::Attributes::get(module->getContext(), function_attr_builder);
+	llvm::AttributeSet attributes = llvm::AttributeSet::get(
+		module->getContext(),
+		llvm::AttributeSet::FunctionIndex, // Index
+		function_attr_builder);
 
-	llvm::AttrListPtr attribute_list = llvm_func->getAttributes();
-	llvm::AttrListPtr attribute_list_new = attribute_list.addAttr(module->getContext(), llvm::AttrListPtr::FunctionIndex, attributes);
 
-	llvm_func->setAttributes(attribute_list_new);
+	llvm_func->setAttributes(attributes);
+	//llvm_func->addAttributes(llvm::AttributeSet::FunctionIndex, attributes);
+
+#endif
 
 	// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
 	llvm_func->setCallingConv(llvm::CallingConv::C);
-
-	//internal_llvm_func->setAttributes(
 
 	// Set names for all arguments.
 	
@@ -692,14 +740,37 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 		}
 		else
 		{
-			if(i == 0)
+			if(i == 0) // Return value pointer arg
+			{
 				AI->setName("ret");
-			else if(i > this->args.size())
+
+				// Set SRET and NoAlias attributes.
+				llvm::AttrBuilder builder;
+				builder.addAttribute(llvm::Attribute::StructRet);
+				builder.addAttribute(llvm::Attribute::NoAlias);
+				llvm::AttributeSet set = llvm::AttributeSet::get(module->getContext(), 1, builder);
+				AI->addAttr(set);
+			}
+			else if(i > this->args.size()) // Hidden pointer to env arg.
+			{
 				AI->setName("hidden");
-			else
+			}
+			else // Normal arg.  Due to arg zero being the SRET arg, the index is offset by one.
 			{
 				//std::cout << i << std::endl;
 				AI->setName(this->args[i-1].name);
+
+				if(!this->args[i-1].type->passByValue()) // If pointer arg:
+				{
+					// Mark arg as NoAlias.
+					llvm::AttrBuilder builder;
+					builder.addAttribute(llvm::Attribute::NoAlias);
+
+					//NOTE: in trunk, not in LLVM 3.3 yet.
+					//builder.addAttribute(llvm::Attribute::ReadOnly); // "On an argument, this attribute indicates that the function does not write through this pointer argument, even though it may write to the memory that the pointer points to."
+					llvm::AttributeSet set = llvm::AttributeSet::get(module->getContext(), 1 + i, builder);
+					AI->addAttr(set);
+				}
 			}
 		}
 	}
@@ -712,11 +783,24 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	llvm::Module* module,
 	const PlatformUtils::CPUInfo& cpu_info,
 	bool hidden_voidptr_arg, 
-	const llvm::DataLayout/*TargetData*/* target_data
+	const llvm::DataLayout/*TargetData*/* target_data,
+	const CommonFunctions& common_functions
 	//std::map<Lang::FunctionSignature, llvm::Function*>& external_functions
 	)
 {
 #if USE_LLVM
+
+	//NEW: do a pass to get the cleanup nodes first
+	/*{
+		TraversalPayload payload(TraversalPayload::GetCleanupNodes, false, NULL);
+		std::vector<ASTNode*> stack(1, this);
+		this->body->traverse(payload, stack);
+	}
+*/
+	//TEMP:
+	//this->print(0, std::cout);
+	//std::cout << std::endl;
+
 
 	llvm::Function* llvm_func = this->getOrInsertFunction(
 		module,
@@ -731,6 +815,16 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	);
 	llvm::IRBuilder<> builder(block);
 
+	// TEMP NEW;
+	llvm::FastMathFlags flags;
+	flags.setNoNaNs();
+	flags.setNoInfs();
+	flags.setNoSignedZeros();
+
+	builder.SetFastMathFlags(flags);
+
+	const bool nsz = builder.getFastMathFlags().noSignedZeros();
+
 	// Build body LLVM code
 	EmitLLVMCodeParams params;
 	params.currently_building_func_def = this;
@@ -741,6 +835,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	params.currently_building_func = llvm_func;
 	params.context = &module->getContext();
 	params.target_data = target_data;
+	params.common_functions = common_functions;
 
 	//llvm::Value* body_code = NULL;
 	if(this->built_in_func_impl)
@@ -753,21 +848,94 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	}
 	else
 	{
-		llvm::Value* body_code = this->body->emitLLVMCode(params);
-
 		if(this->returnType()->passByValue())
 		{
+			llvm::Value* body_code = this->body->emitLLVMCode(params);
+
+			// Emit cleanup code for reference-counted values.
+			for(size_t z=0; z<params.cleanup_values.size(); ++z)
+			{
+				// Don't want to clean up (decr ref) the return value.
+				if(params.cleanup_values[z].node != this->body.getPointer())
+					params.cleanup_values[z].node->emitCleanupLLVMCode(params, params.cleanup_values[z].value);
+			}
+
 			builder.CreateRet(body_code);
 		}
 		else
 		{
+			// Else return type is pass-by-pointer
+
 			// body code will return a pointer to the result of the body expression, allocated on the stack.
 			// So load from the stack, and save to the return pointer which will have been passed in as arg zero.
 			llvm::Value* return_val_ptr = LLVMTypeUtils::getNthArg(llvm_func, 0);
 
-			//if(*this->returnType() == 
-			if(this->returnType()->getType() == Type::StructureTypeType)
+			// Emit body code, storing the result directly to the return value ptr.
+			llvm::Value* body_code = this->body->emitLLVMCode(params, return_val_ptr);
+
+			// We want to do something here like,
+			// If we haven't computed the result, but are merely returning it, then need to copy the arg to return ptr.
+			if(this->body->nodeType() == ASTNode::VariableASTNodeType)
 			{
+				// Load value
+				llvm::Value* val = params.builder->CreateLoad(
+					body_code
+				);
+
+				// And store at return_val_ptr
+				params.builder->CreateStore(
+					val, // value
+					return_val_ptr // ptr
+				);
+
+				/*if(this->body->type()->getType() == Type::ArrayTypeType)
+				{
+					llvm::Value* size;
+					size = llvm::ConstantInt::get(*params.context, llvm::APInt(32, sizeof(float) * 4, true)); // TEMP HACK
+					//size = //this->type().downcast<ArrayType>()->t->LLVMType(*params.context)->getPrimitiveSizeInBits() * 8;
+
+						// Need to copy the value from the mem at arg to the mem at ret_space_ptr
+					params.builder->CreateMemCpy(
+						return_val_ptr, // dest
+						body_code, // src
+						size, // size
+						4 // align
+					);
+				}
+				else if(this->returnType()->getType() == Type::StructureTypeType)
+				{
+					// Load struct
+					llvm::Value* struct_val = params.builder->CreateLoad(
+						body_code
+					);
+
+					// And store at return_val_ptr
+					params.builder->CreateStore(
+						struct_val, // value
+						return_val_ptr // ptr
+					);
+
+				}
+				else
+				{
+					assert(0);
+				}*/
+				
+			}
+
+			// Emit cleanup code for reference-counted values.
+			for(size_t z=0; z<params.cleanup_values.size(); ++z)
+			{
+				// Don't want to clean up (decr ref) the return value.
+				if(params.cleanup_values[z].node != this->body.getPointer())
+					params.cleanup_values[z].node->emitCleanupLLVMCode(params, params.cleanup_values[z].value);
+			}
+
+			builder.CreateRetVoid();
+
+			//if(*this->returnType() == 
+			/*if(this->returnType()->getType() == Type::StructureTypeType)
+			{*/
 				//StructureType* struct_type = static_cast<StructureType*>(this->returnType().getPointer());
 
 				/*for(unsigned int i=0; i<struct_type->component_types.size(); ++i)
@@ -800,7 +968,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 					);
 				}*/
 
-				llvm::Value* struct_val = params.builder->CreateLoad(
+			/*	llvm::Value* struct_val = params.builder->CreateLoad(
 					body_code
 				);
 
@@ -808,6 +976,10 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 					struct_val, // value
 					return_val_ptr // ptr
 				);
+			}
+			else if(this->returnType()->getType() == Type::ArrayTypeType)
+			{
+				
 			}
 			else if(this->returnType()->getType() == Type::FunctionType)
 			{
@@ -827,10 +999,10 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 			else
 			{
 				assert(0);
-			}
+			}*/
 
 			//builder.CreateRet(return_val_ptr);
-			builder.CreateRetVoid();
+			
 		}
 	}
 

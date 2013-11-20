@@ -47,6 +47,9 @@ public:
 	VMConstructionArgs() : env(NULL) {}
 	std::vector<ExternalFunctionRef> external_functions;
 	std::vector<SourceBufferRef> source_buffers;
+	std::vector<FunctionSignature> entry_point_sigs;
+
+	std::vector<FunctionDefinitionRef> preconstructed_func_defs;//TEMP
 	void* env;
 };
 
@@ -66,8 +69,8 @@ public:
 	void* getJittedFunctionByName(const std::string& name);
 
 private:
-	void loadSource(const std::vector<SourceBufferRef>& s);
-	void build();
+	void loadSource(const std::vector<SourceBufferRef>& s, const std::vector<FunctionDefinitionRef>& preconstructed_func_defs);
+	void build(const VMConstructionArgs& args);
 	void addExternalFunction(const ExternalFunctionRef& f, llvm::LLVMContext& context, llvm::Module& module);
 	void compileToNativeAssembly(llvm::Module* mod, const std::string& filename);
 
@@ -79,6 +82,7 @@ private:
 	llvm::ExecutionEngine* llvm_exec_engine;
 	bool hidden_voidptr_arg;
 	void* env;
+	std::string triple;
 };
 
 

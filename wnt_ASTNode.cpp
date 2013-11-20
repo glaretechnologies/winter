@@ -12,26 +12,31 @@ Copyright 2009 Nicholas Chapman
 #include "wnt_FunctionExpression.h"
 #include "wnt_SourceBuffer.h"
 #include "wnt_Diagnostics.h"
+#include "wnt_RefCounting.h"
 #include "VMState.h"
 #include "Value.h"
+#include "VMState.h"
 #include "Linker.h"
 #include "BuiltInFunctionImpl.h"
 #include "LLVMTypeUtils.h"
+#include "ProofUtils.h"
 #include "utils/stringutils.h"
+#include "maths/mathstypes.h"
+#include "maths/vec2.h"
 #if USE_LLVM
-#include "llvm/Type.h"
-#include "llvm/Module.h"
-#include "llvm/DerivedTypes.h"
-#include "llvm/Constants.h"
-#include "llvm/Instructions.h"
+#include "llvm/IR/Type.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/Analysis/Verifier.h"
 #include "llvm/ExecutionEngine/JIT.h"
 #include "llvm/ExecutionEngine/Interpreter.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
 #include "llvm/Support/raw_ostream.h"
-#include <llvm/CallingConv.h>
-#include <llvm/IRBuilder.h>
-#include <llvm/Intrinsics.h>
+#include <llvm/IR/CallingConv.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/Intrinsics.h>
 #endif
 
 
@@ -40,6 +45,22 @@ static const bool VERBOSE_EXEC = false;
 
 namespace Winter
 {
+
+
+/*
+	decrementStringRefCount(stringRep* s):
+		r = load s->refcount
+		if r == 1
+			call freeString(s)
+		else
+			r' = r - 1
+			store r' in s->refcount
+		
+*/
+
+
+
+
 
 
 void printMargin(int depth, std::ostream& s)
@@ -85,10 +106,12 @@ bool shouldFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
 				(e->type()->getType() == Type::IntType &&
 				(e->nodeType() != ASTNode::IntLiteralType))
 			) &&
-			expressionIsWellTyped(e, payload);
+			expressionIsWellTyped(e, payload);// &&
+			//e->provenDefined();
 }
 	
 
+// Replace an expression with a constant (literal AST node)
 ASTNodeRef foldExpression(ASTNodeRef& e, TraversalPayload& payload)
 {
 	VMState vmstate(payload.hidden_voidptr_arg);
@@ -152,9 +175,9 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::v
 	{
 		AdditionExpression* expr = static_cast<AdditionExpression*>(e.getPointer());
 		if(expr->a->type().nonNull() && expr->b->type().nonNull())
-			if(	expr->a->type()->getType() == Type::StructureTypeType ||
-				expr->b->type()->getType() == Type::StructureTypeType)
-				if(expr->a->type()->getType() == Type::StructureTypeType)
+			if(	expr->a->type()->getType() == Type::StructureTypeType || expr->a->type()->getType() == Type::ArrayTypeType ||
+				expr->b->type()->getType() == Type::StructureTypeType || expr->b->type()->getType() == Type::ArrayTypeType)
+				//if(expr->a->type()->getType() == Type::StructureTypeType)
 				{
 					// Replace expr with an op_add function call.
 					e = ASTNodeRef(new FunctionExpression(expr->srcLocation(), "op_add", expr->a, expr->b));
@@ -174,9 +197,9 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::v
 	{
 		SubtractionExpression* expr = static_cast<SubtractionExpression*>(e.getPointer());
 		if(expr->a->type().nonNull() && expr->b->type().nonNull())
-			if(	expr->a->type()->getType() == Type::StructureTypeType ||
-				expr->b->type()->getType() == Type::StructureTypeType)
-				if(expr->a->type()->getType() == Type::StructureTypeType)
+			if(	expr->a->type()->getType() == Type::StructureTypeType || expr->a->type()->getType() == Type::ArrayTypeType ||
+				expr->b->type()->getType() == Type::StructureTypeType || expr->b->type()->getType() == Type::ArrayTypeType)
+				//if(expr->a->type()->getType() == Type::StructureTypeType)
 				{
 					// Replace expr with an op_sub function call.
 					e = ASTNodeRef(new FunctionExpression(expr->srcLocation(), "op_sub", expr->a, expr->b));
@@ -197,8 +220,8 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::v
 		MulExpression* expr = static_cast<MulExpression*>(e.getPointer());
 		assert(expr->a->type().nonNull() && expr->b->type().nonNull());
 		if(expr->a->type().nonNull() && expr->b->type().nonNull())
-			if(	expr->a->type()->getType() == Type::StructureTypeType ||
-				expr->b->type()->getType() == Type::StructureTypeType)
+			if(	expr->a->type()->getType() == Type::StructureTypeType || expr->a->type()->getType() == Type::ArrayTypeType ||
+				expr->b->type()->getType() == Type::StructureTypeType || expr->b->type()->getType() == Type::ArrayTypeType)
 			{
 				// Replace expr with an op_mul function call.
 				e = ASTNodeRef(new FunctionExpression(expr->srcLocation(), "op_mul", expr->a, expr->b));
@@ -218,8 +241,8 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::v
 	{
 		DivExpression* expr = static_cast<DivExpression*>(e.getPointer());
 		if(expr->a->type().nonNull() && expr->b->type().nonNull())
-			if(	expr->a->type()->getType() == Type::StructureTypeType ||
-				expr->b->type()->getType() == Type::StructureTypeType)
+			if(	expr->a->type()->getType() == Type::StructureTypeType || expr->a->type()->getType() == Type::ArrayTypeType ||
+				expr->b->type()->getType() == Type::StructureTypeType || expr->b->type()->getType() == Type::ArrayTypeType)
 				{
 					// Replace expr with an op_div function call.
 					e = ASTNodeRef(new FunctionExpression(expr->srcLocation(), "op_div", expr->a, expr->b));
@@ -260,12 +283,96 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::v
 }
 
 
+/*
+Process an AST node with two children, a and b.
+
+Do implicit conversion from int to float
+3.0 > 4      =>       3.0 > 4.0
+
+Updates the nodes a and b in place if needed.
+*/
+static void doImplicitIntToFloatTypeCoercion(ASTNodeRef& a, ASTNodeRef& b, TraversalPayload& payload)
+{
+	// Type may be null if 'a' is a variable node that has not been bound yet.
+	const TypeRef a_type = a->type(); 
+	const TypeRef b_type = b->type();
+
+	if(a_type.nonNull() && a_type->getType() == Type::FloatType && b->nodeType() == ASTNode::IntLiteralType)
+	{
+		IntLiteral* b_lit = static_cast<IntLiteral*>(b.getPointer());
+		if(isIntExactlyRepresentableAsFloat(b_lit->value))
+		{
+			b = ASTNodeRef(new FloatLiteral((float)b_lit->value, b->srcLocation()));
+			payload.tree_changed = true;
+		}
+	}
+
+	// 3 > 4.0      =>        3.0 > 4.0
+	if(b_type.nonNull() && b_type->getType() == Type::FloatType && a->nodeType() == ASTNode::IntLiteralType)
+	{
+		IntLiteral* a_lit = static_cast<IntLiteral*>(a.getPointer());
+		if(isIntExactlyRepresentableAsFloat(a_lit->value))
+		{
+			a = ASTNodeRef(new FloatLiteral((float)a_lit->value, a->srcLocation()));
+			payload.tree_changed = true;
+		}
+	}
+}
+
+
 template <class T> 
 T cast(ValueRef& v)
 {
 	assert(dynamic_cast<T>(v.getPointer()) != NULL);
 	return static_cast<T>(v.getPointer());
 }
+
+
+
+
+
+/*
+Do two expressions have the same value?
+
+Cases where they have the same value:
+
+both variable nodes that refer to the same variable.
+
+*/
+bool expressionsHaveSameValue(const ASTNodeRef& a, const ASTNodeRef& b)
+{
+	if(a->nodeType() == ASTNode::VariableASTNodeType && b->nodeType() == ASTNode::VariableASTNodeType)
+	{
+		const Variable* avar = static_cast<const Variable*>(a.getPointer());
+		const Variable* bvar = static_cast<const Variable*>(b.getPointer());
+
+		if(avar->vartype != bvar->vartype)
+			return false;
+
+		if(avar->vartype == Variable::ArgumentVariable)
+		{
+			return 
+				avar->bound_function == bvar->bound_function && 
+				avar->bound_index == bvar->bound_index;
+		}
+		else if(avar->vartype == Variable::LetVariable)
+		{
+			return 
+				avar->bound_let_block == bvar->bound_let_block && 
+				avar->bound_index == bvar->bound_index;
+		}
+		else
+		{
+			// TODO: captured vars etc..
+			assert(0);
+		}
+	}
+
+	return false;
+}
+
+
+//----------------------------------------------------------------------------------
 
 
 CapturedVar::CapturedVar()
@@ -294,6 +401,28 @@ TypeRef CapturedVar::type() const
 }
 
 
+//----------------------------------------------------------------------------------
+
+
+void ASTNode::emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* val) const
+{
+	assert(0);
+}
+
+
+// For the global const array optimisation: Return the AST node as a LLVM value directly.
+llvm::Value* ASTNode::getConstantLLVMValue(EmitLLVMCodeParams& params) const
+{
+	// By default, just return emitLLVMCode().  This will work for pass-by-value types.
+	assert(this->type()->passByValue());
+
+	// TODO: check is constant
+	llvm::Value* v = this->emitLLVMCode(params);
+	
+	return v;
+}
+
+
 /*
 ASTNode::ASTNode()
 {
@@ -305,6 +434,10 @@ ASTNode::~ASTNode()
 {
 	
 }*/
+
+
+//----------------------------------------------------------------------------------
+
 
 /*void BufferRoot::linkFunctions(Linker& linker)
 {
@@ -344,7 +477,19 @@ void BufferRoot::print(int depth, std::ostream& s) const
 }
 
 
-llvm::Value* BufferRoot::emitLLVMCode(EmitLLVMCodeParams& params) const
+std::string BufferRoot::sourceString() const
+{
+	std::string s;
+	for(unsigned int i=0; i<func_defs.size(); ++i)
+	{
+		s += func_defs[i]->sourceString();
+		s += "\n";
+	}
+	return s;
+}
+
+
+llvm::Value* BufferRoot::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
 	assert(0);
 	return NULL;
@@ -391,7 +536,7 @@ const std::string errorContext(const ASTNode& n, TraversalPayload& payload)
 
 
 Variable::Variable(const std::string& name_, const SrcLocation& loc)
-:	ASTNode(loc),
+:	ASTNode(VariableASTNodeType, loc),
 	vartype(UnboundVariable),
 	name(name_),
 	bound_index(-1),
@@ -453,17 +598,19 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 			LetBlock* let_block = static_cast<LetBlock*>(stack[s]);
 
 			for(unsigned int i=0; i<let_block->lets.size(); ++i)
-				if(let_block->lets[i]->variable_name == this->name)
+			{
+				// If 'this' is in the let expression for the current Let Block, then don't bind to it's variable name
+				// In cases like
+				// let
+				//   x = x
+				// This avoids the x expression on the right binding to the x Let node on the left.
+				if((s + 1 < stack.size()) && (stack[s+1]->nodeType() == ASTNode::LetType) && (let_block->lets[i].getPointer() == stack[s+1]))
 				{
-					// If 'this' is in the let expression for the current Let Block, then don't bind to it's variable name
-					// In cases like
-					// let
-					//   x = x
-					// This avoids the x expression on the right binding to the x Let node on the left.
-					if((s + 1 < stack.size()) && (stack[s+1]->nodeType() == ASTNode::LetType) && (let_block->lets[i].getPointer() == stack[s+1]))
-					{
-					}
-					else
+				}
+				else
+				{
+
+					if(let_block->lets[i]->variable_name == this->name)
 					{
 						if(!in_current_func_def && payload.func_def_stack.back()->use_captured_vars)
 						{
@@ -496,6 +643,7 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 						return;
 					}
 				}
+			}
 
 			// We only want to count an ancestor let block as an offsetting block if we are not currently in a let clause of it.
 			/*bool is_this_let_clause = false;
@@ -591,7 +739,7 @@ TypeRef Variable::type() const
 	}
 	else
 	{
-		assert(!"invalid vartype.");
+		//assert(!"invalid vartype.");
 		return TypeRef(NULL);
 	}
 }
@@ -624,12 +772,21 @@ void Variable::print(int depth, std::ostream& s) const
 }
 
 
-llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params) const
+std::string Variable::sourceString() const
+{
+	return this->name;
+}
+
+
+llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
 #if USE_LLVM
 	if(vartype == LetVariable)
 	{
-		return this->bound_let_block->getLetExpressionLLVMValue(params, this->bound_index);
+		//return this->bound_let_block->getLetExpressionLLVMValue(params, this->bound_index, ret_space_ptr);
+		//TEMP:
+		assert(params.let_block_let_values.find(this->bound_let_block) != params.let_block_let_values.end());
+		return params.let_block_let_values[this->bound_let_block][this->bound_index];
 	}
 	else if(vartype == ArgumentVariable)
 	{
@@ -643,10 +800,38 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params) const
 			//else
 			//	return LLVMTypeUtils::getNthArg(params.currently_building_func, this->bound_index + 1);
 
-		return LLVMTypeUtils::getNthArg(
+		llvm::Value* arg = LLVMTypeUtils::getNthArg(
 			params.currently_building_func,
 			params.currently_building_func_def->getLLVMArgIndex(this->bound_index)
 		);
+
+		return arg;
+
+		/*if(ret_space_ptr)
+		{
+			assert(!this->type()->passByValue());
+
+			llvm::Value* size;
+			if(this->type()->getType() == Type::ArrayTypeType)
+			{
+				size = llvm::ConstantInt::get(*params.context, llvm::APInt(32, sizeof(float) * 4, true)); // TEMP HACK
+				//size = //this->type().downcast<ArrayType>()->t->LLVMType(*params.context)->getPrimitiveSizeInBits() * 8;
+			}
+			else
+			{
+				assert(0);
+			}
+			// Need to copy the value from the mem at arg to the mem at ret_space_ptr
+			params.builder->CreateMemCpy(
+				ret_space_ptr, // dest
+				arg, // src
+				size, // size
+				4 // align
+			);
+		}
+
+		return ret_space_ptr;*/
+
 		/*}
 		else
 		{
@@ -660,7 +845,7 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params) const
 	}
 	else if(vartype == BoundToGlobalDefVariable)
 	{
-		return this->bound_function->emitLLVMCode(params);
+		return this->bound_function->emitLLVMCode(params, ret_space_ptr);
 	}
 	else if(vartype == CapturedVariable)
 	{
@@ -752,7 +937,13 @@ void FloatLiteral::print(int depth, std::ostream& s) const
 }
 
 
-llvm::Value* FloatLiteral::emitLLVMCode(EmitLLVMCodeParams& params) const
+std::string FloatLiteral::sourceString() const
+{
+	return toString(this->value);
+}
+
+
+llvm::Value* FloatLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
 #if USE_LLVM
 	return llvm::ConstantFP::get(
@@ -787,7 +978,13 @@ void IntLiteral::print(int depth, std::ostream& s) const
 }
 
 
-llvm::Value* IntLiteral::emitLLVMCode(EmitLLVMCodeParams& params) const
+std::string IntLiteral::sourceString() const
+{
+	return toString(this->value);
+}
+
+
+llvm::Value* IntLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
 #if USE_LLVM
 	return llvm::ConstantInt::get(
@@ -826,7 +1023,14 @@ void BoolLiteral::print(int depth, std::ostream& s) const
 }
 
 
-llvm::Value* BoolLiteral::emitLLVMCode(EmitLLVMCodeParams& params) const
+std::string BoolLiteral::sourceString() const
+{
+	return boolToString(this->value);
+}
+
+
+
+llvm::Value* BoolLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
 	return llvm::ConstantInt::get(
 		*params.context, 
@@ -889,6 +1093,13 @@ void MapLiteral::print(int depth, std::ostream& s) const
 }
 
 
+std::string MapLiteral::sourceString() const
+{
+	assert(0);
+	return "";
+}
+
+
 void MapLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
 	if(payload.operation == TraversalPayload::ConstantFolding)
@@ -927,7 +1138,7 @@ void MapLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 }
 
 
-llvm::Value* MapLiteral::emitLLVMCode(EmitLLVMCodeParams& params) const
+llvm::Value* MapLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
 	return NULL;
 }
@@ -956,7 +1167,7 @@ bool MapLiteral::isConstant() const
 
 
 ArrayLiteral::ArrayLiteral(const std::vector<ASTNodeRef>& elems, const SrcLocation& loc)
-:	ASTNode(loc),
+:	ASTNode(ArrayLiteralType, loc),
 	elements(elems)
 {
 	//this->t
@@ -965,9 +1176,9 @@ ArrayLiteral::ArrayLiteral(const std::vector<ASTNodeRef>& elems, const SrcLocati
 }
 
 
-TypeRef ArrayLiteral::type() const// { return array_type; }
+TypeRef ArrayLiteral::type() const
 {
-	return TypeRef(new ArrayType(elements[0]->type()));
+	return new ArrayType(elements[0]->type(), elements.size());
 }
 
 
@@ -994,6 +1205,13 @@ void ArrayLiteral::print(int depth, std::ostream& s) const
 		printMargin(depth+1, s);
 		this->elements[i]->print(depth+2, s);
 	}
+}
+
+
+std::string ArrayLiteral::sourceString() const
+{
+	assert(0);
+	return "";
 }
 
 
@@ -1036,8 +1254,109 @@ void ArrayLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 }
 
 
-llvm::Value* ArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params) const
+bool ArrayLiteral::areAllElementsConstant() const
 {
+	for(size_t i=0; i<this->elements.size(); ++i)
+		if(!this->elements[i]->isConstant())
+			return false;
+	return true;
+}
+
+
+llvm::Value* ArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
+{
+	//if(!ret_space_ptr)
+	//{
+
+	// Check if all elements in the array are constant.  If so, use a constant global array.
+	if(this->areAllElementsConstant())
+	{
+		vector<llvm::Constant*> array_llvm_values(this->elements.size());
+
+		for(size_t i=0; i<elements.size(); ++i)
+		{
+			VMState vm_state(true); // hidden_voidptr_arg
+			vm_state.func_args_start.push_back(0);
+			vm_state.argument_stack.push_back(ValueRef(new VoidPtrValue(NULL)));
+			ValueRef value = this->elements[i]->exec(vm_state);
+			array_llvm_values[i] = value->getConstantLLVMValue(params, this->type().downcast<ArrayType>()->elem_type);
+		}
+
+		assert(this->type()->LLVMType(*params.context)->isArrayTy());
+
+		llvm::GlobalVariable* global = new llvm::GlobalVariable(
+			*params.module,
+			this->type()->LLVMType(*params.context), // This type (array type)
+			true, // is constant
+			llvm::GlobalVariable::InternalLinkage,
+			llvm::ConstantArray::get(
+				(llvm::ArrayType*)this->type()->LLVMType(*params.context),
+				array_llvm_values
+			)
+		);
+
+		return global;
+	}
+	//}
+
+
+
+	llvm::Value* array_addr;
+	if(ret_space_ptr)
+		array_addr = ret_space_ptr;
+	else
+	{
+		// Allocate space on stack for array
+		
+		// Emit the alloca in the entry block for better code-gen.
+		llvm::IRBuilder<> entry_block_builder(&params.currently_building_func->getEntryBlock());
+
+		array_addr = entry_block_builder.CreateAlloca(
+			this->type()->LLVMType(*params.context), // This type (array type)
+			llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1, true)), // num elems
+			//this->elements[0]->type()->LLVMType(*params.context),
+			//llvm::ConstantInt::get(*params.context, llvm::APInt(32, this->elements.size(), true)), // num elems
+			"Array literal space"
+		);
+	}
+
+	// For each element in the literal
+	for(unsigned int i=0; i<this->elements.size(); ++i)
+	{
+		vector<llvm::Value*> indices(2);
+		indices[0] = llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true)); // Zeroth array
+		indices[1] = llvm::ConstantInt::get(*params.context, llvm::APInt(32, i, true)); // i-th element in array
+			
+		llvm::Value* element_ptr = params.builder->CreateGEP(
+			array_addr, // ptr
+			indices
+		);
+
+		if(this->elements[i]->type()->passByValue())
+		{
+			llvm::Value* element_value = this->elements[i]->emitLLVMCode(params);
+
+			// Store the element in the array
+			params.builder->CreateStore(
+				element_value, // value
+				element_ptr // ptr
+			);
+		}
+		else
+		{
+			// Element is pass-by-pointer, for example a structure.
+			// So just emit code that will store it directly in the array.
+			llvm::Value* element_value = this->elements[i]->emitLLVMCode(params, element_ptr);
+		}
+	}
+
+	return array_addr;//NOTE: this correct?
+}
+
+
+llvm::Value* ArrayLiteral::getConstantLLVMValue(EmitLLVMCodeParams& params) const
+{
+	assert(0);
 	return NULL;
 }
 
@@ -1064,7 +1383,7 @@ bool ArrayLiteral::isConstant() const
 
 
 VectorLiteral::VectorLiteral(const std::vector<ASTNodeRef>& elems, const SrcLocation& loc)
-:	ASTNode(loc),
+:	ASTNode(VectorLiteralType, loc),
 	elements(elems)
 {
 	if(elems.empty())
@@ -1104,6 +1423,13 @@ void VectorLiteral::print(int depth, std::ostream& s) const
 }
 
 
+std::string VectorLiteral::sourceString() const
+{
+	assert(0);
+	return "";
+}
+
+
 void VectorLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
 	if(payload.operation == TraversalPayload::ConstantFolding)
@@ -1121,6 +1447,29 @@ void VectorLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	{
 		for(size_t i=0; i<elements.size(); ++i)
 			convertOverloadedOperators(elements[i], payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::TypeCoercion)
+	{
+		// Convert e.g. [1.0, 2.0, 3]v to [1.0, 2.0, 3.0]v
+
+		// Do we have any floats in this vector?
+		bool have_float = false;
+		for(size_t i=0; i<elements.size(); ++i)
+			have_float = have_float || (elements[i]->nodeType() == ASTNode::FloatLiteralType);
+
+		if(have_float)
+		{
+			for(size_t i=0; i<elements.size(); ++i)
+				if(elements[i]->nodeType() == ASTNode::IntLiteralType)
+				{
+					const IntLiteral* int_lit = static_cast<const IntLiteral*>(elements[i].getPointer());
+					if(isIntExactlyRepresentableAsFloat(int_lit->value))
+					{
+						elements[i] = ASTNodeRef(new FloatLiteral((float)int_lit->value, int_lit->srcLocation()));
+						payload.tree_changed = true;
+					}
+				}
+		}
 	}
 
 
@@ -1142,36 +1491,57 @@ void VectorLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 }
 
 
-llvm::Value* VectorLiteral::emitLLVMCode(EmitLLVMCodeParams& params) const
+bool VectorLiteral::areAllElementsConstant() const
 {
-	// Get LLVM vector type
-	//const llvm::VectorType* llvm_vec_type = llvm::VectorType::get(
-	//	this->elements[0]->type()->LLVMType(*params.context),
-	//	this->elements.size()
-	//);
+	for(size_t i=0; i<this->elements.size(); ++i)
+		if(!this->elements[i]->isConstant())
+			return false;
+	return true;
+}
 
-	const llvm::VectorType* llvm_vec_type = (const llvm::VectorType*)this->type()->LLVMType(*params.context);
 
-	//Value* default_val = this->elements[0]->type()->getDefaultValue();
+llvm::Value* VectorLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
+{
+	// Check if all elements in the array are constant.  If so, use a constant global array.
+	/*if(this->areAllElementsConstant())
+	{
+		vector<llvm::Constant*> llvm_values(this->elements.size());
 
-	// Create an initial constant vector with default values.
-	llvm::Value* v = llvm::ConstantVector::get(
-		//llvm_vec_type, 
-		std::vector<llvm::Constant*>(
-			this->elements.size(),
-			this->elements[0]->type()->defaultLLVMValue(*params.context)
-			//llvm::ConstantFP::get(*params.context, llvm::APFloat(0.0))
-		)
+		for(size_t i=0; i<elements.size(); ++i)
+		{
+			VMState vm_state(true); // hidden_voidptr_arg
+			vm_state.func_args_start.push_back(0);
+			vm_state.argument_stack.push_back(ValueRef(new VoidPtrValue(NULL)));
+			ValueRef value = this->elements[i]->exec(vm_state);
+			llvm_values[i] = value->getConstantLLVMValue(params, this->type().downcast<VectorType>()->t);
+		}
+
+		assert(this->type()->LLVMType(*params.context)->isVectorTy());
+
+		llvm::GlobalVariable* global = new llvm::GlobalVariable(
+			*params.module,
+			this->type()->LLVMType(*params.context), // This type (vector type)
+			true, // is constant
+			llvm::GlobalVariable::InternalLinkage,
+			llvm::ConstantVector::get(
+				llvm_values
+			)
+		);
+
+		global->dump();//TEMP
+
+		return params.builder->CreateLoad(global);
+	}*/
+
+
+
+	// Start with a vector of Undefs.
+	llvm::Value* v = llvm::ConstantVector::getSplat(
+		(unsigned int)this->elements.size(),
+		llvm::UndefValue::get(this->elements[0]->type()->LLVMType(*params.context))
 	);
-	/*llvm::Value* v = llvm::ConstantVector::get(
-		llvm_vec_type, 
-		std::vector<llvm::Constant*>(
-			this->elements.size(),
-			this->elements[0]->type()->defaultLLVMValue(*params.context)
-			//llvm::ConstantFP::get(*params.context, llvm::APFloat(0.0))
-		)
-	);*/
 
+	// Insert elements one-by-one.
 	llvm::Value* vec = v;
 	for(unsigned int i=0; i<this->elements.size(); ++i)
 	{
@@ -1183,6 +1553,7 @@ llvm::Value* VectorLiteral::emitLLVMCode(EmitLLVMCodeParams& params) const
 			llvm::ConstantInt::get(*params.context, llvm::APInt(32, i)) // index
 		);
 	}
+
 	return vec;
 }
 
@@ -1208,28 +1579,180 @@ bool VectorLiteral::isConstant() const
 //------------------------------------------------------------------------------------------
 
 
+StringLiteral::StringLiteral(const std::string& v, const SrcLocation& loc) 
+:	ASTNode(StringLiteralType, loc), value(v)
+{
+
+}
+
+
 ValueRef StringLiteral::exec(VMState& vmstate)
 {
-	return ValueRef(new StringValue(value));
+	return new StringValue(value);
 }
 
 
 void StringLiteral::print(int depth, std::ostream& s) const
 {
 	printMargin(depth, s);
-	s << "String literal, value='" << this->value << "'\n";
+	s << "String literal: '" << this->value << "'\n";
 }
 
 
-llvm::Value* StringLiteral::emitLLVMCode(EmitLLVMCodeParams& params) const
+std::string StringLiteral::sourceString() const
 {
-	return NULL;
+	assert(0);
+	return "";
+}
+
+
+void StringLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
+{
+	/*if(payload.operation == TraversalPayload::BindVariables) // LinkFunctions)
+	{
+		const FunctionSignature allocateStringSig("allocateString", vector<TypeRef>(1, new VoidPtrType()));
+
+		// Try and resolve to internal function.
+		this->allocateStringFunc = payload.linker->findMatchingFunction(allocateStringSig).getPointer();
+
+		assert(this->allocateStringFunc);
+
+
+
+		const FunctionSignature freeStringSig("freeString", vector<TypeRef>(1, new String()));
+
+		// Try and resolve to internal function.
+		this->freeStringFunc = payload.linker->findMatchingFunction(freeStringSig).getPointer();
+
+		assert(this->freeStringFunc);
+	}*/
+}
+
+
+llvm::Value* StringLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
+{
+	// Make a global constant character array for the string data.
+	llvm::Value* string_global = params.builder->CreateGlobalString(
+		this->value
+	);
+
+	// Get a pointer to the zeroth elem
+	llvm::Value* elem_0 = params.builder->CreateConstInBoundsGEP2_32(string_global, 0, 0);
+
+	//elem_0->dump();
+
+	llvm::Value* elem_bitcast = params.builder->CreateBitCast(elem_0, LLVMTypeUtils::voidPtrType(*params.context));
+
+	//elem_bitcast->dump();
+
+	// Emit a call to allocateString
+	llvm::Function* allocateStringLLVMFunc = params.common_functions.allocateStringFunc->getOrInsertFunction(
+		params.module,
+		false, // use_cap_var_struct_ptr: False as global functions don't have captured vars. ?!?!?
+		true // target_takes_voidptr_arg // params.hidden_voidptr_arg
+	);
+
+	vector<llvm::Value*> args(1, elem_bitcast);
+
+	// Set hidden voidptr argument
+	const bool target_takes_voidptr_arg = true;
+	if(target_takes_voidptr_arg)
+		args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));
+
+
+	//allocateStringLLVMFunc->dump(); // TEMP
+
+	//args[0]->dump();
+	//args[1]->dump();
+
+	llvm::CallInst* call_inst = params.builder->CreateCall(allocateStringLLVMFunc, args, "str");
+
+	// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
+	call_inst->setCallingConv(llvm::CallingConv::C);
+
+	// Set the reference count to 1
+	llvm::Value* ref_ptr = params.builder->CreateConstInBoundsGEP2_32(call_inst, 0, 0, "ref ptr");
+
+	llvm::Value* one = llvm::ConstantInt::get(
+		*params.context,
+		llvm::APInt(64, 1, 
+			true // signed
+		)
+	);
+
+	params.builder->CreateStore(one, ref_ptr);
+
+	CleanUpInfo info;
+	info.node = this;
+	info.value = call_inst;
+	params.cleanup_values.push_back(info);
+
+	return call_inst;
+}
+
+
+void StringLiteral::emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* string_val) const
+{
+	RefCounting::emitStringCleanupLLVMCode(params, string_val);
 }
 
 
 Reference<ASTNode> StringLiteral::clone()
 {
 	return ASTNodeRef(new StringLiteral(*this));
+}
+
+
+//-----------------------------------------------------------------------------------------------
+
+
+CharLiteral::CharLiteral(const std::string& v, const SrcLocation& loc) 
+:	ASTNode(CharLiteralType, loc), value(v)
+{
+
+}
+
+
+ValueRef CharLiteral::exec(VMState& vmstate)
+{
+	return ValueRef(new CharValue(value));
+}
+
+
+void CharLiteral::print(int depth, std::ostream& s) const
+{
+	printMargin(depth, s);
+	s << "Char literal: '" << this->value << "'\n";
+}
+
+
+std::string CharLiteral::sourceString() const
+{
+	assert(0);
+	return "";
+}
+
+
+void CharLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
+{
+}
+
+
+llvm::Value* CharLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
+{
+	return NULL;
+}
+
+
+void CharLiteral::emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* string_val) const
+{
+	//emitStringCleanupLLVMCode(params, string_val);
+}
+
+
+Reference<ASTNode> CharLiteral::clone()
+{
+	return ASTNodeRef(new CharLiteral(*this));
 }
 
 //-----------------------------------------------------------------------------------------------
@@ -1262,60 +1785,122 @@ public:
 template <class Op>
 ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 {
-	ValueRef aval = a->exec(vmstate);
-	ValueRef bval = b->exec(vmstate);
-
-	ValueRef retval;
+	const ValueRef aval = a->exec(vmstate);
+	const ValueRef bval = b->exec(vmstate);
 
 	switch(a->type()->getType())
 	{
 	case Type::FloatType:
-		retval = ValueRef(new FloatValue(op(
-			static_cast<FloatValue*>(aval.getPointer())->value,
-			static_cast<FloatValue*>(bval.getPointer())->value
-		)));
-		break;
+		{
+			if(b->type()->getType() == Type::VectorTypeType) // float * vector
+			{
+				VectorValue* bval_vec = static_cast<VectorValue*>(bval.getPointer());
+				vector<ValueRef> elem_values(bval_vec->e.size());
+				for(unsigned int i=0; i<elem_values.size(); ++i)
+					elem_values[i] = ValueRef(new FloatValue(op(
+						static_cast<FloatValue*>(aval.getPointer())->value,
+						static_cast<FloatValue*>(bval_vec->e[i].getPointer())->value
+					)));
+				return new VectorValue(elem_values);
+			}
+			else // Else float * float
+			{
+				return new FloatValue(op(
+					static_cast<FloatValue*>(aval.getPointer())->value,
+					static_cast<FloatValue*>(bval.getPointer())->value
+				));
+			}
+		}
 	case Type::IntType:
-		retval = ValueRef(new IntValue(op(
-			static_cast<IntValue*>(aval.getPointer())->value,
-			static_cast<IntValue*>(bval.getPointer())->value
-		)));
-		break;
+		{
+			if(b->type()->getType() == Type::VectorTypeType) // int * vector
+			{
+				VectorValue* bval_vec = static_cast<VectorValue*>(bval.getPointer());
+				vector<ValueRef> elem_values(bval_vec->e.size());
+				for(unsigned int i=0; i<elem_values.size(); ++i)
+					elem_values[i] = ValueRef(new IntValue(op(
+						static_cast<IntValue*>(aval.getPointer())->value,
+						static_cast<IntValue*>(bval_vec->e[i].getPointer())->value
+					)));
+				return new VectorValue(elem_values);
+			}
+			else // Else int * int
+			{
+				return new IntValue(op(
+					static_cast<IntValue*>(aval.getPointer())->value,
+					static_cast<IntValue*>(bval.getPointer())->value
+				));
+			}
+		}
 	case Type::VectorTypeType:
 		{
-		TypeRef this_type = a->type();
-		VectorType* vectype = static_cast<VectorType*>(this_type.getPointer());
+			TypeRef this_type = a->type();
+			VectorType* vectype = static_cast<VectorType*>(this_type.getPointer());
 
-		VectorValue* aval_vec = static_cast<VectorValue*>(aval.getPointer());
-		VectorValue* bval_vec = static_cast<VectorValue*>(bval.getPointer());
-		vector<ValueRef> elem_values(aval_vec->e.size());
-		switch(vectype->t->getType())
-		{
-		case Type::FloatType:
-			for(unsigned int i=0; i<elem_values.size(); ++i)
-				elem_values[i] = ValueRef(new FloatValue(op(
-					static_cast<FloatValue*>(aval_vec->e[i].getPointer())->value,
-					static_cast<FloatValue*>(bval_vec->e[i].getPointer())->value
-				)));
-			break;
-		case Type::IntType:
-			for(unsigned int i=0; i<elem_values.size(); ++i)
-				elem_values[i] = ValueRef(new IntValue(op(
-					static_cast<IntValue*>(aval_vec->e[i].getPointer())->value,
-					static_cast<IntValue*>(bval_vec->e[i].getPointer())->value
-				)));
-			break;
-		default:
-			assert(!"expression vector field type invalid!");
-		};
-		retval = ValueRef(new VectorValue(elem_values));
-		break;
+			VectorValue* aval_vec = static_cast<VectorValue*>(aval.getPointer());
+		
+			vector<ValueRef> elem_values(aval_vec->e.size());
+			switch(vectype->elem_type->getType())
+			{
+			case Type::FloatType:
+				{
+					if(b->type()->getType() == Type::VectorTypeType) // Vector * vector
+					{
+						VectorValue* bval_vec = static_cast<VectorValue*>(bval.getPointer());
+						for(unsigned int i=0; i<elem_values.size(); ++i)
+							elem_values[i] = ValueRef(new FloatValue(op(
+								static_cast<FloatValue*>(aval_vec->e[i].getPointer())->value,
+								static_cast<FloatValue*>(bval_vec->e[i].getPointer())->value
+							)));
+					}
+					else if(b->type()->getType() == Type::FloatType) // Vector * float
+					{
+						for(unsigned int i=0; i<elem_values.size(); ++i)
+							elem_values[i] = ValueRef(new FloatValue(op(
+								static_cast<FloatValue*>(aval_vec->e[i].getPointer())->value,
+								static_cast<FloatValue*>(bval.getPointer())->value
+							)));
+					}
+					else
+					{
+						assert(0);
+					}
+					break;
+				}
+			case Type::IntType:
+				{
+					if(b->type()->getType() == Type::VectorTypeType) // Vector * vector
+					{
+						VectorValue* bval_vec = static_cast<VectorValue*>(bval.getPointer());
+						for(unsigned int i=0; i<elem_values.size(); ++i)
+							elem_values[i] = ValueRef(new IntValue(op(
+								static_cast<IntValue*>(aval_vec->e[i].getPointer())->value,
+								static_cast<IntValue*>(bval_vec->e[i].getPointer())->value
+							)));
+					}
+					else if(b->type()->getType() == Type::IntType) // Vector * int
+					{
+						for(unsigned int i=0; i<elem_values.size(); ++i)
+							elem_values[i] = ValueRef(new IntValue(op(
+								static_cast<IntValue*>(aval_vec->e[i].getPointer())->value,
+								static_cast<IntValue*>(bval.getPointer())->value
+							)));
+					}
+					else
+					{
+						assert(0);
+					}
+					break;
+				}
+			default:
+				assert(!"expression vector field type invalid!");
+			};
+			return new VectorValue(elem_values);
 		}
 	default:
 		assert(!"expression type invalid!");
+		return ValueRef();
 	}
-
-	return retval;
 }
 
 
@@ -1331,6 +1916,12 @@ void AdditionExpression::print(int depth, std::ostream& s) const
 	s << "Addition Expression\n";
 	this->a->print(depth+1, s);
 	this->b->print(depth+1, s);
+}
+
+
+std::string AdditionExpression::sourceString() const
+{
+	return "(" + a->sourceString() + " + " + b->sourceString() + ")";
 }
 
 
@@ -1381,9 +1972,11 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 	}
 	else if(payload.operation == TraversalPayload::TypeCoercion)
 	{
+		doImplicitIntToFloatTypeCoercion(a, b, payload);
+
 		// implicit conversion from int to float in addition operation:
 		// 3.0 + 4
-		if(a->nodeType() == ASTNode::FloatLiteralType && b->nodeType() == ASTNode::IntLiteralType)
+		/*if(a->nodeType() == ASTNode::FloatLiteralType && b->nodeType() == ASTNode::IntLiteralType)
 		{
 			IntLiteral* b_lit = static_cast<IntLiteral*>(b.getPointer());
 			if(isIntExactlyRepresentableAsFloat(b_lit->value))
@@ -1402,20 +1995,23 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 				a = ASTNodeRef(new FloatLiteral((float)a_lit->value, a->srcLocation()));
 				payload.tree_changed = true;
 			}
-		}
+		}*/
 	}
 	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
-		if(this->type()->getType() == Type::GenericTypeType || *this->type() == Int() || *this->type() == Float())
+		if(this->type()->getType() == Type::GenericTypeType || this->type()->getType() == Type::IntType || this->type()->getType() == Type::FloatType)
 		{
 			if(*a->type() != *b->type())
 				throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
 		}
-		else if(a->type()->getType() == Type::VectorTypeType && b->type()->getType() == Type::VectorTypeType)
+		else if(a->type()->getType() == Type::VectorTypeType && b->type()->getType() == Type::VectorTypeType) // Vector + vector addition.
 		{
-			// this is alright.
-			// NOTE: need to do more checking tho.
-			// Need to check number of elements is same in both vectors, and field types are the same.
+			if(*a->type() != *b->type())
+				throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
+
+			// Check element type is int or float
+			if(!(a->type().downcast<VectorType>()->elem_type->getType() == Type::IntType || a->type().downcast<VectorType>()->elem_type->getType() == Type::FloatType))
+				throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
 		}
 		else
 		{
@@ -1427,21 +2023,42 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 }
 
 
-llvm::Value* AdditionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
+llvm::Value* AdditionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
 #if USE_LLVM
-	if(this->type()->getType() == Type::VectorTypeType || this->type()->getType() == Type::FloatType)
+	if(this->type()->getType() == Type::VectorTypeType)
 	{
-		return params.builder->CreateBinOp(
-			llvm::Instruction::FAdd, 
+		const TypeRef elem_type = this->type().downcast<VectorType>()->elem_type;
+		if(elem_type->getType() == Type::FloatType)
+		{
+			return params.builder->CreateFAdd(
+				a->emitLLVMCode(params), 
+				b->emitLLVMCode(params)
+			);
+		}
+		else if(elem_type->getType() == Type::IntType)
+		{
+			return params.builder->CreateAdd(
+				a->emitLLVMCode(params), 
+				b->emitLLVMCode(params)
+			);
+		}
+		else
+		{
+			assert(0);
+			return NULL;
+		}
+	}
+	else if(this->type()->getType() == Type::FloatType)
+	{
+		return params.builder->CreateFAdd(
 			a->emitLLVMCode(params), 
 			b->emitLLVMCode(params)
 		);
 	}
 	else if(this->type()->getType() == Type::IntType)
 	{
-		return params.builder->CreateBinOp(
-			llvm::Instruction::Add, 
+		return params.builder->CreateAdd(
 			a->emitLLVMCode(params), 
 			b->emitLLVMCode(params)
 		);
@@ -1486,6 +2103,12 @@ void SubtractionExpression::print(int depth, std::ostream& s) const
 	s << "Subtraction Expression\n";
 	this->a->print(depth+1, s);
 	this->b->print(depth+1, s);
+}
+
+
+std::string SubtractionExpression::sourceString() const
+{
+	return a->sourceString() + " - " + b->sourceString();
 }
 
 
@@ -1534,9 +2157,11 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 	}
 	else if(payload.operation == TraversalPayload::TypeCoercion)
 	{
+		doImplicitIntToFloatTypeCoercion(a, b, payload);
+
 		// implicit conversion from int to float
 		// 3.0 - 4
-		if(a->nodeType() == ASTNode::FloatLiteralType && b->nodeType() == ASTNode::IntLiteralType)
+		/*if(a->nodeType() == ASTNode::FloatLiteralType && b->nodeType() == ASTNode::IntLiteralType)
 		{
 			IntLiteral* b_lit = static_cast<IntLiteral*>(b.getPointer());
 			if(isIntExactlyRepresentableAsFloat(b_lit->value))
@@ -1555,25 +2180,28 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 				a = ASTNodeRef(new FloatLiteral((float)a_lit->value, a->srcLocation()));
 				payload.tree_changed = true;
 			}
-		}
+		}*/
 	}
 
 	if(payload.operation == TraversalPayload::TypeCheck)
 	{
-		if(this->type()->getType() == Type::GenericTypeType || *this->type() == Int() || *this->type() == Float())
+		if(this->type()->getType() == Type::GenericTypeType || this->type()->getType() == Type::IntType || this->type()->getType() == Type::FloatType)
 		{
 			if(*a->type() != *b->type())
-				throw BaseException("Binary operator '-' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
+				throw BaseException("AdditionExpression: Binary operator '-' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
 		}
-		else if(a->type()->getType() == Type::VectorTypeType && b->type()->getType() == Type::VectorTypeType)
+		else if(a->type()->getType() == Type::VectorTypeType && b->type()->getType() == Type::VectorTypeType) // Vector + vector addition.
 		{
-			// this is alright.
-			// NOTE: need to do more checking tho.
-			// Need to check number of elements is same in both vectors, and field types are the same.
+			if(*a->type() != *b->type())
+				throw BaseException("AdditionExpression: Binary operator '-' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
+
+			// Check element type is int or float
+			if(!(a->type().downcast<VectorType>()->elem_type->getType() == Type::IntType || a->type().downcast<VectorType>()->elem_type->getType() == Type::FloatType))
+				throw BaseException("AdditionExpression: Binary operator '-' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
 		}
 		else
 		{
-			throw BaseException("Binary operator '-' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
+			throw BaseException("AdditionExpression: Binary operator '-' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
 		}
 	}
 
@@ -1581,7 +2209,7 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 }
 
 
-llvm::Value* SubtractionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
+llvm::Value* SubtractionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
 #if USE_LLVM
 	if(this->type()->getType() == Type::VectorTypeType || this->type()->getType() == Type::FloatType)
@@ -1636,6 +2264,14 @@ ValueRef MulExpression::exec(VMState& vmstate)
 
 TypeRef MulExpression::type() const
 {
+	// For cases like vector<float, n> * float, we want to return the vector type.
+	const TypeRef a_type = a->type(); // May be null if non-bound var.
+	const TypeRef b_type = b->type();
+	if(a_type.nonNull() && a_type->getType() == Type::VectorTypeType)
+		return a->type();
+	else if(b_type.nonNull() && b_type->getType() == Type::VectorTypeType)
+		return b->type();
+
 	return a->type();
 }
 
@@ -1677,9 +2313,11 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	}
 	else if(payload.operation == TraversalPayload::TypeCoercion)
 	{
+		doImplicitIntToFloatTypeCoercion(a, b, payload);
+
 		// implicit conversion from int to float
 		// 3.0 * 4
-		if(a->nodeType() == ASTNode::FloatLiteralType && b->nodeType() == ASTNode::IntLiteralType)
+		/*if(a->nodeType() == ASTNode::FloatLiteralType && b->nodeType() == ASTNode::IntLiteralType)
 		{
 			IntLiteral* b_lit = static_cast<IntLiteral*>(b.getPointer());
 			if(isIntExactlyRepresentableAsFloat(b_lit->value))
@@ -1698,24 +2336,43 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 				a = ASTNodeRef(new FloatLiteral((float)a_lit->value, a->srcLocation()));
 				payload.tree_changed = true;
 			}
-		}
+		}*/
 	}
 	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
-		if(this->type()->getType() == Type::GenericTypeType || *this->type() == Int() || *this->type() == Float())
+		if(this->type()->getType() == Type::GenericTypeType || this->type()->getType() == Type::IntType || this->type()->getType() == Type::FloatType)
 		{
 			if(*a->type() != *b->type())
-				throw BaseException("Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
+				throw BaseException("AdditionExpression: Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
 		}
-		else if(a->type()->getType() == Type::VectorTypeType && b->type()->getType() == Type::VectorTypeType)
+		else if(a->type()->getType() == Type::VectorTypeType && b->type()->getType() == Type::VectorTypeType) // Vector + vector addition.
 		{
-			// this is alright.
-			// NOTE: need to do more checking tho.
-			// Need to check number of elements is same in both vectors, and field types are the same.
+			if(*a->type() != *b->type())
+				throw BaseException("AdditionExpression: Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
+
+			// Check element type is int or float
+			if(!(a->type().downcast<VectorType>()->elem_type->getType() == Type::IntType || a->type().downcast<VectorType>()->elem_type->getType() == Type::FloatType))
+				throw BaseException("AdditionExpression: Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
+		}
+		else if(a->type()->getType() == Type::VectorTypeType && *b->type() == *a->type().downcast<VectorType>()->elem_type)
+		{
+			// A is a vector<T>, and B is of type T
+
+			// Check element type is int or float
+			if(!(a->type().downcast<VectorType>()->elem_type->getType() == Type::IntType || a->type().downcast<VectorType>()->elem_type->getType() == Type::FloatType))
+				throw BaseException("AdditionExpression: Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
+		}
+		else if(b->type()->getType() == Type::VectorTypeType && *a->type() == *b->type().downcast<VectorType>()->elem_type)
+		{
+			// B is a vector<T>, and A is of type T
+
+			// Check element type is int or float
+			if(!(b->type().downcast<VectorType>()->elem_type->getType() == Type::IntType || b->type().downcast<VectorType>()->elem_type->getType() == Type::FloatType))
+				throw BaseException("AdditionExpression: Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
 		}
 		else
 		{
-			throw BaseException("Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
+			throw BaseException("AdditionExpression: Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
 		}
 	}
 
@@ -1732,6 +2389,12 @@ void MulExpression::print(int depth, std::ostream& s) const
 }
 
 
+std::string MulExpression::sourceString() const
+{
+	return "(" + a->sourceString() + " * " + b->sourceString() + ")";
+}
+
+
 /*void MulExpression::linkFunctions(Linker& linker)
 {
 	a->linkFunctions(linker);
@@ -1739,13 +2402,108 @@ void MulExpression::print(int depth, std::ostream& s) const
 }*/
 
 
-llvm::Value* MulExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
+llvm::Value* MulExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
 #if USE_LLVM
-	if(this->type()->getType() == Type::VectorTypeType || this->type()->getType() == Type::FloatType)
+	if(this->type()->getType() == Type::VectorTypeType)
 	{
-		return params.builder->CreateBinOp(
-			llvm::Instruction::FMul, 
+		if(a->type()->getType() == Type::FloatType)
+		{
+			// float * vector<float>
+			assert(b->type()->getType() == Type::VectorTypeType);
+
+			// Splat a to a vector<float> value.
+			llvm::Value* aval = a->emitLLVMCode(params);
+			llvm::Value* avec = params.builder->CreateVectorSplat(
+				b->type().downcast<VectorType>()->num,
+				aval
+			);
+
+			return params.builder->CreateFMul(
+				avec, 
+				b->emitLLVMCode(params)
+			);
+		}
+		else if(b->type()->getType() == Type::FloatType)
+		{
+			// vector<float> * float
+			assert(a->type()->getType() == Type::VectorTypeType);
+
+			llvm::Value* bval = b->emitLLVMCode(params);
+			llvm::Value* bvec = params.builder->CreateVectorSplat(
+				a->type().downcast<VectorType>()->num,
+				bval
+			);
+
+			return params.builder->CreateFMul(
+				a->emitLLVMCode(params), 
+				bvec
+			);
+		}
+		else if(a->type()->getType() == Type::IntType)
+		{
+			// int * vector<int>
+			assert(b->type()->getType() == Type::VectorTypeType);
+
+			// Splat a to a vector<float> value.
+			llvm::Value* aval = a->emitLLVMCode(params);
+			llvm::Value* avec = params.builder->CreateVectorSplat(
+				b->type().downcast<VectorType>()->num,
+				aval
+			);
+
+			return params.builder->CreateMul(
+				avec, 
+				b->emitLLVMCode(params)
+			);
+		}
+		else if(b->type()->getType() == Type::IntType)
+		{
+			// vector<int> * int
+			assert(a->type()->getType() == Type::VectorTypeType);
+
+			llvm::Value* bval = b->emitLLVMCode(params);
+			llvm::Value* bvec = params.builder->CreateVectorSplat(
+				a->type().downcast<VectorType>()->num,
+				bval
+			);
+
+			return params.builder->CreateMul(
+				a->emitLLVMCode(params), 
+				bvec
+			);
+		}
+		else
+		{
+			// vector<T> * vector<T>
+			assert(a->type()->getType() == Type::VectorTypeType);
+			assert(b->type()->getType() == Type::VectorTypeType);
+
+			const TypeRef elem_type = a->type().downcast<VectorType>()->elem_type;
+			if(elem_type->getType() == Type::FloatType)
+			{
+				return params.builder->CreateFMul(
+					a->emitLLVMCode(params), 
+					b->emitLLVMCode(params)
+				);
+			}
+			else if(elem_type->getType() == Type::IntType)
+			{
+				return params.builder->CreateMul(
+					a->emitLLVMCode(params), 
+					b->emitLLVMCode(params)
+				);
+			}
+			else
+			{
+				assert(0);
+				return NULL;
+			}
+		}
+	}
+	else if(this->type()->getType() == Type::FloatType)
+	{
+		return params.builder->CreateFMul(
 			a->emitLLVMCode(params), 
 			b->emitLLVMCode(params)
 		);
@@ -1840,7 +2598,12 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 		// implicit conversion from int to float
 		// 3.0 / 4
 		// Only do this if b is != 0.  Otherwise we are messing with divide by zero semantics.
-		if(a->nodeType() == ASTNode::FloatLiteralType && b->nodeType() == ASTNode::IntLiteralType)
+
+		// Type may be null if 'a' is a variable node that has not been bound yet.
+		const TypeRef a_type = a->type(); 
+		//const TypeRef b_type = b->type();
+
+		if(a_type.nonNull() && a_type->getType() == Type::FloatType && b->nodeType() == ASTNode::IntLiteralType)
 		{
 			IntLiteral* b_lit = static_cast<IntLiteral*>(b.getPointer());
 			if(isIntExactlyRepresentableAsFloat(b_lit->value) && (b_lit->value != 0))
@@ -1879,8 +2642,251 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 			throw BaseException("Binary operator '/' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
 		}
 	}
+	else if(payload.operation == TraversalPayload::CheckInDomain)
+	{
+		checkNoZeroDivide(payload, stack);
+
+		checkNoOverflow(payload, stack);
+
+		this->proven_defined = true;
+	}
 
 	stack.pop_back();
+}
+
+
+bool DivExpression::provenDefined() const
+{
+	return false; // TEMP
+}
+
+
+
+
+
+// Try and prove we are not doing INT_MIN / -1
+void DivExpression::checkNoOverflow(TraversalPayload& payload, std::vector<ASTNode*>& stack)
+{
+	if(this->type()->getType() == Type::IntType)
+	{
+		// See if the numerator is contant
+		if(a->isConstant())
+		{
+			// Evaluate the numerator expression
+			VMState vmstate(payload.hidden_voidptr_arg);
+			vmstate.func_args_start.push_back(0);
+			if(payload.hidden_voidptr_arg)
+				vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(payload.env)));
+
+			ValueRef retval = a->exec(vmstate);
+
+			assert(dynamic_cast<IntValue*>(retval.getPointer()));
+
+			const int numerator_val = static_cast<IntValue*>(retval.getPointer())->value;
+
+			if(numerator_val != std::numeric_limits<int32>::min())
+				return; // Success
+		}
+
+		// See if the divisor is contant
+		if(b->isConstant())
+		{
+			// Evaluate the divisor expression
+			VMState vmstate(payload.hidden_voidptr_arg);
+			vmstate.func_args_start.push_back(0);
+			if(payload.hidden_voidptr_arg)
+				vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(payload.env)));
+
+			ValueRef retval = b->exec(vmstate);
+
+			assert(dynamic_cast<IntValue*>(retval.getPointer()));
+
+			const int divisor_val = static_cast<IntValue*>(retval.getPointer())->value;
+
+			if(divisor_val != -1)
+				return; // Success
+		}
+
+		// See if we can bound the numerator or denominator ranges
+		const IntervalSetInt a_bounds = ProofUtils::getIntegerRange(payload, stack, 
+			a // integer value
+		);
+
+		if(a_bounds.lower() > std::numeric_limits<int32>::min())
+		{
+			// We have proven numerator > INT_MIN
+			return;
+		}
+
+		const IntervalSetInt b_bounds = ProofUtils::getIntegerRange(payload, stack, 
+			b // integer value
+		);
+
+		/*if(b_bounds. > -1) // If denom lower bound is > -1
+			return;
+		if(b_bounds.y < -1) // If denom upper bound is < -1
+			return;*/
+		if(!b_bounds.includesValue(-1))
+			return;
+
+
+
+		/*int numerator_lower = std::numeric_limits<int32>::min();
+		int numerator_upper = std::numeric_limits<int32>::max();
+
+		// Walk up stack
+		for(int z=(int)stack.size()-1; z >= 0; --z)
+		{
+			ASTNode* stack_node = stack[z];
+
+			if(stack_node->nodeType() == ASTNode::FunctionExpressionType && 
+				static_cast<FunctionExpression*>(stack_node)->target_function->sig.name == "if")
+			{
+				// AST node above this one is an "if" expression
+				FunctionExpression* if_node = static_cast<FunctionExpression*>(stack_node);
+
+				// Is this node the 1st arg of the if expression?
+				// e.g. if condition then this_node else other_node
+				// Or is this node a child of the 1st arg?
+				if(if_node->argument_expressions[1].getPointer() == this || ((z+1) < (int)stack.size() && if_node->argument_expressions[1].getPointer() == stack[z+1]))
+				{
+					if(if_node->argument_expressions[0]->nodeType() == ASTNode::ComparisonExpressionType) // If condition is a comparison:
+					{
+						ComparisonExpression* comp = static_cast<ComparisonExpression*>(if_node->argument_expressions[0].getPointer());
+
+						if(expressionsHaveSameValue(comp->a, this->b)) // if condition left side is equal to div expression divisor
+						{
+							if(comp->token->getType() == NOT_EQUALS_TOKEN) // if comparison is 'divisor != x'
+							{
+								if(comp->b->isConstant())
+								{
+									// Evaluate the x expression
+									VMState vmstate(payload.hidden_voidptr_arg);
+									vmstate.func_args_start.push_back(0);
+									if(payload.hidden_voidptr_arg)
+										vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(payload.env)));
+
+									ValueRef retval = comp->b->exec(vmstate);
+
+									assert(dynamic_cast<IntValue*>(retval.getPointer()));
+
+									const int divisor_val = static_cast<IntValue*>(retval.getPointer())->value;
+
+									if(divisor_val == -1)
+									{
+										// We know the comparison is effectively 'divisor != -1', which proves we are not doing INT_MIN / -1.
+										return; 
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}*/
+
+		throw BaseException("Failed to prove division is not -2147483648 / -1.  (INT_MIN / -1)" + errorContext(*this));
+	}
+}
+
+
+void DivExpression::checkNoZeroDivide(TraversalPayload& payload, std::vector<ASTNode*>& stack)
+{
+	if(this->type()->getType() == Type::IntType)
+	{
+		// See if the divisor is contant
+		if(b->isConstant())
+		{
+			// Evaluate the divisor expression
+			VMState vmstate(payload.hidden_voidptr_arg);
+			vmstate.func_args_start.push_back(0);
+			if(payload.hidden_voidptr_arg)
+				vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(payload.env)));
+
+			ValueRef retval = b->exec(vmstate);
+
+			assert(dynamic_cast<IntValue*>(retval.getPointer()));
+
+			const int divisor_val = static_cast<IntValue*>(retval.getPointer())->value;
+
+			if(divisor_val == 0)
+			{
+				throw BaseException("Integer division by zero." + errorContext(*this));
+			}
+			else
+			{
+				return; // Success, we have proven the divisor != 0.
+			}
+		}
+		else
+		{
+			// b is not constant.
+
+			const IntervalSetInt b_bounds = ProofUtils::getIntegerRange(payload, stack, 
+				b // integer value
+			);
+
+			/*if(b_bounds.x > 0) // If denom lower bound is > 0
+				return;
+			if(b_bounds.y < 0) // If denom upper bound is < 0
+				return;*/
+			if(!b_bounds.includesValue(0))
+				return;
+
+			// Walk up stack, until we get to a divisor != 0 test
+			/*for(int z=(int)stack.size()-1; z >= 0; --z)
+			{
+				ASTNode* stack_node = stack[z];
+
+				if(stack_node->nodeType() == ASTNode::FunctionExpressionType && 
+					static_cast<FunctionExpression*>(stack_node)->target_function->sig.name == "if")
+				{
+					// AST node above this one is an "if" expression
+					FunctionExpression* if_node = static_cast<FunctionExpression*>(stack_node);
+
+					// Is this node the 1st arg of the if expression?
+					// e.g. if condition then this_node else other_node
+					// Or is this node a child of the 1st arg?
+					if(if_node->argument_expressions[1].getPointer() == this || ((z+1) < (int)stack.size() && if_node->argument_expressions[1].getPointer() == stack[z+1]))
+					{
+						if(if_node->argument_expressions[0]->nodeType() == ASTNode::ComparisonExpressionType) // If condition is a comparison:
+						{
+							ComparisonExpression* comp = static_cast<ComparisonExpression*>(if_node->argument_expressions[0].getPointer());
+
+							if(expressionsHaveSameValue(comp->a, this->b)) // if condition left side is equal to div expression divisor
+							{
+								if(comp->token->getType() == NOT_EQUALS_TOKEN) // if comparison is 'divisor != x'
+								{
+									if(comp->b->isConstant())
+									{
+										// Evaluate the x expression
+										VMState vmstate(payload.hidden_voidptr_arg);
+										vmstate.func_args_start.push_back(0);
+										if(payload.hidden_voidptr_arg)
+											vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(payload.env)));
+
+										ValueRef retval = comp->b->exec(vmstate);
+
+										assert(dynamic_cast<IntValue*>(retval.getPointer()));
+
+										const int divisor_val = static_cast<IntValue*>(retval.getPointer())->value;
+
+										if(divisor_val == 0)
+										{
+											// We know the comparison is effectively 'divisor != 0', which is a valid proof.
+											return; 
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}*/
+		}
+
+		throw BaseException("Failed to prove divisor is != 0." + errorContext(*this));
+	}
 }
 
 
@@ -1893,7 +2899,13 @@ void DivExpression::print(int depth, std::ostream& s) const
 }
 
 
-llvm::Value* DivExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
+std::string DivExpression::sourceString() const
+{
+	return a->sourceString() + " / " + b->sourceString();
+}
+
+
+llvm::Value* DivExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
 #if USE_LLVM
 	if(this->type()->getType() == Type::FloatType)
@@ -1935,7 +2947,7 @@ Reference<ASTNode> DivExpression::clone()
 
 bool DivExpression::isConstant() const
 {
-	return a->isConstant() && b->isConstant();
+	return this->proven_defined && a->isConstant() && b->isConstant();
 }
 
 
@@ -1943,7 +2955,7 @@ bool DivExpression::isConstant() const
 
 
 BinaryBooleanExpr::BinaryBooleanExpr(Type t_, const ASTNodeRef& a_, const ASTNodeRef& b_, const SrcLocation& loc)
-:	ASTNode(loc),
+:	ASTNode(BinaryBooleanType, loc),
 	t(t_), a(a_), b(b_)
 {
 }
@@ -2032,7 +3044,13 @@ void BinaryBooleanExpr::print(int depth, std::ostream& s) const
 }
 
 
-llvm::Value* BinaryBooleanExpr::emitLLVMCode(EmitLLVMCodeParams& params) const
+std::string BinaryBooleanExpr::sourceString() const
+{
+	return a->sourceString() + (this->t == OR ? " || " : " && ") + b->sourceString();
+}
+
+
+llvm::Value* BinaryBooleanExpr::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
 #if USE_LLVM
 	if(t == AND)
@@ -2144,7 +3162,13 @@ void UnaryMinusExpression::print(int depth, std::ostream& s) const
 }
 
 
-llvm::Value* UnaryMinusExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
+std::string UnaryMinusExpression::sourceString() const
+{
+	return "-" + expr->sourceString();
+}
+
+
+llvm::Value* UnaryMinusExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
 #if USE_LLVM
 	if(this->type()->getType() == Type::FloatType)
@@ -2201,6 +3225,13 @@ void LetASTNode::print(int depth, std::ostream& s) const
 }
 
 
+std::string LetASTNode::sourceString() const
+{
+	assert(0);
+	return "";
+}
+
+
 void LetASTNode::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
 	if(payload.operation == TraversalPayload::ConstantFolding)
@@ -2228,9 +3259,23 @@ void LetASTNode::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 }
 
 
-llvm::Value* LetASTNode::emitLLVMCode(EmitLLVMCodeParams& params) const
+llvm::Value* LetASTNode::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
-	return expr->emitLLVMCode(params);
+	llvm::Value* v = expr->emitLLVMCode(params);
+	
+	// If this is a string value, need to decr ref count at end of func.
+	/*if(this->type()->getType() == Type::StringType)
+	{
+		params.cleanup_values.push_back(CleanUpInfo(this, v));
+	}*/
+
+	return v;
+}
+
+
+void LetASTNode::emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* val) const
+{
+	RefCounting::emitCleanupLLVMCode(params, this->type(), val);
 }
 
 
@@ -2346,6 +3391,12 @@ void ComparisonExpression::print(int depth, std::ostream& s) const
 }
 
 
+std::string ComparisonExpression::sourceString() const
+{
+	return a->sourceString() + tokenName(this->token->getType()) + b->sourceString();
+}
+
+
 void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
 	if(payload.operation == TraversalPayload::ConstantFolding)
@@ -2374,10 +3425,16 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 	}
 	else if(payload.operation == TraversalPayload::TypeCoercion)
 	{
+		doImplicitIntToFloatTypeCoercion(a, b, payload);
+
 		// implicit conversion from int to float
 		// 3.0 > 4      =>       3.0 > 4.0
-		// TODO: Make this work for arbitrary expressions and not just literals.
-		if(a->nodeType() == ASTNode::FloatLiteralType && b->nodeType() == ASTNode::IntLiteralType)
+
+		// Type may be null if 'a' is a variable node that has not been bound yet.
+		/*const TypeRef a_type = a->type(); 
+		const TypeRef b_type = b->type();
+
+		if(a_type.nonNull() && a_type->getType() == Type::FloatType && b->nodeType() == ASTNode::IntLiteralType)
 		{
 			IntLiteral* b_lit = static_cast<IntLiteral*>(b.getPointer());
 			if(isIntExactlyRepresentableAsFloat(b_lit->value))
@@ -2388,7 +3445,7 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 		}
 
 		// 3 > 4.0      =>        3.0 > 4.0
-		if(b->nodeType() == ASTNode::FloatLiteralType && a->nodeType() == ASTNode::IntLiteralType)
+		if(b_type.nonNull() && b_type->getType() == Type::FloatType && a->nodeType() == ASTNode::IntLiteralType)
 		{
 			IntLiteral* a_lit = static_cast<IntLiteral*>(a.getPointer());
 			if(isIntExactlyRepresentableAsFloat(a_lit->value))
@@ -2396,7 +3453,7 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 				a = ASTNodeRef(new FloatLiteral((float)a_lit->value, a->srcLocation()));
 				payload.tree_changed = true;
 			}
-		}
+		}*/
 	}
 	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
@@ -2415,7 +3472,7 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 }
 
 
-llvm::Value* ComparisonExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
+llvm::Value* ComparisonExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
 	llvm::Value* a_code = a->emitLLVMCode(params);
 	llvm::Value* b_code = b->emitLLVMCode(params);
@@ -2530,6 +3587,12 @@ void LetBlock::print(int depth, std::ostream& s) const
 	this->expr->print(depth+1, s);
 }
 
+std::string LetBlock::sourceString() const
+{
+	assert(0);
+	return "";
+}
+
 
 void LetBlock::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
@@ -2566,15 +3629,34 @@ void LetBlock::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 }
 
 
-llvm::Value* LetBlock::emitLLVMCode(EmitLLVMCodeParams& params) const
+llvm::Value* LetBlock::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
+	// NEW: Emit code for the let statements now.
+	// We need to do this now, otherwise we will get "instruction does not dominate all uses", if a let statement has it's code emitted in a if statement block.
+	
+	//for(size_t i=0; i<lets.size(); ++i)
+	//	let_exprs_llvm_value[i] = this->lets[i]->emitLLVMCode(params, ret_space_ptr);
+
+	params.let_block_let_values.insert(std::make_pair(this, std::vector<llvm::Value*>()));
+
+	//std::vector<llvm::Value*> let_values(lets.size());
+	for(size_t i=0; i<lets.size(); ++i)
+	{
+		llvm::Value* let_value = this->lets[i]->emitLLVMCode(params, ret_space_ptr);
+
+		params.let_block_let_values[this].push_back(let_value);
+	}
+
+	//params.let_block_let_values.insert(std::make_pair(this, let_values));
+
+
 	params.let_block_stack.push_back(const_cast<LetBlock*>(this));
 
-	llvm::Value* result = expr->emitLLVMCode(params);
+	llvm::Value* expr_value = expr->emitLLVMCode(params, ret_space_ptr);
 
 	params.let_block_stack.pop_back();
 
-	return result;
+	return expr_value;
 }
 
 
@@ -2599,14 +3681,93 @@ bool LetBlock::isConstant() const
 }
 
 
-llvm::Value* LetBlock::getLetExpressionLLVMValue(EmitLLVMCodeParams& params, unsigned int let_index)
-{
-	if(let_exprs_llvm_value[let_index] == NULL)
+//llvm::Value* LetBlock::getLetExpressionLLVMValue(EmitLLVMCodeParams& params, unsigned int let_index, llvm::Value* ret_space_ptr)
+//{
+	/*if(let_exprs_llvm_value[let_index] == NULL)
 	{
-		let_exprs_llvm_value[let_index] = this->lets[let_index]->emitLLVMCode(params);
+		let_exprs_llvm_value[let_index] = this->lets[let_index]->emitLLVMCode(params, ret_space_ptr);
+	}*/
+
+	//return let_exprs_llvm_value[let_index];
+//}
+
+
+//---------------------------------------------------------------------------------
+
+
+ValueRef ArraySubscript::exec(VMState& vmstate)
+{
+	// Array pointer is in arg 0.
+	// Index is in arg 1.
+	const ArrayValue* arr = static_cast<const ArrayValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+	const IntValue* index = static_cast<const IntValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+
+	return arr->e[index->value];
+}
+
+
+void ArraySubscript::print(int depth, std::ostream& s) const
+{
+	printMargin(depth, s);
+	s << "ArraySubscript\n";
+	printMargin(depth, s); s << "subscript_expr:\n";
+	this->subscript_expr->print(depth+1, s);
+}
+
+
+std::string ArraySubscript::sourceString() const
+{
+	assert(0);
+	return "";
+}
+
+
+void ArraySubscript::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
+{
+	if(payload.operation == TraversalPayload::ConstantFolding)
+	{
+		if(shouldFoldExpression(subscript_expr, payload))
+		{
+			subscript_expr = foldExpression(subscript_expr, payload);
+			payload.tree_changed = true;
+		}
 	}
 
-	return let_exprs_llvm_value[let_index];
+	stack.push_back(this);
+
+
+	subscript_expr->traverse(payload, stack);
+
+	
+	
+	// Convert overloaded operators before we pop this node off the stack.
+	// This node needs to be on the node stack if an operator overloading substitution is made,
+	// as the new op_X function will need to have a bind variables pass run on it.
+	if(payload.operation == TraversalPayload::BindVariables)
+	{
+		convertOverloadedOperators(subscript_expr, payload, stack);
+	}
+
+	stack.pop_back();
+}
+
+
+llvm::Value* ArraySubscript::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
+{
+	assert(0);
+	return NULL;
+}
+
+
+Reference<ASTNode> ArraySubscript::clone()
+{
+	return new ArraySubscript(subscript_expr->clone(), this->srcLocation());
+}
+
+
+bool ArraySubscript::isConstant() const
+{
+	return subscript_expr->isConstant();
 }
 
 
@@ -2657,3 +3818,4 @@ llvm::Value* AnonFunction::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 
 } //end namespace Lang
+

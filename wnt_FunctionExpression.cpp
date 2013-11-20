@@ -8,26 +8,29 @@ Generated at 2011-04-30 18:53:38 +0100
 
 
 #include "wnt_ASTNode.h"
+#include "wnt_RefCounting.h"
 #include "VMState.h"
 #include "Value.h"
 #include "Linker.h"
 #include "BuiltInFunctionImpl.h"
 #include "LLVMTypeUtils.h"
+#include "ProofUtils.h"
 #include "utils/stringutils.h"
+#include "maths/mathstypes.h"
 #if USE_LLVM
-#include "llvm/Type.h"
-#include "llvm/Module.h"
-#include "llvm/DerivedTypes.h"
-#include "llvm/Constants.h"
-#include "llvm/Instructions.h"
+#include "llvm/IR/Type.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/Analysis/Verifier.h"
 #include "llvm/ExecutionEngine/JIT.h"
 #include "llvm/ExecutionEngine/Interpreter.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
 #include "llvm/Support/raw_ostream.h"
-#include <llvm/CallingConv.h>
-#include <llvm/IRBuilder.h>
-#include <llvm/Intrinsics.h>
+#include <llvm/IR/CallingConv.h>
+#include <llvm/IR/IRBuilder.h>
+#include <llvm/IR/Intrinsics.h>
 #endif
 #include <iostream>
 
@@ -40,27 +43,29 @@ static const bool VERBOSE_EXEC = false;
 
 
 FunctionExpression::FunctionExpression(const SrcLocation& src_loc) 
-:	ASTNode(src_loc),
+:	ASTNode(FunctionExpressionType, src_loc),
 	target_function(NULL),
 	bound_index(-1),
 	binding_type(Unbound),
 	bound_let_block(NULL),
 	bound_function(NULL),
 	use_captured_var(false),
-	captured_var_index(0)
+	captured_var_index(0),
+	proven_defined(false)
 {
 }
 
 
 FunctionExpression::FunctionExpression(const SrcLocation& src_loc, const std::string& func_name, const ASTNodeRef& arg0, const ASTNodeRef& arg1) // 2-arg function
-:	ASTNode(src_loc),
+:	ASTNode(FunctionExpressionType, src_loc),
 	target_function(NULL),
 	bound_index(-1),
 	binding_type(Unbound),
 	bound_let_block(NULL),
 	bound_function(NULL),
 	use_captured_var(false),
-	captured_var_index(0)
+	captured_var_index(0),
+	proven_defined(false)
 {
 	function_name = func_name;
 	argument_expressions.push_back(arg0);
@@ -141,6 +146,25 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 	// passed in as a variable to this function.
 	FunctionValue* function_value = NULL;
 	FunctionDefinition* use_target_func = runtimeBind(vmstate, function_value);
+
+	if(this->target_function->sig.name == "if")
+	{
+		// Special case handling for 'if' function, since we can't eargerly eval the args since they may not be defined
+
+		ValueRef condition_val = this->argument_expressions[0]->exec(vmstate);
+		assert(dynamic_cast<BoolValue*>(condition_val.getPointer()));
+
+		if(static_cast<BoolValue*>(condition_val.getPointer())->value)
+		{
+			// If condition is true:
+			return this->argument_expressions[1]->exec(vmstate);
+		}
+		else
+		{
+			// Else if condition is false:
+			return this->argument_expressions[2]->exec(vmstate);
+		}
+	}
 
 	// Push arguments onto argument stack
 	const unsigned int initial_arg_stack_size = (unsigned int)vmstate.argument_stack.size();
@@ -458,15 +482,303 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 		if(!payload.func_def_stack.back()->isGenericFunction())
 			linkFunctions(*payload.linker, payload, stack);
 	}
-
+	else if(payload.operation == TraversalPayload::CheckInDomain)
+	{
+		checkInDomain(payload, stack);
+		this->proven_defined = true;
+	}
+	
 	stack.pop_back();
+}
+
+
+bool FunctionExpression::provenDefined() const
+{
+	//return proven_defined;
+	if(this->target_function->sig.name == "elem")
+		return proven_defined;
+
+	return true;
+}
+
+
+void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<ASTNode*>& stack)
+{
+	if(this->target_function && this->target_function->sig.name == "elem" && this->argument_expressions.size() == 2)
+	{
+		if(this->argument_expressions[0]->type()->getType() == Type::ArrayTypeType &&
+			this->argument_expressions[1]->type()->getType() == Type::IntType)
+		{
+			// elem(array, index)
+			const Reference<ArrayType> array_type = this->argument_expressions[0]->type().downcast<ArrayType>();
+
+			// If the index is constant, into a fixed length array, we can prove whether the index is in-bounds
+			if(this->argument_expressions[1]->isConstant())
+			{
+				// Evaluate the index expression
+				VMState vmstate(payload.hidden_voidptr_arg);
+				vmstate.func_args_start.push_back(0);
+				if(payload.hidden_voidptr_arg)
+					vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(payload.env)));
+
+				ValueRef retval = this->argument_expressions[1]->exec(vmstate);
+
+				assert(dynamic_cast<IntValue*>(retval.getPointer()));
+
+				const int index_val = static_cast<IntValue*>(retval.getPointer())->value;
+
+				if(index_val >= 0 && index_val < array_type->num_elems)
+				{
+					// Array index is in-bounds!
+					return;
+				}
+				else
+				{
+					throw BaseException("Constant index with value " + toString(index_val) + " was out of bounds of array type " + array_type->toString());
+				}
+			}
+			else
+			{
+				// Else index is not known at compile time.
+
+				//int i_lower = std::numeric_limits<int32>::min();
+				//int i_upper = std::numeric_limits<int32>::max();
+				//Vec2<int> i_bounds(std::numeric_limits<int32>::min(), std::numeric_limits<int32>::max());
+
+				const IntervalSetInt i_bounds = ProofUtils::getIntegerRange(payload, stack, 
+					this->argument_expressions[1] // integer value
+				);
+
+				// Now check our bounds against the array
+				if(i_bounds.lower() >= 0 && i_bounds.upper() < array_type->num_elems)
+				{
+					// Array index is proven to be in-bounds.
+					return;
+				}
+
+#if 0
+				for(int z=(int)stack.size()-1; z >= 0; --z)
+				{
+					ASTNode* stack_node = stack[z];
+
+					// Get next node up the call stack
+					if(stack_node->nodeType() == ASTNode::FunctionExpressionType && 
+						static_cast<FunctionExpression*>(stack_node)->target_function->sig.name == "if")
+					{
+						// AST node above this one is an "if" expression
+						FunctionExpression* if_node = static_cast<FunctionExpression*>(stack_node);
+
+						// Is this node the 1st arg of the if expression?
+						// e.g. if condition then this_node else other_node
+						// Or is this node a child of the 1st arg?
+						if(if_node->argument_expressions[1].getPointer() == this || ((z+1) < (int)stack.size() && if_node->argument_expressions[1].getPointer() == stack[z+1]))
+						{
+							// Ok, now we need to check the condition of the if expression.
+							// A valid proof condition will be of form
+							// inBounds(array, index)
+							// Where array and index are the same as the ones for this elem() call.
+
+							if(if_node->argument_expressions[0]->nodeType() == ASTNode::FunctionExpressionType)
+							{
+								FunctionExpression* condition_func_express = static_cast<FunctionExpression*>(if_node->argument_expressions[0].getPointer());
+								if(condition_func_express->target_function->sig.name == "inBounds")
+								{
+									// Is the array the same? 
+									if(expressionsHaveSameValue(condition_func_express->argument_expressions[0], this->argument_expressions[0]))
+									{
+										// Is the index the same?
+										if(expressionsHaveSameValue(condition_func_express->argument_expressions[1], this->argument_expressions[1]))
+										{
+											// Success, inBounds uses the same variables, proving that the array access is in-bounds
+											return;
+										}
+									}
+								}
+							}
+							/*else if(if_node->argument_expressions[0]->nodeType() == ASTNode::BinaryBooleanType)
+							{
+								BinaryBooleanExpr* bin = static_cast<BinaryBooleanExpr*>(if_node->argument_expressions[0].getPointer());
+								if(bin->t == BinaryBooleanExpr::AND)
+								{
+									// We know condition expression is of type A AND B
+
+									// Process A
+									if(bin->a->nodeType() == ASTNode::ComparisonExpressionType)
+									{
+										ComparisonExpression* a = static_cast<ComparisonExpression*>(bin->a.getPointer());
+										updateIndexBounds(payload, *a, this->argument_expressions[1], i_lower, i_upper);
+									}
+
+									// Process B
+									if(bin->b->nodeType() == ASTNode::ComparisonExpressionType)
+									{
+										ComparisonExpression* b = static_cast<ComparisonExpression*>(bin->b.getPointer());
+										updateIndexBounds(payload, *b, this->argument_expressions[1], i_lower, i_upper);
+									}
+								}
+
+								// Now check our bounds against the array
+								if(i_lower >= 0 && i_upper < array_type->num_elems)
+								{
+									// Array index is proven to be in-bounds.
+									return;
+								}
+							}*/
+						}
+					}
+				}
+#endif
+			}
+		}
+		else if(this->argument_expressions[0]->type()->getType() == Type::VectorTypeType &&
+			this->argument_expressions[1]->type()->getType() == Type::IntType)
+		{
+			// elem(vector, index)
+			const Reference<VectorType> vector_type = this->argument_expressions[0]->type().downcast<VectorType>();
+
+			// If the index is constant, into a fixed length array, we can prove whether the index is in-bounds
+			if(this->argument_expressions[1]->isConstant())
+			{
+				// Evaluate the index expression
+				VMState vmstate(payload.hidden_voidptr_arg);
+				vmstate.func_args_start.push_back(0);
+				if(payload.hidden_voidptr_arg)
+					vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(payload.env)));
+
+				ValueRef retval = this->argument_expressions[1]->exec(vmstate);
+
+				assert(dynamic_cast<IntValue*>(retval.getPointer()));
+
+				const int index_val = static_cast<IntValue*>(retval.getPointer())->value;
+
+				if(index_val >= 0 && index_val < vector_type->num)
+				{
+					// Vector index is in-bounds!
+					return;
+				}
+				else
+				{
+					throw BaseException("Constant index with value " + toString(index_val) + " was out of bounds of vector type " + vector_type->toString());
+				}
+			}
+			else
+			{
+				// Else index is not known at compile time.
+
+				const IntervalSetInt i_bounds = ProofUtils::getIntegerRange(payload, stack, 
+					this->argument_expressions[1] // integer value
+				);
+
+				// Now check our bounds against the array
+				if(i_bounds.lower() >= 0 && i_bounds.upper() < vector_type->num)
+				{
+					// Array index is proven to be in-bounds.
+					return;
+				}
+
+
+				// Get next node up the call stack
+				if(stack.back()->nodeType() == ASTNode::FunctionExpressionType && 
+					static_cast<FunctionExpression*>(stack.back())->target_function->sig.name == "if")
+				{
+					// AST node above this one is an "if" expression
+					FunctionExpression* if_node = static_cast<FunctionExpression*>(stack.back());
+
+					// Is this node the 1st arg of the if expression?
+					// e.g. if condition then this_node else other_node
+
+					if(if_node->argument_expressions[1].getPointer() == this)
+					{
+						// Ok, now we need to check the condition of the if expression.
+						// A valid proof condition will be of form
+						// inBounds(array, index)
+						// Where array and index are the same as the ones for this elem() call.
+
+						if(if_node->argument_expressions[0]->nodeType() == ASTNode::FunctionExpressionType)
+						{
+							FunctionExpression* condition_func_express = static_cast<FunctionExpression*>(if_node->argument_expressions[0].getPointer());
+							if(condition_func_express->target_function->sig.name == "inBounds")
+							{
+								// Is the array the same? 
+								if(expressionsHaveSameValue(condition_func_express->argument_expressions[0], this->argument_expressions[0]))
+								{
+									// Is the index the same?
+									if(expressionsHaveSameValue(condition_func_express->argument_expressions[1], this->argument_expressions[1]))
+									{
+										// Success, inBounds uses the same variables, proving that the array access is in-bounds
+										return;
+									}
+								}
+							}
+						}
+						/*else if(if_node->argument_expressions[0]->nodeType() == ASTNode::BinaryBooleanType)
+						{
+							int i_lower = std::numeric_limits<int32>::min();
+							int i_upper = std::numeric_limits<int32>::max();
+
+							BinaryBooleanExpr* bin = static_cast<BinaryBooleanExpr*>(if_node->argument_expressions[0].getPointer());
+							if(bin->t == BinaryBooleanExpr::AND)
+							{
+								// We know condition expression is of type A AND B
+
+								// Process A
+								if(bin->a->nodeType() == ASTNode::ComparisonExpressionType)
+								{
+									ComparisonExpression* a = static_cast<ComparisonExpression*>(bin->a.getPointer());
+									updateIndexBounds(payload, *a, this->argument_expressions[1], i_lower, i_upper);
+								}
+
+								// Process B
+								if(bin->b->nodeType() == ASTNode::ComparisonExpressionType)
+								{
+									ComparisonExpression* b = static_cast<ComparisonExpression*>(bin->b.getPointer());
+									updateIndexBounds(payload, *b, this->argument_expressions[1], i_lower, i_upper);
+								}
+							}
+
+							// Now check our bounds against the array
+							if(i_lower >= 0 && i_upper < vector_type->num)
+							{
+								// Array index is proven to be in-bounds.
+								return;
+							}
+						}*/
+					}
+				}
+			}
+		}
+
+		throw BaseException("Failed to prove elem() argument is in-bounds." + errorContext(*this));
+	}
+	// truncateToInt
+	else if(this->target_function && this->target_function->sig.name == "truncateToInt" && this->argument_expressions.size() == 1)
+	{
+		//TEMP: allow truncateToInt to be unsafe to allow ISL_stdlib.txt to compile
+
+	/*	// LLVM lang ref says 'If the value cannot fit in ty2, the results are undefined.'
+		// So we need to make sure that the arg has value x such that x > INT_MIN - 1 && x < INT_MIN + 1
+
+		const IntervalSetFloat bounds = ProofUtils::getFloatRange(payload, stack, 
+			this->argument_expressions[0] // float value
+		);
+
+		// Now check our bounds.
+		// TODO: get the exactly correct expression here
+		if(bounds.lower() >= (float)std::numeric_limits<int>::min() && bounds.upper() <= (float)std::numeric_limits<int>::max())
+		{
+			// value is proven to be in-bounds.
+			return;
+		}
+
+		throw BaseException("Failed to prove truncateToInt() argument is in-bounds." + errorContext(*this));*/
+	}
 }
 
 
 void FunctionExpression::print(int depth, std::ostream& s) const
 {
 	printMargin(depth, s);
-	s << "FunctionExpr";
+	s << "FunctionExpr (" << this->function_name << ")";
 	if(this->target_function)
 		s << "; target: " << this->target_function->sig.toString();
 	else if(this->binding_type == Arg)
@@ -476,6 +788,19 @@ void FunctionExpression::print(int depth, std::ostream& s) const
 	s << "\n";
 	for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
 		this->argument_expressions[i]->print(depth + 1, s);
+}
+
+
+std::string FunctionExpression::sourceString() const
+{
+	std::string s = this->function_name + "(";
+	for(unsigned int i=0; i<argument_expressions.size(); ++i)
+	{
+		s += argument_expressions[i]->sourceString();
+		if(i + 1 < argument_expressions.size())
+			s += ", ";
+	}
+	return s + ")";
 }
 
 
@@ -499,7 +824,7 @@ TypeRef FunctionExpression::type() const
 	}
 
 	// If got here, binding type is probably unbound.
-	assert(0);
+	//assert(0);
 	return TypeRef(NULL);
 
 	//if(target_function_return_type.nonNull())
@@ -518,7 +843,7 @@ TypeRef FunctionExpression::type() const
 }
 
 
-llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
+llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
 #if USE_LLVM
 	llvm::Value* target_llvm_func = NULL;
@@ -532,7 +857,10 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 	{
 		//target_llvm_func = this->bound_let_block->getLetExpressionLLVMValue(params, bound_index);
 
-		llvm::Value* closure_pointer = this->bound_let_block->getLetExpressionLLVMValue(params, bound_index);
+		//llvm::Value* closure_pointer = this->bound_let_block->getLetExpressionLLVMValue(params, bound_index, ret_space_ptr);
+		assert(params.let_block_let_values.find(this->bound_let_block) != params.let_block_let_values.end());
+		llvm::Value* closure_pointer = params.let_block_let_values[this->bound_let_block][this->bound_index];
+
 
 		
 		//TEMP:
@@ -679,16 +1007,137 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 	//target_llvm_func->dump();
 	//std::cout << std::endl;
 
+	
 
-	//------------------
-	// Build args list
+
+	//==================================== Special case if code ============================================
+	if(this->target_function->sig.name == "if") // Check anything more? && this->target_function->built_in_func_impl)
+	{
+		llvm::Value* return_val_addr = NULL;
+		if(!target_ret_type->passByValue())
+		{
+			if(ret_space_ptr)
+				return_val_addr = ret_space_ptr;
+			else
+			{
+				// Allocate return value on stack
+
+				// Emit the alloca in the entry block for better code-gen.
+				llvm::IRBuilder<> entry_block_builder(&params.currently_building_func->getEntryBlock());
+
+				return_val_addr = entry_block_builder.Insert(new llvm::AllocaInst(
+					target_ret_type->LLVMType(*params.context), // type
+					NULL, // ArraySize
+					16 // alignment
+					//"return_val_addr" // target_sig.toString() + " return_val_addr"
+				),
+				"" + this->target_function->sig.name + "() ret");
+			}
+		}
+
+		llvm::Value* condition_code = argument_expressions[0]->emitLLVMCode(params, NULL);
+
+		
+		// Get a pointer to the current function
+		llvm::Function* the_function = params.currently_building_func; // params.builder->GetInsertBlock()->getParent();
+
+		// Create blocks for the then and else cases.  Insert the 'then' block at the end of the function.
+		llvm::BasicBlock* ThenBB  = llvm::BasicBlock::Create(*params.context, "then", the_function);
+		llvm::BasicBlock* ElseBB  = llvm::BasicBlock::Create(*params.context, "else");
+		llvm::BasicBlock* MergeBB = llvm::BasicBlock::Create(*params.context, "ifcont");
+
+		params.builder->CreateCondBr(condition_code, ThenBB, ElseBB);
+
+		// Emit then value.
+		params.builder->SetInsertPoint(ThenBB);
+
+		llvm::Value* then_value = argument_expressions[1]->emitLLVMCode(params, return_val_addr);
+
+		params.builder->CreateBr(MergeBB);
+
+		// Codegen of 'Then' can change the current block, update ThenBB for the PHI.
+		ThenBB = params.builder->GetInsertBlock();
+
+		// Emit else block.
+		the_function->getBasicBlockList().push_back(ElseBB);
+		params.builder->SetInsertPoint(ElseBB);
+
+		llvm::Value* else_value = argument_expressions[2]->emitLLVMCode(params, return_val_addr);
+
+		params.builder->CreateBr(MergeBB);
+
+		// Codegen of 'Else' can change the current block, update ElseBB for the PHI.
+		ElseBB = params.builder->GetInsertBlock();
+
+		// Emit merge block.
+		the_function->getBasicBlockList().push_back(MergeBB);
+		params.builder->SetInsertPoint(MergeBB);
+
+		// Create phi node for result value
+		llvm::PHINode* phi_node = params.builder->CreatePHI(
+			target_ret_type->passByValue() ? target_ret_type->LLVMType(*params.context) : LLVMTypeUtils::pointerType(*target_ret_type->LLVMType(*params.context)),
+			0, // num reserved values
+			"iftmp"
+		);
+
+		phi_node->addIncoming(then_value, ThenBB);
+		phi_node->addIncoming(else_value, ElseBB);
+
+		if(target_ret_type->passByValue())
+		{
+			
+
+			//TEMP:
+			//std::cout << "\nthen_value: " << std::endl;
+			//then_value->dump();
+			//std::cout << "\nelse_value: " << std::endl;
+			//else_value->dump();
+
+			
+
+		//	return phi_node;
+		}
+		else
+		{
+			//the_function->getBasicBlockList().push_back(MergeBB);
+			//params.builder->SetInsertPoint(MergeBB);
+
+		//	return phi_node;
+
+			//return return_val_addr;
+
+
+			/*llvm::Value* arg_val = params.builder->CreateLoad(
+				phi_result
+			);
+
+			llvm::Value* return_val_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+
+			return params.builder->CreateStore(
+				arg_val, // value
+				return_val_ptr // ptr
+			);*/
+			//llvm::Value* return_val_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+			//return return_val_ptr;
+		}
+
+		// If this is a string value, need to decr ref count at end of func.
+		if(target_ret_type->getType() == Type::StringType)
+		{
+			params.cleanup_values.push_back(CleanUpInfo(this, phi_node));
+		}
+
+		return phi_node;
+	}
+	//==================================== End special case if code ============================================
+
 
 	if(target_ret_type->passByValue())
 	{
 		vector<llvm::Value*> args;
 
 		for(unsigned int i=0; i<argument_expressions.size(); ++i)
-			args.push_back(argument_expressions[i]->emitLLVMCode(params));
+			args.push_back(argument_expressions[i]->emitLLVMCode(params, NULL));
 
 		// Append pointer to Captured var struct, if this function was from a closure, and there are captured vars.
 		if(captured_var_struct_ptr != NULL)
@@ -706,23 +1155,36 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 		// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
 		call_inst->setCallingConv(llvm::CallingConv::C);
 
+		// If this is a string value, need to decr ref count at end of func.
+		if(target_ret_type->getType() == Type::StringType)
+		{
+			params.cleanup_values.push_back(CleanUpInfo(this, call_inst));
+		}
+
 		return call_inst;
 	}
 	else
 	{
-		//llvm::Value* return_val_addr = NULL;
-		//if(parent->passByValue())
-		//{
+		llvm::Value* return_val_addr;
+		if(ret_space_ptr)
+			return_val_addr = ret_space_ptr;
+		else
+		{
+			// Allocate return value on stack
 
-		// Allocate return value on stack
-		llvm::Value* return_val_addr = params.builder->Insert(new llvm::AllocaInst(
-			target_ret_type->LLVMType(*params.context), // type
-			NULL, // ArraySize
-			16, // alignment
-			"return_val_addr" // target_sig.toString() + " return_val_addr"
-		));
+			// Emit the alloca in the entry block for better code-gen.
+			llvm::IRBuilder<> entry_block_builder(&params.currently_building_func->getEntryBlock(), params.currently_building_func->getEntryBlock().begin());
 
-		vector<llvm::Value*> args(1, return_val_addr);
+			return_val_addr = entry_block_builder.Insert(new llvm::AllocaInst(
+				target_ret_type->LLVMType(*params.context), // type
+				NULL, // ArraySize
+				16 // alignment
+				//"return_val_addr" // target_sig.toString() + " return_val_addr"
+			),
+			"" + this->target_function->sig.name + "() ret");
+		}
+
+		vector<llvm::Value*> args(1, return_val_addr); // First argument is return value pointer.
 
 		for(unsigned int i=0; i<argument_expressions.size(); ++i)
 			args.push_back(argument_expressions[i]->emitLLVMCode(params));
@@ -735,16 +1197,50 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params) const
 		if(target_takes_voidptr_arg) // params.hidden_voidptr_arg)
 			args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));
 
+		//TEMP:
+		/*std::cout << "Args to CreateCall() for " << this->target_function->sig.toString() << ":" << std::endl;
+		for(int z=0; z<args.size(); ++z)
+		{
+			std::cout << "arg " << z << ": ";
+			args[z]->dump();
+		}*/
+
 		llvm::CallInst* call_inst = params.builder->CreateCall(target_llvm_func, args);
 		
 		// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
 		call_inst->setCallingConv(llvm::CallingConv::C);
+
+		// If this is a string value, need to decr ref count at end of func.
+		/*if(target_ret_type->getType() == Type::StringType)
+		{
+			params.cleanup_values.push_back(CleanUpInfo(this, call_inst));
+		}
+		else */if(target_ret_type->getType() == Type::StructureTypeType)
+		{
+			//const StructureType& struct_type = static_cast<const StructureType&>(*target_ret_type);
+
+			//for(size_t i=0; i<struct_type.component_types.size(); ++i)
+
+			params.cleanup_values.push_back(CleanUpInfo(this, return_val_addr));
+		}
 
 		return return_val_addr;
 	}
 #else
 	return NULL;
 #endif
+}
+
+
+void FunctionExpression::emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* val) const
+{
+	RefCounting::emitCleanupLLVMCode(params, this->type(), val);
+}
+
+
+llvm::Value* FunctionExpression::getConstantLLVMValue(EmitLLVMCodeParams& params) const
+{
+	return this->target_function->getConstantLLVMValue(params);
 }
 
 
@@ -768,7 +1264,9 @@ Reference<ASTNode> FunctionExpression::clone()
 
 bool FunctionExpression::isConstant() const
 {
-	return false; // TEMP HACK
+	//TEMP return false; // TEMP HACK
+	if(!this->provenDefined())
+		return false;
 
 	// For now, we'll say a function expression bound to an argument of let var is not constant.
 	if(this->binding_type != BoundToGlobalDef)
@@ -777,6 +1275,11 @@ bool FunctionExpression::isConstant() const
 	for(unsigned int i=0; i<argument_expressions.size(); ++i)
 		if(!argument_expressions[i]->isConstant())
 			return false;
+
+	//TEMP:
+	if(this->target_function->isExternalFunction())
+		return false;
+
 	return true;
 }
 

@@ -30,12 +30,13 @@ public:
 
 	ExternalFunction();
 	ExternalFunction(void* func_, INTERPRETED_FUNC interpreted_func_, const FunctionSignature& sig_,
-		TypeRef& return_type_, bool takes_hidden_voidptr_arg_)
+		const TypeRef& return_type_, bool takes_hidden_voidptr_arg_)
 	:	func(func_),
 		interpreted_func(interpreted_func_),
 		sig(sig_),
 		return_type(return_type_),
-		takes_hidden_voidptr_arg(takes_hidden_voidptr_arg_)
+		takes_hidden_voidptr_arg(takes_hidden_voidptr_arg_),
+		has_side_effects(false)
 	{}
 
 	~ExternalFunction();
@@ -47,6 +48,7 @@ public:
 	TypeRef return_type;
 
 	bool takes_hidden_voidptr_arg;
+	bool has_side_effects; // Such as the function freeString()
 private:
 
 };

@@ -5,25 +5,8 @@
 #include "LanguageTests.h"
 
 
-//#include <maths/sse.h>
-extern "C"
-{
-#include <xmmintrin.h> //SSE header file
-};
-
-
-#include <iostream>
-#include <cassert>
-#include <fstream>
-#include "utils/fileutils.h"
-#include "wnt_Lexer.h"
-#include "TokenBase.h"
-#include "wnt_LangParser.h"
-#include "wnt_ASTNode.h"
-#include "VMState.h"
-#include "Linker.h"
-#include "Value.h"
-#include "VirtualMachine.h"
+#include "LanguageTestUtils.h"
+//#include "ProgramBuilder.h"
 
 
 namespace Winter
@@ -38,627 +21,1033 @@ LanguageTests::~LanguageTests()
 {}
 
 
-static bool epsEqual(float x, float y)
-{
-	return std::fabs(x - y) < 1.0e-5f;
-}
-
-
-struct TestEnv
-{
-	float val;
-};
-
-
-static float testFunc(float x, TestEnv* env)
-{
-	std::cout << "In test func!, " << x << std::endl;
-	std::cout << "In test func!, env->val: " << env->val << std::endl;
-	return env->val;
-}
-
-
-static ValueRef testFuncInterpreted(const vector<ValueRef>& arg_values)
-{
-	assert(arg_values.size() == 2);
-	assert(dynamic_cast<const FloatValue*>(arg_values[0].getPointer()));
-	assert(dynamic_cast<const VoidPtrValue*>(arg_values[1].getPointer()));
-
-	// Cast argument 0 to type FloatValue
-	const FloatValue* float_val = static_cast<const FloatValue*>(arg_values[0].getPointer());
-	const VoidPtrValue* voidptr_val = static_cast<const VoidPtrValue*>(arg_values[1].getPointer());
-
-	return ValueRef(new FloatValue(testFunc(float_val->value, (TestEnv*)voidptr_val->value)));
-}
-
-
-/*static float externalSin(float x, TestEnv* env)
-{
-	return std::sin(x);
-}*/
-
-
-static ValueRef externalSinInterpreted(const vector<ValueRef>& arg_values)
-{
-	assert(arg_values.size() == 1);
-	assert(dynamic_cast<const FloatValue*>(arg_values[0].getPointer()));
-	//assert(dynamic_cast<const VoidPtrValue*>(arg_values[1].getPointer()));
-
-	// Cast argument 0 to type FloatValue
-	const FloatValue* float_val = static_cast<const FloatValue*>(arg_values[0].getPointer());
-	//const VoidPtrValue* voidptr_val = static_cast<const VoidPtrValue*>(arg_values[1].getPointer());
-
-	return ValueRef(new FloatValue(std::sin(float_val->value/*, (TestEnv*)voidptr_val->value*/)));
-}
-
-
-typedef float(WINTER_JIT_CALLING_CONV * float_void_func)(void* env);
-
-
-static void testMainFloat(const std::string& src, float target_return_val)
-{
-	std::cout << "===================== Winter testMainFloat() =====================" << std::endl;
-	try
-	{
-		TestEnv test_env;
-		test_env.val = 10;
-
-		VMConstructionArgs vm_args;
-		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
-		vm_args.env = &test_env;
-
-		{
-			ExternalFunctionRef f(new ExternalFunction());
-			f->func = (void*)testFunc;
-			f->interpreted_func = testFuncInterpreted;
-			f->return_type = TypeRef(new Float());
-			f->sig = FunctionSignature("testFunc", vector<TypeRef>(1, TypeRef(new Float())));
-			vm_args.external_functions.push_back(f);
-		}
-		{
-			ExternalFunctionRef f(new ExternalFunction());
-			f->func = (void*)(float(*)(float))std::sin; //externalSin;
-			f->interpreted_func = externalSinInterpreted;
-			f->return_type = TypeRef(new Float());
-			f->sig = FunctionSignature("sin", vector<TypeRef>(1, TypeRef(new Float())));
-			f->takes_hidden_voidptr_arg = false;
-			vm_args.external_functions.push_back(f);
-		}
-
-		VirtualMachine vm(vm_args);
-
-		// Get main function
-		FunctionSignature mainsig("main", std::vector<TypeRef>());
-		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
-
-		void* f = vm.getJittedFunction(mainsig);
-
-		//// cast to correct type
-		float_void_func mainf = (float_void_func)f;
-
-
-		//// Call the JIT'd function
-		const float jitted_result = mainf(&test_env);
-
-
-		// Check JIT'd result.
-		if(!epsEqual(jitted_result, target_return_val))
-		{
-			std::cerr << "Test failed: JIT'd main returned " << jitted_result << ", target was " << target_return_val << std::endl;
-			exit(1);
-		}
-
-		VMState vmstate(true);
-		vmstate.func_args_start.push_back(0);
-		vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(&test_env)));
-
-		ValueRef retval = maindef->invoke(vmstate);
-
-		assert(vmstate.argument_stack.size() == 1);
-		//delete vmstate.argument_stack[0];
-		vmstate.func_args_start.pop_back();
-		FloatValue* val = dynamic_cast<FloatValue*>(retval.getPointer());
-		if(!val)
-		{
-			std::cerr << "main() Return value was of unexpected type." << std::endl;
-			exit(1);
-		}
-
-		if(!epsEqual(val->value, target_return_val))
-		{
-			std::cerr << "Test failed: main returned " << val->value << ", target was " << target_return_val << std::endl;
-			exit(1);
-		}
-
-	//	delete retval;
-
-	}
-	catch(Winter::BaseException& e)
-	{
-		std::cerr << e.what() << std::endl;
-		exit(1);
-	}
-}
-
-
-static void testMainFloatArgInvalidProgram(const std::string& src, float argument, float target_return_val)
-{
-	std::cout << "===================== Winter testMainFloatArgInvalidProgram() =====================" << std::endl;
-	try
-	{
-		TestEnv test_env;
-		test_env.val = 10;
-
-		VMConstructionArgs vm_args;
-		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
-		vm_args.env = &test_env;
-
-		const FunctionSignature mainsig("main", std::vector<TypeRef>(1, TypeRef(new Float())));
-
-		VirtualMachine vm(vm_args);
-
-		// Get main function
-		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
-
-		float(WINTER_JIT_CALLING_CONV*f)(float, void*) = (float(WINTER_JIT_CALLING_CONV*)(float, void*))vm.getJittedFunction(mainsig);
-
-
-		std::cerr << "Test failed: Expected compilation failure." << std::endl;
-		exit(1);
-	}
-	catch(Winter::BaseException& e)
-	{
-		// Expected.
-		std::cout << "Expected exception occurred: " << e.what() << std::endl;
-	}
-}
-
-
-static void testMainFloatArg(const std::string& src, float argument, float target_return_val)
-{
-	std::cout << "============================== Winter testMainFloat() ============================" << std::endl;
-	try
-	{
-		TestEnv test_env;
-		test_env.val = 10;
-
-		VMConstructionArgs vm_args;
-		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
-		vm_args.env = &test_env;
-
-		{
-			ExternalFunctionRef f(new ExternalFunction());
-			f->func = (void*)testFunc;
-			f->interpreted_func = testFuncInterpreted;
-			f->return_type = TypeRef(new Float());
-			f->sig = FunctionSignature("testFunc", vector<TypeRef>(1, TypeRef(new Float())));
-			vm_args.external_functions.push_back(f);
-		}
-		{
-			ExternalFunctionRef f(new ExternalFunction());
-			f->func = (void*)(float(*)(float))std::sin; //externalSin;
-			f->interpreted_func = externalSinInterpreted;
-			f->return_type = TypeRef(new Float());
-			f->sig = FunctionSignature("sin", vector<TypeRef>(1, TypeRef(new Float())));
-			f->takes_hidden_voidptr_arg = false;
-			vm_args.external_functions.push_back(f);
-		}
-
-		VirtualMachine vm(vm_args);
-
-		// Get main function
-		FunctionSignature mainsig("main", std::vector<TypeRef>(1, TypeRef(new Float())));
-		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
-
-		float(WINTER_JIT_CALLING_CONV*f)(float, void*) = (float(WINTER_JIT_CALLING_CONV*)(float, void*))vm.getJittedFunction(mainsig);
-
-
-		// Call the JIT'd function
-		const float jitted_result = f(argument, &test_env);
-
-		// Check JIT'd result.
-		if(!epsEqual(jitted_result, target_return_val))
-		{
-			std::cerr << "Test failed: JIT'd main returned " << jitted_result << ", target was " << target_return_val << std::endl;
-			exit(1);
-		}
-
-		VMState vmstate(true);
-		vmstate.func_args_start.push_back(0);
-		vmstate.argument_stack.push_back(ValueRef(new FloatValue(argument)));
-		vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(&test_env)));
-
-		ValueRef retval = maindef->invoke(vmstate);
-
-		vmstate.func_args_start.pop_back();
-		FloatValue* val = dynamic_cast<FloatValue*>(retval.getPointer());
-		if(!val)
-		{
-			std::cerr << "main() Return value was of unexpected type." << std::endl;
-			exit(1);
-		}
-
-		if(!epsEqual(val->value, target_return_val))
-		{
-			std::cerr << "Test failed: main returned " << val->value << ", target was " << target_return_val << std::endl;
-			exit(1);
-		}
-
-		//delete retval;
-
-	}
-	catch(Winter::BaseException& e)
-	{
-		std::cerr << e.what() << std::endl;
-		exit(1);
-	}
-}
-
-
-static void testMainInteger(const std::string& src, float target_return_val)
-{
-	std::cout << "============================== Winter testMainInteger() ============================" << std::endl;
-	try
-	{
-		VMConstructionArgs vm_args;
-		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
-
-		VirtualMachine vm(vm_args);
-
-		// Get main function
-		FunctionSignature mainsig("main", std::vector<TypeRef>());
-		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
-
-		int (WINTER_JIT_CALLING_CONV *f)(void*) = (int (WINTER_JIT_CALLING_CONV *)(void*)) vm.getJittedFunction(mainsig);
-
-		TestEnv test_env;
-		test_env.val = 10;
-
-		// Call the JIT'd function
-		const int jitted_result = f(&test_env);
-
-
-		// Check JIT'd result.
-		if(jitted_result != target_return_val)
-		{
-			std::cerr << "Test failed: JIT'd main returned " << jitted_result << ", target was " << target_return_val << std::endl;
-			exit(1);
-		}
-
-		VMState vmstate(true);
-		vmstate.func_args_start.push_back(0);
-		vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(&test_env)));
-
-		ValueRef retval = maindef->invoke(vmstate);
-
-		vmstate.func_args_start.pop_back();
-		IntValue* val = dynamic_cast<IntValue*>(retval.getPointer());
-		if(!val)
-		{
-			std::cerr << "main() Return value was of unexpected type." << std::endl;
-			exit(1);
-		}
-
-		if(val->value != target_return_val)
-		{
-			std::cerr << "Test failed: main returned " << val->value << ", target was " << target_return_val << std::endl;
-			exit(1);
-		}
-
-		//delete retval;
-
-	}
-	catch(Winter::BaseException& e)
-	{
-		std::cerr << e.what() << std::endl;
-		exit(1);
-	}
-}
-
-
-//typedef float(*float_void_func)();
-
-
-
-
-
-template <class StructType>
-static void bleh(StructType* s)
-{
-	s->a = 1;
-}
-
-
-
-#if defined(_WIN32) || defined(_WIN64)
-#define SSE_ALIGN _MM_ALIGN16
-#define SSE_CLASS_ALIGN _MM_ALIGN16 class
-#else
-#define SSE_ALIGN __attribute__ ((aligned (16)))
-#define SSE_CLASS_ALIGN class __attribute__ ((aligned (16)))
-#endif
-
-
-
-
-
-
-template <class StructType>
-static void testMainStruct(const std::string& src, const StructType& target_return_val)
-{
-	std::cout << "============================== Winter testMainStruct() ============================" << std::endl;
-	try
-	{
-		VMConstructionArgs vm_args;
-		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
-
-		VirtualMachine vm(vm_args);
-
-		// Get main function
-		FunctionSignature mainsig("main", std::vector<TypeRef>());
-		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
-
-		SSE_ALIGN StructType jitted_result;
-		
-		void (WINTER_JIT_CALLING_CONV *f)(StructType*, void*) = (void (WINTER_JIT_CALLING_CONV *)(StructType*, void*))vm.getJittedFunction(mainsig);
-		//StructType (WINTER_JIT_CALLING_CONV *f)() = (StructType (WINTER_JIT_CALLING_CONV *)())vm.getJittedFunction(mainsig);
-
-		TestEnv test_env;
-		test_env.val = 10;
-
-
-		// Call the JIT'd function
-		f(&jitted_result, &test_env);
-		//jitted_result = f();
-
-		/*std::cout << "============================" << std::endl;
-		std::cout << jitted_result.a << std::endl;
-		std::cout << jitted_result.b << std::endl;
-		std::cout << jitted_result.c << std::endl;
-		std::cout << jitted_result.d << std::endl;*/
-
-		// Check JIT'd result.
-		if(!(jitted_result == target_return_val))
-		{
-			std::cerr << "Test failed: jitted_result != target_return_val  " << std::endl;
-			exit(1);
-		}
-
-		/*VMState vmstate;
-		vmstate.func_args_start.push_back(0);
-
-		Value* retval = maindef->invoke(vmstate);
-
-		vmstate.func_args_start.pop_back();
-		StructureValue* val = dynamic_cast<StructureValue*>(retval);
-		if(!val)
-		{
-			std::cerr << "main() Return value was of unexpected type." << std::endl;
-			exit(1);
-		}*/
-
-
-		/*if(val->value != target_return_val)
-		{
-			std::cerr << "Test failed: main returned " << val->value << ", target was " << target_return_val << std::endl;
-			exit(1);
-		}*/
-
-		//delete retval;
-
-	}
-	catch(Winter::BaseException& e)
-	{
-		std::cerr << e.what() << std::endl;
-		exit(1);
-	}
-}
-
-
-template <class InStructType, class OutStructType>
-static void testMainStructInputAndOutput(const std::string& src, const InStructType& struct_in, const OutStructType& target_return_val)
-{
-	std::cout << "============================== Winter testMainStructInputAndOutput() ============================" << std::endl;
-	try
-	{
-		VMConstructionArgs vm_args;
-		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
-
-		VirtualMachine vm(vm_args);
-
-		vector<string> field_names;
-		field_names.push_back("x");
-		field_names.push_back("y");
-
-		// Get main function
-		FunctionSignature mainsig(
-			"main", 
-			std::vector<TypeRef>(1, TypeRef(new StructureType(
-				"TestStructIn", 
-				std::vector<TypeRef>(2, TypeRef(new Float)), 
-				field_names
-			)))
-		);
-		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
-
-
-		// __cdecl
-		void (WINTER_JIT_CALLING_CONV *f)(OutStructType*, InStructType*, void*) = (void (WINTER_JIT_CALLING_CONV *)(OutStructType*, InStructType*, void*))vm.getJittedFunction(mainsig);
-
-		// Call the JIT'd function
-		SSE_ALIGN OutStructType jitted_result;
-
-		SSE_ALIGN InStructType aligned_struct_in = struct_in;
-
-		TestEnv test_env;
-		test_env.val = 10;
-
-		f(&jitted_result, &aligned_struct_in, &test_env);
-
-		// Check JIT'd result.
-		if(!(jitted_result == target_return_val))
-		{
-			std::cerr << "Test failed: jitted_result != target_return_val  " << std::endl;
-			exit(1);
-		}
-
-		/*VMState vmstate;
-		vmstate.func_args_start.push_back(0);
-
-		Value* retval = maindef->invoke(vmstate);
-
-		vmstate.func_args_start.pop_back();
-		StructureValue* val = dynamic_cast<StructureValue*>(retval);
-		if(!val)
-		{
-		std::cerr << "main() Return value was of unexpected type." << std::endl;
-		exit(1);
-		}*/
-
-
-		/*if(val->value != target_return_val)
-		{
-		std::cerr << "Test failed: main returned " << val->value << ", target was " << target_return_val << std::endl;
-		exit(1);
-		}*/
-
-		//delete retval;
-
-	}
-	catch(Winter::BaseException& e)
-	{
-		std::cerr << e.what() << std::endl;
-		exit(1);
-	}
-}
-
-
-SSE_CLASS_ALIGN float4
-{
-public:
-	float e[4];
-
-	inline bool operator == (const float4& other) const
-	{
-		return 
-			(e[0] == other.e[0]) &&
-			(e[1] == other.e[1]) &&
-			(e[2] == other.e[2]) &&
-			(e[3] == other.e[3]);
-	}
-};
-
-
-struct StructWithVec
-{
-	//int data;
-	float4 a;
-	float4 b;
-	float data2;
-
-	inline bool operator == (const StructWithVec& other)
-	{
-		return (a == other.a) && (b == other.b) && (data2 == other.data2);
-	}
-};
-
-
-static void testVectorInStruct(const std::string& src, const StructWithVec& struct_in, const StructWithVec& target_return_val)
-{
-	std::cout << "============================== Winter testVectorInStruct() ============================" << std::endl;
-	try
-	{
-		VMConstructionArgs vm_args;
-		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
-
-		VirtualMachine vm(vm_args);
-
-		vector<string> field_names;
-		field_names.push_back("a");
-		field_names.push_back("b");
-		field_names.push_back("data2");
-
-		vector<TypeRef> field_types;
-		field_types.push_back(TypeRef(new VectorType(TypeRef(new Float), 4)));
-		field_types.push_back(TypeRef(new VectorType(TypeRef(new Float), 4)));
-		field_types.push_back(TypeRef(new Float));
-
-
-		// Get main function
-		FunctionSignature mainsig(
-			"main", 
-			std::vector<TypeRef>(1, TypeRef(new StructureType(
-				"StructWithVec", 
-				field_types, 
-				field_names
-			)))
-		);
-		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
-
-
-		// __cdecl
-		void (WINTER_JIT_CALLING_CONV *f)(StructWithVec*, StructWithVec*, void*) = (void (WINTER_JIT_CALLING_CONV *)(StructWithVec*, StructWithVec*, void*))vm.getJittedFunction(mainsig);
-
-		// Call the JIT'd function
-		SSE_ALIGN StructWithVec jitted_result;
-
-		SSE_ALIGN StructWithVec aligned_struct_in = struct_in;
-
-		TestEnv test_env;
-		test_env.val = 10;
-
-		f(&jitted_result, &aligned_struct_in, &test_env);
-
-		// Check JIT'd result.
-		if(!(jitted_result == target_return_val))
-		{
-			std::cerr << "Test failed: jitted_result != target_return_val  " << std::endl;
-			exit(1);
-		}
-
-		/*VMState vmstate;
-		vmstate.func_args_start.push_back(0);
-
-		Value* retval = maindef->invoke(vmstate);
-
-		vmstate.func_args_start.pop_back();
-		StructureValue* val = dynamic_cast<StructureValue*>(retval);
-		if(!val)
-		{
-		std::cerr << "main() Return value was of unexpected type." << std::endl;
-		exit(1);
-		}*/
-
-
-		/*if(val->value != target_return_val)
-		{
-		std::cerr << "Test failed: main returned " << val->value << ", target was " << target_return_val << std::endl;
-		exit(1);
-		}*/
-
-		//delete retval;
-
-	}
-	catch(Winter::BaseException& e)
-	{
-		std::cerr << e.what() << std::endl;
-		exit(1);
-	}
-}
-
-
-float test()
-{
-	return 10;
-}
-
-//int test2()
-//{
-//	return 3.0f;
-//}
+/*
+
+def main(int x) int : 
+	if x < 5 then
+		10 
+	else
+		20
+
+def main(int x) int : 
+	if x < 5
+		10 
+	else
+		20
+
+def main(int x) int : if x < 5 then 10 else	20
+
+def main(int x) int : if (x < 5) then 10 else 20
+def main(int x) int : if (x < 5) then 10 else 20
+
+def main(int x) int : if (x < 5, 10, 20)
+
+parse 'if ('
+parse expression 'x < 5'
+if next token == ')', then it's if-then-else.
+if next token == ',', then it's if(,,)
+*/
 
 void LanguageTests::run()
 {
+//	ProgramBuilder::test();
+
+	// truncateToInt with runtime args, with bounds checking
+	testMainFloatArg("def main(float x) float : toFloat(if x >= -2147483648.0 && x < 2147483647.0 then truncateToInt(x) else 0)", 3.1f, 3.0f);
+
+	// truncateToInt with constant value
+	testMainFloatArg("def main(float x) float : toFloat(truncateToInt(3.1))", 3.1f, 3.0f);
+
+	// Test truncateToInt where we can't prove the arg is in-bounds.
+//TEMP	testMainFloatArgInvalidProgram("def main(float x) float : toFloat(truncateToInt(x))", 3.9f, 3.0f);
+
+
+
+	
+
+	// Test division by -1 where we prove the numerator is not INT_MIN
+	/*testMainIntegerArg(
+		"def main(int i) int : if i > 1 then 2 else 0", 
+		8, -8);*/
+
+
+
+	testMainIntegerArg("def div(int x, int y) int : if(y != 0 && x != -2147483648, x / y, 0)	\n\
+					   def main(int i) int : div(i, i)",    
+		5, 1);
+	testMainIntegerArg("def main(int i) int : if i != 0 && i != -1 then i / i else 0",    
+		5, 1);
+
+
+	testMainFloatArg("def f(int x) int : x*x	      def main(float x) float : 14 / (f(2) + 2)", 2.0f, 2.0f);
+
+	//testMainFloatArg("def f(int x) int : x*x	      def main(float x) float : f(2) + 3", 1.0f, 7.0f);
+	testMainFloatArg("def f(int x) int : x*x	      def main(float x) float : 14 / (f(2) + 3)", 2.0f, 2.0f);
+
+	// Test division by -1 where we prove the numerator is not INT_MIN
+	testMainIntegerArg(
+		"def main(int i) int : if i > -10000 then i / -1 else 0", 
+		8, -8);
+
+	// Test division where numerator = INT_MIN where we prove the denominator is not -1
+	testMainIntegerArg(
+		"def main(int i) int : if i >= 1 then -2147483648 / i else 0", 
+		2, -1073741824);
+
+	// Test division by -1 where we can't prove the numerator is not INT_MIN
+	testMainIntegerArgInvalidProgram(
+		"def main(int i) int : i / -1", 
+		8);
+
+
+	// Test division by a constant
+	testMainIntegerArg(
+		"def main(int i) int : i / 4", 
+		8, 2);
+
+	// Test division by zero
+	testMainIntegerArgInvalidProgram(
+		"def main(int i) int : i / 0", 
+		1);
+
+
+	// Test division by a runtime value
+	testMainIntegerArg(
+		"def main(int i) int : if i != 0 then 8 / i else 0", 
+		4, 2);
+
+
+
+
+	// Test array in array
+	testMainIntegerArg(
+		"def main(int i) int : if i >= 0 && i < 2 then elem(elem([[1, 2]a, [3, 4]a]a, i), i) else 0", 
+		1, 4);
+
+	// Test integer in-bounds runtime index access to array
+	testMainIntegerArg(
+		"def main(int i) int : if i >= 0 && i < 10 then elem([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]a, i) else 0", 
+		2, 3);
+
+
+	// Test integer in-bounds runtime index access to vector
+	testMainIntegerArg(
+		"def main(int i) int : if i >= 0 && i < 10 then elem([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]v, i) else 0", 
+		2, 3);
+	// ===================================================================
+	// Test array access with elem()
+	// ===================================================================
+	// Test integer in-bounds constant index access to array
+	testMainIntegerArg(
+		"def main(int i) int :						\n\
+			let										\n\
+				a = [1, 2, 3, 4]a					\n\
+			in										\n\
+				elem(a, 1)							",
+		1, 2);
+
+	// Test integer out-of-bounds constant index access to array
+	testMainIntegerArgInvalidProgram(
+		"def main(int i) int :						\n\
+			let										\n\
+				a = [1, 2, 3, 4]a					\n\
+			in										\n\
+				elem(a, -1)							",
+		1);
+
+	// Test integer in-bounds runtime index access to array  (let clause)
+	testMainIntegerArg(
+		"def main(int i) int :						\n\
+			let										\n\
+				a = [1, 2, 3, 4]a					\n\
+			in										\n\
+				if inBounds(a, i)					\n\
+					elem(a, i)						\n\
+				else								\n\
+					0								",
+		1, 2);
+
+	// Test integer in-bounds runtime index access to array (function arg var)
+	testMainIntegerArg(
+		"def f(array<int, 4> a, int i) int :		\n\
+			if inBounds(a, i)						\n\
+				elem(a, i)							\n\
+			else									\n\
+				0									\n\
+		def main(int i) int :						\n\
+			f([1, 2, 3, 4]a, i)",
+		1, 2);
+
+	// Test integer out-of-bounds runtime index access to array
+	testMainIntegerArg(
+		"def main(int i) int :						\n\
+			let										\n\
+				a = [1, 2, 3, 4]a					\n\
+			in										\n\
+				if inBounds(a, i)					\n\
+					elem(a, i)						\n\
+				else								\n\
+					0								",
+		-1, 0);
+
+	// Test integer out-of-bounds runtime index access to array (function arg var)
+	testMainIntegerArg(
+		"def f(array<int, 4> a, int i) int :		\n\
+			if inBounds(a, i)						\n\
+				elem(a, i)							\n\
+			else									\n\
+				0									\n\
+		def main(int i) int :						\n\
+			f([1, 2, 3, 4]a, i)",
+		-1, 0);
+
+
+	// ===================================================================
+	// Test vector access with elem()
+	// ===================================================================
+	// Test integer in-bounds constant index access to vector
+	testMainIntegerArg(
+		"def main(int i) int :						\n\
+			let										\n\
+				a = [1, 2, 3, 4]v					\n\
+			in										\n\
+				elem(a, 1)							",
+		1, 2);
+
+	// Test integer out-of-bounds constant index access to vector
+	testMainIntegerArgInvalidProgram(
+		"def main(int i) int :						\n\
+			let										\n\
+				a = [1, 2, 3, 4]v					\n\
+			in										\n\
+				elem(a, -1)							",
+		1);
+
+	// Test integer in-bounds runtime index access to vector
+	testMainIntegerArg(
+		"def main(int i) int :						\n\
+			let										\n\
+				a = [1, 2, 3, 4]v					\n\
+			in										\n\
+				if inBounds(a, i)					\n\
+					elem(a, i)						\n\
+				else								\n\
+					0								",
+		1, 2);
+
+	// Test integer out-of-bounds runtime index access to vector
+	testMainIntegerArg(
+		"def main(int i) int :						\n\
+			let										\n\
+				a = [1, 2, 3, 4]v					\n\
+			in										\n\
+				if inBounds(a, i)					\n\
+					elem(a, i)						\n\
+				else								\n\
+					0								",
+		-1, 0);
+
+	/*testMainIntegerArg(
+		"def main(int i) int :						\n\
+			match x = elem([1, 2, 3, 4]a, i)		\n\
+				int: x								\n\
+				error: 0							",
+		1, 2);*/
+
+	// Test integer out-of-bounds runtime index access
+	/*testMainIntegerArg(
+		"def main(int i) int :						\n\
+			match x = elem([1, 2, 3, 4]a, i)		\n\
+				int: x								\n\
+				error: 0							",
+		100, 0);*/
+
+
+
+	/*float x = 2.0f;
+	float y = (x + x) -1.5;*/
+
+	// Test divide-by-zero
+	//testMainIntegerArg("def main(int x) int : 10 / x ", 0, 10);
+
+	// ===================================================================
+	// Test if-then-else
+	// ===================================================================
+	testMainIntegerArg("def main(int x) int : if x < 5 then 10 else 5 ", 2, 10);
+	testMainIntegerArg("def main(int x) int : if x < 5 then 10 else 5 ", 6, 5);
+
+	testMainIntegerArg("def main(int x) int : if (x < 5) then 10 else 5 ", 6, 5);
+
+	// Test optional 'then'
+	testMainIntegerArg("def main(int x) int : if x < 5 10 else 5 ", 2, 10);
+	testMainIntegerArg("def main(int x) int : if x < 5 10 else 5 ", 6, 5);
+
+	// Test nested if-then-else
+	testMainIntegerArg("def main(int x) int : if x < 5 then if x < 2 then 1 else 2 else 5 ", 1, 1);
+	testMainIntegerArg("def main(int x) int : if x < 5 then if x < 2 then 1 else 2 else 5 ", 2, 2);
+	testMainIntegerArg("def main(int x) int : if x < 5 then if x < 2 then 1 else 2 else 5 ", 10, 5);
+
+	// Test nested if-then-else without the 'then'
+	testMainIntegerArg("def main(int x) int : if x < 5 if x < 2 1 else 2 else 5 ", 1, 1);
+	testMainIntegerArg("def main(int x) int : if x < 5 if x < 2 1 else 2 else 5 ", 2, 2);
+	testMainIntegerArg("def main(int x) int : if x < 5 if x < 2 1 else 2 else 5 ", 10, 5);
+
+	testMainIntegerArg("def main(int x) int :			\n\
+								if x < 5				\n\
+									if x < 3			\n\
+										1				\n\
+									else				\n\
+										2				\n\
+								else					\n\
+									if x < 7			\n\
+										6				\n\
+									else				\n\
+										7				\n\
+		", 10, 7);
+
+	// Test nested if-then-else with parentheses
+	testMainIntegerArg("def main(int x) int : if x < 5 then (if x < 2 then 1 else 2) else 5 ", 1, 1);
+	testMainIntegerArg("def main(int x) int : if x < 5 then (if x < 2 then 1 else 2) else 5 ", 2, 2);
+	testMainIntegerArg("def main(int x) int : if x < 5 then (if x < 2 then 1 else 2) else 5 ", 10, 5);
+
+
+	// ===================================================================
+	// Ref counting tests
+	// ===================================================================
+	// Test putting a string in a structure, then returning it.
+	testMainIntegerArg(
+		"struct teststruct { string str }										\n\
+		def f() teststruct : teststruct(\"hello world\")						\n\
+		def main(int x) int : stringLength(str(f())) ",
+		2, 11);
+
+	// Test a string in a structure
+	testMainIntegerArg(
+		"struct teststruct { string str }										\n\
+		def main(int x) int : stringLength(teststruct(\"hello world\").str) ",
+		2, 11);
+
+	
+
+	// ===================================================================
+	// String tests
+	// ===================================================================
+
+	// Double return of a string
+	testMainIntegerArg(
+		"def f() string : \"hello world\"	\n\
+		def g() string : f()				\n\
+		def main(int x) int : stringLength(g())",
+		2, 11);
+	
+
+	// String test - string literal in let statement, with assignment.
+	testMainIntegerArg(
+		"def main(int x) int : stringLength(concatStrings(\"hello\", \"world\"))",
+		2, 10);
+
+	// String test - string literal in let statement, with assignment.
+	testMainIntegerArg(
+		"def main(int x) int :				\n\
+			let								\n\
+				s = \"hello world\"			\n\
+				s2 = s						\n\
+			in								\n\
+				stringLength(s) + stringLength(s2)",
+		2, 22);
+
+	// String test - string literal in let statement, with assignment.
+	testMainIntegerArg(
+		"def main(int x) int :				\n\
+			let								\n\
+				s = \"hello world\"			\n\
+				s2 = \"hallo thar\"			\n\
+			in								\n\
+				stringLength(s) + stringLength(s2)",
+		2, 21);
+
+	// a function returning a string
+	testMainIntegerArg(
+		"def f() string : \"hello world\"	\n\
+		def main(int x) int : stringLength(f())",
+		2, 11);
+
+	// a function returning a string in a let block
+	testMainIntegerArg(
+		"def f() string : \"hello world\"	\n\
+		def main(int x) int :				\n\
+			let								\n\
+				s = f()						\n\
+			in								\n\
+				stringLength(s)",
+		2, 11);
+
+	// String test - string literal in let statement
+	testMainIntegerArg(
+		"def main(int x) int :				\n\
+			let								\n\
+				s = \"hello world\"			\n\
+			in								\n\
+				stringLength(s)",
+		2, 11);
+
+	// String test - string literal as argument
+	testMainIntegerArg(
+		"def main(int x) int :				\n\
+				stringLength(\"hello world\")",
+		2, 11);
+
+	// String test - string literal in let statement, with assignment.
+	testMainIntegerArg(
+		"def main(int x) int :				\n\
+			let								\n\
+				s = \"hello world\"			\n\
+				s2 = s						\n\
+			in								\n\
+				stringLength(s2)",
+		2, 11);
+
+	// Char test
+	testMainIntegerArg(
+		"def main(int x) int :				\n\
+			let								\n\
+				c = 'a'						\n\
+			in								\n\
+				10",
+		2, 10);
+
+
+	// test type coercion on vectors: vector<float> initialisation with some int elems
+	testMainFloatArg(
+		"def main(float x) float: elem(   2.0 * [1.0, 2.0, 3, 4]v, 1)",
+		1.0f, 4.0f);
+
+	// float * Vector<float> multiplication
+	testMainFloatArg(
+		"def main(float x) float: elem(   2.0 * [1.0, 2.0, 3.0, 4.0]v, 1)",
+		1.0f, 4.0f);
+
+	// Vector<float> * float multiplication
+	testMainFloatArg(
+		"def main(float x) float: elem(   [1.0, 2.0, 3.0, 4.0]v * 2.0, 1)",
+		1.0f, 4.0f);
+
+	// int * Vector<int> multiplication
+	testMainIntegerArg(
+		"def main(int x) int: elem(   2 * [1, 2, 3, 4]v, 1)",
+		1, 4);
+
+	// Vector<int> * int multiplication
+	testMainIntegerArg(
+		"def main(int x) int: elem(   [1, 2, 3, 4]v * 2, 1)",
+		1, 4);
+
+
+	// float * Vector<float> multiplication
+	testMainFloatArg(
+		"def main(float x) float: elem(   x * [x, 2.0, 3.0, 4.0]v, 1)",
+		2.0f, 4.0f);
+
+	// Vector<float> * float multiplication
+	testMainFloatArg(
+		"def main(float x) float: elem(   [1.0, 2.0, 3.0, 4.0]v * x, 1)",
+		2.0f, 4.0f);
+
+	// int * Vector<int> multiplication
+	testMainIntegerArg(
+		"def main(int x) int: elem(   x * [1, 2, 3, 4]v, 1)",
+		2, 4);
+
+	// Vector<int> * int multiplication
+	testMainIntegerArg(
+		"def main(int x) int: elem(   [1, 2, 3, 4]v * x, 1)",
+		2, 4);
+
+	
+
+
+	// Test integer in-bounds runtime index access to vector
+	/*testMainIntegerArg(
+		"def main(int i) int :								\n\
+			let												\n\
+				a = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]v		\n\
+				b = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1 ]v		\n\
+			in												\n\
+				elem(a + b, i)",
+		2, 4);
+
+	
+
+	// Test integer in-bounds runtime index access to vector
+	testMainIntegerArg(
+		"def main(int i) int :								\n\
+			let												\n\
+				a = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]v		\n\
+				b = [1.0, 1.6, 1.0, 1.0, 1.3, 1.6, 1.8, 1.6]v		\n\
+				c = [1.7, 2.8, 3.0, 4.7, 5.5, 6.7, 7.0, 8.4]v		\n\
+			in												\n\
+				truncateToInt(elem(a + if(i < 1, b, c), i))",
+		2, 6);
+
+	//exit(1);//TEMP
+
+	// Test integer in-bounds runtime index access to vector
+	testMainIntegerArg(
+		"def main(int i) int :								\n\
+			let												\n\
+				a = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]v		\n\
+				b = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 ]v		\n\
+				c = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]v		\n\
+			in												\n\
+				truncateToInt(elem(a + if(i < 1, b, c), i))",
+		2, 6);
+		*/
+	
+
+	// Test integer in-bounds runtime index access to vector
+	testMainIntegerArg(
+		"def main(int i) int : if i >= 0 && i < 10 then elem([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]v, i) else 0", 
+		2, 3);
+
+	testMainFloatArg(
+		"def main(float x) float: elem( if(x < 0.5, [1.0, 2.0]a, [3.0, 4.0]a), 0)",
+		1.0f, 3.0f);
+	
+	// Test a structure composed of another structure, and taking the dot product of two vectors in the child structures, in an if statement
+	{
+		Float4StructPair a(
+			Float4Struct(1, 1, 1, 1),
+			Float4Struct(2, 2, 2, 2)
+		);
+		
+		testFloat4StructPairRetFloat(
+			"struct Float4Struct { vector<float, 4> v }			\n\
+			struct Float4StructPair { Float4Struct a, Float4Struct b }			\n\
+			def main(Float4StructPair pair1, Float4StructPair pair2) float :			\n\
+				if(e0(pair1.a.v) < 0.5, dot(pair1.a.v, pair2.b.v), dot(pair1.b.v, pair2.a.v))",
+			a, a, 8.0f);
+	}
+
+	// Test a structure composed of another structure, and taking the dot product of two vectors in the child structures.
+	{
+		Float4StructPair a(
+			Float4Struct(1, 1, 1, 1),
+			Float4Struct(2, 2, 2, 2)
+		);
+		
+		testFloat4StructPairRetFloat(
+			"struct Float4Struct { vector<float, 4> v }			\n\
+			struct Float4StructPair { Float4Struct a, Float4Struct b }			\n\
+			def main(Float4StructPair pair1, Float4StructPair pair2) float :			\n\
+				dot(pair1.a.v, pair2.b.v)",
+			a, a, 8.0f);
+	}
+
+
+	
+
+	// Test if with expensive-to-eval args
+	testMainFloatArg(
+		//"def expensiveA(float x) float : pow(x, 0.1 + pow(0.2, x))			\n
+		"def expensiveA(float x) float : cos(x * 0.456 + cos(x))			\n\
+		def expensiveB(float x) float : sin(x * 0.345 + sin(x))			\n\
+		def main(float x) float: if(x < 0.5, expensiveA(x + 0.145), expensiveB(x + 0.2435))",
+		0.2f, cos((0.2f + 0.145f) * 0.456f + cos((0.2f + 0.145f))));	
+
+	// Test operator overloading (op_add) for an array
+	testMainFloatArg(
+		"def op_add(array<float, 2> a, array<float, 2> b) array<float, 2> : [elem(a, 0) + elem(b, 0), elem(a, 1) + elem(b, 1)]a		\n\
+		def main(float x) float: elem([1.0, 2.0]a  + [3.0, 4.0]a, 1)",
+		1.0f, 6.0f);	
+
+	// Test operator overloading (op_mul) for an array
+	testMainFloatArg(
+		"def op_mul(array<float, 2> a, float x) array<float, 2> : [elem(a, 0) * x, elem(a, 1) * x]a		\n\
+		def main(float x) float: elem([1.0, 2.0]a * 2.0, 1)",
+		1.0f, 4.0f);	
+
+	
+	// Test array in array
+	testMainIntegerArg(
+		"def main(int i) int : if i >= 0 && i < 2 then elem(elem([[1, 2]a, [3, 4]a]a, i), i) else 0", 
+		1, 4);
+
+	// Test struct in array
+	testMainIntegerArg(
+		"struct Pair { int a, int b }		\n\
+		def main(int i) int : if i >= 0 && i < 2 then b(elem([Pair(1, 2), Pair(3, 4)]a, i)) else 0 ", 
+		1, 4);
+
+
+	testMainIntegerArg(
+		"def main(int i) int : if i >= 0 && i < 5 then elem([1, 2, 3, 4, 5]a, i) else 0", 
+		1, 2);
+		
+	// Test integer in-bounds runtime index access
+	testMainIntegerArg(
+		"def main(int i) int : if i >= 0 && i < 20 then elem([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]a, i) else 0", 
+		10, 11);
+
+	// Test integer in-bounds runtime index access
+	for(int i=0; i<5; ++i)
+	{
+		testMainIntegerArg(
+			"def main(int i) int : if i >= 0 && i < 5 then elem([1, 2, 3, 4, 5]a, i) else 0", 
+			i, i+1);
+	}
+
+	// Test integer in-bounds runtime index access
+	testMainIntegerArg(
+		"def main(int i) int : if i >= 0 && i < 4 then elem([1, 2, 3, 4]a, i) else 0", 
+		1, 2);
+
+	// Test runtime out of bounds access.  Should return 0.
+	if(false)
+	{
+		testMainIntegerArg(
+			"def main(int i) int : elem([1, 2, 3, 4]a, i)", 
+			-1, 0);
+
+		testMainIntegerArg(
+			"def main(int i) int : elem([1, 2, 3, 4]a, i)", 
+			4, 0);
+
+		// Test out of bounds array access
+		testMainFloatArg(
+			"def main(float x) float : elem([1.0, 2.0, 3.0, 4.0]a, 4)", 
+			10.0, std::numeric_limits<float>::quiet_NaN());
+
+		testMainFloatArg(
+			"def main(float x) float : elem([1.0, 2.0, 3.0, 4.0]a, -1)", 
+			10.0, std::numeric_limits<float>::quiet_NaN());
+	}
+
+	
+
+
+
+	
+
+	// Test float arrays getting passed in to and returned from main function
+	{
+		const float a[] = {1.0f, 2.0f, 3.0f, 4.0f};
+		const float b[] = {10.0f, 20.0f, 30.0f, 40.0f};
+		float target_results[] = {1.0f, 2.0f, 3.0f, 4.0f};
+
+		testFloatArray("def main(array<float, 4> a, array<float, 4> b) array<float, 4> : a",
+			a, b, target_results, 4);
+	}
+
+	// Test map
+	{
+		const float a[] = {1.0f, 2.0f, 3.0f, 4.0f};
+		const float b[] = {10.0f, 20.0f, 30.0f, 40.0f};
+		float target_results[] = {1.0f, 4.0f, 9.0f, 16.0f};
+
+		testFloatArray(
+			"def square(float x) float : x*x			\n\
+			def main(array<float, 4> a, array<float, 4> b) array<float, 4> : map(square, a)",
+			a, b, target_results, 4);
+	}
+
+	// Test map with more elems
+	{
+		const size_t N = 256;
+		std::vector<float> input(N, 2.0f);
+		std::vector<float> target_results(N, 4.0f);
+
+
+		testFloatArray(
+			"def square(float x) float : x*x			\n\
+			def main(array<float, 256> a, array<float, 256> b) array<float, 256> : map(square, a)",
+			&input[0], &input[0], &target_results[0], N);
+	}
+
+
+	// Test float arrays getting passed in to and returned from main function
+	{
+		const float a[] = {1.0f, 2.0f, 3.0f, 4.0f};
+		const float b[] = {10.0f, 20.0f, 30.0f, 40.0f};
+		float target_results[] = {11.f, 22.f, 33.f, 44.f};
+
+		testFloatArray("def main(array<float, 4> a, array<float, 4> b) array<float, 4> : [elem(a,0) + elem(b,0), elem(a,1) + elem(b,1), elem(a,2) + elem(b,2), elem(a,3) + elem(b,3)]a",
+			a, b, target_results, 4);
+	}
+
+
+
+	
+
+	// Test structure getting returned directly.
+	{
+		Float4Struct a(1.0f, -2.0f, 3.0f, -4.0f);
+		Float4Struct target_result(1.0f, -2.0f, 3.0f, -4.0f);
+		
+		testFloat4Struct(
+			"struct Float4Struct { vector<float, 4> v } \n\
+			def main(Float4Struct a, Float4Struct b) Float4Struct : \n\
+				a", 
+			a, a, target_result
+		);
+	}
+
+
+	
+
+	// Test Array of structs
+	testMainFloatArg(
+		"struct Pair { float a, float b }		\n\
+		def main(float x) float : b(elem([Pair(1.0, 2.0), Pair(3.0, 4.0)]a, 1)) ", 
+		10.0, 4.0f);
+	
+	// Test mixing of int and float in an array - is invalid
+	testMainFloatArgInvalidProgram("def main(float x) float : elem([1.0, 2, 3.0, 4.0]a, 1) + x", 10.0, 12.f);
+	testMainFloatArgInvalidProgram("def main(float x) float : elem([1, 2.0, 3.0, 4.0]a, 1) + x", 10.0, 12.f);
+
+	// Test Array Literal
+	testMainFloatArg("def main(float x) float : elem([1.0, 2.0, 3.0, 4.0]a, 1) + x", 10.0, 12.f);
+
+	// Test Array Literal with one element
+	testMainFloatArg("def main(float x) float : elem([1.0]a, 0) + x", 10.0, 11.f);
+
+	// Test Array Literal with non-const value
+	testMainFloatArg("def main(float x) float : elem([x, x, x, x]a, 1) + x", 1.0, 2.f);
+	testMainFloatArg("def main(float x) float : elem([x, x+1.0, x+2.0, x+3.0]a, 2)", 1.0, 3.f);
+
+	// Test Array Literal of integers
+	testMainIntegerArg("def main(int x) int : elem([1, 2, 3, 4]a, 1) + x", 10, 12);
+
+	
+
+
+	// Test array with let statement
+	testMainFloatArg(
+		"def main(float x) float :				\n\
+			let									\n\
+				a = [1.0, 2.0, 3.0, 4.0]a		\n\
+			in									\n\
+				elem(a, 0)",
+		0.0f, 1.0f);
+
+	// Passing array by argument
+	testMainFloatArg(
+		"def f(array<float, 4> a) float : elem(a, 1)		\n\
+		def main(float x) float :						\n\
+			f([1.0, 2.0, 3.0, 4.0]a) +  x",
+		10.0f, 12.0f);
+
+
+	// abs
+	testMainFloatArg("def main(float x) float : abs(x)", 9.0f, 9.0f);
+	testMainFloatArg("def main(float x) float : abs(x)", -9.0f, 9.0f);
+
+
+	// Test abs on vector
+	{
+		Float4Struct a(1.0f, -2.0f, 3.0f, -4.0f);
+		Float4Struct target_result(1.0f, 2.0f, 3.0f, 4.0f);
+		
+		testFloat4Struct(
+			"struct Float4Struct { vector<float, 4> v } \n\
+			def abs(Float4Struct f) : Float4Struct(abs(f.v))		\n\
+			def main(Float4Struct a, Float4Struct b) Float4Struct : \n\
+				abs(a)", 
+			a, a, target_result
+		);
+	}
+
+	// TODO: abs for integers
+
+
+	//testMainFloatArg("def main(float x) float : someFuncBleh(x)", 9.0f, 10.0f);
+
+	// truncateToInt
+	//testMainIntegerArg("def main(int x) int : truncateToInt(toFloat(x) + 0.2)", 3, 3);
+	//testMainIntegerArg("def main(int x) int : truncateToInt(toFloat(x) + 0.2)", -3, -2);
+
+	// Test truncateToInt on vector
+/*	
+TODO: FIXME: needs truncateToInt in bounds proof.
+	{
+		Float4Struct a(-2.2f, -1.2f, 0.2f, 1.2f);
+		Float4Struct target_result(-2.f, -1.f, 0.f, 1.f);
+		
+		testFloat4Struct(
+			"struct Float4Struct { vector<float, 4> v } \n\
+			def sqrt(Float4Struct f) : Float4Struct(sqrt(f.v))		\n\
+			def main(Float4Struct a, Float4Struct b) Float4Struct : \n\
+				let													\n\
+					vec_int = truncateToInt(a.v)					\n\
+				in													\n\
+					Float4Struct(toFloat(vec_int))",
+			a, a, target_result
+		);
+	}
+*/
+	// sqrt
+	testMainFloatArg("def main(float x) float : sqrt(x)", 9.0f, std::sqrt(9.0f));
+
+	// Test sqrt on vector
+	{
+		Float4Struct a(1.0f, 2.0f, 3.0f, 4.0f);
+		Float4Struct target_result(std::sqrt(1.0f), std::sqrt(2.0f), std::sqrt(3.0f), std::sqrt(4.0f));
+		
+		testFloat4Struct(
+			"struct Float4Struct { vector<float, 4> v } \n\
+			def sqrt(Float4Struct f) : Float4Struct(sqrt(f.v))		\n\
+			def main(Float4Struct a, Float4Struct b) Float4Struct : \n\
+				sqrt(a)", 
+			a, a, target_result
+		);
+	}
+
+	// pow
+	testMainFloatArg("def main(float x) float : pow(2.4, x)", 3.0f, std::pow(2.4f, 3.0f));
+	testMainFloatArg("def main(float x) float : pow(2.0, x)", 3.0f, std::pow(2.0f, 3.0f));
+
+	// Test pow on vector
+	{
+		Float4Struct a(1.0f, 2.0f, 3.0f, 4.0f);
+		Float4Struct b(1.4f, 2.4f, 3.4f, 4.4f);
+		Float4Struct target_result(std::pow(1.0f, 1.4f), std::pow(2.0f, 2.4f), std::pow(3.0f, 3.4f), std::pow(4.0f, 4.4f));
+		
+		testFloat4Struct(
+			"struct Float4Struct { vector<float, 4> v } \n\
+			def pow(Float4Struct a, Float4Struct b) : Float4Struct(pow(a.v, b.v))		\n\
+			def main(Float4Struct a, Float4Struct b) Float4Struct : \n\
+				pow(a, b)", 
+			a, b, target_result
+		);
+	}
+
+	// sin
+	testMainFloatArg("def main(float x) float : sin(x)", 1.0f, std::sin(1.0f));
+
+	// Test sin on vector
+	{
+		Float4Struct a(1.0f, 2.0f, 3.0f, 4.0f);
+		Float4Struct target_result(std::sin(1.0f), std::sin(2.0f), std::sin(3.0f), std::sin(4.0f));
+		
+		testFloat4Struct(
+			"struct Float4Struct { vector<float, 4> v } \n\
+			def sin(Float4Struct f) : Float4Struct(sin(f.v))		\n\
+			def main(Float4Struct a, Float4Struct b) Float4Struct : \n\
+				sin(a)", 
+			a, a, target_result
+		);
+	}
+
+	// exp
+	testMainFloatArg("def main(float x) float : exp(x)", 3.0f, std::exp(3.0f));
+
+	// Test exp on vector
+	{
+		Float4Struct a(1.0f, 2.0f, 3.0f, 4.0f);
+		Float4Struct target_result(std::exp(1.0f), std::exp(2.0f), std::exp(3.0f), std::exp(4.0f));
+		
+		testFloat4Struct(
+			"struct Float4Struct { vector<float, 4> v } \n\
+			def exp(Float4Struct f) : Float4Struct(exp(f.v))		\n\
+			def main(Float4Struct a, Float4Struct b) Float4Struct : \n\
+				exp(a)", 
+			a, a, target_result
+		);
+	}
+
+	// log
+	testMainFloatArg("def main(float x) float : log(x)", 3.0f, std::log(3.0f));
+
+	// Test exp on vector
+	{
+		Float4Struct a(1.0f, 2.0f, 3.0f, 4.0f);
+		Float4Struct target_result(std::log(1.0f), std::log(2.0f), std::log(3.0f), std::log(4.0f));
+		
+		testFloat4Struct(
+			"struct Float4Struct { vector<float, 4> v } \n\
+			def log(Float4Struct f) : Float4Struct(log(f.v))		\n\
+			def main(Float4Struct a, Float4Struct b) Float4Struct : \n\
+				log(a)", 
+			a, a, target_result
+		);
+	}
+
+	// cos
+	testMainFloatArg("def main(float x) float : cos(x)", 1.0f, std::cos(1.0f));
+
+	// Test cos on vector
+	{
+		Float4Struct a(1.0f, 2.0f, 3.0f, 4.0f);
+		Float4Struct target_result(std::cos(1.0f), std::cos(2.0f), std::cos(3.0f), std::cos(4.0f));
+		
+		testFloat4Struct(
+			"struct Float4Struct { vector<float, 4> v } \n\
+			def cos(Float4Struct f) : Float4Struct(cos(f.v))		\n\
+			def main(Float4Struct a, Float4Struct b) Float4Struct : \n\
+				cos(a)", 
+			a, a, target_result
+		);
+	}
+
+
+
+	// Test floor
+	testMainFloatArg("def main(float x) float : floor(x)", 2.3f, 2.0f);
+	testMainFloatArg("def main(float x) float : floor(x)", -2.3f, -3.0f);
+
+	// Test floor on vector
+	{
+		Float4Struct a(-1.2, -0.2, 0.2, 1.2);
+		Float4Struct target_result(-2, -1, 0, 1);
+		
+		testFloat4Struct(
+			"struct Float4Struct { vector<float, 4> v } \n\
+			def floor(Float4Struct f) : Float4Struct(floor(f.v))		\n\
+			def main(Float4Struct a, Float4Struct b) Float4Struct : \n\
+				floor(a)", 
+			a, a, target_result
+		);
+	}
+
+	// Test ceil
+	testMainFloatArg("def main(float x) float : ceil(x)", 2.3f, 3.0f);
+	testMainFloatArg("def main(float x) float : ceil(x)", -2.3f, -2.0f);
+
+	// Test ceil on vector
+	{
+		Float4Struct a(-1.2, -0.2, 0.2, 1.2);
+		Float4Struct target_result(-1, 0, 1, 2);
+		
+		testFloat4Struct(
+			"struct Float4Struct { vector<float, 4> v } \n\
+			def ceil(Float4Struct f) : Float4Struct(ceil(f.v))		\n\
+			def main(Float4Struct a, Float4Struct b) Float4Struct : \n\
+				ceil(a)", 
+			a, a, target_result
+		);
+	}
+
+
+	// Test avoidance of circular let definition: 
+	testMainFloatArgInvalidProgram("									\n\
+		def main(float y) float :		\n\
+			let							\n\
+				x = x					\n\
+			in							\n\
+				x						",
+		2.0f,
+		2.0f
+	);
+
+	// Test avoidance of circular let definition
+	testMainFloatArgInvalidProgram("									\n\
+		def main(float y) float :		\n\
+			let							\n\
+				x = 1.0 + x				\n\
+			in							\n\
+				x						",
+		2.0f,
+		2.0f
+	);
+
+
+	//COPIED:
+	// Test two let clauses where one refers to the other.
+	testMainFloat("def f() float : \
+				  let	\
+					z = 2.0 \
+					y = z \
+				  in \
+					y \
+				  def main() float : f()", 2.0);
+
+	// Test vector in structure
+	{
+		Float4Struct a(1, 2, 3, 4);
+		Float4Struct b(1, 2, 3, 4);
+		Float4Struct target_result(1, 2, 3, 4);
+		
+		 //Float8Struct([min(e0(a.v), e0(b.v)), min(e1(a.v), e1(b.v)),	min(e2(a.v), e2(b.v)),	min(e3(a.v), e3(b.v)), min(e4(a.v), e4(b.v)), min(e5(a.v), e5(b.v)), min(e6(a.v), e6(b.v)), min(e7(a.v), e7(b.v))]v ) 
+		testFloat4Struct(
+			"struct Float4Struct { vector<float, 4> v } \n\
+			def min(Float4Struct a, Float4Struct b) Float4Struct : Float4Struct(min(a.v, b.v)) \n\
+			def main(Float4Struct a, Float4Struct b) Float4Struct : \n\
+				min(a, b)", 
+			a, b, target_result
+		);
+	}
+
+
+	// Test vector in structure
+	{
+		Float8Struct a;
+		a.v.e[0] = 10;
+		a.v.e[1] = 2;
+		a.v.e[2] = 30;
+		a.v.e[3] = 4;
+		a.v.e[4] = 4;
+		a.v.e[5] = 5;
+		a.v.e[6] = 6;
+		a.v.e[7] = 7;
+
+		Float8Struct b;
+		b.v.e[0] = 1;
+		b.v.e[1] = 20;
+		b.v.e[2] = 3;
+		b.v.e[3] = 40;
+		b.v.e[4] = 4;
+		b.v.e[5] = 5;
+		b.v.e[6] = 6;
+		b.v.e[7] = 7;
+
+		Float8Struct target_result;
+		target_result.v.e[0] = 1;
+		target_result.v.e[1] = 2;
+		target_result.v.e[2] = 3;
+		target_result.v.e[3] = 4;
+		target_result.v.e[4] = 4;
+		target_result.v.e[5] = 5;
+		target_result.v.e[6] = 6;
+		target_result.v.e[7] = 7;
+		
+		 //Float8Struct([min(e0(a.v), e0(b.v)), min(e1(a.v), e1(b.v)),	min(e2(a.v), e2(b.v)),	min(e3(a.v), e3(b.v)), min(e4(a.v), e4(b.v)), min(e5(a.v), e5(b.v)), min(e6(a.v), e6(b.v)), min(e7(a.v), e7(b.v))]v ) 
+		testFloat8Struct(
+			"struct Float8Struct { vector<float, 8> v } \n\
+			def min(Float8Struct a, Float8Struct b) Float8Struct : Float8Struct(min(a.v, b.v)) \n\
+			def main(Float8Struct a, Float8Struct b) Float8Struct : \n\
+				min(a, b)", 
+			a, b, target_result
+		);
+	}
+
+
+	// Test alignment of structure elements when they are vectors
+	testMainFloatArg("struct vec4 { vector<float, 4> v }					\n\
+				   struct vec16 { vector<float, 16> v }					\n\
+				   struct large_struct { vec4 a, vec16 b }				\n\
+				   def main(float x) float : large_struct(vec4([x, x, x, x]v), vec16([x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x]v)).a.v.e0",
+				  3.0f, 3.0f);
+
+
+	//TEMP:
+	// Try dot product
+	testMainFloatArg("	def main(float x) float : \
+					 let v = [x, x, x, x]v in\
+					 dot(v, v)", 2.0f, 16.0f);
+
+
+	
+
+	// Test avoidance of circular variable definition: 
+	testMainFloatArg("									\n\
+		def main(float x) float :		\n\
+			let							\n\
+				x = 2.0					\n\
+			in							\n\
+				x						",
+		2.0f,
+		2.0f
+	);
+
 	// Test avoidance of circular variable definition: the x(pos) expression was attempting to get the type of the 'x =' let node,
 	// which was not known yet as was being computed.  The solution adopted is to not try to bind to let variables that are ancestors of the current variable.
 	// Another solution could be to not try to bind to unbound variables.
@@ -705,10 +1094,8 @@ void LanguageTests::run()
 		1.0f, 10000.0f);	
 
 	
-	/*
-	testMainFloatArg("def lt(real x, real y) real : x < y   \n\
-					 def main(float x) float : x + 1.0", 1.0f, 2.0f);
-	*/
+	
+	
 	
 	// Test comparison vs addition precedence: addition should have higher precedence.
 	testMainFloatArg("def main(float x) float : if(x < 1.0 + 2.0, 5.0, 6.0)", 1.0f, 5.0f);
@@ -717,13 +1104,13 @@ void LanguageTests::run()
 
 
 	// Test capture of let variable.
-	/*
-	NOTE: Disabled, because these tests leak due to call to allocateRefCountedStructure().
-	testMainFloat("	def main() float :                          \n\
-				  let blerg = 3.0 in                     \n\
-				  let f = \\() : blerg  in                    \n\
-				  f()", 3.0);
-	*/
+	
+	//NOTE: Disabled, because these tests leak due to call to allocateRefCountedStructure().
+	//testMainFloat("	def main() float :                          \n\
+	//			  let blerg = 3.0 in                     \n\
+	//			  let f = \\() : blerg  in                    \n\
+	//			  f()", 3.0);
+	
 
 	testMainFloatArg("def main(float x) float : sin(x)", 1.0f, std::sin(1.0f));
 
@@ -787,18 +1174,7 @@ void LanguageTests::run()
 
 
 
-	// sqrt
-	testMainFloat("def main() float : sqrt(9.0)", std::sqrt(9.0f));
-
-	//pow
-	//testMainFloat("def main() float : pow(2.4, 3.0)", std::pow(2.4f, 3.0f));
-	//testMainFloat("def main() float : pow(2.0, 3.0)", std::pow(2.0f, 3.0f));
-
-	// sin
-	//testMainFloat("def main() float : sin(1.0f)", std::sin(1.0f));
-
-	// cos
-	//testMainFloat("def main() float : cos(1.0f)", std::cos(1.0f));
+	
 
 	testMainFloat("def f(float x) float : x*x         def main() float : f(10)", 100.0);
 	testMainFloat("def f(float x, float y) float : 1.0f   \n\
@@ -806,9 +1182,10 @@ void LanguageTests::run()
 				  def main() float : f(1.0, 2)", 2.0);
 
 	// ===================================================================
-	// Test implicit conversions from int to float
+	// Test implicit type conversions from int to float
 	// ===================================================================
 
+	// For numeric literals
 	testMainFloat("def main() float : 3.0 + 4", 7.0);
 	testMainFloat("def main() float : 3 + 4.0", 7.0);
 
@@ -821,10 +1198,48 @@ void LanguageTests::run()
 	testMainFloat("def main() float : 12.0 / 4", 3.0);
 	testMainFloat("def main() float : 12 / 4.0", 3.0);
 	
-//TEMP FAILING FIXME 	testMainFloat("def f(float x) float : x*x      def main() float : 14 / (f(2.0) + 3)", 2.0);
-//TEMP FAILING FIXME 	testMainFloat("def f(float x) float : x*x      def main() float : 14 / (f(2) + 3)", 2.0);
-//TEMP FAILING FIXME 	testMainFloat("def f(int x) int : x*x      def main() float : 14 / (f(2) + 3)", 2.0);
-//TEMP FAILING FIXME 	testMainFloat("def f<T>(T x) T : x*x      def main() float : 14 / (f(2) + 3)", 2.0);
+	// Test with nodes that can't be constant-folded.
+	// Addition
+	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : f(x) + 3", 2.0f, 7.0f);
+	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : 3 + f(x)", 2.0f, 7.0f);
+
+	// Subtraction
+	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : f(x) - 3", 2.0f, 1.0f);
+	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : 3 - f(x)", 2.0f, -1.0f);
+
+	// Multiplication
+	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : f(x) * 3", 2.0f, 12.0f);
+	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : 3 * f(x)", 2.0f, 12.0f);
+
+	// Division
+	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : f(x) / 3", 3.0f, 3.0f);
+	// Can't be done as f(x) might be zero:
+	// testMainFloatArg("def f(float x) float : x*x      def main(float x) float : 3 / f(x)", 2.0f, 12.0f);
+
+	// NOTE: this one can't convert because f(x) + 3 might be zero.
+	//testMainFloatArg("def f(float x) float : x*x      def main(float x) float : 14 / (f(x) + 3)", 2.0f, 2.0f);
+	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : 14 / (f(2) + 3)", 2.0f, 2.0f);
+	testMainFloatArg("def f(int x) int : x*x	      def main(float x) float : 14 / (f(2) + 3)", 2.0f, 2.0f);
+	testMainFloatArg("def f<T>(T x) T : x*x           def main(float x) float : 14 / (f(2) + 3)", 2.0, 2.0f);
+
+	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : f(x) * 2 + 1", 2.0f, 9.0f);
+	
+	testMainFloatArg("def main(float x) float : ( x + x) * (-0.4)", 2.0f, -1.6f);
+
+	testMainFloatArg("def main(float x) float : (x + x) - 1.5", 2.0f, 2.5f);
+	//testMainFloatArg("def main(float x) float : (x + x) -1.5", 2.0f, 2.0); // NOTE: this works in C++. (e.g. the -1.5 is interpreted as a binary subtraction)
+	
+	// Division
+	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : f(x) / 3", 3.0f, 3.0f);
+
+
+	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : f(x) * (1.0 / 3.0)", 3.0f, 3.0f);
+	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : f(x) * (1 / 3.0)", 3.0f, 3.0f);
+	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : f(x) * (1.0 / 3)", 3.0f, 3.0f);
+
+	// Division
+	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : 1.0 / 3.0", 3.0f, 1.0f / 3.0f);
+
 
 
 	// Test promotion to match function return type:
@@ -833,9 +1248,9 @@ void LanguageTests::run()
 	testMainFloat("def main() float : 1.0 + (2 + 3)", 6.0);
 	
 	testMainFloat("def main() float : 1.0 + 2 + 3", 6.0);
-
+	
 	// Test implicit conversion from int to float in addition operation with a function call
-//TEMP FAILING FIXME 	testMainFloat("def f(int x) : x*x    def main() float : 1.0 + f(2) + 3", 8.0);
+	//testMainFloat("def f(int x) : x*x    def main() float : 1.0 + f(2)", 5.0f);
 
 	testMainFloat("def main() float : (1.0 + 2.0) + (3 + 4)", 10.0);
 	testMainFloat("def main() float : (1.0 + 2) + (3 + 4)", 10.0);
@@ -911,9 +1326,11 @@ void LanguageTests::run()
 	testMainFloat("def main() float : if(3.0 <= 1, 10.0, 20.0)", 20.0);
 
 	// Comparison between a variable and a literal:
-	// Doesn't work yet.
-	// testMainFloatArg("def main(float x) float : if(x <= 2, 10.0, 20.0)", 1.0, 10.0);
-	// testMainFloatArg("def main(float x) float : if(1 <= x, 10.0, 20.0)", 1.0, 10.0);
+	testMainFloatArg("def main(float x) float : if(x <= 2, 10.0, 20.0)", 1.0, 10.0);
+	testMainFloatArg("def main(float x) float : if(x <= 2, 10.0, 20.0)", 3.0, 20.0);
+
+	testMainFloatArg("def main(float x) float : if(2 <= x, 10.0, 20.0)", 3.0, 10.0);
+	testMainFloatArg("def main(float x) float : if(2 <= x, 10.0, 20.0)", 1.0, 20.0);
 
 
 
@@ -1108,28 +1525,6 @@ void LanguageTests::run()
 					y \
 				  def main() float : f()", 2.0);
 
-	// Test avoidance of circular let definition: 
-	testMainFloatArgInvalidProgram("									\n\
-		def main(float y) float :		\n\
-			let							\n\
-				x = x					\n\
-			in							\n\
-				x						",
-		2.0f,
-		2.0f
-	);
-
-	// Test avoidance of circular let definition
-	testMainFloatArgInvalidProgram("									\n\
-		def main(float y) float :		\n\
-			let							\n\
-				x = 1.0 + x				\n\
-			in							\n\
-				x						",
-		2.0f,
-		2.0f
-	);
-
 	// Test two let clauses where one refers to the other (reverse order)
 	/*testMainFloat("def f() float : \
 				  let	\
@@ -1234,7 +1629,7 @@ void LanguageTests::run()
 					def main() float :                          \n\
 					let f = makeFunc(2.0) in                    \n\
 					f(3.0)", 5.0);
-*/
+
 	// Test capture of let variable.
 	/*
 	NOTE: Disabled, because these tests leak due to call to allocateRefCountedStructure().
@@ -1291,7 +1686,23 @@ void LanguageTests::run()
 				  def main() float : f(2.0)", 6.0);
 
 
-	
+	// Test creation of struct
+	{
+		Float4Struct a(1.0f, -2.0f, 3.0f, -4.0f);
+		Float4Struct target_result(std::sqrt(1.0f), std::sqrt(2.0f), std::sqrt(3.0f), std::sqrt(4.0f));
+		testFloat4Struct(
+			"struct Float4Struct { vector<float, 4> v } \n\
+			def sqrt(Float4Struct f) : Float4Struct(sqrt(f.v))		\n\
+			def main(Float4Struct a, Float4Struct b) Float4Struct : \n\
+				let													\n\
+					a = Float4Struct([1.0, 2.0, 3.0, 4.0]v)			\n\
+				in													\n\
+					sqrt(a)",
+			a, a, target_result
+		);
+	}
+
+
 	// Test struct
 	testMainFloat("struct Complex { float re, float im } \
 				  def main() float : re(Complex(2.0, 3.0))", 2.0f);
@@ -1355,16 +1766,21 @@ void LanguageTests::run()
 					e1(x - y)", -18.0f);
 
 	// Test vector * float multiplication
-	// NOTE: doesn't work yet.
-	/*testMainFloat("	def main() float : \
-				  let x = [1.0, 2.0, 3.0, 4.0]v \
-			  e1(x * 10.0)", 2.0f * 10.0f);*/
+	testMainFloat("	def main() float : \
+				  let x = [1.0, 2.0, 3.0, 4.0]v in \
+			  e1(x * 10.0)", 2.0f * 10.0f);
 
 	// Test vector * vector multiplication
 	testMainFloat("	def main() float : \
 				  let x = [1.0, 2.0, 3.0, 4.0]v \
 				  y = [10.0, 20.0, 30.0, 40.0]v in\
 				e1(x * y)", 2.0f * 20.0f);
+
+	// Test vector<int> * vector<int> multiplication
+	testMainInteger("	def main() int : \
+				  let x = [1, 2, 3, 4]v \
+				  y = [10, 20, 30, 40]v in\
+				e1(x * y)", 2 * 20);
 
 	// Test vector * scalar multiplication
 	testMainFloat("	def mul(vector<float, 4> v, float x) vector<float, 4> : v * [x, x, x, x]v \n\
@@ -1382,6 +1798,10 @@ void LanguageTests::run()
 	testMainFloatArg("	def main(float x) float : \
 					 let v = [x, x, x, x]v in\
 					 dot(v, v)", 2.0f, 16.0f);
+
+	testMainFloatArg("	def main(float x) float : \
+					 let v = [x, x, x, x, x, x, x, x]v in\
+					 dot(v, v)", 2.0f, 32.0f);
 
 	// Test vector min
 	testMainFloat("	def main() float : \
@@ -1545,7 +1965,6 @@ void LanguageTests::run()
 								data2(in_s))", 
 							in, target_result);
 	}
-
 
 	std::cout << "===================All LanguageTests passed.=============================" << std::endl;
 }

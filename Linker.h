@@ -32,12 +32,12 @@ public:
 	//void linkFunctions(BufferRoot& root);
 
 	//ExternalFunctionRef findMatchingExternalFunction(const FunctionSignature& sig);
-	FunctionDefinitionRef findMatchingFunction(const FunctionSignature& sig);
-	//FunctionDefinitionRef findMatchingFunctionByName(const std::string& name); // NOTE: rather unsafe
+	FunctionDefinitionRef findMatchingFunction(const FunctionSignature& sig); // Returns null ref if not found
+	FunctionDefinitionRef findMatchingFunctionByName(const std::string& name); // NOTE: rather unsafe
 
 	void getFuncsWithMatchingName(const std::string& name, vector<FunctionDefinitionRef>& funcs_out);
 
-	void buildLLVMCode(llvm::Module* module, const llvm::DataLayout/*TargetData*/* target_data);
+	void buildLLVMCode(llvm::Module* module, const llvm::DataLayout/*TargetData*/* target_data, const CommonFunctions& common_functions);
 
 	vector<FunctionDefinitionRef> concrete_funcs;
 private:

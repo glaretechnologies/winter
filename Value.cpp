@@ -1,17 +1,95 @@
 #include "Value.h"
 
 
+#include "wnt_ASTNode.h"
+#include "wnt_FunctionDefinition.h"
 #include "utils/stringutils.h"
+#include "llvm/IR/Constants.h"
 
 
 namespace Winter
 {
 
 
+//------------------------------------------------------------------------------------------
+
+
+llvm::Constant* IntValue::getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const
+{
+	return llvm::ConstantInt::get(
+		*params.context,
+		llvm::APInt(32, this->value, 
+			true // signed
+		)
+	);
+}
+
+
+//------------------------------------------------------------------------------------------
+
+
 const std::string FloatValue::toString() const
 {
 	return ::toString(this->value);
 }
+
+
+llvm::Constant* FloatValue::getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const
+{
+	return llvm::ConstantFP::get(
+		*params.context, 
+		llvm::APFloat(this->value)
+	);
+}
+
+
+//------------------------------------------------------------------------------------------
+
+
+llvm::Constant* BoolValue::getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const
+{
+	return llvm::ConstantInt::get(
+		*params.context, 
+		llvm::APInt(
+			1, // num bits
+			this->value ? 1 : 0, // value
+			false // signed
+		)
+	);
+}
+
+
+//------------------------------------------------------------------------------------------
+
+
+llvm::Constant* StringValue::getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const
+{
+	assert(0);
+	return NULL;
+}
+
+
+//------------------------------------------------------------------------------------------
+
+
+llvm::Constant* CharValue::getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const
+{
+	assert(0);
+	return NULL;
+}
+
+
+//------------------------------------------------------------------------------------------
+
+
+llvm::Constant* MapValue::getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const
+{
+	assert(0);
+	return NULL;
+}
+
+
+//------------------------------------------------------------------------------------------
 
 
 StructureValue::~StructureValue()
@@ -32,10 +110,37 @@ Value* StructureValue::clone() const
 }
 
 
+llvm::Constant* StructureValue::getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const
+{
+	assert(type->getType() == Type::StructureTypeType);
+
+	vector<llvm::Constant*> llvm_fields(this->fields.size());
+	for(unsigned int i=0; i<this->fields.size(); ++i)
+		llvm_fields[i] = this->fields[i]->getConstantLLVMValue(params, type.downcast<StructureType>()->component_types[i]);
+
+
+	return llvm::ConstantStruct::get(
+		(llvm::StructType*)type->LLVMType(*params.context),
+		llvm_fields
+	);
+}
+
+
+//------------------------------------------------------------------------------------------
+
+
+llvm::Constant* FunctionValue::getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const
+{
+	assert(0);
+	return NULL;
+}
+
+
+//------------------------------------------------------------------------------------------
+
+
 ArrayValue::~ArrayValue()
 {
-	//for(unsigned int i=0; i<this->e.size(); ++i)
-	//	delete e[i];
 }
 
 
@@ -62,7 +167,25 @@ const std::string ArrayValue::toString() const
 }
 
 
-//=====================================================================
+llvm::Constant* ArrayValue::getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const
+{
+	assert(type->getType() == Type::ArrayTypeType);
+
+	vector<llvm::Constant*> llvm_elems(this->e.size());
+	for(unsigned int i=0; i<this->e.size(); ++i)
+		llvm_elems[i] = this->e[i]->getConstantLLVMValue(params, type.downcast<ArrayType>()->elem_type);
+
+
+	assert(type->LLVMType(*params.context)->isArrayTy());
+
+	return llvm::ConstantArray::get(
+		(llvm::ArrayType*)type->LLVMType(*params.context),
+		llvm_elems
+	);
+}
+
+
+//------------------------------------------------------------------------------------------
 
 
 VectorValue::~VectorValue()
@@ -95,12 +218,34 @@ const std::string VectorValue::toString() const
 }
 
 
-//==============================================================================
+llvm::Constant* VectorValue::getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const
+{
+	assert(type->getType() == Type::VectorTypeType);
+
+	vector<llvm::Constant*> llvm_elems(this->e.size());
+	for(unsigned int i=0; i<this->e.size(); ++i)
+		llvm_elems[i] = this->e[i]->getConstantLLVMValue(params, type.downcast<StructureType>()->component_types[i]);
+
+
+	return llvm::ConstantVector::get(
+		llvm_elems
+	);
+}
+
+
+//------------------------------------------------------------------------------------------
 
 
 const std::string VoidPtrValue::toString() const
 {
 	return "void* " + ::toString((uint64)this->value);
+}
+
+
+llvm::Constant* VoidPtrValue::getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const
+{
+	assert(0);
+	return NULL;
 }
 
 

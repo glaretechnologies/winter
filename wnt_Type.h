@@ -2,16 +2,16 @@
 #pragma once
 
 
-#include <vector>
-#include <string>
+#include "llvm/IR/Type.h"
+#include "llvm/IR/DerivedTypes.h"
 #include <utils/Reference.h>
 #include <utils/RefCounted.h>
+#include <vector>
+#include <string>
+
 
 namespace llvm { class Type; class Constant; }
-#if USE_LLVM
-#include "llvm/Type.h"
-#include "llvm/DerivedTypes.h"
-#endif
+
 
 namespace Winter
 {
@@ -23,64 +23,70 @@ class Value;
 class Type : public RefCounted
 {
 public:
-	virtual ~Type(){}
-
 	enum TypeType
 	{
 		GenericTypeType,
 		FloatType,
 		IntType,
 		StringType,
+		CharTypeType,
 		BoolType,
 		MapType,
 		ArrayTypeType,
 		FunctionType,
 		StructureTypeType,
 		VectorTypeType,
-		VoidPtrTypeType
+		VoidPtrTypeType,
+		SumTypeType,
+		ErrorTypeType
 	};
 
-	virtual TypeType getType() const = 0;
+	Type(TypeType t) : type(t) {}
+	virtual ~Type(){}
+
 	virtual const std::string toString() const = 0;
 	virtual bool lessThan(const Type& b) const = 0;
 	virtual bool matchTypes(const Type& b, std::vector<Reference<Type> >& type_mapping) const = 0;
-#if USE_LLVM
 	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const = 0;
-	virtual llvm::Constant* defaultLLVMValue(llvm::LLVMContext& context);
 	virtual bool passByValue() const { return true; }
-#endif
-	//virtual Reference<Value> getDefaultValue();
+	virtual Reference<Value> getInvalidValue() const; // For array out-of-bounds
+	virtual llvm::Value* getInvalidLLVMValue(llvm::LLVMContext& context) const; // For array out-of-bounds
+
+	inline TypeType getType() const { return type; }
+private:
+	TypeType type;
 };
 
 
 typedef Reference<Type> TypeRef;
 
 
+inline bool operator < (const Type& a, const Type& b);
+inline bool operator == (const Type& a, const Type& b);
+inline bool operator != (const Type& a, const Type& b);
+
+
 class Float : public Type
 {
 public:
-	virtual TypeType getType() const { return FloatType; }
+	Float() : Type(FloatType) {}
 	virtual const std::string toString() const { return "float"; }
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
-#if USE_LLVM
 	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const { return llvm::Type::getFloatTy(context); }
-	virtual llvm::Constant* defaultLLVMValue(llvm::LLVMContext& context);
-#endif
+	virtual llvm::Value* getInvalidLLVMValue(llvm::LLVMContext& context) const; // For array out-of-bounds
+	virtual Reference<Value> getInvalidValue() const; // For array out-of-bounds
 };
 
 
 class GenericType : public Type
 {
 public:
-	GenericType(int generic_type_param_index_) : generic_type_param_index(generic_type_param_index_) {}
-	virtual TypeType getType() const { return GenericTypeType; }
+	GenericType(int generic_type_param_index_) : Type(GenericTypeType), generic_type_param_index(generic_type_param_index_) {}
 	virtual const std::string toString() const { return "generic"; }
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
-#if USE_LLVM
 	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
-#endif
 	const int genericTypeParamIndex() const { return generic_type_param_index; }
 private:
 	int generic_type_param_index;
@@ -90,26 +96,24 @@ private:
 class Int : public Type
 {
 public:
-	virtual TypeType getType() const { return IntType; }
+	Int() : Type(IntType) {}
 	virtual const std::string toString() const { return "int"; }
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
-#if USE_LLVM
-	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const { return llvm::Type::getInt32Ty(context); }
-#endif
+	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+	virtual llvm::Value* getInvalidLLVMValue(llvm::LLVMContext& context) const; // For array out-of-bounds
+	virtual Reference<Value> getInvalidValue() const; // For array out-of-bounds
 };
 
 
 class Bool : public Type
 {
 public:
-	virtual TypeType getType() const { return BoolType; }
+	Bool() : Type(BoolType) {}
 	virtual const std::string toString() const { return "bool"; }
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
-#if USE_LLVM
 	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const { return llvm::Type::getInt1Ty(context); }
-#endif
 };
 
 
@@ -128,14 +132,24 @@ class TupleN : public Type
 class String : public Type
 {
 public:
-	virtual TypeType getType() const { return StringType; }
+	String() : Type(StringType) {}
 	virtual const std::string toString() const { return "string"; }
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
-#if USE_LLVM
 	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
-	virtual bool passByValue() const { return false; }
-#endif
+	virtual bool passByValue() const { return true; } // Pass the pointer 'by value'
+};
+
+
+class CharType : public Type
+{
+public:
+	CharType() : Type(CharTypeType) {}
+	virtual const std::string toString() const { return "char"; }
+	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
+	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
+	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+	virtual bool passByValue() const { return true; }
 };
 
 
@@ -144,10 +158,10 @@ public:
 class Function : public Type
 {
 public:
-	Function(const std::vector<TypeRef>& arg_types_, TypeRef return_type_, 
+	Function(const std::vector<TypeRef>& arg_types_, const TypeRef& return_type_, 
 		//const std::vector<TypeRef>& captured_var_types_,
 		bool use_captured_vars_) 
-		:	arg_types(arg_types_), return_type(return_type_), 
+		:	Type(FunctionType), arg_types(arg_types_), return_type(return_type_), 
 		//captured_var_types(captured_var_types_), 
 			use_captured_vars(use_captured_vars_){}
 
@@ -156,12 +170,9 @@ public:
 	//std::vector<TypeRef> captured_var_types;
 	bool use_captured_vars;
 
-	virtual TypeType getType() const { return FunctionType; }
 	virtual const std::string toString() const; // { return "function"; }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
-#if USE_LLVM
 	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
-#endif
 	// Pass by reference, because the actual value passed/returned is a closure structure.
 	virtual bool passByValue() const { return true; }
 	virtual bool lessThan(const Type& b) const
@@ -207,9 +218,8 @@ public:
 class Map : public Type
 {
 public:
-	Map(TypeRef a, TypeRef b) : from_type(a), to_type(b) {}
+	Map(const TypeRef& a, const TypeRef& b) : Type(MapType), from_type(a), to_type(b) {}
 
-	virtual TypeType getType() const { return MapType; }
 	virtual const std::string toString() const { return "map<" + from_type->toString() + ", " + to_type->toString() + ">"; }
 	virtual bool lessThan(const Type& b) const
 	{
@@ -234,10 +244,8 @@ public:
 		}
 	}
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
-#if USE_LLVM
 	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
 	virtual bool passByValue() const { return false; }
-#endif
 
 	TypeRef from_type;
 	TypeRef to_type;
@@ -247,9 +255,8 @@ public:
 class ArrayType : public Type
 {
 public:
-	ArrayType(const TypeRef& t_) : t(t_) {}
-	virtual TypeType getType() const { return ArrayTypeType; }
-	virtual const std::string toString() const { return "array<" + t->toString() + ">"; }
+	ArrayType(const TypeRef& elem_type_, size_t num_elems_) : Type(ArrayTypeType), elem_type(elem_type_), num_elems(num_elems_) {}
+	virtual const std::string toString() const;
 	virtual bool lessThan(const Type& b) const
 	{
 		if(getType() < b.getType())
@@ -261,28 +268,31 @@ public:
 			// else b is a structure as well
 			const ArrayType& b_array = static_cast<const ArrayType&>(b);
 
-			return this->t->lessThan(*b_array.t);
+			if(num_elems < b_array.num_elems)
+				return true;
+			else if(num_elems > b_array.num_elems)
+				return false;
+			else
+				return this->elem_type->lessThan(*b_array.elem_type);
 		}
 	}
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 
-#if USE_LLVM
 	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
 	virtual bool passByValue() const { return false; }
-#endif
 
 
-	TypeRef t;
+	TypeRef elem_type;
+	size_t num_elems;
 };
 
 
 class StructureType : public Type
 {
 public:
-	StructureType(const std::string& name_, std::vector<TypeRef> component_types_, std::vector<std::string> component_names_) 
-	: name(name_), component_types(component_types_), component_names(component_names_) {}
+	StructureType(const std::string& name_, const std::vector<TypeRef>& component_types_, const std::vector<std::string>& component_names_) 
+	: Type(StructureTypeType), name(name_), component_types(component_types_), component_names(component_names_) {}
 
-	virtual TypeType getType() const { return StructureTypeType; }
 	virtual const std::string toString() const { return /*"struct " + */name; }
 	virtual bool lessThan(const Type& b) const
 	{
@@ -300,10 +310,9 @@ public:
 	}
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 
-#if USE_LLVM
 	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
 	virtual bool passByValue() const { return false; }
-#endif
+
 
 	std::string name;
 	std::vector<TypeRef> component_types;
@@ -314,10 +323,9 @@ public:
 class VectorType : public Type
 {
 public:
-	VectorType(const TypeRef t_, unsigned int num_)
-	: t(t_), num(num_) {}
+	VectorType(const TypeRef& elem_type_, unsigned int num_)
+	: Type(VectorTypeType), elem_type(elem_type_), num(num_) {}
 
-	virtual TypeType getType() const { return VectorTypeType; }
 	virtual const std::string toString() const;
 	virtual bool lessThan(const Type& b) const
 	{
@@ -335,16 +343,13 @@ public:
 			else if(this->num > b_vector.num)
 				return false;
 			else
-				return this->t->lessThan(*b_vector.t);
+				return this->elem_type->lessThan(*b_vector.elem_type);
 		}
 	}
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
-
-#if USE_LLVM
 	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
-#endif
 
-	TypeRef t;
+	TypeRef elem_type;
 	unsigned int num;
 };
 
@@ -353,9 +358,8 @@ public:
 class VoidPtrType : public Type
 {
 public:
-	VoidPtrType() {}
+	VoidPtrType() : Type(VoidPtrTypeType) {}
 
-	virtual TypeType getType() const { return VoidPtrTypeType; }
 	virtual const std::string toString() const;
 	virtual bool lessThan(const Type& b) const
 	{
@@ -369,11 +373,79 @@ public:
 		}
 	}
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
-
-#if USE_LLVM
 	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
-#endif
 };
+
+
+class SumType : public Type
+{
+public:
+	SumType(const std::vector<TypeRef>& types_)
+	:	Type(SumTypeType), types(types_) {}
+
+	virtual const std::string toString() const;
+	virtual bool lessThan(const Type& b) const
+	{
+		if(getType() < b.getType())
+			return true;
+		else if(b.getType() < getType())
+			return false;
+		else
+		{
+			// else b is a SumType as well
+			const SumType& b_sumtype = static_cast<const SumType&>(b);
+
+			if(this->types.size() < b_sumtype.types.size())
+				return true;
+			else if(this->types.size() > b_sumtype.types.size())
+				return false;
+			else
+			{
+				for(size_t i=0; i<this->types.size(); ++i)
+				{
+					if((*this->types[i]) < (*b_sumtype.types[i]))
+						return true;
+					else if(*this->types[i] < *b_sumtype.types[i])
+						return false;
+				}
+
+				return false;
+			}
+		}
+	}
+
+	virtual bool passByValue() const { return false; }
+	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
+	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+
+	std::vector<TypeRef> types;
+};
+
+
+class ErrorType : public Type
+{
+public:
+	ErrorType() : Type(ErrorTypeType) {}
+
+	virtual const std::string toString() const;
+	virtual bool lessThan(const Type& b) const
+	{
+		if(getType() < b.getType())
+			return true;
+		else if(b.getType() < getType())
+			return false;
+		else
+		{
+			return false;
+		}
+	}
+	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
+	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+};
+
+
+// Some utility methods:
+TypeRef errorTypeSum(const TypeRef& t);
 
 
 inline bool operator < (const Type& a, const Type& b)
@@ -391,5 +463,5 @@ inline bool operator != (const Type& a, const Type& b)
 	return a.lessThan(b) || b.lessThan(a);
 }
 
-}
 
+} // end namespace Winter

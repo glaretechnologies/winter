@@ -34,7 +34,8 @@ const unsigned int FLOAT_LITERAL_TOKEN = 0;
 const unsigned int INT_LITERAL_TOKEN = 1;
 const unsigned int BOOL_LITERAL_TOKEN = 2;
 const unsigned int STRING_LITERAL_TOKEN = 3;
-const unsigned int IDENTIFIER_TOKEN = 4;
+const unsigned int CHAR_LITERAL_TOKEN = 4;
+const unsigned int IDENTIFIER_TOKEN = 5;
 
 
 class TokenBase : public RefCounted
@@ -58,6 +59,7 @@ public:
 	virtual int getIntLiteralValue() const { throw TokenBaseExcep("getIntLiteralValue()"); }
 	virtual bool getBoolLiteralValue() const { throw TokenBaseExcep("getBoolLiteralValue()"); }
 	virtual const std::string& getStringLiteralValue() const { throw TokenBaseExcep("getStringLiteralValue()"); }
+	virtual const std::string& getCharLiteralValue() const { throw TokenBaseExcep("getCharLiteralValue()"); }
 
 	unsigned int char_index;
 private:
@@ -136,6 +138,21 @@ public:
 	virtual bool isBinaryInfixOp() const { return false; }
 
 	virtual const std::string& getStringLiteralValue() const { return val; }
+private:
+	std::string val;
+};
+
+
+class CharLiteralToken : public TokenBase
+{
+public:
+	CharLiteralToken(const std::string& x, unsigned int char_index) : TokenBase(char_index, CHAR_LITERAL_TOKEN), val(x) {}
+	
+	virtual bool isLiteral() const { return true; }
+	virtual bool isParanthesis() const { return false; }
+	virtual bool isBinaryInfixOp() const { return false; }
+
+	virtual const std::string& getCharLiteralValue() const { return val; }
 private:
 	std::string val;
 };

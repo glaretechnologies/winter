@@ -65,6 +65,9 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 	{
 		BufferRoot* root = new BufferRoot(SrcLocation(0, source_buffer.getPointer()));
 
+		Reference<Type> float_type(new Float());
+		Reference<VectorType> vec4f_type(new VectorType(float_type, 4));
+		//Reference<VectorType> vec8f_type(new VectorType(float_type, 8));
 		
 
 		//TEMP:
@@ -75,7 +78,7 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 			args[0].name = "f";
 			args[1].type = TypeRef(new ArrayType(TypeRef(new Float)));
 			args[1].name = "array";
-*
+
 			FunctionDefinition* def = new FunctionDefinition(
 				"map",
 				args,
@@ -122,7 +125,7 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 
 			root->func_defs.push_back(Reference<FunctionDefinition>(def));
 		}*/
-
+		/*
 		// Create 'if' built in function
 		{
 			vector<FunctionDefinition::FunctionArg> args(3);
@@ -138,212 +141,33 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 			args[2].type = T;
 			args[2].name = "b";
 
-			FunctionDefinition* def = new FunctionDefinition(
+			FunctionDefinitionRef def = new FunctionDefinition(
 				SrcLocation::invalidLocation(),
 				"if", // name
 				args, // args
-				//vector<Reference<LetASTNode> >(), // lets
 				ASTNodeRef(NULL), // body expr
 				T, // return type
 				new IfBuiltInFunc(T) // built in impl.
 			);
 
-			root->func_defs.push_back(Reference<FunctionDefinition>(def));
+			root->func_defs.push_back(def);
 		}
-
-		// Create 'dot' (dot product) built-in function
-		{
-			TypeRef vec4f_type(new VectorType(TypeRef(new Float()), 4));
-			Reference<VectorType> vec4f_type_v(new VectorType(TypeRef(new Float()), 4));
-
-			vector<FunctionDefinition::FunctionArg> args(2);
-			args[0].name = "a";
-			args[0].type = vec4f_type;
-			args[1].name = "b";
-			args[1].type = vec4f_type;
-
-			FunctionDefinition* def = new FunctionDefinition(
-				SrcLocation::invalidLocation(),
-				"dot", // name
-				args, // args
-				//vector<Reference<LetASTNode> >(), // lets
-				ASTNodeRef(NULL), // body expr
-				TypeRef(new Float()), // return type
-				new DotProductBuiltInFunc(vec4f_type_v) // built in impl.
-				);
-
-			root->func_defs.push_back(Reference<FunctionDefinition>(def));
-		}
-
-		// Create vec4f min built-in function
-		{
-			TypeRef vec4f_type(new VectorType(TypeRef(new Float()), 4));
-			Reference<VectorType> vec4f_type_v(new VectorType(TypeRef(new Float()), 4));
-
-			vector<FunctionDefinition::FunctionArg> args(2);
-			args[0].name = "a";
-			args[0].type = vec4f_type;
-			args[1].name = "b";
-			args[1].type = vec4f_type;
-
-			FunctionDefinition* def = new FunctionDefinition(
-				SrcLocation::invalidLocation(),
-				"min", // name
-				args, // args
-				//vector<Reference<LetASTNode> >(), // lets
-				ASTNodeRef(NULL), // body expr
-				vec4f_type, // return type
-				new VectorMinBuiltInFunc(vec4f_type_v) // built in impl.
-				);
-
-			root->func_defs.push_back(Reference<FunctionDefinition>(def));
-		}
-
-		// Create vec4f max built-in function
-		{
-			TypeRef vec4f_type(new VectorType(TypeRef(new Float()), 4));
-			Reference<VectorType> vec4f_type_v(new VectorType(TypeRef(new Float()), 4));
-
-			vector<FunctionDefinition::FunctionArg> args(2);
-			args[0].name = "a";
-			args[0].type = vec4f_type;
-			args[1].name = "b";
-			args[1].type = vec4f_type;
-
-			FunctionDefinition* def = new FunctionDefinition(
-				SrcLocation::invalidLocation(),
-				"max", // name
-				args, // args
-				//vector<Reference<LetASTNode> >(), // lets
-				ASTNodeRef(NULL), // body expr
-				vec4f_type, // return type
-				new VectorMaxBuiltInFunc(vec4f_type_v) // built in impl.
-				);
-
-			root->func_defs.push_back(Reference<FunctionDefinition>(def));
-		}
-
-		// Create 'pow' built-in function
-		/*{
-			vector<FunctionDefinition::FunctionArg> args(2);
-			args[0].name = "a";
-			args[0].type = TypeRef(new Float());
-			args[1].name = "b";
-			args[1].type = TypeRef(new Float());
-
-			FunctionDefinition* def = new FunctionDefinition(
-				"pow", // name
-				args, // args
-				//vector<Reference<LetASTNode> >(), // lets
-				ASTNodeRef(NULL), // body expr
-				TypeRef(new Float()), // return type
-				new PowBuiltInFunc() // built in impl.
-				);
-
-			root->func_defs.push_back(Reference<FunctionDefinition>(def));
-		}*/
-
-		// Create 'sqrt' built-in function
-		{
-			vector<FunctionDefinition::FunctionArg> args(1);
-			args[0].name = "x";
-			args[0].type = TypeRef(new Float());
-
-			FunctionDefinition* def = new FunctionDefinition(
-				SrcLocation::invalidLocation(),
-				"sqrt", // name
-				args, // args
-				//vector<Reference<LetASTNode> >(), // lets
-				ASTNodeRef(NULL), // body expr
-				TypeRef(new Float()), // return type
-				new SqrtBuiltInFunc() // built in impl.
-				);
-
-			root->func_defs.push_back(Reference<FunctionDefinition>(def));
-		}
-
-
-		// Create 'sin' built-in function
-		/*TEMP{
-			vector<FunctionDefinition::FunctionArg> args(1);
-			args[0].name = "x";
-			args[0].type = TypeRef(new Float());
-
-			FunctionDefinition* def = new FunctionDefinition(
-				"sin", // name
-				args, // args
-				//vector<Reference<LetASTNode> >(), // lets
-				ASTNodeRef(NULL), // body expr
-				TypeRef(new Float()), // return type
-				new SinBuiltInFunc() // built in impl.
-				);
-
-			root->func_defs.push_back(Reference<FunctionDefinition>(def));
-		}*/
-
-
-		// Create 'cos' built-in function
-		/*{
-			vector<FunctionDefinition::FunctionArg> args(1);
-			args[0].name = "x";
-			args[0].type = TypeRef(new Float());
-
-			FunctionDefinition* def = new FunctionDefinition(
-				"cos", // name
-				args, // args
-				//vector<Reference<LetASTNode> >(), // lets
-				ASTNodeRef(NULL), // body expr
-				TypeRef(new Float()), // return type
-				new CosBuiltInFunc() // built in impl.
-				);
-
-			root->func_defs.push_back(Reference<FunctionDefinition>(def));
-		}*/
-
-		// Create 'truncateToInt' built-in function
-		{
-			vector<FunctionDefinition::FunctionArg> args(1);
-			args[0].name = "x";
-			args[0].type = TypeRef(new Float());
-
-			FunctionDefinition* def = new FunctionDefinition(
-				SrcLocation::invalidLocation(),
-				"truncateToInt", // name
-				args, // args
-				ASTNodeRef(NULL), // body expr
-				TypeRef(new Int()), // return type
-				new TruncateToIntBuiltInFunc() // built in impl.
-				);
-
-			root->func_defs.push_back(Reference<FunctionDefinition>(def));
-		}
-
-		// Create 'toFloat' built-in function
-		{
-			vector<FunctionDefinition::FunctionArg> args(1);
-			args[0].name = "x";
-			args[0].type = TypeRef(new Int());
-
-			FunctionDefinition* def = new FunctionDefinition(
-				SrcLocation::invalidLocation(),
-				"toFloat", // name
-				args, // args
-				ASTNodeRef(NULL), // body expr
-				TypeRef(new Float()), // return type
-				new ToFloatBuiltInFunc() // built in impl.
-				);
-
-			root->func_defs.push_back(Reference<FunctionDefinition>(def));
-		}
+		*/
 
 		func_defs_out = root->func_defs;
-
-		//Reference<ASTNode> root( new BufferRoot() );
 
 		unsigned int i = 0;
 
 		ParseInfo parseinfo(i, tokens, named_types, func_defs_out);
 		parseinfo.text_buffer = source_buffer.getPointer();
+
+		// NEW: go through buffer and see if there is a 'else' token
+		for(size_t z=0; z<tokens.size(); ++z)
+			if(tokens[z]->getType() == IDENTIFIER_TOKEN && tokens[z]->getIdentifierValue() == "else")
+			{
+				parseinfo.else_token_present = true;
+				break;
+			}
 
 		while(i < tokens.size())
 		{
@@ -363,17 +187,16 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 					args[z].type = t->component_types[z];
 				}
 
-				FunctionDefinition* cons = new FunctionDefinition(
+				FunctionDefinitionRef cons = new FunctionDefinition(
 					SrcLocation::invalidLocation(),
 					t->name, // name
 					args, // arguments
-					//vector<Reference<LetASTNode> >(), // lets
 					ASTNodeRef(NULL), // body expr
 					TypeRef(t.getPointer()), // declard return type
 					new Constructor(t) // built in func impl.
 				);
-				root->func_defs.push_back(FunctionDefinitionRef(cons));
-				func_defs_out.push_back(FunctionDefinitionRef(cons));
+				root->func_defs.push_back(cons);
+				func_defs_out.push_back(cons);
 
 				// Make field access functions
 				vector<FunctionDefinition::FunctionArg> getfield_args(1);
@@ -382,11 +205,10 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 
 				for(unsigned int i=0; i<t->component_types.size(); ++i)
 				{
-					Reference<FunctionDefinition> def(new FunctionDefinition(
+					FunctionDefinitionRef def(new FunctionDefinition(
 						SrcLocation::invalidLocation(),
 						t->component_names[i], // name
 						getfield_args, // args
-						//vector<Reference<LetASTNode> >(), // lets
 						ASTNodeRef(NULL), // body expr
 						t->component_types[i], // return type
 						new GetField(t, i) // impl
@@ -445,11 +267,20 @@ ASTNodeRef LangParser::parseFieldExpression(const ParseInfo& p)
 //	ASTNodeRef var_expression = parseVariableExpression(p);
 	ASTNodeRef var_expression;
 
-	// If next token is a '(', then this is a function expression
-	if(p.i + 1 < p.tokens.size() && p.tokens[p.i+1]->getType() == OPEN_PARENTHESIS_TOKEN)
-		var_expression = parseFunctionExpression(p);
+	if(p.else_token_present && p.tokens[p.i]->getType() == IDENTIFIER_TOKEN && p.tokens[p.i]->getIdentifierValue() == "if")
+	{
+		var_expression = parseIfExpression(p);
+	}
 	else
-		var_expression = parseVariableExpression(p);
+	{
+		// If next token is a '(', then this is a function expression
+		if(p.i + 1 < p.tokens.size() && p.tokens[p.i+1]->getType() == OPEN_PARENTHESIS_TOKEN)
+			var_expression = parseFunctionExpression(p);
+		else
+		{
+			var_expression = parseVariableExpression(p);
+		}
+	}
 
 
 	/*if(isTokenCurrent(DOT_TOKEN, p))
@@ -516,22 +347,42 @@ ASTNodeRef LangParser::parseIfExpression(const ParseInfo& p)
 {
 	const SrcLocation loc = locationForParseInfo(p);
 
-	const std::string name = parseIdentifier("if", p);
-	if(name != "if")
+	std::string id = parseIdentifier("if", p);
+	if(id != "if")
 	{
 		assert(0);
 		throw LangParserExcep("Internal error: expected identifier 'if'.");
 	}
 
 	// Parse condition
+	ASTNodeRef condition = parseLetBlock(p);
+
+	// Parse optional 'then'
+	if(p.i < p.tokens.size() && p.tokens[p.i]->isIdentifier() && p.tokens[p.i]->getIdentifierValue() == "then")
+	{
+		id = parseIdentifier("then", p);
+		if(id != "then")
+			throw LangParserExcep("Internal error: expected 'then', found " + tokenName(p.tokens[p.i]->getType()) + errorPosition(*p.text_buffer, p.tokens[p.i]->char_index));
+	}
 
 	// Parse if(true) expression
+	ASTNodeRef true_expr = parseLetBlock(p);
+
+	// Parse 'else'
+	id = parseIdentifier("else", p);
+	if(id != "else")
+		throw LangParserExcep("Internal error: expected 'else', found " + tokenName(p.tokens[p.i]->getType()) + errorPosition(*p.text_buffer, p.tokens[p.i]->char_index));
 
 	// Parse if(false) expression
-	//parseExpression(p);
+	ASTNodeRef false_expr = parseLetBlock(p);
 
-	assert(0);
-	return ASTNodeRef();
+	FunctionExpressionRef func = new FunctionExpression(loc);
+	func->argument_expressions.resize(3);
+	func->argument_expressions[0] = condition;
+	func->argument_expressions[1] = true_expr;
+	func->argument_expressions[2] = false_expr;
+	func->function_name = "if";
+	return func;
 }
 
 
@@ -751,6 +602,10 @@ ASTNodeRef LangParser::parseLiteral(const ParseInfo& p)
 	{
 		return ASTNodeRef( new StringLiteral(p.tokens[p.i++]->getStringLiteralValue(), loc) );
 	}
+	else if(p.tokens[p.i]->getType() == CHAR_LITERAL_TOKEN)
+	{
+		return ASTNodeRef( new CharLiteral(p.tokens[p.i++]->getCharLiteralValue(), loc) );
+	}
 	else if(p.tokens[p.i]->getType() == BOOL_LITERAL_TOKEN)
 	{
 		return ASTNodeRef( new BoolLiteral(p.tokens[p.i++]->getBoolLiteralValue(), loc) );
@@ -861,7 +716,7 @@ ASTNodeRef LangParser::parseBasicExpression(const ParseInfo& p)
 	}
 	else if(p.tokens[p.i]->getType() == OPEN_SQUARE_BRACKET_TOKEN)
 	{
-		return parseArrayOrVectorLiteralExpression(p);
+		return parseArrayOrVectorLiteralOrArraySubscriptExpression(p);
 	}
 	else if(p.tokens[p.i]->getType() == BACK_SLASH_TOKEN)
 	{
@@ -874,7 +729,33 @@ ASTNodeRef LangParser::parseBasicExpression(const ParseInfo& p)
 }
 
 
+TypeRef LangParser::parseSumType(const ParseInfo& p, const std::vector<std::string>& generic_type_params)
+{
+	TypeRef t = parseElementaryType(p, generic_type_params);
+
+	if(!isTokenCurrent(OR_TOKEN, p))
+		return t;
+	
+	vector<TypeRef> types(1, t);
+
+	while(isTokenCurrent(OR_TOKEN, p))
+	{
+		parseToken(OR_TOKEN, p);
+
+		types.push_back(parseElementaryType(p, generic_type_params));
+	}
+
+	return new SumType(types);
+}
+
+
 TypeRef LangParser::parseType(const ParseInfo& p, const std::vector<std::string>& generic_type_params)
+{
+	return parseSumType(p, generic_type_params);
+}
+
+
+TypeRef LangParser::parseElementaryType(const ParseInfo& p, const std::vector<std::string>& generic_type_params)
 {
 	const std::string t = parseIdentifier("type", p);
 	if(t == "float" || t == "real")
@@ -883,10 +764,14 @@ TypeRef LangParser::parseType(const ParseInfo& p, const std::vector<std::string>
 		return TypeRef(new Int());
 	else if(t == "string")
 		return TypeRef(new String());
+	else if(t == "char")
+		return TypeRef(new CharType());
 	else if(t == "voidptr")
 		return TypeRef(new VoidPtrType());
 	else if(t == "bool")
 		return TypeRef(new Bool());
+	else if(t == "error")
+		return new ErrorType();
 	else if(t == "map")
 		return parseMapType(p, generic_type_params);
 	else if(t == "array")
@@ -908,7 +793,7 @@ TypeRef LangParser::parseType(const ParseInfo& p, const std::vector<std::string>
 					return TypeRef(new GenericType(i));
 
 			// If it wasn't a generic type, then it's completely unknown, like a rolling stone.
-			throw LangParserExcep("Unknown type '" + t + "'.");
+			throw LangParserExcep("Unknown type '" + t + "'." + errorPosition(*p.text_buffer, p.tokens[p.i]->char_index));
 		}
 		else
 		{
@@ -941,9 +826,13 @@ TypeRef LangParser::parseArrayType(const ParseInfo& p, const std::vector<std::st
 
 	TypeRef t = parseType(p, generic_type_params);
 
+	parseToken(COMMA_TOKEN, p);
+
+	Reference<IntLiteral> int_literal = parseIntLiteral(p);
+
 	parseToken(RIGHT_ANGLE_BRACKET_TOKEN, p);
 
-	return TypeRef(new ArrayType(t));
+	return TypeRef(new ArrayType(t, int_literal->value));
 }
 
 
@@ -1017,8 +906,8 @@ TypeRef LangParser::parseVectorType(const ParseInfo& p, const std::vector<std::s
 	Reference<IntLiteral> int_literal = parseIntLiteral(p);
 	int num = int_literal->value;
 
-	if(num <= 0 || num >= 128 || !Maths::isPowerOfTwo(num))
-		throw LangParserExcep("num must be > 0, < 128, and a power of two.");
+	if(num <= 0 || num >= 128) // || !Maths::isPowerOfTwo(num))
+		throw LangParserExcep("num must be > 0, < 128");
 
 	parseToken(RIGHT_ANGLE_BRACKET_TOKEN, p);
 
@@ -1244,7 +1133,7 @@ ASTNodeRef LangParser::parseMapLiteralExpression(const ParseInfo& p)
 }
 
 
-ASTNodeRef LangParser::parseArrayOrVectorLiteralExpression(const ParseInfo& p)
+ASTNodeRef LangParser::parseArrayOrVectorLiteralOrArraySubscriptExpression(const ParseInfo& p)
 {
 	SrcLocation loc = locationForParseInfo(p);
 
@@ -1278,7 +1167,18 @@ ASTNodeRef LangParser::parseArrayOrVectorLiteralExpression(const ParseInfo& p)
 	else if(id == "v")
 		return ASTNodeRef(new VectorLiteral(elems, loc));
 	else
-		throw LangParserExcep("Unknown square bracket literal suffix '" + id + "'.");
+	{
+		//if(elems.size() > 1)
+		//{
+		//	// This is definitely a vector or array literal without the suffix.
+			throw LangParserExcep("Unknown square bracket literal suffix '" + id + "'.");
+		/*}
+		else
+		{
+			// Treat this as an array subscript expression
+			return new ArraySubscript(elems[0], loc);
+		}*/
+	}
 }
 
 

@@ -22,7 +22,7 @@ using std::vector;
 #include "TokenBase.h"
 #include "Value.h"
 #if USE_LLVM
-#include <llvm/IRBuilder.h>
+#include <llvm/IR/IRBuilder.h>
 #endif
 namespace llvm { class Function; };
 namespace llvm { class Value; };
@@ -49,19 +49,26 @@ public:
 	bool doesFunctionTypeMatch(const TypeRef& type);
 
 	virtual ValueRef exec(VMState& vmstate);
-	virtual ASTNodeType nodeType() const { return FunctionExpressionType; }
 	virtual TypeRef type() const;
 
 	virtual void linkFunctions(Linker& linker, TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	//virtual void bindVariables(const std::vector<ASTNode*>& stack);
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual void print(int depth, std::ostream& s) const;
-	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+	virtual std::string sourceString() const;
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
+	virtual void emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* string_val) const;
+	virtual llvm::Value* getConstantLLVMValue(EmitLLVMCodeParams& params) const;
 	virtual Reference<ASTNode> clone();
 	virtual bool isConstant() const;
 	FunctionDefinition* runtimeBind(VMState& vmstate, FunctionValue*& function_value_out);
+	virtual bool provenDefined() const;
 
 	///////
+
+private:
+	void checkInDomain(TraversalPayload& payload, std::vector<ASTNode*>& stack);
+public:
 
 	string function_name;
 	vector<Reference<ASTNode> > argument_expressions;
@@ -87,7 +94,13 @@ public:
 	bool use_captured_var;
 	int captured_var_index;
 	int let_frame_offset;
+
+private:
+	bool proven_defined;
 };
+
+
+typedef Reference<FunctionExpression> FunctionExpressionRef;
 
 
 } // end namespace Winter

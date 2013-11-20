@@ -1,8 +1,4 @@
-TODO: TypeCoercion doesn't work for variables in comparisons, but only for literals.
-calling getType() on the child vars crashes as the variable is not bound yet.
-See wnt_astNode.cpp: // TODO: Make this work for arbitrary expressions and not just literals.
+
+TODO: integer divides by zero crash: testMainIntegerArg("def main(int x) int : 10 / x ", 0, 10);
 
 TODO: operator overloading doesn't work in template bodies.
-
-TODO: def lt(real x, real y) real : x < y  Doesn't give error even though return type is wrong.
-
