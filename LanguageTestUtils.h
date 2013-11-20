@@ -520,7 +520,7 @@ static void testMainStruct(const std::string& src, const StructType& target_retu
 		std::cout << jitted_result.d << std::endl;*/
 
 		// Check JIT'd result.
-		if(!(jitted_result == target_return_val))
+		if(!epsEqual(jitted_result, target_return_val))
 		{
 			std::cerr << "Test failed: jitted_result != target_return_val  " << std::endl;
 			assert(0);
@@ -603,7 +603,7 @@ static void testMainStructInputAndOutput(const std::string& src, const InStructT
 		f(&jitted_result, &aligned_struct_in, &test_env);
 
 		// Check JIT'd result.
-		if(!(jitted_result == target_return_val))
+		if(!epsEqual(jitted_result, target_return_val))
 		{
 			std::cerr << "Test failed: jitted_result != target_return_val  " << std::endl;
 			assert(0);
@@ -656,6 +656,14 @@ public:
 	}
 };
 
+inline bool epsEqual(const float4& a, const float4& b)
+{
+	for(int i=0; i<4; ++i)
+		if(!epsEqual(a.e[i], b.e[i]))
+			return false;
+	return true;
+}
+
 
 struct StructWithVec
 {
@@ -671,6 +679,11 @@ struct StructWithVec
 };
 
 
+inline bool epsEqual(const StructWithVec& a, const StructWithVec& b)
+{
+	return epsEqual(a.a, b.a) && epsEqual(a.b, b.b) && epsEqual(a.data2, b.data2);
+}
+
 
 SSE_CLASS_ALIGN Float4Struct
 {
@@ -685,6 +698,15 @@ public:
 		return v == other.v;
 	}
 };
+
+
+inline bool epsEqual(const Float4Struct& a, const Float4Struct& b)
+{
+	for(int i=0; i<4; ++i)
+		if(!epsEqual(a.v.e[i], b.v.e[i]))
+			return false;
+	return true;
+}
 
 
 SSE_CLASS_ALIGN Float4StructPair
@@ -731,6 +753,15 @@ public:
 		return v == other.v;
 	}
 };
+
+
+inline bool epsEqual(const Float8Struct& a, const Float8Struct& b)
+{
+	for(int i=0; i<8; ++i)
+		if(!epsEqual(a.v.e[i], b.v.e[i]))
+			return false;
+	return true;
+}
 
 
 static void testFloat4StructPairRetFloat(const std::string& src, const Float4StructPair& a, const Float4StructPair& b, float target_return_val)
@@ -792,7 +823,7 @@ static void testFloat4StructPairRetFloat(const std::string& src, const Float4Str
 		const float jitted_result = f(&a, &b, NULL);
 
 		// Check JIT'd result.
-		if(!(jitted_result == target_return_val))
+		if(!epsEqual(jitted_result, target_return_val))
 		{
 			std::cerr << "Test failed: jitted_result != target_return_val  " << std::endl;
 			assert(0);
@@ -881,7 +912,7 @@ static void testVectorInStruct(const std::string& src, const StructWithVec& stru
 		f(&jitted_result, &aligned_struct_in, &test_env);
 
 		// Check JIT'd result.
-		if(!(jitted_result == target_return_val))
+		if(!epsEqual(jitted_result, target_return_val))
 		{
 			std::cerr << "Test failed: jitted_result != target_return_val  " << std::endl;
 			assert(0);
@@ -967,7 +998,7 @@ static void testFloat4Struct(const std::string& src, const Float4Struct& a, cons
 		f(&jitted_result, &a, &b, &test_env);
 
 		// Check JIT'd result.
-		if(!(jitted_result == target_return_val))
+		if(!epsEqual(jitted_result, target_return_val))
 		{
 			std::cerr << "Test failed: jitted_result != target_return_val  " << std::endl;
 			assert(0);
@@ -1030,7 +1061,7 @@ static void testFloat8Struct(const std::string& src, const Float8Struct& a, cons
 		f(&jitted_result, &a, &b, &test_env);
 
 		// Check JIT'd result.
-		if(!(jitted_result == target_return_val))
+		if(!epsEqual(jitted_result, target_return_val))
 		{
 			std::cerr << "Test failed: jitted_result != target_return_val  " << std::endl;
 			assert(0);
@@ -1081,7 +1112,7 @@ static void testFloatArray(const std::string& src, const float* a, const float* 
 		// Check JIT'd result.
 		for(size_t i=0; i<len; ++i)
 		{
-			if(jitted_result[i] != target_return_val[i])
+			if(!epsEqual(jitted_result[i], target_return_val[i]))
 			{
 				std::cerr << "Test failed: jitted_result != target_return_val  " << std::endl;
 				assert(0);
