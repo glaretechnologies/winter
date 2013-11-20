@@ -163,119 +163,135 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 		true, // hidden_voidptr_arg
 		args.env
 	),
-	env(args.env)
+	env(args.env),
+	llvm_context(NULL),
+	llvm_module(NULL),
+	llvm_exec_engine(NULL)
 {
-	hidden_voidptr_arg = true;
+	try
+	{
+		hidden_voidptr_arg = true;
 
-	this->llvm_context = new llvm::LLVMContext();
+		this->llvm_context = new llvm::LLVMContext();
 	
-	this->llvm_module = new llvm::Module("WinterModule", *this->llvm_context);
+		this->llvm_module = new llvm::Module("WinterModule", *this->llvm_context);
 
-	llvm::InitializeNativeTarget();
+		llvm::InitializeNativeTarget();
 
-	//llvm::TargetOptions to;
-
-
-	//const char* argv[] = { "dummyprogname", "-vectorizer-min-trip-count=4"};
-	//llvm::cl::ParseCommandLineOptions(2, argv, "my tool");
-
-	//const char* argv[] = { "dummyprogname", "-debug"};
-	//llvm::cl::ParseCommandLineOptions(2, argv, "my tool");
+		//llvm::TargetOptions to;
 
 
-	//TEMP HACK try and print out assembly
-	llvm::EngineBuilder engine_builder(this->llvm_module);
-	engine_builder.setEngineKind(llvm::EngineKind::JIT);
+		//const char* argv[] = { "dummyprogname", "-vectorizer-min-trip-count=4"};
+		//llvm::cl::ParseCommandLineOptions(2, argv, "my tool");
+
+		//const char* argv[] = { "dummyprogname", "-debug"};
+		//llvm::cl::ParseCommandLineOptions(2, argv, "my tool");
+
+
+		//TEMP HACK try and print out assembly
+		llvm::EngineBuilder engine_builder(this->llvm_module);
+		engine_builder.setEngineKind(llvm::EngineKind::JIT);
 	
-	llvm::TargetMachine* tm = engine_builder.selectTarget();
-	tm->Options.PrintMachineCode = PRINT_ASSEMBLY_TO_STDOUT;
-	this->llvm_exec_engine = engine_builder.create(tm);
+		llvm::TargetMachine* tm = engine_builder.selectTarget();
+		tm->Options.PrintMachineCode = PRINT_ASSEMBLY_TO_STDOUT;
+		this->llvm_exec_engine = engine_builder.create(tm);
 
-	this->triple = tm->getTargetTriple();
+		this->triple = tm->getTargetTriple();
 
-	
-
-	// NOTE: ExecutionEngine takes ownership of the module if createJIT is successful.
-	std::string error_str;
-	
-	/*this->llvm_exec_engine = llvm::ExecutionEngine::createJIT(
-		this->llvm_module, 
-		&error_str
-	);*/
 	
 
-	this->llvm_exec_engine->DisableLazyCompilation();
-	//this->llvm_exec_engine->DisableSymbolSearching(); // Symbol searching is required for sin, pow intrinsics etc..
+		// NOTE: ExecutionEngine takes ownership of the module if createJIT is successful.
+		std::string error_str;
+	
+		/*this->llvm_exec_engine = llvm::ExecutionEngine::createJIT(
+			this->llvm_module, 
+			&error_str
+		);*/
+	
 
-	this->external_functions = args.external_functions;
+		this->llvm_exec_engine->DisableLazyCompilation();
+		//this->llvm_exec_engine->DisableSymbolSearching(); // Symbol searching is required for sin, pow intrinsics etc..
 
-	ExternalFunctionRef alloc_ref(new ExternalFunction());
-	alloc_ref->interpreted_func = NULL;
-	alloc_ref->return_type = TypeRef(new VoidPtrType());
-	alloc_ref->sig = FunctionSignature("allocateRefCountedStructure", std::vector<TypeRef>(1, TypeRef(new Int())));
-	alloc_ref->func = (void*)(allocateRefCountedStructure);
-	this->external_functions.push_back(alloc_ref);
+		this->external_functions = args.external_functions;
 
-
-	// TEMP: There is a problem with LLVM 3.3 and earlier with the pow intrinsic getting turned into exp2f().
-	// So for now just use our own pow() external function.
-	external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
-		(void*)(float(*)(float, float))std::pow,
-		powInterpreted,
-		FunctionSignature("pow", vector<TypeRef>(2, new Float())),
-		new Float(),
-		false // takes hidden voidptr arg
-	)));
+		ExternalFunctionRef alloc_ref(new ExternalFunction());
+		alloc_ref->interpreted_func = NULL;
+		alloc_ref->return_type = TypeRef(new VoidPtrType());
+		alloc_ref->sig = FunctionSignature("allocateRefCountedStructure", std::vector<TypeRef>(1, TypeRef(new Int())));
+		alloc_ref->func = (void*)(allocateRefCountedStructure);
+		this->external_functions.push_back(alloc_ref);
 
 
-	// Add allocateString
-	external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
-		allocateString,
-		allocateStringInterpreted, // interpreted func
-		FunctionSignature("allocateString", vector<TypeRef>(1, new VoidPtrType())),
-		new String(), // return type
-		true // takes hidden voidptr arg
-	)));
-
-	// Add freeString
-	external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
-		freeString,
-		NULL, // interpreted func TEMP
-		FunctionSignature("freeString", vector<TypeRef>(1, new String())),
-		new Int(), // return type
-		true // takes hidden voidptr arg
-	)));
-	external_functions.back()->has_side_effects = true;
-
-	// Add stringLength
-	external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
-		stringLength,
-		stringLengthInterpreted, // interpreted func
-		FunctionSignature("stringLength", vector<TypeRef>(1, new String())),
-		new Int(), // return type
-		true // takes hidden voidptr arg
-	)));
-
-	// Add concatStrings
-	external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
-		concatStrings,
-		concatStringsInterpreted, // interpreted func
-		FunctionSignature("concatStrings", vector<TypeRef>(2, new String())),
-		new String(), // return type
-		true // takes hidden voidptr arg
-	)));
-
-	for(unsigned int i=0; i<this->external_functions.size(); ++i)
-		addExternalFunction(this->external_functions[i], *this->llvm_context, *this->llvm_module);
+		// TEMP: There is a problem with LLVM 3.3 and earlier with the pow intrinsic getting turned into exp2f().
+		// So for now just use our own pow() external function.
+		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
+			(void*)(float(*)(float, float))std::pow,
+			powInterpreted,
+			FunctionSignature("pow", vector<TypeRef>(2, new Float())),
+			new Float(),
+			false // takes hidden voidptr arg
+		)));
 
 
-	assert(this->llvm_exec_engine);
-	assert(error_str.empty());
+		// Add allocateString
+		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
+			allocateString,
+			allocateStringInterpreted, // interpreted func
+			FunctionSignature("allocateString", vector<TypeRef>(1, new VoidPtrType())),
+			new String(), // return type
+			true // takes hidden voidptr arg
+		)));
 
-	// Load source buffers
-	loadSource(args.source_buffers, args.preconstructed_func_defs);
+		// Add freeString
+		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
+			freeString,
+			NULL, // interpreted func TEMP
+			FunctionSignature("freeString", vector<TypeRef>(1, new String())),
+			new Int(), // return type
+			true // takes hidden voidptr arg
+		)));
+		external_functions.back()->has_side_effects = true;
 
-	this->build(args);
+		// Add stringLength
+		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
+			stringLength,
+			stringLengthInterpreted, // interpreted func
+			FunctionSignature("stringLength", vector<TypeRef>(1, new String())),
+			new Int(), // return type
+			true // takes hidden voidptr arg
+		)));
+
+		// Add concatStrings
+		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
+			concatStrings,
+			concatStringsInterpreted, // interpreted func
+			FunctionSignature("concatStrings", vector<TypeRef>(2, new String())),
+			new String(), // return type
+			true // takes hidden voidptr arg
+		)));
+
+		for(unsigned int i=0; i<this->external_functions.size(); ++i)
+			addExternalFunction(this->external_functions[i], *this->llvm_context, *this->llvm_module);
+
+
+		assert(this->llvm_exec_engine);
+		assert(error_str.empty());
+
+		// Load source buffers
+		loadSource(args.source_buffers, args.preconstructed_func_defs);
+
+		this->build(args);
+	}
+	catch(BaseException& e)
+	{
+		// Since we threw an exception in the constructor, the destructor will not be run.
+		// So we need to delete these objects now.
+		delete this->llvm_exec_engine;
+
+		delete llvm_context;
+
+		throw e; // Re-throw exception
+	}
 }
 
 
