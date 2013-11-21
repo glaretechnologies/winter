@@ -628,7 +628,7 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 	
 
 
-	const bool optimise = false;
+	const bool optimise = true;
 	const bool verbose = false;
 
 	// Do LLVM optimisations
