@@ -158,8 +158,16 @@ void checkFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
 {
 	if(shouldFoldExpression(e, payload))
 	{
-		e = foldExpression(e, payload);
-		payload.tree_changed = true;
+		try
+		{
+			e = foldExpression(e, payload);
+			payload.tree_changed = true;
+		}
+		catch(BaseException& )
+		{
+			// An invalid operation was performed, such as dividing by zero, while trying to eval the AST node.
+			// In this case we will consider the folding as not taking place.
+		}
 	}
 }
 
@@ -2556,8 +2564,16 @@ ValueRef DivExpression::exec(VMState& vmstate)
 	}
 	else if(this->type()->getType() == Type::IntType)
 	{
-		// TODO: catch divide by zero.
-		retval = ValueRef(new IntValue(static_cast<IntValue*>(aval.getPointer())->value / static_cast<IntValue*>(bval.getPointer())->value));
+		const int a_int_val = static_cast<IntValue*>(aval.getPointer())->value;
+		const int b_int_val = static_cast<IntValue*>(bval.getPointer())->value;
+
+		if(b_int_val == 0)
+			throw BaseException("Divide by zero.");
+
+		if(a_int_val == std::numeric_limits<int32>::min() && b_int_val == -1)
+			throw BaseException("Tried to compute -2147483648 / -1.");
+
+		retval = ValueRef(new IntValue(a_int_val / b_int_val));
 	}
 	else
 	{
@@ -2947,7 +2963,7 @@ Reference<ASTNode> DivExpression::clone()
 
 bool DivExpression::isConstant() const
 {
-	return this->proven_defined && a->isConstant() && b->isConstant();
+	return /*this->proven_defined && */a->isConstant() && b->isConstant();
 }
 
 

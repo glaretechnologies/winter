@@ -180,7 +180,7 @@ static void testMainFloat(const std::string& src, float target_return_val)
 }
 
 
-static void testMainFloatArgInvalidProgram(const std::string& src, float argument, float target_return_val)
+static void testMainFloatArgInvalidProgram(const std::string& src, float argument)
 {
 	std::cout << "===================== Winter testMainFloatArgInvalidProgram() =====================" << std::endl;
 	try

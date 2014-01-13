@@ -1023,7 +1023,8 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 				// Allocate return value on stack
 
 				// Emit the alloca in the entry block for better code-gen.
-				llvm::IRBuilder<> entry_block_builder(&params.currently_building_func->getEntryBlock());
+				// We will emit the alloca at the start of the block, so that it doesn't go after any terminator instructions already created which have to be at the end of the block.
+				llvm::IRBuilder<> entry_block_builder(&params.currently_building_func->getEntryBlock(), params.currently_building_func->getEntryBlock().getFirstInsertionPt());
 
 				return_val_addr = entry_block_builder.Insert(new llvm::AllocaInst(
 					target_ret_type->LLVMType(*params.context), // type
@@ -1264,9 +1265,8 @@ Reference<ASTNode> FunctionExpression::clone()
 
 bool FunctionExpression::isConstant() const
 {
-	//TEMP return false; // TEMP HACK
-	if(!this->provenDefined())
-		return false;
+	//if(!this->provenDefined())
+	//	return false;
 
 	// For now, we'll say a function expression bound to an argument of let var is not constant.
 	if(this->binding_type != BoundToGlobalDef)

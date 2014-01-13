@@ -18,6 +18,7 @@ namespace llvm
 	class LLVMContext;
 	class Module;
 	class ExecutionEngine;
+	class TargetMachine;
 }
 
 
@@ -80,9 +81,11 @@ private:
 	llvm::LLVMContext* llvm_context;
 	llvm::Module* llvm_module;
 	llvm::ExecutionEngine* llvm_exec_engine;
+	llvm::TargetMachine* target_machine;
 	bool hidden_voidptr_arg;
 	void* env;
 	std::string triple;
+	std::map<std::string, void*> func_map;
 };
 
 

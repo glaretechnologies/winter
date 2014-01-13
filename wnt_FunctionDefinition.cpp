@@ -629,6 +629,17 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 //	}
 //}
 
+const std::string makeSafeStringForFunctionName(const std::string& s)
+{
+	std::string res = s;
+
+	for(size_t i=0; i<s.size(); ++i)
+		if(!(::isAlphaNumeric(s[i]) || s[i] == '_'))
+			res[i] = '_';
+
+	return res;
+}
+
 
 llvm::Function* FunctionDefinition::getOrInsertFunction(
 		llvm::Module* module,
@@ -703,7 +714,7 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 	function_attr_builder.addAttribute(llvm::Attribute::AlwaysInline);
 
 	llvm::Constant* llvm_func_constant = module->getOrInsertFunction(
-		this->sig.toString(), // Name
+		makeSafeStringForFunctionName(this->sig.toString()), // Name
 		functype // Type
 	);
 

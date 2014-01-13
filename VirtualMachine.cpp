@@ -36,14 +36,33 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "llvm/Transforms/IPO.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
+#include "llvm/ExecutionEngine/ObjectImage.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Target/TargetLibraryInfo.h"
+#include "llvm/Target/TargetMachine.h"
 #include "llvm/ADT/Triple.h"
+#include "llvm/ExecutionEngine/MCJIT.h"
+#include "llvm/ExecutionEngine/JITEventListener.h"
+#include "llvm/MC/MCDisassembler.h"
+#include "llvm/MC/MCInst.h"
+#include "llvm/MC/MCSubtargetInfo.h"
+#include "llvm/MC/MCAsmInfo.h"
+#include "llvm/MC/MCStreamer.h"
+#include "llvm/MC/MCContext.h"
+#include "llvm/MC/MCObjectFileInfo.h"
+#include "llvm/MC/MCInstPrinter.h"
+#include "llvm/ExecutionEngine/SectionMemoryManager.h"
+#include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/MemoryObject.h"
+#include "llvm/Support/TargetRegistry.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/DynamicLibrary.h"
 #endif
 
 
@@ -55,7 +74,7 @@ namespace Winter
 
 
 static const bool DUMP_MODULE_IR = false;
-static const bool PRINT_ASSEMBLY_TO_STDOUT = false;
+static const bool DUMP_ASSEMBLY = false;
 
 
 
@@ -158,6 +177,30 @@ static ValueRef powInterpreted(const vector<ValueRef>& args)
 }
 
 
+// We need to define our own memory manager so that we can supply our own getPointerToNamedFunction() method, that will return pointers to external functions.
+// This seems to be necessary when using MCJIT.
+class WinterMemoryManager : public llvm::SectionMemoryManager
+{
+public:
+	virtual ~WinterMemoryManager() {}
+
+	virtual void *getPointerToNamedFunction(const std::string& name, bool AbortOnFailure = true)
+	{
+		std::map<std::string, void*>::iterator res = func_map->find(name);
+		if(res != func_map->end())
+			return res->second;
+
+		// If function was not in func_map (i.e. was not an 'external' function), then use normal symbol resolution, for functions like sinf, cosf etc..
+
+		void* f = llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(name);
+		return f;
+	}
+	
+	std::map<std::string, void*>* func_map;
+};
+
+
+
 VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 :	linker(
 		true, // hidden_voidptr_arg
@@ -177,9 +220,9 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 		this->llvm_module = new llvm::Module("WinterModule", *this->llvm_context);
 
 		llvm::InitializeNativeTarget();
+		llvm::InitializeNativeTargetAsmPrinter();
 
 		//llvm::TargetOptions to;
-
 
 		//const char* argv[] = { "dummyprogname", "-vectorizer-min-trip-count=4"};
 		//llvm::cl::ParseCommandLineOptions(2, argv, "my tool");
@@ -188,26 +231,20 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 		//llvm::cl::ParseCommandLineOptions(2, argv, "my tool");
 
 
-		//TEMP HACK try and print out assembly
 		llvm::EngineBuilder engine_builder(this->llvm_module);
 		engine_builder.setEngineKind(llvm::EngineKind::JIT);
-	
-		llvm::TargetMachine* tm = engine_builder.selectTarget();
-		tm->Options.PrintMachineCode = PRINT_ASSEMBLY_TO_STDOUT;
-		this->llvm_exec_engine = engine_builder.create(tm);
+		engine_builder.setUseMCJIT(true);
 
-		this->triple = tm->getTargetTriple();
+		WinterMemoryManager* mem_manager = new WinterMemoryManager();
+		mem_manager->func_map = &func_map;
+		engine_builder.setJITMemoryManager(mem_manager);
 
-	
+		this->triple = llvm::sys::getProcessTriple();
+		this->triple.append("-elf"); // MCJIT requires the -elf suffix currently, see https://groups.google.com/forum/#!topic/llvm-dev/DOmHEXhNNWw
+		
+		this->target_machine = engine_builder.selectTarget(llvm::Triple(this->triple), "", "", llvm::SmallVector<std::string, 4>());
+		this->llvm_exec_engine = engine_builder.create(target_machine);
 
-		// NOTE: ExecutionEngine takes ownership of the module if createJIT is successful.
-		std::string error_str;
-	
-		/*this->llvm_exec_engine = llvm::ExecutionEngine::createJIT(
-			this->llvm_module, 
-			&error_str
-		);*/
-	
 
 		this->llvm_exec_engine->DisableLazyCompilation();
 		//this->llvm_exec_engine->DisableSymbolSearching(); // Symbol searching is required for sin, pow intrinsics etc..
@@ -274,9 +311,6 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			addExternalFunction(this->external_functions[i], *this->llvm_context, *this->llvm_module);
 
 
-		assert(this->llvm_exec_engine);
-		assert(error_str.empty());
-
 		// Load source buffers
 		loadSource(args.source_buffers, args.preconstructed_func_defs);
 
@@ -322,11 +356,14 @@ void VirtualMachine::addExternalFunction(const ExternalFunctionRef& f, llvm::LLV
 	);
 
 	llvm::Function* llvm_f = static_cast<llvm::Function*>(module.getOrInsertFunction(
-		f->sig.toString(), // Name
+		makeSafeStringForFunctionName(f->sig.toString()), // Name
 		llvm_f_type // Type
 	));
 
-	this->llvm_exec_engine->addGlobalMapping(llvm_f, f->func);
+	// This doesn't seem to work with MCJIT:
+	//this->llvm_exec_engine->addGlobalMapping(llvm_f, f->func);
+
+	func_map[makeSafeStringForFunctionName(f->sig.toString())] = f->func;
 }
 
 
@@ -510,15 +547,6 @@ void VirtualMachine::loadSource(const std::vector<SourceBufferRef>& source_buffe
 	
 	while(true)
 	{
-		// Do in-domain checking (e.g. check elem() calls are in-bounds etc..)
-		{
-			std::vector<ASTNode*> stack;
-			TraversalPayload payload(TraversalPayload::CheckInDomain, hidden_voidptr_arg, env);
-			for(size_t i=0; i<func_defs.size(); ++i)
-				if(!func_defs[i]->is_anon_func)
-					func_defs[i]->traverse(payload, stack);
-			assert(stack.size() == 0);
-		}
 
 		// TEMP: Now that we have domain checked, do some more constant folding
 
@@ -554,6 +582,16 @@ void VirtualMachine::loadSource(const std::vector<SourceBufferRef>& source_buffe
 
 		if(!tree_changed)
 			break;
+	}
+
+	// Do in-domain checking (e.g. check elem() calls are in-bounds etc..)
+	{
+		std::vector<ASTNode*> stack;
+		TraversalPayload payload(TraversalPayload::CheckInDomain, hidden_voidptr_arg, env);
+		for(size_t i=0; i<func_defs.size(); ++i)
+			if(!func_defs[i]->is_anon_func)
+				func_defs[i]->traverse(payload, stack);
+		assert(stack.size() == 0);
 	}
 
 		// TypeCheck
@@ -722,12 +760,13 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 			errorinfo
 		);
 		this->llvm_module->print(f, NULL);
-		
-		//TEMP:
-		//this->compileToNativeAssembly(this->llvm_module, "module_assembly.txt");
 	}
-}
 
+	if(DUMP_ASSEMBLY)
+		this->compileToNativeAssembly(this->llvm_module, "module_assembly.txt");
+
+	this->llvm_exec_engine->finalizeObject();
+}
 
 
 Reference<FunctionDefinition> VirtualMachine::findMatchingFunction(
@@ -750,85 +789,32 @@ void* VirtualMachine::getJittedFunction(const FunctionSignature& sig)
 }
 
 
+// Writes the assembly for the module to disk at filename.  Throws Winter::BaseException on failure.
 void VirtualMachine::compileToNativeAssembly(llvm::Module* mod, const std::string& filename) 
 {
-	//std::string err;
-	//const llvm::Target* target = llvm::TargetRegistry::getClosestTargetForJIT(err);
+	target_machine->setAsmVerbosityDefault(true);
 
-	/*std::string FeaturesStr;
-	std::auto_ptr<llvm::TargetMachine> target(_arch->CtorFn(*_module,
-		FeaturesStr));
-
-	std::ostringstream os;
-	llvm::raw_ostream *Out = new llvm::raw_os_ostream(os);
-	target->addPassesToEmitFile(*_passManager, *Out,
-		llvm::TargetMachine::AssemblyFile, true);
-	target->addPassesToEmitFileFinish(*_passManager, 0, true);*/
-
-	/*llvm::Triple triple(mod->getTargetTriple());
-	if (triple.getTriple().empty()) {
-		triple.setTriple(llvm::sys::getHostTriple());
-	}
-
-	const llvm::Target* target = NULL;
-	string err;
-	target = llvm::TargetRegistry::lookupTarget(triple.getTriple(), err);
-	if (!target) {
-		llvm::errs() << "Error: unable to pick a target for compiling to assembly"
-			<< "\n";
-		exit(1);
-	}
-
-	llvm::TargetMachine* tm = target->createTargetMachine(triple.getTriple(), "");
-	if (!tm) {
-		llvm::errs() << "Error! Creation of target machine"
-			" failed for triple " << triple.getTriple() << "\n";
-		exit(1);
-	}
-
-	tm->setAsmVerbosityDefault(true);
-
-	llvm::PassManager passes;
-	if (const llvm::TargetData* td = tm->getTargetData()) {
-		passes.add(new llvm::TargetData(*td));
-	} else {
-		passes.add(new llvm::TargetData(mod));
-	}
-
-	//std::string Err;
-	//const llvm::TargetMachineRegistry::entry* arch = 
-	//	llvm::TargetMachineRegistry::getClosestTargetForJIT(Err);
-
-	//llvm::PassManager passes;
-	///llvm::TargetData* target_data = new llvm::TargetData(*this->llvm_exec_engine->getTargetData());
-	//passes.add();
-
-	//target_data->
+	llvm::PassManager pm;
+	pm.add(new llvm::DataLayout(*this->llvm_exec_engine->getDataLayout()));
+	pm.add(new llvm::TargetLibraryInfo(llvm::Triple(this->triple)));
 
 	bool disableVerify = true;
-
+	std::string err;
 	llvm::raw_fd_ostream raw_out(filename.c_str(), err, 0);
-	if (!err.empty()) {
-		llvm::errs() << "Error when opening file to print assembly to:\n\t"
-			<< err << "\n";
-		exit(1);
-	}
+	if (!err.empty())
+		throw Winter::BaseException("Error when opening file to print assembly to: " + err);
 
-	llvm::formatted_raw_ostream out(raw_out,
-		llvm::formatted_raw_ostream::PRESERVE_STREAM);
 
-	
+	llvm::formatted_raw_ostream out(raw_out, llvm::formatted_raw_ostream::PRESERVE_STREAM);
 
-	if (tm->addPassesToEmitFile(passes, 
+	if (this->target_machine->addPassesToEmitFile(
+		pm, 
 		out,
-		llvm::TargetMachine::CGFT_AssemblyFile,
-		llvm::CodeGenOpt::Aggressive,
-		disableVerify)) {
-			llvm::errs() << "Unable to emit assembly file! " << "\n";
-			exit(1);
-	}
+		llvm::TargetMachine::CGFT_AssemblyFile
+	))
+		throw Winter::BaseException("Unable to emit assembly file!");
 
-	passes.run(*mod);*/
+	pm.run(*mod);
 }
 
 

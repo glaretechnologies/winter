@@ -14,6 +14,9 @@ namespace Winter
 {
 
 
+const std::string makeSafeStringForFunctionName(const std::string& s);
+
+
 /*=====================================================================
 FunctionDefinition
 -------------------

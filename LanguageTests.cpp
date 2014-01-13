@@ -6,6 +6,7 @@
 
 
 #include "LanguageTestUtils.h"
+#include <utils/timer.h>
 //#include "ProgramBuilder.h"
 
 
@@ -51,6 +52,27 @@ if next token == ',', then it's if(,,)
 void LanguageTests::run()
 {
 //	ProgramBuilder::test();
+	Timer timer;
+
+
+	// Test returning a structure from a function that is called inside an if expression
+	testMainIntegerArg(
+		"struct teststruct { int y }										\n\
+		def f() teststruct : teststruct(1)						\n\
+		def g() teststruct : teststruct(2)						\n\
+		def main(int x) int : y( if x < 5 then f() else g() ) ",
+		2, 1);
+
+	// Test returning a structure from a function that takes a structure and that is called inside an if expression
+	testMainIntegerArg(
+		"struct teststruct { int y }										\n\
+		def f(teststruct s) teststruct : teststruct(1 + y(s))						\n\
+		def g(teststruct s) teststruct : teststruct(2 + y(s))						\n\
+		def main(int x) int : y( if x < 5 then f(teststruct(1)) else g(teststruct(2)) ) ",
+		2, 2);
+
+
+
 
 	// truncateToInt with runtime args, with bounds checking
 	testMainFloatArg("def main(float x) float : toFloat(if x >= -2147483648.0 && x < 2147483647.0 then truncateToInt(x) else 0)", 3.1f, 3.0f);
@@ -78,6 +100,9 @@ void LanguageTests::run()
 	testMainIntegerArg("def main(int i) int : if i != 0 && i != -1 then i / i else 0",    
 		5, 1);
 
+
+	// Do a test where a division by zero would be done while constant folding.
+	testMainFloatArgInvalidProgram("def f(int x) int : x*x	      def main(float x) float : 14 / (f(2) - 4)", 2.0f);
 
 	testMainFloatArg("def f(int x) int : x*x	      def main(float x) float : 14 / (f(2) + 2)", 2.0f, 2.0f);
 
@@ -701,8 +726,8 @@ void LanguageTests::run()
 		10.0, 4.0f);
 	
 	// Test mixing of int and float in an array - is invalid
-	testMainFloatArgInvalidProgram("def main(float x) float : elem([1.0, 2, 3.0, 4.0]a, 1) + x", 10.0, 12.f);
-	testMainFloatArgInvalidProgram("def main(float x) float : elem([1, 2.0, 3.0, 4.0]a, 1) + x", 10.0, 12.f);
+	testMainFloatArgInvalidProgram("def main(float x) float : elem([1.0, 2, 3.0, 4.0]a, 1) + x", 10.0);
+	testMainFloatArgInvalidProgram("def main(float x) float : elem([1, 2.0, 3.0, 4.0]a, 1) + x", 10.0);
 
 	// Test Array Literal
 	testMainFloatArg("def main(float x) float : elem([1.0, 2.0, 3.0, 4.0]a, 1) + x", 10.0, 12.f);
@@ -934,7 +959,6 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 				x = x					\n\
 			in							\n\
 				x						",
-		2.0f,
 		2.0f
 	);
 
@@ -945,7 +969,6 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 				x = 1.0 + x				\n\
 			in							\n\
 				x						",
-		2.0f,
 		2.0f
 	);
 
@@ -1966,7 +1989,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 							in, target_result);
 	}
 
-	std::cout << "===================All LanguageTests passed.=============================" << std::endl;
+	std::cout << "===================All LanguageTests passed.  Elapsed: " << timer.elapsedString() << " =============================" << std::endl;
 }
 
 

@@ -1,0 +1,187 @@
+llvm::InitializeNativeTargetDisassembler();
+
+
+
+/*class WinterJITEventListener : public llvm::JITEventListener
+{
+public:
+	virtual ~WinterJITEventListener() {}
+
+  /// NotifyFunctionEmitted - Called after a function has been successfully
+  /// emitted to memory.  The function still has its MachineFunction attached,
+  /// if you should happen to need that.
+  virtual void NotifyFunctionEmitted(const llvm::Function& func,
+                                     void* addr, size_t size,
+                                     const EmittedFunctionDetails &)
+  {
+	 (*(this->function_sizes))[addr] = size;
+  }
+
+  /// NotifyFreeingMachineCode - Called from freeMachineCodeForFunction(), after
+  /// the global mapping is removed, but before the machine code is returned to
+  /// the allocator.
+  ///
+  /// OldPtr is the address of the machine code and will be the same as the Code
+  /// parameter to a previous NotifyFunctionEmitted call.  The Function passed
+  /// to NotifyFunctionEmitted may have been destroyed by the time of the
+  /// matching NotifyFreeingMachineCode call.
+  virtual void NotifyFreeingMachineCode(void *) {}
+
+  /// NotifyObjectEmitted - Called after an object has been successfully
+  /// emitted to memory.  NotifyFunctionEmitted will not be called for
+  /// individual functions in the object.
+  ///
+  /// ELF-specific information
+  /// The ObjectImage contains the generated object image
+  /// with section headers updated to reflect the address at which sections
+  /// were loaded and with relocations performed in-place on debug sections.
+  virtual void NotifyObjectEmitted(const llvm::ObjectImage &Obj)
+  {
+	  //uint64 addr;
+	  //Obj.begin_symbols()->getAddress(addr);
+
+	  //std::cout << addr << std::endl;
+  }
+
+	/// NotifyFreeingObject - Called just before the memory associated with
+	/// a previously emitted object is released.
+	virtual void NotifyFreeingObject(const llvm::ObjectImage &Obj) {}
+
+
+	std::map<void*, size_t>* function_sizes;
+};*/
+
+
+
+
+
+
+	//jit_event_listener = new WinterJITEventListener();
+		//jit_event_listener->function_sizes = &this->function_sizes;
+
+
+
+
+//this->llvm_exec_engine->RegisterJITEventListener(jit_event_listener);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class BufferMemoryObject : public llvm::MemoryObject {
+private:
+	const uint8_t *Bytes;
+	uint64_t Length;
+public:
+	BufferMemoryObject(const uint8_t *bytes, uint64_t length) : Bytes(bytes), Length(length) {}
+
+	uint64_t getBase() const { return 0; }
+	uint64_t getExtent() const { return Length; }
+
+	int readByte(uint64_t addr, uint8_t *byte) const 
+	{
+		if (addr > getExtent())
+			return -1;
+		*byte = Bytes[addr];
+		return 0;
+	}
+};
+
+
+// See http://blog.llvm.org/2010/01/x86-disassembler.html
+// also https://android.googlesource.com/platform/frameworks/compile/libbcc/+/9347e0bdf9d9cb691c3681ea06c87716b6251af4%5E!/
+
+void VirtualMachine::getDisassembledJittedFunction(const FunctionSignature& sig)
+{
+	/*void* f = getJittedFunction(sig);
+
+	if(function_sizes.find(f) != function_sizes.end())
+	{
+		const size_t function_size = function_sizes[f];
+
+		const llvm::Target* target = &this->target_machine->getTarget();
+
+	
+
+		//llvm::OwningPtr<llvm::MCObjectFileInfo> MOFI(new llvm::MCObjectFileInfo());
+
+		//llvm::SourceMgr SrcMgr;
+		//llvm::MCContext mccontext(*MAI, *MRI, MOFI.get(), &SrcMgr);
+
+		//llvm::OwningPtr<llvm::MCStreamer> mc_streamer(llvm::createAsmStreamer(
+		//	mccontext,
+		//	disas,
+		//	true, // is verbose ASM
+		//	true, // useloc
+		//	false, // useCFI ???
+		//	false // useDwarfDirectory???
+		//));
+
+		llvm::OwningPtr<llvm::MCAsmInfo> MAI(target->createMCAsmInfo(this->triple));
+
+		llvm::OwningPtr<llvm::MCRegisterInfo> MRI(target->createMCRegInfo(this->triple));
+
+		llvm::OwningPtr<llvm::MCInstrInfo> MCII(target->createMCInstrInfo());
+
+		llvm::OwningPtr<llvm::MCSubtargetInfo> STI(this->target_machine->getTarget().createMCSubtargetInfo(
+			this->triple,
+			"", // CPU - seems to work if left blank, gets filled in.
+			"" // Features - seems to work if left blank, gets filled in.
+		));
+
+		llvm::MCInstPrinter* printer = target->createMCInstPrinter(
+			1, // SyntaxVariant - 1 = Intel style
+			*MAI,
+			*MCII,
+			*MRI,
+			*STI
+		);
+
+		BufferMemoryObject buff(
+			(const uint8_t*)f,
+			function_size // TEMP HACK
+		);
+
+		const llvm::MCDisassembler* disassembler = target->createMCDisassembler(
+			*STI
+		); 
+
+		//const llvm::MCAsmInfo* asm_info = target->createMCAsmInfo(this->triple);
+
+		std::string err;
+		llvm::raw_fd_ostream raw_out("disas.txt", err, 0);
+		llvm::formatted_raw_ostream disas_stream(raw_out);
+	
+
+		for(int offset = 0; offset < function_size; )
+		{
+			llvm::MCInst instuction;
+			uint64_t instr_size;
+			disassembler->getInstruction(instuction, instr_size, buff, offset, llvm::nulls(), llvm::nulls());
+
+			printer->printInst(&instuction, disas_stream, "");
+			disas_stream << "\n";
+
+			offset += instr_size;
+		}
+	}*/
+}
+
+
+
+
+
+in header:
+//std::map<void*, size_t> function_sizes;
