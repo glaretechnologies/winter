@@ -54,6 +54,10 @@ void LanguageTests::run()
 //	ProgramBuilder::test();
 	Timer timer;
 
+	// Gather load:
+	//TEMP testMainFloatArg("def main(float x) float : elem(  elem([1.0, 2.0, 3.0, 4.0]a, [2, 3]v)   , 0)", 0.1f, 3.0f);
+
+
 
 	// Test returning a structure from a function that is called inside an if expression
 	testMainIntegerArg(

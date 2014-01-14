@@ -312,7 +312,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 
 
 		// Load source buffers
-		loadSource(args.source_buffers, args.preconstructed_func_defs);
+		loadSource(args, args.source_buffers, args.preconstructed_func_defs);
 
 		this->build(args);
 	}
@@ -383,7 +383,7 @@ static void optimiseFunctions(llvm::FunctionPassManager& fpm, llvm::Module* modu
 }
 
 
-void VirtualMachine::loadSource(const std::vector<SourceBufferRef>& source_buffers, const std::vector<FunctionDefinitionRef>& preconstructed_func_defs)
+void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vector<SourceBufferRef>& source_buffers, const std::vector<FunctionDefinitionRef>& preconstructed_func_defs)
 {
 	vector<FunctionDefinitionRef> func_defs;
 	std::map<std::string, TypeRef> named_types;
@@ -585,6 +585,7 @@ void VirtualMachine::loadSource(const std::vector<SourceBufferRef>& source_buffe
 	}
 
 	// Do in-domain checking (e.g. check elem() calls are in-bounds etc..)
+	if(!args.allow_unsafe_operations)
 	{
 		std::vector<ASTNode*> stack;
 		TraversalPayload payload(TraversalPayload::CheckInDomain, hidden_voidptr_arg, env);

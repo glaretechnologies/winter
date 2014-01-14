@@ -25,6 +25,7 @@
 #include <llvm/IR/Intrinsics.h>
 #endif
 
+#include <iostream>//TEMP
 
 using std::vector;
 
@@ -543,14 +544,28 @@ ArraySubscriptBuiltInFunc::ArraySubscriptBuiltInFunc(const Reference<ArrayType>&
 ValueRef ArraySubscriptBuiltInFunc::invoke(VMState& vmstate)
 {
 	// Array pointer is in arg 0.
-	// Index is in arg 1.
+	// Index or index vector is in arg 1.
 	const ArrayValue* arr = static_cast<const ArrayValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
-	const IntValue* index = static_cast<const IntValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
 
-	if(index->value >= 0 && index->value < arr->e.size())
-		return arr->e[index->value];
+	if(index_type->getType() == Type::IntType)
+	{
+		const IntValue* index = static_cast<const IntValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
+
+		if(index->value >= 0 && index->value < arr->e.size())
+			return arr->e[index->value];
+		else
+			return this->array_type->elem_type->getInvalidValue();
+	}
 	else
-		return this->array_type->elem_type->getInvalidValue();
+	{
+		const VectorValue* index_vec = static_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
+
+		vector<ValueRef> res(index_vec->e.size());
+		for(size_t i=0; i<index_vec->e.size(); ++i)
+			res[i] = arr->e[index_vec->e[i].downcast<IntValue>()->value]; // TODO: bounds check
+
+		return new ArrayValue(res);
+	}
 }
 
 
@@ -573,6 +588,89 @@ static llvm::Value* loadElement(EmitLLVMCodeParams& params, int arg_offset)
 		elem_ptr
 	);
 }
+
+
+
+
+static llvm::Value* loadGatherElements(EmitLLVMCodeParams& params, int arg_offset, int index_vec_num_elems)
+{
+	llvm::Value* array_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, arg_offset + 0);
+	llvm::Value* index_vec     = LLVMTypeUtils::getNthArg(params.currently_building_func, arg_offset + 1);
+
+	// We have a single ptr, we need to shuffle it to an array of ptrs.
+
+	// TEMP: Get pointer to index 0 of the array:
+	llvm::Value* array_elem0_ptr = params.builder->CreateConstInBoundsGEP2_32(array_ptr, 0, 0);
+
+	std::cout << "array_elem0_ptr" << std::endl;
+	array_elem0_ptr->dump();
+	array_elem0_ptr->getType()->dump();
+	std::cout << std::endl;
+
+	//llvm::Value* shuffled_ptr = params.builder->CreateShuffleVector(
+
+	llvm::Value* shuffled_ptr = params.builder->CreateVectorSplat(
+		index_vec_num_elems,
+		array_elem0_ptr
+	);
+
+	std::cout << "shuffled_ptr:" << std::endl;
+	shuffled_ptr->dump();
+	std::cout << std::endl;
+	std::cout << "shuffled_ptr type:" << std::endl;
+	shuffled_ptr->getType()->dump();
+	std::cout << std::endl;
+
+	std::cout << "index_vec:" << std::endl;
+	index_vec->dump();//TEMP
+	std::cout << std::endl;
+	std::cout << "index_vec type:" << std::endl;
+	index_vec->getType()->dump();//TEMP
+	std::cout << std::endl;
+
+	llvm::Value* indices[] = {
+		//llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0)), // get the array
+		index_vec // get the indexed element in the array
+	};
+
+	llvm::Value* elem_ptr = params.builder->CreateInBoundsGEP(
+		shuffled_ptr, // ptr
+		indices
+	);
+
+	std::cout << "elem_ptr:" << std::endl;
+	elem_ptr->dump();//TEMP
+	std::cout << std::endl;
+	std::cout << "elem_ptr type:" << std::endl;
+	elem_ptr->getType()->dump();//TEMP
+	std::cout << std::endl;
+
+	return params.builder->CreateLoad(
+		elem_ptr
+	);
+}
+
+
+/*
+static llvm::Value* loadElements(EmitLLVMCodeParams& params, int arg_offset)
+{
+	llvm::Value* array_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, arg_offset + 0);
+	llvm::Value* index     = LLVMTypeUtils::getNthArg(params.currently_building_func, arg_offset + 1);
+
+	llvm::Value* indices[] = {
+		llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0)), // get the array
+		index, // get the indexed element in the array
+	};
+
+	llvm::Value* elem_ptr = params.builder->CreateInBoundsGEP(
+		array_ptr, // ptr
+		indices
+	);
+
+	return params.builder->CreateLoad(
+		elem_ptr
+	);
+}*/
 
 
 llvm::Value* ArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
@@ -674,22 +772,53 @@ llvm::Value* ArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 	}
 	else // Else if no bounds check:
 	{
-		if(field_type->passByValue())
+		if(index_type->getType() == Type::IntType)
 		{
-			return loadElement(
-				params, 
-				0 // arg offset - zero as no sret zeroth arg.
-			);
+			// Scalar index
+
+			if(field_type->passByValue())
+			{
+				return loadElement(
+					params, 
+					0 // arg offset - zero as no sret zeroth arg.
+				);
+			}
+			else // Else if element type is pass-by-pointer
+			{
+				// Pointer to memory for return value will be 0th argument.
+				llvm::Value* return_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+
+				llvm::Value* elem_val = loadElement(
+					params, 
+					1 // arg offset - we have an sret arg.
+				);
+
+				// Store the element
+				params.builder->CreateStore(
+					elem_val, // value
+					return_ptr // ptr
+				);
+
+				return NULL;
+			}
 		}
-		else // Else if element type is pass-by-pointer
+		else if(index_type->getType() == Type::ArrayTypeType);
 		{
+			// Gather (vector) index.
+			// Since we are returning an array, and we are assuming arrays are pass by pointer, we know the return type is pass by pointer.
+			
 			// Pointer to memory for return value will be 0th argument.
 			llvm::Value* return_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
 
-			llvm::Value* elem_val = loadElement(
+			llvm::Value* elem_val = loadGatherElements(
 				params, 
-				1 // arg offset - we have an sret arg.
+				1, // arg offset - we have an sret arg.
+				this->index_type.downcast<ArrayType>()->num_elems // index_vec_num_elems
 			);
+
+			//TEMP:
+			elem_val->dump();
+			return_ptr->dump();
 
 			// Store the element
 			params.builder->CreateStore(
@@ -1162,11 +1291,27 @@ ValueRef VectorMinBuiltInFunc::invoke(VMState& vmstate)
 	
 	vector<ValueRef> res_values(vector_type->num);
 
-	for(unsigned int i=0; i<vector_type->num; ++i)
+	if(this->vector_type->elem_type->getType() == Type::FloatType)
 	{
-		const float x = static_cast<const FloatValue*>(a->e[i].getPointer())->value;
-		const float y = static_cast<const FloatValue*>(b->e[i].getPointer())->value;
-		res_values[i] = ValueRef(new FloatValue(x < y ? x : y));
+		for(unsigned int i=0; i<vector_type->num; ++i)
+		{
+			const float x = static_cast<const FloatValue*>(a->e[i].getPointer())->value;
+			const float y = static_cast<const FloatValue*>(b->e[i].getPointer())->value;
+			res_values[i] = ValueRef(new FloatValue(x < y ? x : y));
+		}
+	}
+	else if(this->vector_type->elem_type->getType() == Type::IntType)
+	{
+		for(unsigned int i=0; i<vector_type->num; ++i)
+		{
+			const float x = static_cast<const IntValue*>(a->e[i].getPointer())->value;
+			const float y = static_cast<const IntValue*>(b->e[i].getPointer())->value;
+			res_values[i] = ValueRef(new IntValue(x > y ? x : y));
+		}
+	}
+	else
+	{
+		assert(0);
 	}
 
 	return ValueRef(new VectorValue(res_values));
@@ -1178,7 +1323,20 @@ llvm::Value* VectorMinBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 	llvm::Value* a = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
 	llvm::Value* b = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
 
-	llvm::Value* condition = params.builder->CreateFCmpOLT(a, b);
+	llvm::Value* condition;
+	
+	if(this->vector_type->elem_type->getType() == Type::FloatType)
+	{
+		condition = params.builder->CreateFCmpOLT(a, b);
+	}
+	else if(this->vector_type->elem_type->getType() == Type::IntType)
+	{
+		condition = params.builder->CreateICmpSLT(a, b);
+	}
+	else
+	{
+		assert(0);
+	}
 
 	return params.builder->CreateSelect(condition, a, b);
 
@@ -1237,12 +1395,29 @@ ValueRef VectorMaxBuiltInFunc::invoke(VMState& vmstate)
 
 	vector<ValueRef> res_values(vector_type->num);
 
-	for(unsigned int i=0; i<vector_type->num; ++i)
+	if(this->vector_type->elem_type->getType() == Type::FloatType)
 	{
-		const float x = static_cast<const FloatValue*>(a->e[i].getPointer())->value;
-		const float y = static_cast<const FloatValue*>(b->e[i].getPointer())->value;
-		res_values[i] = ValueRef(new FloatValue(x > y ? x : y));
+		for(unsigned int i=0; i<vector_type->num; ++i)
+		{
+			const float x = static_cast<const FloatValue*>(a->e[i].getPointer())->value;
+			const float y = static_cast<const FloatValue*>(b->e[i].getPointer())->value;
+			res_values[i] = ValueRef(new FloatValue(x > y ? x : y));
+		}
 	}
+	else if(this->vector_type->elem_type->getType() == Type::IntType)
+	{
+		for(unsigned int i=0; i<vector_type->num; ++i)
+		{
+			const float x = static_cast<const IntValue*>(a->e[i].getPointer())->value;
+			const float y = static_cast<const IntValue*>(b->e[i].getPointer())->value;
+			res_values[i] = ValueRef(new IntValue(x > y ? x : y));
+		}
+	}
+	else
+	{
+		assert(0);
+	}
+
 
 	return ValueRef(new VectorValue(res_values));
 }
@@ -1253,7 +1428,19 @@ llvm::Value* VectorMaxBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 	llvm::Value* a = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
 	llvm::Value* b = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
 
-	llvm::Value* condition = params.builder->CreateFCmpOGT(a, b);
+	llvm::Value* condition;
+	if(this->vector_type->elem_type->getType() == Type::FloatType)
+	{
+		condition = params.builder->CreateFCmpOGT(a, b);
+	}
+	else if(this->vector_type->elem_type->getType() == Type::IntType)
+	{
+		condition = params.builder->CreateICmpSGT(a, b);
+	}
+	else
+	{
+		assert(0);
+	}
 
 	return params.builder->CreateSelect(condition, a, b);
 }

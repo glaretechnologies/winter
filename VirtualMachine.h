@@ -45,13 +45,14 @@ VirtualMachine
 class VMConstructionArgs
 {
 public:
-	VMConstructionArgs() : env(NULL) {}
+	VMConstructionArgs() : env(NULL), allow_unsafe_operations(false) {}
 	std::vector<ExternalFunctionRef> external_functions;
 	std::vector<SourceBufferRef> source_buffers;
 	std::vector<FunctionSignature> entry_point_sigs;
 
 	std::vector<FunctionDefinitionRef> preconstructed_func_defs;//TEMP
 	void* env;
+	bool allow_unsafe_operations; // If this is true, in-bounds proof requirements of elem() etc.. are disabled.
 };
 
 
@@ -70,7 +71,7 @@ public:
 	void* getJittedFunctionByName(const std::string& name);
 
 private:
-	void loadSource(const std::vector<SourceBufferRef>& s, const std::vector<FunctionDefinitionRef>& preconstructed_func_defs);
+	void loadSource(const VMConstructionArgs& args, const std::vector<SourceBufferRef>& s, const std::vector<FunctionDefinitionRef>& preconstructed_func_defs);
 	void build(const VMConstructionArgs& args);
 	void addExternalFunction(const ExternalFunctionRef& f, llvm::LLVMContext& context, llvm::Module& module);
 	void compileToNativeAssembly(llvm::Module* mod, const std::string& filename);

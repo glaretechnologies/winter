@@ -398,6 +398,35 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 			}
 		}
 
+		// Gather elem :      elem(array<T, n>, vector<int, m>) -> array<T, m>
+		if(sig.param_types[0]->getType() == Type::ArrayTypeType && sig.param_types[1]->getType() == Type::VectorTypeType && sig.param_types[1].downcast<VectorType>()->elem_type->getType() == Type::IntType)
+		{
+			if(sig.name == "elem")
+			{
+				vector<FunctionDefinition::FunctionArg> args(2);
+				args[0].name = "vector";
+				args[0].type = sig.param_types[0];
+				args[1].name = "index";
+				args[1].type = sig.param_types[1];
+				
+				Reference<ArrayType> a_type = sig.param_types[0].downcast<ArrayType>();
+
+				TypeRef return_type = new ArrayType(a_type->elem_type, sig.param_types[1].downcast<VectorType>()->num);
+
+				FunctionDefinitionRef def = new FunctionDefinition(
+					SrcLocation::invalidLocation(),
+					"elem", // name
+					args, // args
+					NULL, // body expr
+					return_type, // return type
+					new ArraySubscriptBuiltInFunc(a_type, sig.param_types[1]) // built in impl.
+				);
+
+				this->sig_to_function_map.insert(std::make_pair(sig, def));
+				return def;
+			}
+		}
+
 		if(sig.param_types[0]->getType() == Type::FloatType && sig.param_types[1]->getType() == Type::FloatType)
 		{
 			// TEMP: There is a problem with LLVM 3.3 and earlier with the pow intrinsic getting turned into exp2f().
@@ -423,6 +452,107 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 				return def;
 			}*/
 		}
+
+		if(
+			sig.param_types[0]->getType() == Type::VectorTypeType && // vector 
+			sig.param_types[1]->getType() == Type::VectorTypeType) // and vector
+		{
+			if(
+				(static_cast<const VectorType*>(sig.param_types[0].getPointer())->elem_type->getType() == Type::FloatType && // vector of floats
+				static_cast<const VectorType*>(sig.param_types[1].getPointer())->elem_type->getType() == Type::FloatType) || // and vector of floats
+				(static_cast<const VectorType*>(sig.param_types[0].getPointer())->elem_type->getType() == Type::IntType && // vector of ints
+				static_cast<const VectorType*>(sig.param_types[1].getPointer())->elem_type->getType() == Type::IntType)) // and vector of ints
+			{
+				if(sig.name == "min")
+				{
+					vector<FunctionDefinition::FunctionArg> args(2);
+					args[0].name = "x";
+					args[0].type = sig.param_types[0];
+					args[1].name = "y";
+					args[1].type = sig.param_types[1];
+
+					FunctionDefinitionRef def = new FunctionDefinition(
+						SrcLocation::invalidLocation(),
+						"min", // name
+						args, // args
+						NULL, // body expr
+						sig.param_types[0], // return type
+						new VectorMinBuiltInFunc(sig.param_types[0].downcast<VectorType>()) // built in impl.
+					);
+
+					this->sig_to_function_map.insert(std::make_pair(sig, def));
+					return def;
+				}
+				else if(sig.name == "max")
+				{
+					vector<FunctionDefinition::FunctionArg> args(2);
+					args[0].name = "x";
+					args[0].type = sig.param_types[0];
+					args[1].name = "y";
+					args[1].type = sig.param_types[1];
+
+					FunctionDefinitionRef def = new FunctionDefinition(
+						SrcLocation::invalidLocation(),
+						"max", // name
+						args, // args
+						NULL, // body expr
+						sig.param_types[0], // return type
+						new VectorMaxBuiltInFunc(sig.param_types[0].downcast<VectorType>()) // built in impl.
+					);
+
+					this->sig_to_function_map.insert(std::make_pair(sig, def));
+					return def;
+				}
+			}
+
+
+			if(
+				static_cast<const VectorType*>(sig.param_types[0].getPointer())->elem_type->getType() == Type::FloatType && // vector of floats
+				static_cast<const VectorType*>(sig.param_types[1].getPointer())->elem_type->getType() == Type::FloatType) // and vector of floats
+			{
+				if(sig.name == "pow")
+				{
+					vector<FunctionDefinition::FunctionArg> args(2);
+					args[0].name = "x";
+					args[0].type = sig.param_types[0];
+					args[1].name = "y";
+					args[1].type = sig.param_types[1];
+
+					FunctionDefinitionRef def = new FunctionDefinition(
+						SrcLocation::invalidLocation(),
+						"pow", // name
+						args, // args
+						NULL, // body expr
+						sig.param_types[0], // return type
+						new PowBuiltInFunc(sig.param_types[0]) // built in impl.
+					);
+
+					this->sig_to_function_map.insert(std::make_pair(sig, def));
+					return def;
+				}
+				else if(sig.name == "dot")
+				{
+					vector<FunctionDefinition::FunctionArg> args(2);
+					args[0].name = "x";
+					args[0].type = sig.param_types[0];
+					args[1].name = "y";
+					args[1].type = sig.param_types[1];
+
+					FunctionDefinitionRef def = new FunctionDefinition(
+						SrcLocation::invalidLocation(),
+						"dot", // name
+						args, // args
+						NULL, // body expr
+						new Float(), // return type
+						new DotProductBuiltInFunc(sig.param_types[0].downcast<VectorType>()) // built in impl.
+					);
+
+					this->sig_to_function_map.insert(std::make_pair(sig, def));
+					return def;
+				}
+			} // End if (vector of floats, vector of floats)
+		} // End if (vector, vector) params
+
 
 		if(
 			(sig.param_types[0]->getType() == Type::VectorTypeType && static_cast<const VectorType*>(sig.param_types[0].getPointer())->elem_type->getType() == Type::FloatType) && // vector of floats
