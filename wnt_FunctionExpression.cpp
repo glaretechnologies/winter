@@ -481,11 +481,57 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 
 		if(!payload.func_def_stack.back()->isGenericFunction())
 			linkFunctions(*payload.linker, payload, stack);
+
+		// Set shuffle mask now
+		if(this->target_function && ::hasPrefix(this->target_function->sig.name, "shuffle"))
+		{
+			assert(this->argument_expressions.size() == 2);
+			if(!this->argument_expressions[1]->isConstant())
+				throw BaseException("Second arg to shuffle must be constant");
+
+			try
+			{
+				VMState vmstate(payload.hidden_voidptr_arg);
+				vmstate.func_args_start.push_back(0);
+				if(payload.hidden_voidptr_arg)
+					vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(payload.env)));
+
+				ValueRef res = this->argument_expressions[1]->exec(vmstate);
+
+				assert(dynamic_cast<VectorValue*>(res.getPointer()));
+
+				VectorValue* res_v = static_cast<VectorValue*>(res.getPointer());
+				
+				std::vector<int> mask(res_v->e.size());
+				for(size_t i=0; i<mask.size(); ++i)
+				{
+					assert(dynamic_cast<IntValue*>(res_v->e[i].getPointer()));
+
+					mask[i] = static_cast<IntValue*>(res_v->e[i].getPointer())->value;
+				}
+
+				assert(this->target_function->built_in_func_impl);
+				assert(dynamic_cast<ShuffleBuiltInFunc*>(this->target_function->built_in_func_impl));
+				static_cast<ShuffleBuiltInFunc*>(this->target_function->built_in_func_impl)->setShuffleMask(mask);
+			}
+			catch(BaseException& e)
+			{
+				throw BaseException("Failed to eval second arg of shuffle: " + e.what());
+			}
+		}
 	}
 	else if(payload.operation == TraversalPayload::CheckInDomain)
 	{
 		checkInDomain(payload, stack);
 		this->proven_defined = true;
+	}
+	else if(payload.operation == TraversalPayload::TypeCheck)
+	{
+		// Check shuffle mask (arg 1) is a vector of ints
+		if(::hasPrefix(this->target_function->sig.name, "shuffle"))
+		{
+			// TODO
+		}
 	}
 	
 	stack.pop_back();

@@ -1449,6 +1449,77 @@ llvm::Value* VectorMaxBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 //----------------------------------------------------------------------------------------------
 
 
+ValueRef ShuffleBuiltInFunc::invoke(VMState& vmstate)
+{
+	const VectorValue* a = dynamic_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 0].getPointer());
+	const VectorValue* index_vec = dynamic_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
+	assert(a && index_vec);
+
+
+	vector<ValueRef> res_values(index_vec->e.size());
+
+	for(unsigned int i=0; i<index_vec->e.size(); ++i)
+	{
+		res_values[i] = a->e[ index_vec->e[i].downcast<IntValue>()->value ];
+	}
+
+	return ValueRef(new VectorValue(res_values));
+}
+
+
+llvm::Value* ShuffleBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	llvm::Value* a = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+	llvm::Value* index_vec = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
+
+
+	llvm::Constant* mask;
+	if(shuffle_mask.empty()) // if shuffle mask has not been set yet, just set to a zero mask vector of the final size.
+	{
+		assert(0);
+
+		std::vector<llvm::Constant*> elems(index_type->num);
+		for(size_t i=0; i<index_type->num; ++i)
+			elems[i] = llvm::ConstantInt::get(
+				*params.context, 
+				llvm::APInt(
+					32, // num bits
+					0, // value
+					true // signed
+				)
+			);
+
+		mask = llvm::ConstantVector::get(elems);
+	}
+	else
+	{
+		std::vector<llvm::Constant*> elems(shuffle_mask.size());
+		for(size_t i=0; i<shuffle_mask.size(); ++i)
+			elems[i] = llvm::ConstantInt::get(
+				*params.context, 
+				llvm::APInt(
+					32, // num bits
+					shuffle_mask[i], // value
+					true // signed
+				)
+			);
+
+		mask = llvm::ConstantVector::get(elems);
+	}
+
+	// TEMP: just use 'a' for the second vector arg as well
+	return params.builder->CreateShuffleVector(a, a, mask, "shuffle");
+}
+
+
+void ShuffleBuiltInFunc::setShuffleMask(const std::vector<int>& shuffle_mask_)
+{
+	shuffle_mask = shuffle_mask_;
+}
+
+//----------------------------------------------------------------------------------------------
+
+
 PowBuiltInFunc::PowBuiltInFunc(const TypeRef& type_)
 :	type(type_)
 {}

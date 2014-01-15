@@ -77,7 +77,7 @@ static const bool DUMP_MODULE_IR = false;
 static const bool DUMP_ASSEMBLY = false;
 
 
-
+static const bool USE_MCJIT = true;
 
 
 static void* allocateRefCountedStructure(uint32 size, void* env)
@@ -193,6 +193,8 @@ public:
 		// If function was not in func_map (i.e. was not an 'external' function), then use normal symbol resolution, for functions like sinf, cosf etc..
 
 		void* f = llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(name);
+
+		assert(f);
 		return f;
 	}
 	
@@ -233,14 +235,19 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 
 		llvm::EngineBuilder engine_builder(this->llvm_module);
 		engine_builder.setEngineKind(llvm::EngineKind::JIT);
-		engine_builder.setUseMCJIT(true);
+		if(USE_MCJIT) engine_builder.setUseMCJIT(true);
 
-		WinterMemoryManager* mem_manager = new WinterMemoryManager();
-		mem_manager->func_map = &func_map;
-		engine_builder.setJITMemoryManager(mem_manager);
+
+		if(USE_MCJIT)
+		{
+			WinterMemoryManager* mem_manager = new WinterMemoryManager();
+			mem_manager->func_map = &func_map;
+			engine_builder.setJITMemoryManager(mem_manager);
+		}
 
 		this->triple = llvm::sys::getProcessTriple();
-		this->triple.append("-elf"); // MCJIT requires the -elf suffix currently, see https://groups.google.com/forum/#!topic/llvm-dev/DOmHEXhNNWw
+		if(USE_MCJIT) this->triple.append("-elf"); // MCJIT requires the -elf suffix currently, see https://groups.google.com/forum/#!topic/llvm-dev/DOmHEXhNNWw
+
 		
 		this->target_machine = engine_builder.selectTarget(llvm::Triple(this->triple), "", "", llvm::SmallVector<std::string, 4>());
 		this->llvm_exec_engine = engine_builder.create(target_machine);
@@ -360,10 +367,15 @@ void VirtualMachine::addExternalFunction(const ExternalFunctionRef& f, llvm::LLV
 		llvm_f_type // Type
 	));
 
-	// This doesn't seem to work with MCJIT:
-	//this->llvm_exec_engine->addGlobalMapping(llvm_f, f->func);
-
-	func_map[makeSafeStringForFunctionName(f->sig.toString())] = f->func;
+	if(USE_MCJIT)
+	{
+		func_map[makeSafeStringForFunctionName(f->sig.toString())] = f->func;
+	}
+	else
+	{
+		// This doesn't seem to work with MCJIT:
+		this->llvm_exec_engine->addGlobalMapping(llvm_f, f->func);
+	}
 }
 
 

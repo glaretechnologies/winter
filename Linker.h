@@ -50,6 +50,8 @@ private:
 	typedef std::map<FunctionSignature, Reference<FunctionDefinition> > SigToFuncMapType;
 	SigToFuncMapType sig_to_function_map;
 
+	std::vector<Reference<FunctionDefinition> > unique_functions;
+
 	typedef std::map<FunctionSignature, ExternalFunctionRef > ExternalFuncMapType;
 	ExternalFuncMapType external_functions;
 

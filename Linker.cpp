@@ -114,6 +114,12 @@ void Linker::buildLLVMCode(llvm::Module* module, const llvm::DataLayout/*TargetD
 
 		concrete_funcs[i]->buildLLVMFunction(module, cpu_info, hidden_voidptr_arg, target_data, common_functions);
 	}
+
+	// Build 'unique' functions (like shuffle())
+	for(unsigned int i=0; i<unique_functions.size(); ++i)
+	{
+		unique_functions[i]->buildLLVMFunction(module, cpu_info, hidden_voidptr_arg, target_data, common_functions);
+	}
 }
 
 
@@ -457,6 +463,36 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 			sig.param_types[0]->getType() == Type::VectorTypeType && // vector 
 			sig.param_types[1]->getType() == Type::VectorTypeType) // and vector
 		{
+			// Shuffle(vector<T, m>, vector<int, n) -> vector<T, n>
+			if(sig.param_types[1].downcast<VectorType>()->elem_type->getType() == Type::IntType)
+			{
+				if(sig.name == "shuffle")
+				{
+					vector<FunctionDefinition::FunctionArg> args(2);
+					args[0].name = "x";
+					args[0].type = sig.param_types[0];
+					args[1].name = "y";
+					args[1].type = sig.param_types[1];
+
+					FunctionDefinitionRef def = new FunctionDefinition(
+						SrcLocation::invalidLocation(),
+						"shuffle_" + toString(unique_functions.size()) + "_", // name
+						args, // args
+						NULL, // body expr
+						new VectorType(sig.param_types[0].downcast<VectorType>()->elem_type, sig.param_types[1].downcast<VectorType>()->num), // return type
+						new ShuffleBuiltInFunc(sig.param_types[0].downcast<VectorType>(), sig.param_types[1].downcast<VectorType>()) // built in impl.
+					);
+
+					// NOTE: because shuffle is unusual in that it has the shuffle mask 'baked into it', we need a unique ShuffleBuiltInFunc impl each time.
+					// So don't add to function map, so that it isn't reused.
+					// However, we need to add it to unique_functions to prevent it from being deleted, as calling function expr doesn't hold a ref to it.
+					unique_functions.push_back(def);
+					return def;
+				}
+			}
+
+
+
 			if(
 				(static_cast<const VectorType*>(sig.param_types[0].getPointer())->elem_type->getType() == Type::FloatType && // vector of floats
 				static_cast<const VectorType*>(sig.param_types[1].getPointer())->elem_type->getType() == Type::FloatType) || // and vector of floats

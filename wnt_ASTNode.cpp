@@ -1542,6 +1542,7 @@ llvm::Value* VectorLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 	}*/
 
 
+	//NOTE TODO: Can just use get() here to create the constant vector immediately?
 
 	// Start with a vector of Undefs.
 	llvm::Value* v = llvm::ConstantVector::getSplat(

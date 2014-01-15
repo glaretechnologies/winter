@@ -222,6 +222,30 @@ private:
 };
 
 
+// Shuffle(vector<T, m>, vector<int, n) -> vector<T, n>
+class ShuffleBuiltInFunc : public BuiltInFunctionImpl
+{
+public:
+	ShuffleBuiltInFunc(const Reference<VectorType>& vector_type_, 
+		//const std::vector<int>& shuffle_mask_
+		const Reference<VectorType>& index_type_
+		) : vector_type(vector_type_), 
+		//shuffle_mask(shuffle_mask_) 
+		index_type(index_type_) 
+	{}
+	virtual ~ShuffleBuiltInFunc(){}
+
+	virtual ValueRef invoke(VMState& vmstate);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+
+	void setShuffleMask(const std::vector<int>& shuffle_mask);
+private:
+	Reference<VectorType> vector_type;
+	Reference<VectorType> index_type;
+	std::vector<int> shuffle_mask;
+};
+
+
 class PowBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
