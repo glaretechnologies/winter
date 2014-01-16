@@ -591,13 +591,20 @@ static llvm::Value* loadElement(EmitLLVMCodeParams& params, int arg_offset)
 
 
 
-
-static llvm::Value* loadGatherElements(EmitLLVMCodeParams& params, int arg_offset, int index_vec_num_elems)
+// Returns a vector value
+static llvm::Value* loadGatherElements(EmitLLVMCodeParams& params, int arg_offset, const TypeRef& array_elem_type, int index_vec_num_elems)
 {
 	llvm::Value* array_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, arg_offset + 0);
-	llvm::Value* index_vec     = LLVMTypeUtils::getNthArg(params.currently_building_func, arg_offset + 1);
+	llvm::Value* index_vec = LLVMTypeUtils::getNthArg(params.currently_building_func, arg_offset + 1);
 
 	// We have a single ptr, we need to shuffle it to an array of ptrs.
+
+	std::cout << "array_ptr:" << std::endl;
+	array_ptr->dump();
+	std::cout << std::endl;
+	std::cout << "array_ptr type:" << std::endl;
+	array_ptr->getType()->dump();
+	std::cout << std::endl;
 
 	// TEMP: Get pointer to index 0 of the array:
 	llvm::Value* array_elem0_ptr = params.builder->CreateConstInBoundsGEP2_32(array_ptr, 0, 0);
@@ -645,9 +652,37 @@ static llvm::Value* loadGatherElements(EmitLLVMCodeParams& params, int arg_offse
 	elem_ptr->getType()->dump();//TEMP
 	std::cout << std::endl;
 
-	return params.builder->CreateLoad(
+
+	// TEMP: LLVM does not currently support loading from a vector of pointers.  So just do the loads individually.
+
+	/*return params.builder->CreateLoad(
 		elem_ptr
+	);*/
+
+	// Start with a vector of Undefs.
+	llvm::Value* vec = llvm::ConstantVector::getSplat(
+		index_vec_num_elems,
+		llvm::UndefValue::get(array_elem_type->LLVMType(*params.context))
 	);
+
+	for(int i=0; i<index_vec_num_elems; ++i)
+	{
+		// Emit code to load value i
+		llvm::Value* val_i = params.builder->CreateLoad(
+			params.builder->CreateExtractElement( // Get pointer i out of the elem_ptr vector
+				elem_ptr, 
+				llvm::ConstantInt::get(*params.context, llvm::APInt(32, i))
+			)
+		);
+
+		vec = params.builder->CreateInsertElement(
+			vec, // vec
+			val_i, // new element
+			llvm::ConstantInt::get(*params.context, llvm::APInt(32, i)) // index
+		);
+	}
+	
+	return vec;
 }
 
 
@@ -805,28 +840,29 @@ llvm::Value* ArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 		else if(index_type->getType() == Type::ArrayTypeType);
 		{
 			// Gather (vector) index.
-			// Since we are returning an array, and we are assuming arrays are pass by pointer, we know the return type is pass by pointer.
+			// Since we are returning a vector, and we are assuming vectors are not pass by pointer, we know the return type is not pass by pointer.
 			
 			// Pointer to memory for return value will be 0th argument.
-			llvm::Value* return_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+			//llvm::Value* return_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
 
-			llvm::Value* elem_val = loadGatherElements(
+			llvm::Value* result_vector = loadGatherElements(
 				params, 
-				1, // arg offset - we have an sret arg.
+				0, // arg offset - we have an sret arg.
+				this->array_type->elem_type,
 				this->index_type.downcast<ArrayType>()->num_elems // index_vec_num_elems
 			);
 
 			//TEMP:
-			elem_val->dump();
-			return_ptr->dump();
+			result_vector->dump();
+			//return_ptr->dump();
 
 			// Store the element
-			params.builder->CreateStore(
-				elem_val, // value
-				return_ptr // ptr
-			);
+			//params.builder->CreateStore(
+			//	elem_val, // value
+			//	return_ptr // ptr
+			//);
 
-			return NULL;
+			return result_vector;
 		}
 	}
 }

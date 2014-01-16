@@ -404,7 +404,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 			}
 		}
 
-		// Gather elem :      elem(array<T, n>, vector<int, m>) -> array<T, m>
+		// Gather elem :      elem(array<T, n>, vector<int, m>) -> vector<T, m>
 		if(sig.param_types[0]->getType() == Type::ArrayTypeType && sig.param_types[1]->getType() == Type::VectorTypeType && sig.param_types[1].downcast<VectorType>()->elem_type->getType() == Type::IntType)
 		{
 			if(sig.name == "elem")
@@ -417,7 +417,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 				
 				Reference<ArrayType> a_type = sig.param_types[0].downcast<ArrayType>();
 
-				TypeRef return_type = new ArrayType(a_type->elem_type, sig.param_types[1].downcast<VectorType>()->num);
+				TypeRef return_type = new VectorType(a_type->elem_type, sig.param_types[1].downcast<VectorType>()->num);
 
 				FunctionDefinitionRef def = new FunctionDefinition(
 					SrcLocation::invalidLocation(),

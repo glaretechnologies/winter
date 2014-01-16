@@ -505,7 +505,8 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 				std::vector<int> mask(res_v->e.size());
 				for(size_t i=0; i<mask.size(); ++i)
 				{
-					assert(dynamic_cast<IntValue*>(res_v->e[i].getPointer()));
+					if(!(dynamic_cast<IntValue*>(res_v->e[i].getPointer())))
+						throw BaseException("Element in shuffle mask was not an integer.");
 
 					mask[i] = static_cast<IntValue*>(res_v->e[i].getPointer())->value;
 				}

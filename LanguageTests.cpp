@@ -54,13 +54,23 @@ void LanguageTests::run()
 //	ProgramBuilder::test();
 	Timer timer;
 
+
+	// Gather load:
+	testMainFloatArg("def main(float x) float : elem(  elem([1.0, 2.0, 3.0, 4.0]a, [2, 3]v)   , 0)", 0.1f, 3.0f);
+
+
 	// Shuffle
 	testMainFloatArg("def main(float x) float : elem(   shuffle([1.0, 2.0, 3.0, 4.0]v, [2, 3]v)   , 1)", 0.1f, 4.0f);
 
 	testMainFloatArg("def main(float x) float : elem(   shuffle([x + 1.0, x + 2.0, x + 3.0, x + 4.0]v, [2, 3]v)   , 1)", 0.1f, 4.1f);
 
-	// Gather load:
-	//TEMP testMainFloatArg("def main(float x) float : elem(  elem([1.0, 2.0, 3.0, 4.0]a, [2, 3]v)   , 0)", 0.1f, 3.0f);
+	// Test a shuffle where the mask is invalid - a float
+	testMainFloatArgInvalidProgram("def main(float x) float : elem(   shuffle([1.0, 2.0, 3.0, 4.0]v, [2, 3.0]v)   , 1)", 0.1f);
+
+	// Test a shuffle where the mask is invalid - not a constant
+	testMainIntegerArgInvalidProgram("def main(int x) int : elem(   shuffle([1.0, 2.0, 3.0, 4.0]v, [2, x]v)   , 1)", 1);
+
+	
 
 
 
