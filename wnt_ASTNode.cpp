@@ -1317,7 +1317,8 @@ llvm::Value* ArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 		// Allocate space on stack for array
 		
 		// Emit the alloca in the entry block for better code-gen.
-		llvm::IRBuilder<> entry_block_builder(&params.currently_building_func->getEntryBlock());
+		// We will emit the alloca at the start of the block, so that it doesn't go after any terminator instructions already created which have to be at the end of the block.
+		llvm::IRBuilder<> entry_block_builder(&params.currently_building_func->getEntryBlock(), params.currently_building_func->getEntryBlock().getFirstInsertionPt());
 
 		array_addr = entry_block_builder.CreateAlloca(
 			this->type()->LLVMType(*params.context), // This type (array type)

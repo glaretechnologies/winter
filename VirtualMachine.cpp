@@ -557,7 +557,7 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 	
 
 	
-	while(true)
+	/*while(true)
 	{
 
 		// TEMP: Now that we have domain checked, do some more constant folding
@@ -594,7 +594,7 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 
 		if(!tree_changed)
 			break;
-	}
+	}*/
 
 	// Do in-domain checking (e.g. check elem() calls are in-bounds etc..)
 	if(!args.allow_unsafe_operations)

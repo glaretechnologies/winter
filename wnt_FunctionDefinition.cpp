@@ -1056,7 +1056,11 @@ bool FunctionDefinition::isGenericFunction() const // true if it is parameterise
 bool FunctionDefinition::isConstant() const
 {
 	//assert(!"FunctionDefinition::isConstant()");
-	return false;//TEMP
+	//return false;//TEMP
+	if(body.isNull())
+		return false;
+
+	return this->body->isConstant();
 }
 
 

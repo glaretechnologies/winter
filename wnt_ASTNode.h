@@ -503,6 +503,7 @@ public:
 	virtual Reference<ASTNode> clone();
 	virtual bool isConstant() const;
 
+	const std::vector<ASTNodeRef>& getElements() const { return elements; }
 private:
 	bool areAllElementsConstant() const;
 	std::vector<ASTNodeRef> elements;

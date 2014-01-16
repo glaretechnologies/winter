@@ -677,6 +677,35 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 #endif
 			}
 		}
+		// else if gather form of elem:  elem(array<T, n>, vector<int, m>) -> vector<T, m>
+		else if(this->argument_expressions[0]->type()->getType() == Type::ArrayTypeType &&
+			this->argument_expressions[1]->type()->getType() == Type::VectorTypeType) 
+		{
+			const Reference<ArrayType> array_type = this->argument_expressions[0]->type().downcast<ArrayType>();
+
+			// If index vector is a constant vector literal
+			if(this->argument_expressions[1]->isConstant() && this->argument_expressions[1]->nodeType() == ASTNode::VectorLiteralType)
+			{
+				const Reference<VectorLiteral> vec_literal = this->argument_expressions[1].downcast<VectorLiteral>();
+
+				bool all_elements_valid = true;
+				for(size_t i=0; i<vec_literal->getElements().size(); ++i)
+				{
+					bool elem_valid = false;
+					if(vec_literal->getElements()[i]->nodeType() == ASTNode::IntLiteralType)
+					{
+						const Reference<IntLiteral> int_lit = vec_literal->getElements()[i].downcast<IntLiteral>();
+						if(int_lit->value >= 0 && int_lit->value < array_type->num_elems) // if in-bounds
+							elem_valid = true;
+					}
+
+					all_elements_valid = all_elements_valid && elem_valid;
+				}
+
+				if(all_elements_valid)
+					return;
+			}
+		}
 		else if(this->argument_expressions[0]->type()->getType() == Type::VectorTypeType &&
 			this->argument_expressions[1]->type()->getType() == Type::IntType)
 		{
@@ -1327,7 +1356,7 @@ bool FunctionExpression::isConstant() const
 	if(this->target_function->isExternalFunction())
 		return false;
 
-	return true;
+	return this->target_function->isConstant();
 }
 
 
