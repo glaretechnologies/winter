@@ -45,7 +45,7 @@ VirtualMachine
 class VMConstructionArgs
 {
 public:
-	VMConstructionArgs() : env(NULL), allow_unsafe_operations(false) {}
+	VMConstructionArgs() : env(NULL), allow_unsafe_operations(false), add_opaque_env_arg(false) {}
 	std::vector<ExternalFunctionRef> external_functions;
 	std::vector<SourceBufferRef> source_buffers;
 	std::vector<FunctionSignature> entry_point_sigs;
@@ -53,6 +53,8 @@ public:
 	std::vector<FunctionDefinitionRef> preconstructed_func_defs;//TEMP
 	void* env;
 	bool allow_unsafe_operations; // If this is true, in-bounds proof requirements of elem() etc.. are disabled.
+
+	bool add_opaque_env_arg; // This is a backwards-compatibility hack for old Indigo shaders that don't have an explicit 'opaque env' arg.
 };
 
 

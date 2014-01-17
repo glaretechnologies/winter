@@ -62,7 +62,7 @@ void emitRefCountingFunctions(llvm::Module* module, const llvm::DataLayout* targ
 
 		TypeRef string_type = new String();
 		std::vector<llvm::Type*> arg_types(1, string_type->LLVMType(module->getContext()));
-		arg_types.push_back(LLVMTypeUtils::voidPtrType(module->getContext())); // hidden_voidptr_arg
+		//arg_types.push_back(LLVMTypeUtils::voidPtrType(module->getContext())); // hidden_voidptr_arg
 
 		llvm::FunctionType* functype = llvm::FunctionType::get(
 			llvm::Type::getVoidTy(module->getContext()), // return type
@@ -121,15 +121,15 @@ void emitRefCountingFunctions(llvm::Module* module, const llvm::DataLayout* targ
 		// Create call to freeString()
 		llvm::Function* freeStringLLVMFunc = common_functions.freeStringFunc->getOrInsertFunction(
 			module,
-			false, // use_cap_var_struct_ptr: False as global functions don't have captured vars. ?!?!?
-			true // target_takes_voidptr_arg // params.hidden_voidptr_arg
+			false // use_cap_var_struct_ptr: False as global functions don't have captured vars. ?!?!?
+			//true // target_takes_voidptr_arg // params.hidden_voidptr_arg
 		);
 
 		// Set hidden voidptr argument
 		vector<llvm::Value*> args(1, string_val);
-		const bool target_takes_voidptr_arg = true;
-		if(target_takes_voidptr_arg)
-			args.push_back(LLVMTypeUtils::getLastArg(llvm_func));
+		//const bool target_takes_voidptr_arg = true;
+		//if(target_takes_voidptr_arg)
+		//	args.push_back(LLVMTypeUtils::getLastArg(llvm_func));
 
 		//string_val->dump();
 		//freeStringLLVMFunc->dump();
@@ -175,7 +175,7 @@ void emitRefCountingFunctions(llvm::Module* module, const llvm::DataLayout* targ
 	{
 		TypeRef string_type = new String();
 		std::vector<llvm::Type*> arg_types(1, string_type->LLVMType(module->getContext()));
-		arg_types.push_back(LLVMTypeUtils::voidPtrType(module->getContext())); // hidden_voidptr_arg
+		//arg_types.push_back(LLVMTypeUtils::voidPtrType(module->getContext())); // hidden_voidptr_arg
 
 		llvm::FunctionType* functype = llvm::FunctionType::get(
 			llvm::Type::getVoidTy(module->getContext()), // return type
@@ -236,9 +236,9 @@ void emitIncrementStringRefCount(EmitLLVMCodeParams& params, llvm::Value* string
 	vector<llvm::Value*> args(1, string_val);
 
 	// Set hidden voidptr argument
-	const bool target_takes_voidptr_arg = true;
-	if(target_takes_voidptr_arg)
-		args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));
+	//const bool target_takes_voidptr_arg = true;
+	//if(target_takes_voidptr_arg)
+	//	args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));
 
 
 	params.builder->CreateCall(params.common_functions.incrStringRefCountLLVMFunc, args);
@@ -250,9 +250,9 @@ void emitStringCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* string_v
 	vector<llvm::Value*> args(1, string_val);
 
 	// Set hidden voidptr argument
-	const bool target_takes_voidptr_arg = true;
-	if(target_takes_voidptr_arg)
-		args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));
+	//const bool target_takes_voidptr_arg = true;
+	//if(target_takes_voidptr_arg)
+	//	args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));
 
 
 	params.builder->CreateCall(params.common_functions.decrStringRefCountLLVMFunc, args);

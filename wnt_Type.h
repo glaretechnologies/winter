@@ -36,7 +36,7 @@ public:
 		FunctionType,
 		StructureTypeType,
 		VectorTypeType,
-		VoidPtrTypeType,
+		OpaqueTypeType,
 		SumTypeType,
 		ErrorTypeType
 	};
@@ -355,10 +355,10 @@ public:
 
 
 // Something like void*
-class VoidPtrType : public Type
+class OpaqueType : public Type
 {
 public:
-	VoidPtrType() : Type(VoidPtrTypeType) {}
+	OpaqueType() : Type(OpaqueTypeType) {}
 
 	virtual const std::string toString() const;
 	virtual bool lessThan(const Type& b) const

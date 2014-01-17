@@ -8,6 +8,7 @@ Generated at 2011-04-25 19:15:40 +0100
 
 
 #include "wnt_ASTNode.h"
+#include "wnt_SourceBuffer.h"
 #include "VMState.h"
 #include "Value.h"
 #include "Linker.h"
@@ -45,7 +46,7 @@ static const bool VERBOSE_EXEC = false;
 FunctionDefinition::FunctionDefinition(const SrcLocation& src_loc, const std::string& name, const std::vector<FunctionArg>& args_, 
 									   //const vector<Reference<LetASTNode> >& lets_,
 									   const ASTNodeRef& body_, const TypeRef& declared_rettype, 
-									   BuiltInFunctionImpl* impl)
+									   const BuiltInFunctionImplRef& impl)
 :	ASTNode(FunctionDefinitionType, src_loc),
 	args(args_),
 	//lets(lets_),
@@ -72,7 +73,6 @@ FunctionDefinition::FunctionDefinition(const SrcLocation& src_loc, const std::st
 
 FunctionDefinition::~FunctionDefinition()
 {
-	delete built_in_func_impl;
 }
 
 
@@ -178,7 +178,7 @@ ValueRef FunctionDefinition::invoke(VMState& vmstate)
 	}
 
 
-	if(this->built_in_func_impl)
+	if(this->built_in_func_impl.nonNull())
 		return this->built_in_func_impl->invoke(vmstate);
 
 	
@@ -260,6 +260,41 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 			{
 				// Else return type is NULL, so infer it
 				//this->return_type = this->body->type();
+			}
+		}
+	}
+	else if(payload.operation == TraversalPayload::AddOpaqueEnvArg)
+	{
+		// std::cout << "AddOpaqueEnvArg for func def " + sig.toString();
+
+		// If this function is defined in ISL_stdlib.txt is should be fine already.
+		if(this->srcLocation().isValid() && ::hasSuffix(this->srcLocation().source_buffer->name, "ISL_stdlib.txt"))
+		{
+			//std::cout << " Skipped." << std::endl;
+		}
+		else
+		{
+			// Built-in functions should be correct already. 
+			// Also external functions should be correct already.
+			if(this->built_in_func_impl.nonNull() || this->external_function.nonNull())
+			{
+				//std::cout << " Skipped." << std::endl;
+			}
+			else
+			{
+				// Add an opaque env arg if it isn't there already
+				if(this->args.empty() || this->args.back().type->getType() != Type::OpaqueTypeType)
+				{
+					this->args.push_back(FunctionArg(new OpaqueType(), "env"));
+
+					this->sig.param_types.push_back(new OpaqueType());
+
+					//std::cout << " Added!!!!" << std::endl;
+				}
+				else
+				{
+					//std::cout << " Already there." << std::endl;
+				}
 			}
 		}
 	}
@@ -369,7 +404,7 @@ void FunctionDefinition::print(int depth, std::ostream& s) const
 	//for(unsigned int i=0; i<this->lets.size(); ++i)
 	//	lets[i]->print(depth + 1, s);
 
-	if(this->built_in_func_impl)
+	if(this->built_in_func_impl.nonNull())
 	{
 		printMargin(depth+1, s);
 		s << "Built in Implementation.\n";
@@ -428,8 +463,8 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 	{
 		llvm::Function* func = this->getOrInsertFunction(
 			params.module,
-			false, // use_cap_var_struct_ptr: Since we're storing a func ptr, it will be passed the captured var struct on usage.
-			params.hidden_voidptr_arg
+			false // use_cap_var_struct_ptr: Since we're storing a func ptr, it will be passed the captured var struct on usage.
+			//params.hidden_voidptr_arg
 		);
 
 		return func;
@@ -441,8 +476,8 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 	// Get pointer to allocateRefCountedStructure() function.
 	llvm::Function* alloc_llvm_func = this->alloc_func->getOrInsertFunction(
 		params.module,
-		false, // use_cap_var_struct_ptr: false as allocateRefCountedStructure() doesn't take it.
-		params.hidden_voidptr_arg
+		false // use_cap_var_struct_ptr: false as allocateRefCountedStructure() doesn't take it.
+		//params.hidden_voidptr_arg
 	);
 
 	/////////////////// Create function pointer type /////////////////////
@@ -493,8 +528,8 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 	args.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, struct_size, true)));
 	
 	// Set hidden voidptr argument
-	if(params.hidden_voidptr_arg)
-		args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));
+	//if(params.hidden_voidptr_arg)
+	//	args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));
 
 	//target_llvm_func->dump();
 
@@ -513,8 +548,8 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 	{
 		llvm::Function* func = this->getOrInsertFunction(
 			params.module,
-			true, // use_cap_var_struct_ptr: Since we're storing a func ptr, it will be passed the captured var struct on usage.
-			params.hidden_voidptr_arg
+			true // use_cap_var_struct_ptr: Since we're storing a func ptr, it will be passed the captured var struct on usage.
+			//params.hidden_voidptr_arg
 		);
 
 		//std::cout << "closure_pointer: " << std::endl;
@@ -643,8 +678,8 @@ const std::string makeSafeStringForFunctionName(const std::string& s)
 
 llvm::Function* FunctionDefinition::getOrInsertFunction(
 		llvm::Module* module,
-		bool use_cap_var_struct_ptr,
-		bool hidden_voidptr_arg
+		bool use_cap_var_struct_ptr
+		//bool hidden_voidptr_arg
 	) const
 {
 	vector<TypeRef> arg_types = this->sig.param_types;
@@ -663,8 +698,7 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 		arg_types, 
 		use_cap_var_struct_ptr, // this->use_captured_vars, // use captured var struct ptr arg
 		returnType(), 
-		module->getContext(),
-		hidden_voidptr_arg
+		module->getContext()
 	);
 
 	//TEMP:
@@ -815,8 +849,8 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 
 	llvm::Function* llvm_func = this->getOrInsertFunction(
 		module,
-		this->use_captured_vars, // use_cap_var_struct_ptr
-		hidden_voidptr_arg
+		this->use_captured_vars // use_cap_var_struct_ptr
+		//hidden_voidptr_arg
 	);
 
 	llvm::BasicBlock* block = llvm::BasicBlock::Create(
@@ -840,7 +874,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	EmitLLVMCodeParams params;
 	params.currently_building_func_def = this;
 	params.cpu_info = &cpu_info;
-	params.hidden_voidptr_arg = hidden_voidptr_arg;
+	//params.hidden_voidptr_arg = hidden_voidptr_arg;
 	params.builder = &builder;
 	params.module = module;
 	params.currently_building_func = llvm_func;
@@ -849,7 +883,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	params.common_functions = common_functions;
 
 	//llvm::Value* body_code = NULL;
-	if(this->built_in_func_impl)
+	if(this->built_in_func_impl.nonNull())
 	{
 		llvm::Value* body_code = this->built_in_func_impl->emitLLVMCode(params);
 		if(this->returnType()->passByValue())
@@ -1028,8 +1062,16 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 
 Reference<ASTNode> FunctionDefinition::clone()
 {
-	assert(0);
-	throw BaseException("FunctionDefinition::clone()");
+	FunctionDefinitionRef f = new FunctionDefinition(
+		this->srcLocation(),
+		this->sig.name,
+		this->args,
+		this->body.nonNull() ? this->body->clone() : NULL,
+		this->declared_return_type,
+		this->built_in_func_impl
+	);
+
+	return f;
 }
 
 

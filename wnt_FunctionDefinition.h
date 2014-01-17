@@ -8,6 +8,7 @@ Generated at 2011-04-25 19:15:39 +0100
 
 
 #include "wnt_ASTNode.h"
+#include "BuiltInFunctionImpl.h"
 
 
 namespace Winter
@@ -47,7 +48,7 @@ public:
 		//const vector<Reference<LetASTNode> >& lets,
 		const ASTNodeRef& body, 
 		const TypeRef& declared_rettype, // May be null, if return type is to be inferred.
-		BuiltInFunctionImpl* impl);
+		const BuiltInFunctionImplRef& impl);
 	
 	~FunctionDefinition();
 
@@ -60,7 +61,7 @@ public:
 	//vector<Reference<LetASTNode> > lets;
 
 	FunctionSignature sig;
-	BuiltInFunctionImpl* built_in_func_impl;
+	BuiltInFunctionImplRef built_in_func_impl;
 	ExternalFunctionRef external_function;
 
 	bool use_captured_vars; // Set to true if this is an anonymous function, in which case we will always pass it in a closure.
@@ -95,8 +96,8 @@ public:
 
 	llvm::Function* getOrInsertFunction(
 		llvm::Module* module,
-		bool use_cap_var_struct_ptr,
-		bool hidden_voidptr_arg
+		bool use_cap_var_struct_ptr
+		//bool hidden_voidptr_arg
 	) const;
 
 

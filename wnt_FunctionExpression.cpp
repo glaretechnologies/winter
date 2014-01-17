@@ -8,6 +8,7 @@ Generated at 2011-04-30 18:53:38 +0100
 
 
 #include "wnt_ASTNode.h"
+#include "wnt_SourceBuffer.h"
 #include "wnt_RefCounting.h"
 #include "VMState.h"
 #include "Value.h"
@@ -134,9 +135,6 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 		for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
 			args.push_back(this->argument_expressions[i]->exec(vmstate));
 
-		if(this->target_function->external_function->takes_hidden_voidptr_arg) //vmstate.hidden_voidptr_arg)
-			args.push_back(vmstate.argument_stack.back());
-
 		ValueRef result = this->target_function->external_function->interpreted_func(args);
 
 		return result;
@@ -178,9 +176,6 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 			//printStack(vmstate);
 		}
 	}
-
-	if(vmstate.hidden_voidptr_arg)
-		vmstate.argument_stack.push_back(vmstate.argument_stack[initial_arg_stack_size - 1]);
 
 	// If the target function is an anon function and has captured values, push that onto the stack
 	if(use_target_func->use_captured_vars)
@@ -374,7 +369,7 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 			argtypes.push_back(this->argument_expressions[i]->type());
 
 
-		FunctionSignature sig(this->function_name, argtypes);
+		const FunctionSignature sig(this->function_name, argtypes);
 
 		// Try and resolve to internal function.
 		this->target_function = linker.findMatchingFunction(sig).getPointer();
@@ -439,6 +434,45 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 }*/
 
 
+// Return true iff the function requires an opaque env arg.  This will be the case for all functions, *unless* they are calling 'special' functions from Linker.
+
+static const char* plain_func_names[] = { "floor", "ceil", "sqrt", "sin", "cos", "exp", "log", "abs", "truncateToInt", "toFloat", "map", "elem", "inBounds", "shuffle", "min", "max", "pow", "dot", "if", 
+	"vec2", "op_add", "op_sub", "op_mul", "op_eq", "vec3", "vec4", "x", "y", "z", "w", "mat2x2", "mul", "mat3x3", "mat4x4", "col0", "col1", "col2", "col3", "or", "and", "not", "xor", "add", "sub", "div",
+	"lt", "lte", "gt", "gte", "eq", "neq", "doti", "dotj", "dotk", "fract", "floorToInt", "ceilToInt", "lerp", "step", "get_t", "smoothstep", "smootherstep", "pulse", "smoothPulse", "clamp", "cross",
+	"length", "dist", "neg", "recip", "normalise", "real", "pi", "noise", "noise3Valued", "fbm", "fbm3Valued", "noise01", "fbm01", "gridNoise", "voronoiDist", "randomCellShade",
+
+	// From WinterExternalFuncs.cpp:
+	"print", "rotationMatrix", "fbm", "fbm4Valued", "multifractal", "noise", "noise4Valued", "voronoi", "voronoi3d", "gridNoise", "tan", "asin", "acos", "atan", "atan2", "fastPow", "mod",
+	NULL};
+
+
+static bool doesFunctionRequireOpaqueEnvArg(const FunctionExpression& f)
+{
+	if(f.function_name.empty())
+		return false;
+
+	// Check for eN functions
+	if(f.function_name[0] == 'e' && f.function_name.size() >= 2 && isNumeric(f.function_name[1]))
+		return false;
+
+	for(size_t i=0; plain_func_names[i] != NULL; ++i)
+	{
+		if(f.function_name == plain_func_names[i])
+			return false;
+	}
+
+	return true;
+}
+
+
+// Some functions from e.g. ISL_stdlib may be correct already
+static bool isFunctionAlreadyCorrect(const FunctionDefinition& f)
+{
+	// If this function def is from ISL_stdlib.txt, then it should be fine.
+	return f.srcLocation().isValid() && ::hasSuffix(f.srcLocation().source_buffer->name, "ISL_stdlib.txt");
+}
+
+
 void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
 	if(payload.operation == TraversalPayload::ConstantFolding)
@@ -449,6 +483,30 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 				argument_expressions[i] = foldExpression(argument_expressions[i], payload);
 				payload.tree_changed = true;
 			}
+	}
+	else if(payload.operation == TraversalPayload::AddOpaqueEnvArg)
+	{
+		const bool target_requires_opaque_arg = doesFunctionRequireOpaqueEnvArg(*this);
+
+		if(target_requires_opaque_arg)
+		{
+			FunctionDefinition* current_func = payload.func_def_stack.back();
+
+			if(!isFunctionAlreadyCorrect(*current_func))
+			{
+				assert(!current_func->args.empty() && current_func->args.back().type->getType() == Type::OpaqueTypeType);
+
+				bool last_arg_is_opaque_arg = false;
+				if(!argument_expressions.empty() && argument_expressions.back()->nodeType() == ASTNode::VariableASTNodeType)
+				{
+					if(argument_expressions.back().downcast<Variable>()->name == "env")
+						last_arg_is_opaque_arg = true;
+				}
+					
+				if(!last_arg_is_opaque_arg)
+					argument_expressions.push_back(new Variable(current_func->args.back().name, SrcLocation::invalidLocation()));
+			}
+		}
 	}
 	/*else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
@@ -491,10 +549,8 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 
 			try
 			{
-				VMState vmstate(payload.hidden_voidptr_arg);
+				VMState vmstate;
 				vmstate.func_args_start.push_back(0);
-				if(payload.hidden_voidptr_arg)
-					vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(payload.env)));
 
 				ValueRef res = this->argument_expressions[1]->exec(vmstate);
 
@@ -511,9 +567,9 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 					mask[i] = static_cast<IntValue*>(res_v->e[i].getPointer())->value;
 				}
 
-				assert(this->target_function->built_in_func_impl);
-				assert(dynamic_cast<ShuffleBuiltInFunc*>(this->target_function->built_in_func_impl));
-				static_cast<ShuffleBuiltInFunc*>(this->target_function->built_in_func_impl)->setShuffleMask(mask);
+				assert(this->target_function->built_in_func_impl.nonNull());
+				assert(dynamic_cast<ShuffleBuiltInFunc*>(this->target_function->built_in_func_impl.getPointer()));
+				static_cast<ShuffleBuiltInFunc*>(this->target_function->built_in_func_impl.getPointer())->setShuffleMask(mask);
 			}
 			catch(BaseException& e)
 			{
@@ -563,10 +619,8 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 			if(this->argument_expressions[1]->isConstant())
 			{
 				// Evaluate the index expression
-				VMState vmstate(payload.hidden_voidptr_arg);
+				VMState vmstate;
 				vmstate.func_args_start.push_back(0);
-				if(payload.hidden_voidptr_arg)
-					vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(payload.env)));
 
 				ValueRef retval = this->argument_expressions[1]->exec(vmstate);
 
@@ -716,10 +770,8 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 			if(this->argument_expressions[1]->isConstant())
 			{
 				// Evaluate the index expression
-				VMState vmstate(payload.hidden_voidptr_arg);
+				VMState vmstate;
 				vmstate.func_args_start.push_back(0);
-				if(payload.hidden_voidptr_arg)
-					vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(payload.env)));
 
 				ValueRef retval = this->argument_expressions[1]->exec(vmstate);
 
@@ -927,8 +979,6 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 	llvm::Value* captured_var_struct_ptr = NULL;
 
-	bool target_takes_voidptr_arg = params.hidden_voidptr_arg;
-
 	if(binding_type == Let)
 	{
 		//target_llvm_func = this->bound_let_block->getLetExpressionLLVMValue(params, bound_index);
@@ -1056,13 +1106,9 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			target_func_type // Type
 		);*/
 
-		if(this->target_function->external_function.nonNull())
-			target_takes_voidptr_arg = this->target_function->external_function->takes_hidden_voidptr_arg;
-
 		target_llvm_func = this->target_function->getOrInsertFunction(
 			params.module,
-			false, // use_cap_var_struct_ptr: False as global functions don't have captured vars. ?!?!?
-			target_takes_voidptr_arg // params.hidden_voidptr_arg
+			false // use_cap_var_struct_ptr: False as global functions don't have captured vars. ?!?!?
 		);
 
 		//closure_pointer = this->target_function->emitLLVMCode(params);
@@ -1224,8 +1270,8 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		//captured_var_struct_ptr->dump();
 
 		// Set hidden voidptr argument
-		if(target_takes_voidptr_arg) // params.hidden_voidptr_arg)
-			args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));
+		//if(target_takes_voidptr_arg) // params.hidden_voidptr_arg)
+		//	args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));
 
 		llvm::CallInst* call_inst = params.builder->CreateCall(target_llvm_func, args);
 
@@ -1271,8 +1317,8 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			args.push_back(captured_var_struct_ptr);
 
 		// Set hidden voidptr argument
-		if(target_takes_voidptr_arg) // params.hidden_voidptr_arg)
-			args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));
+		//if(target_takes_voidptr_arg) // params.hidden_voidptr_arg)
+		//	args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));
 
 		//TEMP:
 		/*std::cout << "Args to CreateCall() for " << this->target_function->sig.toString() << ":" << std::endl;
@@ -1353,10 +1399,11 @@ bool FunctionExpression::isConstant() const
 			return false;
 
 	//TEMP:
-	if(this->target_function->isExternalFunction())
-		return false;
+	//if(this->target_function->isExternalFunction())
+	//	return false;
 
-	return this->target_function->isConstant();
+	// return this->target_function->isConstant();
+	return true;
 }
 
 

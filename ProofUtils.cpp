@@ -20,10 +20,8 @@ static const IntervalSetInt updateIndexBounds(TraversalPayload& payload, const C
 		if(comp_expr.b->isConstant() && comp_expr.b->type()->getType() == Type::IntType) // if the x value is constant
 		{
 			// Evaluate the index expression
-			VMState vmstate(payload.hidden_voidptr_arg);
+			VMState vmstate;
 			vmstate.func_args_start.push_back(0);
-			if(payload.hidden_voidptr_arg)
-				vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(payload.env)));
 
 			ValueRef retval = comp_expr.b->exec(vmstate);
 
@@ -117,10 +115,8 @@ static const IntervalSetFloat updateBounds(TraversalPayload& payload, const Comp
 		if(comp_expr.b->isConstant() && comp_expr.b->type()->getType() == Type::FloatType) // if the x value is constant
 		{
 			// Evaluate the index expression
-			VMState vmstate(payload.hidden_voidptr_arg);
+			VMState vmstate;
 			vmstate.func_args_start.push_back(0);
-			if(payload.hidden_voidptr_arg)
-				vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(payload.env)));
 
 			ValueRef retval = comp_expr.b->exec(vmstate);
 

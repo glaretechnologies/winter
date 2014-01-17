@@ -85,8 +85,7 @@ llvm::Type* getPtrToBaseCapturedVarStructType(llvm::LLVMContext& context)
 llvm::FunctionType* llvmFunctionType(const vector<TypeRef>& arg_types, 
 									 bool captured_var_struct_ptr_arg,
 									 TypeRef return_type, 
-									 llvm::LLVMContext& context,
-									 bool hidden_voidptr_arg)
+									 llvm::LLVMContext& context)
 {
 	if(return_type->passByValue())
 	{
@@ -98,8 +97,8 @@ llvm::FunctionType* llvmFunctionType(const vector<TypeRef>& arg_types,
 		if(captured_var_struct_ptr_arg)
 			llvm_arg_types.push_back(getPtrToBaseCapturedVarStructType(context));
 
-		if(hidden_voidptr_arg)
-			llvm_arg_types.push_back(voidPtrType(context));
+		//if(hidden_voidptr_arg)
+		//	llvm_arg_types.push_back(voidPtrType(context));
 
 		return llvm::FunctionType::get(
 			return_type->LLVMType(context), // return type
@@ -121,8 +120,8 @@ llvm::FunctionType* llvmFunctionType(const vector<TypeRef>& arg_types,
 		if(captured_var_struct_ptr_arg)
 			llvm_arg_types.push_back(getPtrToBaseCapturedVarStructType(context));
 
-		if(hidden_voidptr_arg)
-			llvm_arg_types.push_back(voidPtrType(context));
+		//if(hidden_voidptr_arg)
+		//	llvm_arg_types.push_back(voidPtrType(context));
 
 		return llvm::FunctionType::get(
 			//LLVMTypeUtils::pointerType(*return_type->LLVMType(context)), 

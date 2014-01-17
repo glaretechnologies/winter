@@ -3,6 +3,8 @@
 
 #include "wnt_Type.h"
 #include "Value.h"
+#include <utils/Reference.h>
+#include <utils/RefCounted.h>
 namespace llvm { class Value; }
 
 
@@ -15,7 +17,7 @@ class VMState;
 class EmitLLVMCodeParams;
 
 
-class BuiltInFunctionImpl
+class BuiltInFunctionImpl : public RefCounted
 {
 public:
 	virtual ~BuiltInFunctionImpl(){}
@@ -24,6 +26,9 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const = 0;
 	//virtual llvm::Value* getConstantLLVMValue(EmitLLVMCodeParams& params) const;
 };
+
+
+typedef Reference<BuiltInFunctionImpl> BuiltInFunctionImplRef;
 
 
 class Constructor : public BuiltInFunctionImpl

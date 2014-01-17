@@ -12,8 +12,7 @@ namespace Winter
 
 	
 ExternalFunction::ExternalFunction()
-:	takes_hidden_voidptr_arg(true),
-	has_side_effects(false)
+:	has_side_effects(false)
 {
 
 }

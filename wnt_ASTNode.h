@@ -86,11 +86,12 @@ public:
 		SubstituteType, // for making concrete types out of generic types.
 		OperatorOverloadConversion, // Converting '+' to op_add
 		GetCleanupNodes,
-		CheckInDomain // Check that calls to elem() etc.. are in bounds.
+		CheckInDomain, // Check that calls to elem() etc.. are in bounds.
+		AddOpaqueEnvArg
 	};
 
-	TraversalPayload(Operation e, bool hidden_voidptr_arg_, void* env_) : 
-		operation(e), tree_changed(false), hidden_voidptr_arg(hidden_voidptr_arg_), env(env_) {}
+	TraversalPayload(Operation e) : 
+		operation(e), tree_changed(false) {}
 
 	Linker* linker;
 
@@ -99,9 +100,6 @@ public:
 	std::vector<TypeRef> type_mappings; // for substitute type operation.
 
 	bool tree_changed;
-
-	bool hidden_voidptr_arg;
-	void* env;
 
 	FrameRef top_lvl_frame;
 
@@ -148,7 +146,7 @@ class EmitLLVMCodeParams
 public:
 	FunctionDefinition* currently_building_func_def;
 	const PlatformUtils::CPUInfo* cpu_info;
-	bool hidden_voidptr_arg;
+	//bool hidden_voidptr_arg;
 #if USE_LLVM
 	llvm::IRBuilder<>* builder;
 	llvm::Module* module;
@@ -176,6 +174,8 @@ public:
 	//uint32 column;
 
 	static const SrcLocation invalidLocation() { return SrcLocation(4000000000u, NULL); }
+
+	bool isValid() const { return char_index != 4000000000u; }
 
 	uint32 char_index;
 	//const std::string* text_buffer;

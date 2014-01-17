@@ -42,35 +42,16 @@ struct TestEnv
 };
 
 
-static float testFunc(float x, TestEnv* env)
+static float testExternalFunc(float x/*, TestEnv* env*/)
 {
-	std::cout << "In test func!, " << x << std::endl;
-	std::cout << "In test func!, env->val: " << env->val << std::endl;
-	return env->val;
+	//std::cout << "In test func!, " << x << std::endl;
+	//std::cout << "In test func!, env->val: " << env->val << std::endl;
+	//return env->val;
+	return x * x;
 }
 
 
-static ValueRef testFuncInterpreted(const vector<ValueRef>& arg_values)
-{
-	assert(arg_values.size() == 2);
-	assert(dynamic_cast<const FloatValue*>(arg_values[0].getPointer()));
-	assert(dynamic_cast<const VoidPtrValue*>(arg_values[1].getPointer()));
-
-	// Cast argument 0 to type FloatValue
-	const FloatValue* float_val = static_cast<const FloatValue*>(arg_values[0].getPointer());
-	const VoidPtrValue* voidptr_val = static_cast<const VoidPtrValue*>(arg_values[1].getPointer());
-
-	return ValueRef(new FloatValue(testFunc(float_val->value, (TestEnv*)voidptr_val->value)));
-}
-
-
-/*static float externalSin(float x, TestEnv* env)
-{
-	return std::sin(x);
-}*/
-
-
-static ValueRef externalSinInterpreted(const vector<ValueRef>& arg_values)
+static ValueRef testExternalFuncInterpreted(const vector<ValueRef>& arg_values)
 {
 	assert(arg_values.size() == 1);
 	assert(dynamic_cast<const FloatValue*>(arg_values[0].getPointer()));
@@ -80,8 +61,28 @@ static ValueRef externalSinInterpreted(const vector<ValueRef>& arg_values)
 	const FloatValue* float_val = static_cast<const FloatValue*>(arg_values[0].getPointer());
 	//const VoidPtrValue* voidptr_val = static_cast<const VoidPtrValue*>(arg_values[1].getPointer());
 
-	return ValueRef(new FloatValue(std::sin(float_val->value/*, (TestEnv*)voidptr_val->value*/)));
+	return ValueRef(new FloatValue(testExternalFunc(float_val->value/*, (TestEnv*)voidptr_val->value*/)));
 }
+
+
+/*static float externalSin(float x, TestEnv* env)
+{
+	return std::sin(x);
+}*/
+
+
+//static ValueRef externalSinInterpreted(const vector<ValueRef>& arg_values)
+//{
+//	assert(arg_values.size() == 1);
+//	assert(dynamic_cast<const FloatValue*>(arg_values[0].getPointer()));
+//	//assert(dynamic_cast<const VoidPtrValue*>(arg_values[1].getPointer()));
+//
+//	// Cast argument 0 to type FloatValue
+//	const FloatValue* float_val = static_cast<const FloatValue*>(arg_values[0].getPointer());
+//	//const VoidPtrValue* voidptr_val = static_cast<const VoidPtrValue*>(arg_values[1].getPointer());
+//
+//	return ValueRef(new FloatValue(std::sin(float_val->value/*, (TestEnv*)voidptr_val->value*/)));
+//}
 
 
 typedef float(WINTER_JIT_CALLING_CONV * float_void_func)(void* env);
@@ -101,21 +102,20 @@ static void testMainFloat(const std::string& src, float target_return_val)
 
 		{
 			ExternalFunctionRef f(new ExternalFunction());
-			f->func = (void*)testFunc;
-			f->interpreted_func = testFuncInterpreted;
+			f->func = (void*)testExternalFunc;
+			f->interpreted_func = testExternalFuncInterpreted;
 			f->return_type = TypeRef(new Float());
-			f->sig = FunctionSignature("testFunc", vector<TypeRef>(1, TypeRef(new Float())));
+			f->sig = FunctionSignature("testExternalFunc", vector<TypeRef>(1, TypeRef(new Float())));
 			vm_args.external_functions.push_back(f);
 		}
-		{
-			ExternalFunctionRef f(new ExternalFunction());
-			f->func = (void*)(float(*)(float))std::sin; //externalSin;
-			f->interpreted_func = externalSinInterpreted;
-			f->return_type = TypeRef(new Float());
-			f->sig = FunctionSignature("sin", vector<TypeRef>(1, TypeRef(new Float())));
-			f->takes_hidden_voidptr_arg = false;
-			vm_args.external_functions.push_back(f);
-		}
+		//{
+		//	ExternalFunctionRef f(new ExternalFunction());
+		//	f->func = (void*)(float(*)(float))std::sin; //externalSin;
+		//	f->interpreted_func = externalSinInterpreted;
+		//	f->return_type = TypeRef(new Float());
+		//	f->sig = FunctionSignature("sin", vector<TypeRef>(1, TypeRef(new Float())));
+		//	vm_args.external_functions.push_back(f);
+		//}
 
 		const FunctionSignature mainsig("main", std::vector<TypeRef>());
 
@@ -145,13 +145,13 @@ static void testMainFloat(const std::string& src, float target_return_val)
 			exit(1);
 		}
 
-		VMState vmstate(true);
+		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
-		vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(&test_env)));
+		//vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(&test_env)));
 
 		ValueRef retval = maindef->invoke(vmstate);
 
-		assert(vmstate.argument_stack.size() == 1);
+//		assert(vmstate.argument_stack.size() == 1);
 		//delete vmstate.argument_stack[0];
 		vmstate.func_args_start.pop_back();
 		FloatValue* val = dynamic_cast<FloatValue*>(retval.getPointer());
@@ -229,10 +229,10 @@ static void testMainFloatArg(const std::string& src, float argument, float targe
 
 		{
 			ExternalFunctionRef f(new ExternalFunction());
-			f->func = (void*)testFunc;
-			f->interpreted_func = testFuncInterpreted;
+			f->func = (void*)testExternalFunc;
+			f->interpreted_func = testExternalFuncInterpreted;
 			f->return_type = TypeRef(new Float());
-			f->sig = FunctionSignature("testFunc", vector<TypeRef>(1, TypeRef(new Float())));
+			f->sig = FunctionSignature("testExternalFunc", vector<TypeRef>(1, TypeRef(new Float())));
 			vm_args.external_functions.push_back(f);
 		}
 		const FunctionSignature mainsig("main", std::vector<TypeRef>(1, TypeRef(new Float())));
@@ -259,10 +259,10 @@ static void testMainFloatArg(const std::string& src, float argument, float targe
 			exit(1);
 		}
 
-		VMState vmstate(true);
+		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
 		vmstate.argument_stack.push_back(ValueRef(new FloatValue(argument)));
-		vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(&test_env)));
+		//vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(&test_env)));
 
 		ValueRef retval = maindef->invoke(vmstate);
 
@@ -326,9 +326,9 @@ static void testMainInteger(const std::string& src, int target_return_val)
 			exit(1);
 		}
 
-		VMState vmstate(true);
+		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
-		vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(&test_env)));
+		//vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(&test_env)));
 
 		ValueRef retval = maindef->invoke(vmstate);
 
@@ -391,10 +391,10 @@ static void testMainIntegerArg(const std::string& src, int x, int target_return_
 			exit(1);
 		}
 
-		VMState vmstate(true);
+		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
 		vmstate.argument_stack.push_back(ValueRef(new IntValue(x)));
-		vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(&test_env)));
+		//vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(&test_env)));
 
 		ValueRef retval = maindef->invoke(vmstate);
 

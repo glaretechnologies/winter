@@ -414,8 +414,8 @@ public:
 		// Call function on element
 		vector<llvm::Value*> args;
 		args.push_back(elem);
-		if(true) // target_takes_voidptr_arg) // params.hidden_voidptr_arg)
-			args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));
+		//if(true) // target_takes_voidptr_arg) // params.hidden_voidptr_arg)
+		//	args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));
 
 		llvm::Value* mapped_elem = params.builder->CreateCall(
 			function, // Callee

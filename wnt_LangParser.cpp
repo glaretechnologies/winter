@@ -766,8 +766,8 @@ TypeRef LangParser::parseElementaryType(const ParseInfo& p, const std::vector<st
 		return TypeRef(new String());
 	else if(t == "char")
 		return TypeRef(new CharType());
-	else if(t == "voidptr")
-		return TypeRef(new VoidPtrType());
+	else if(t == "opaque" || t == "voidptr")
+		return TypeRef(new OpaqueType());
 	else if(t == "bool")
 		return TypeRef(new Bool());
 	else if(t == "error")

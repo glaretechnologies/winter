@@ -240,8 +240,7 @@ llvm::Type* Function::LLVMType(llvm::LLVMContext& context) const
 			arg_types,
 			false, // use captured var struct ptr arg
 			return_type,
-			context,
-			true // hidden voidptr arg TEMP HACK
+			context
 		));
 
 		//std::cout << "Function::LLVMType: " << std::endl;
@@ -287,8 +286,7 @@ llvm::Type* Function::LLVMType(llvm::LLVMContext& context) const
 		arg_types,
 		true, // use captured var struct ptr arg
 		return_type,
-		context,
-		true // hidden voidptr arg TEMP HACK
+		context
 	));
 
 	//vector<const llvm::Type*> field_types;
@@ -463,20 +461,20 @@ llvm::Type* VectorType::LLVMType(llvm::LLVMContext& context) const
 //===============================================================================
 
 
-const std::string VoidPtrType::toString() const
+const std::string OpaqueType::toString() const
 {
-	return "void_ptr";
+	return "opaque";
 }
 
 
-bool VoidPtrType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
+bool OpaqueType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
 {
 	//NOTE: This right?
 	return this->getType() == b.getType();
 }
 
 
-llvm::Type* VoidPtrType::LLVMType(llvm::LLVMContext& context) const
+llvm::Type* OpaqueType::LLVMType(llvm::LLVMContext& context) const
 {
 	return LLVMTypeUtils::voidPtrType(context);
 }

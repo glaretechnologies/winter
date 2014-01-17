@@ -109,7 +109,7 @@ static const std::string& getStringArg(const vector<ValueRef>& arg_values, int i
 }
 
 
-static StringRep* allocateString(const char* initial_string_val, void* env)
+static StringRep* allocateString(const char* initial_string_val/*, void* env*/)
 {
 	StringRep* r = new StringRep();
 	//r->refcount = 1;
@@ -128,7 +128,7 @@ static ValueRef allocateStringInterpreted(const vector<ValueRef>& args)
 
 
 // NOTE: just return an int here as all external funcs need to return something (non-void).
-static int freeString(StringRep* str, void* env)
+static int freeString(StringRep* str/*, void* env*/)
 {
 	assert(str->refcount == 1);
 	delete str;
@@ -136,7 +136,7 @@ static int freeString(StringRep* str, void* env)
 }
 
 
-static int stringLength(StringRep* str, void* env)
+static int stringLength(StringRep* str)
 {
 	return (int)str->string.size();
 }
@@ -260,7 +260,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 
 		ExternalFunctionRef alloc_ref(new ExternalFunction());
 		alloc_ref->interpreted_func = NULL;
-		alloc_ref->return_type = TypeRef(new VoidPtrType());
+		alloc_ref->return_type = TypeRef(new OpaqueType());
 		alloc_ref->sig = FunctionSignature("allocateRefCountedStructure", std::vector<TypeRef>(1, TypeRef(new Int())));
 		alloc_ref->func = (void*)(allocateRefCountedStructure);
 		this->external_functions.push_back(alloc_ref);
@@ -272,8 +272,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			(void*)(float(*)(float, float))std::pow,
 			powInterpreted,
 			FunctionSignature("pow", vector<TypeRef>(2, new Float())),
-			new Float(),
-			false // takes hidden voidptr arg
+			new Float()
 		)));
 
 
@@ -281,28 +280,29 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
 			(void*)allocateString,
 			allocateStringInterpreted, // interpreted func
-			FunctionSignature("allocateString", vector<TypeRef>(1, new VoidPtrType())),
-			new String(), // return type
-			true // takes hidden voidptr arg
+			FunctionSignature("allocateString", vector<TypeRef>(1, new OpaqueType())),
+			new String() // return type
 		)));
 
 		// Add freeString
-		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
-			(void*)freeString,
-			NULL, // interpreted func TEMP
-			FunctionSignature("freeString", vector<TypeRef>(1, new String())),
-			new Int(), // return type
-			true // takes hidden voidptr arg
-		)));
-		external_functions.back()->has_side_effects = true;
+		{
+			vector<TypeRef> arg_types(1, new String());
+			//arg_types.push_back(new VoidPtrType());
+			external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
+				(void*)freeString,
+				NULL, // interpreted func TEMP
+				FunctionSignature("freeString", arg_types),
+				new Int() // return type
+			)));
+			external_functions.back()->has_side_effects = true;
+		}
 
 		// Add stringLength
 		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
 			(void*)stringLength,
 			stringLengthInterpreted, // interpreted func
 			FunctionSignature("stringLength", vector<TypeRef>(1, new String())),
-			new Int(), // return type
-			true // takes hidden voidptr arg
+			new Int() // return type
 		)));
 
 		// Add concatStrings
@@ -310,8 +310,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			(void*)concatStrings,
 			concatStringsInterpreted, // interpreted func
 			FunctionSignature("concatStrings", vector<TypeRef>(2, new String())),
-			new String(), // return type
-			true // takes hidden voidptr arg
+			new String() // return type
 		)));
 
 		for(unsigned int i=0; i<this->external_functions.size(); ++i)
@@ -358,8 +357,7 @@ void VirtualMachine::addExternalFunction(const ExternalFunctionRef& f, llvm::LLV
 		f->sig.param_types,
 		false, // captured vars struct ptr
 		f->return_type, 
-		context, 
-		f->takes_hidden_voidptr_arg //hidden_voidptr_arg
+		context
 	);
 
 	llvm::Function* llvm_f = static_cast<llvm::Function*>(module.getOrInsertFunction(
@@ -409,6 +407,43 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		vector<FunctionDefinitionRef> buffer_func_defs;
 		parser.parseBuffer(tokens, source_buffers[i], buffer_func_defs, named_types);
 
+		// Do AddOpaqueEnvArg pass.
+		// This is a backwards-compatibility hack for old Indigo shaders that don't have an explicit 'opaque env' arg.
+		if(args.add_opaque_env_arg)
+		{
+			// Look for a method called eval.  If last arg does not have type opaque, then we need to do the add_opaque_env_arg stuff
+			bool need_to_do_add_opaque_env_arg = false;
+			for(size_t z=0; z<buffer_func_defs.size(); ++z)
+			{
+				if(buffer_func_defs[z]->sig.name == "eval")
+				{
+					if(buffer_func_defs[z]->sig.param_types.empty() || buffer_func_defs[z]->sig.param_types.back()->getType() != Type::OpaqueTypeType) // if zero args or last arg is not opaque env:
+						need_to_do_add_opaque_env_arg = true;
+				}
+			}
+
+			// If we are loading from a shader string (and not ISL_stdlib.txt), and there is no function that takes an arg with type opaque, this is probably old code.
+			bool any_func_has_opaque_arg = false;
+			if(!hasSuffix(source_buffers[i]->name, "ISL_stdlib.txt"))
+				for(size_t z=0; z<buffer_func_defs.size(); ++z)
+					for(size_t m=0; m<buffer_func_defs[z]->sig.param_types.size(); ++m)
+						if(buffer_func_defs[z]->sig.param_types[m]->getType() == Type::OpaqueTypeType)
+							any_func_has_opaque_arg = true;
+
+			need_to_do_add_opaque_env_arg = need_to_do_add_opaque_env_arg || !any_func_has_opaque_arg;
+
+
+			if(need_to_do_add_opaque_env_arg)
+			{
+				std::vector<ASTNode*> stack;
+				TraversalPayload payload(TraversalPayload::AddOpaqueEnvArg);
+				for(size_t i=0; i<buffer_func_defs.size(); ++i)
+					if(!buffer_func_defs[i]->is_anon_func)
+						buffer_func_defs[i]->traverse(payload, stack);
+				assert(stack.size() == 0);
+			}
+		}
+
 		func_defs.insert(func_defs.end(), buffer_func_defs.begin(), buffer_func_defs.end());
 	}
 
@@ -447,7 +482,7 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 	// Bind variables
 	{
 		std::vector<ASTNode*> stack;
-		TraversalPayload payload(TraversalPayload::BindVariables, hidden_voidptr_arg, env);
+		TraversalPayload payload(TraversalPayload::BindVariables);
 		payload.top_lvl_frame = top_lvl_frame;
 		payload.linker = &linker;
 		for(size_t i=0; i<func_defs.size(); ++i)
@@ -472,7 +507,7 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 	bool op_overloading_changed_tree = false;
 	{
 		std::vector<ASTNode*> stack;
-		TraversalPayload payload(TraversalPayload::OperatorOverloadConversion, hidden_voidptr_arg, env);
+		TraversalPayload payload(TraversalPayload::OperatorOverloadConversion);
 		
 		// Add linker info, so we can bind new functions such as op_add immediately.
 		payload.top_lvl_frame = top_lvl_frame;
@@ -501,7 +536,7 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 	if(op_overloading_changed_tree)
 	{
 		std::vector<ASTNode*> stack;
-		TraversalPayload payload(TraversalPayload::BindVariables, hidden_voidptr_arg, env);
+		TraversalPayload payload(TraversalPayload::BindVariables);
 		payload.top_lvl_frame = top_lvl_frame;
 		payload.linker = &linker;
 		for(size_t i=0; i<func_defs.size(); ++i)
@@ -523,7 +558,7 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		// Do Constant Folding
 		{
 			std::vector<ASTNode*> stack;
-			TraversalPayload payload(TraversalPayload::ConstantFolding, hidden_voidptr_arg, env);
+			TraversalPayload payload(TraversalPayload::ConstantFolding);
 			for(size_t i=0; i<func_defs.size(); ++i)
 				if(!func_defs[i]->is_anon_func)
 					func_defs[i]->traverse(payload, stack);
@@ -536,7 +571,7 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		// Do another pass of type coercion, as constant folding may have made new literals that can be coerced.
 		{
 			std::vector<ASTNode*> stack;
-			TraversalPayload payload(TraversalPayload::TypeCoercion, hidden_voidptr_arg, env);
+			TraversalPayload payload(TraversalPayload::TypeCoercion);
 			for(size_t i=0; i<func_defs.size(); ++i)
 				if(!func_defs[i]->is_anon_func)
 					func_defs[i]->traverse(payload, stack);
@@ -567,7 +602,7 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		// Do Constant Folding
 		{
 			std::vector<ASTNode*> stack;
-			TraversalPayload payload(TraversalPayload::ConstantFolding, hidden_voidptr_arg, env);
+			TraversalPayload payload(TraversalPayload::ConstantFolding);
 			for(size_t i=0; i<func_defs.size(); ++i)
 				if(!func_defs[i]->is_anon_func)
 					func_defs[i]->traverse(payload, stack);
@@ -580,7 +615,7 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		// Do another pass of type coercion, as constant folding may have made new literals that can be coerced.
 		{
 			std::vector<ASTNode*> stack;
-			TraversalPayload payload(TraversalPayload::TypeCoercion, hidden_voidptr_arg, env);
+			TraversalPayload payload(TraversalPayload::TypeCoercion);
 			for(size_t i=0; i<func_defs.size(); ++i)
 				if(!func_defs[i]->is_anon_func)
 					func_defs[i]->traverse(payload, stack);
@@ -600,7 +635,7 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 	if(!args.allow_unsafe_operations)
 	{
 		std::vector<ASTNode*> stack;
-		TraversalPayload payload(TraversalPayload::CheckInDomain, hidden_voidptr_arg, env);
+		TraversalPayload payload(TraversalPayload::CheckInDomain);
 		for(size_t i=0; i<func_defs.size(); ++i)
 			if(!func_defs[i]->is_anon_func)
 				func_defs[i]->traverse(payload, stack);
@@ -610,7 +645,7 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		// TypeCheck
 	{
 		std::vector<ASTNode*> stack;
-		TraversalPayload payload(TraversalPayload::TypeCheck, hidden_voidptr_arg, env);
+		TraversalPayload payload(TraversalPayload::TypeCheck);
 		for(size_t i=0; i<func_defs.size(); ++i)
 			if(!func_defs[i]->is_anon_func)
 				func_defs[i]->traverse(payload, stack);
@@ -628,11 +663,13 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 
 	CommonFunctions common_functions;
 	{
-		const FunctionSignature allocateStringSig("allocateString", vector<TypeRef>(1, new VoidPtrType()));
+		const FunctionSignature allocateStringSig("allocateString", vector<TypeRef>(1, new OpaqueType()));
 		common_functions.allocateStringFunc = findMatchingFunction(allocateStringSig).getPointer();
 		assert(common_functions.allocateStringFunc);
 
-		const FunctionSignature freeStringSig("freeString", vector<TypeRef>(1, new String()));
+		vector<TypeRef> argtypes(1, new String());
+		//argtypes.push_back(new VoidPtrType());
+		const FunctionSignature freeStringSig("freeString", argtypes);
 		common_functions.freeStringFunc = findMatchingFunction(freeStringSig).getPointer();
 		assert(common_functions.freeStringFunc);
 	}

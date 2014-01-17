@@ -961,7 +961,7 @@ Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDef
 	{
 		// Rebind variables to get new type.
 		{
-			TraversalPayload payload(TraversalPayload::BindVariables, hidden_voidptr_arg, env);
+			TraversalPayload payload(TraversalPayload::BindVariables);
 			payload.func_def_stack.push_back(def.getPointer());
 			payload.linker = this;
 			
@@ -974,7 +974,7 @@ Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDef
 
 		// Type check again
 		{
-			TraversalPayload payload(TraversalPayload::TypeCheck, hidden_voidptr_arg, env);
+			TraversalPayload payload(TraversalPayload::TypeCheck);
 			
 			std::vector<ASTNode*> stack;
 			def->traverse(

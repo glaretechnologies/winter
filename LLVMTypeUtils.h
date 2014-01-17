@@ -41,8 +41,8 @@ llvm::Type* getPtrToBaseCapturedVarStructType(llvm::LLVMContext& context);
 llvm::FunctionType* llvmFunctionType(const std::vector<TypeRef>& arg_types, 
 									 bool captured_var_struct_ptr_arg,
 									 TypeRef return_type, 
-									 llvm::LLVMContext& context,
-									 bool hidden_voidptr_arg
+									 llvm::LLVMContext& context
+									 //bool hidden_voidptr_arg
 									 );
 
 llvm::Value* createFieldLoad(llvm::Value* structure_ptr, int field_index, llvm::IRBuilder<>* builder, llvm::LLVMContext& context, const llvm::Twine& Name);

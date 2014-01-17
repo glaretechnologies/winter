@@ -15,7 +15,7 @@ class Value;
 class VMState
 {
 public:
-	VMState(bool hidden_voidptr_arg_) : hidden_voidptr_arg(hidden_voidptr_arg_) {}
+	VMState() {}
 
 	std::vector<ValueRef> argument_stack;
 
@@ -27,8 +27,6 @@ public:
 
 	std::vector<size_t> let_stack_start;
 	//Value* return_register;
-
-	bool hidden_voidptr_arg;
 };
 
 

@@ -82,7 +82,7 @@ static bool expressionIsWellTyped(ASTNodeRef& e, TraversalPayload& payload_)
 	try
 	{
 		vector<ASTNode*> stack;
-		TraversalPayload payload(TraversalPayload::TypeCheck, payload_.hidden_voidptr_arg, payload_.env);
+		TraversalPayload payload(TraversalPayload::TypeCheck);
 		e->traverse(payload, stack);
 		assert(stack.size() == 0);
 
@@ -114,14 +114,12 @@ bool shouldFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
 // Replace an expression with a constant (literal AST node)
 ASTNodeRef foldExpression(ASTNodeRef& e, TraversalPayload& payload)
 {
-	VMState vmstate(payload.hidden_voidptr_arg);
+	VMState vmstate;
 	vmstate.func_args_start.push_back(0);
-	if(payload.hidden_voidptr_arg)
-		vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(payload.env)));
 
 	ValueRef retval = e->exec(vmstate);
 
-	assert(vmstate.argument_stack.size() == 1);
+	//assert(vmstate.argument_stack.size() == 1);
 	//delete vmstate.argument_stack[0];
 	vmstate.func_args_start.pop_back();
 
@@ -193,7 +191,7 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::v
 
 					// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
 					// This is needed now because we need to know the type of op_X, which is only available once bound.
-					TraversalPayload new_payload(TraversalPayload::BindVariables, payload.hidden_voidptr_arg, payload.env);
+					TraversalPayload new_payload(TraversalPayload::BindVariables);
 					new_payload.top_lvl_frame = payload.top_lvl_frame;
 					new_payload.linker = payload.linker;
 					new_payload.func_def_stack = payload.func_def_stack;
@@ -215,7 +213,7 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::v
 
 					// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
 					// This is needed now because we need to know the type of op_X, which is only available once bound.
-					TraversalPayload new_payload(TraversalPayload::BindVariables, payload.hidden_voidptr_arg, payload.env);
+					TraversalPayload new_payload(TraversalPayload::BindVariables);
 					new_payload.top_lvl_frame = payload.top_lvl_frame;
 					new_payload.linker = payload.linker;
 					new_payload.func_def_stack = payload.func_def_stack;
@@ -237,7 +235,7 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::v
 
 				// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
 				// This is needed now because we need to know the type of op_X, which is only available once bound.
-				TraversalPayload new_payload(TraversalPayload::BindVariables, payload.hidden_voidptr_arg, payload.env);
+				TraversalPayload new_payload(TraversalPayload::BindVariables);
 				new_payload.top_lvl_frame = payload.top_lvl_frame;
 				new_payload.linker = payload.linker;
 				new_payload.func_def_stack = payload.func_def_stack;
@@ -258,7 +256,7 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::v
 
 					// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
 					// This is needed now because we need to know the type of op_X, which is only available once bound.
-					TraversalPayload new_payload(TraversalPayload::BindVariables, payload.hidden_voidptr_arg, payload.env);
+					TraversalPayload new_payload(TraversalPayload::BindVariables);
 					new_payload.top_lvl_frame = payload.top_lvl_frame;
 					new_payload.linker = payload.linker;
 					new_payload.func_def_stack = payload.func_def_stack;
@@ -279,7 +277,7 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::v
 
 				// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
 				// This is needed now because we need to know the type of op_X, which is only available once bound.
-				TraversalPayload new_payload(TraversalPayload::BindVariables, payload.hidden_voidptr_arg, payload.env);
+				TraversalPayload new_payload(TraversalPayload::BindVariables);
 				new_payload.top_lvl_frame = payload.top_lvl_frame;
 				new_payload.linker = payload.linker;
 				new_payload.func_def_stack = payload.func_def_stack;
@@ -1283,7 +1281,7 @@ llvm::Value* ArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 
 		for(size_t i=0; i<elements.size(); ++i)
 		{
-			VMState vm_state(true); // hidden_voidptr_arg
+			VMState vm_state; // hidden_voidptr_arg
 			vm_state.func_args_start.push_back(0);
 			vm_state.argument_stack.push_back(ValueRef(new VoidPtrValue(NULL)));
 			ValueRef value = this->elements[i]->exec(vm_state);
@@ -1658,16 +1656,16 @@ llvm::Value* StringLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 	// Emit a call to allocateString
 	llvm::Function* allocateStringLLVMFunc = params.common_functions.allocateStringFunc->getOrInsertFunction(
 		params.module,
-		false, // use_cap_var_struct_ptr: False as global functions don't have captured vars. ?!?!?
-		true // target_takes_voidptr_arg // params.hidden_voidptr_arg
+		false // use_cap_var_struct_ptr: False as global functions don't have captured vars. ?!?!?
+		//true // target_takes_voidptr_arg // params.hidden_voidptr_arg
 	);
 
 	vector<llvm::Value*> args(1, elem_bitcast);
 
 	// Set hidden voidptr argument
-	const bool target_takes_voidptr_arg = true;
+	/*const bool target_takes_voidptr_arg = true;
 	if(target_takes_voidptr_arg)
-		args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));
+		args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));*/
 
 
 	//allocateStringLLVMFunc->dump(); // TEMP
@@ -2691,10 +2689,8 @@ void DivExpression::checkNoOverflow(TraversalPayload& payload, std::vector<ASTNo
 		if(a->isConstant())
 		{
 			// Evaluate the numerator expression
-			VMState vmstate(payload.hidden_voidptr_arg);
+			VMState vmstate;
 			vmstate.func_args_start.push_back(0);
-			if(payload.hidden_voidptr_arg)
-				vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(payload.env)));
 
 			ValueRef retval = a->exec(vmstate);
 
@@ -2710,10 +2706,8 @@ void DivExpression::checkNoOverflow(TraversalPayload& payload, std::vector<ASTNo
 		if(b->isConstant())
 		{
 			// Evaluate the divisor expression
-			VMState vmstate(payload.hidden_voidptr_arg);
+			VMState vmstate;
 			vmstate.func_args_start.push_back(0);
-			if(payload.hidden_voidptr_arg)
-				vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(payload.env)));
 
 			ValueRef retval = b->exec(vmstate);
 
@@ -2816,10 +2810,8 @@ void DivExpression::checkNoZeroDivide(TraversalPayload& payload, std::vector<AST
 		if(b->isConstant())
 		{
 			// Evaluate the divisor expression
-			VMState vmstate(payload.hidden_voidptr_arg);
+			VMState vmstate;
 			vmstate.func_args_start.push_back(0);
-			if(payload.hidden_voidptr_arg)
-				vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(payload.env)));
 
 			ValueRef retval = b->exec(vmstate);
 

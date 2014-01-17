@@ -1402,7 +1402,8 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 
 
 	// Test call to external function
-	testMainFloat("def main() float : testFunc(3.0)", 10.0);
+	testMainFloat("def main() float : testExternalFunc(3.0)", 9.0f);
+	testMainFloatArg("def main(float x) float : testExternalFunc(x)", 5.0f, 25.0f);
 
 
 	
