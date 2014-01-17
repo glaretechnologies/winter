@@ -599,20 +599,20 @@ static llvm::Value* loadGatherElements(EmitLLVMCodeParams& params, int arg_offse
 
 	// We have a single ptr, we need to shuffle it to an array of ptrs.
 
-	std::cout << "array_ptr:" << std::endl;
+	/*std::cout << "array_ptr:" << std::endl;
 	array_ptr->dump();
 	std::cout << std::endl;
 	std::cout << "array_ptr type:" << std::endl;
 	array_ptr->getType()->dump();
-	std::cout << std::endl;
+	std::cout << std::endl;*/
 
 	// TEMP: Get pointer to index 0 of the array:
 	llvm::Value* array_elem0_ptr = params.builder->CreateConstInBoundsGEP2_32(array_ptr, 0, 0);
 
-	std::cout << "array_elem0_ptr" << std::endl;
+	/*std::cout << "array_elem0_ptr" << std::endl;
 	array_elem0_ptr->dump();
 	array_elem0_ptr->getType()->dump();
-	std::cout << std::endl;
+	std::cout << std::endl;*/
 
 	//llvm::Value* shuffled_ptr = params.builder->CreateShuffleVector(
 
@@ -621,19 +621,19 @@ static llvm::Value* loadGatherElements(EmitLLVMCodeParams& params, int arg_offse
 		array_elem0_ptr
 	);
 
-	std::cout << "shuffled_ptr:" << std::endl;
-	shuffled_ptr->dump();
-	std::cout << std::endl;
-	std::cout << "shuffled_ptr type:" << std::endl;
-	shuffled_ptr->getType()->dump();
-	std::cout << std::endl;
+	//std::cout << "shuffled_ptr:" << std::endl;
+	//shuffled_ptr->dump();
+	//std::cout << std::endl;
+	//std::cout << "shuffled_ptr type:" << std::endl;
+	//shuffled_ptr->getType()->dump();
+	//std::cout << std::endl;
 
-	std::cout << "index_vec:" << std::endl;
-	index_vec->dump();//TEMP
-	std::cout << std::endl;
-	std::cout << "index_vec type:" << std::endl;
-	index_vec->getType()->dump();//TEMP
-	std::cout << std::endl;
+	//std::cout << "index_vec:" << std::endl;
+	//index_vec->dump();//TEMP
+	//std::cout << std::endl;
+	//std::cout << "index_vec type:" << std::endl;
+	//index_vec->getType()->dump();//TEMP
+	//std::cout << std::endl;
 
 	llvm::Value* indices[] = {
 		//llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0)), // get the array
@@ -645,19 +645,15 @@ static llvm::Value* loadGatherElements(EmitLLVMCodeParams& params, int arg_offse
 		indices
 	);
 
-	std::cout << "elem_ptr:" << std::endl;
-	elem_ptr->dump();//TEMP
-	std::cout << std::endl;
-	std::cout << "elem_ptr type:" << std::endl;
-	elem_ptr->getType()->dump();//TEMP
-	std::cout << std::endl;
+	//std::cout << "elem_ptr:" << std::endl;
+	//elem_ptr->dump();//TEMP
+	//std::cout << std::endl;
+	//std::cout << "elem_ptr type:" << std::endl;
+	//elem_ptr->getType()->dump();//TEMP
+	//std::cout << std::endl;
 
 
-	// TEMP: LLVM does not currently support loading from a vector of pointers.  So just do the loads individually.
-
-	/*return params.builder->CreateLoad(
-		elem_ptr
-	);*/
+	// LLVM does not currently support loading from a vector of pointers.  So just do the loads individually.
 
 	// Start with a vector of Undefs.
 	llvm::Value* vec = llvm::ConstantVector::getSplat(
@@ -684,28 +680,6 @@ static llvm::Value* loadGatherElements(EmitLLVMCodeParams& params, int arg_offse
 	
 	return vec;
 }
-
-
-/*
-static llvm::Value* loadElements(EmitLLVMCodeParams& params, int arg_offset)
-{
-	llvm::Value* array_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, arg_offset + 0);
-	llvm::Value* index     = LLVMTypeUtils::getNthArg(params.currently_building_func, arg_offset + 1);
-
-	llvm::Value* indices[] = {
-		llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0)), // get the array
-		index, // get the indexed element in the array
-	};
-
-	llvm::Value* elem_ptr = params.builder->CreateInBoundsGEP(
-		array_ptr, // ptr
-		indices
-	);
-
-	return params.builder->CreateLoad(
-		elem_ptr
-	);
-}*/
 
 
 llvm::Value* ArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const

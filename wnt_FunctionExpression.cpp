@@ -1398,11 +1398,6 @@ bool FunctionExpression::isConstant() const
 		if(!argument_expressions[i]->isConstant())
 			return false;
 
-	//TEMP:
-	//if(this->target_function->isExternalFunction())
-	//	return false;
-
-	// return this->target_function->isConstant();
 	return true;
 }
 
