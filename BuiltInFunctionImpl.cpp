@@ -827,7 +827,7 @@ llvm::Value* ArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 			);
 
 			//TEMP:
-			result_vector->dump();
+			//result_vector->dump();
 			//return_ptr->dump();
 
 			// Store the element

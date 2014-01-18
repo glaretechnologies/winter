@@ -44,6 +44,7 @@ class FunctionExpression : public ASTNode
 {
 public:
 	FunctionExpression(const SrcLocation& src_loc);
+	FunctionExpression(const SrcLocation& src_loc, const std::string& func_name, const ASTNodeRef& arg0); // 1-arg function
 	FunctionExpression(const SrcLocation& src_loc, const std::string& func_name, const ASTNodeRef& arg0, const ASTNodeRef& arg1); // 2-arg function
 
 	bool doesFunctionTypeMatch(const TypeRef& type);

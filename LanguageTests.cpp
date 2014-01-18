@@ -55,6 +55,32 @@ void LanguageTests::run()
 	Timer timer;
 
 
+
+	// Unary minus applied to vector:
+	// Test with no runtime values
+	testMainFloatArg("def main(float x) float : elem(-[1.0, 2.0, 3.0, 4.0]v, 2)", 0.1f, -3.0f);
+	testMainIntegerArg("def main(int x) int : elem(-[1, 2, 3, 4]v, 2)", 1, -3);
+
+	// Test with runtime values
+	testMainFloatArg("def main(float x) float : elem(-[x + 1.0, x + 2.0, x + 3.0, x + 4.0]v, 2)", 0.4f, -3.4f);
+	testMainIntegerArg("def main(int x) int : elem(-[x + 1, x + 2, x + 3, x + 4]v, 2)", 1, -4);
+
+	// Test runtime unary minus of 4-vector
+	{
+		Float4Struct a(1.0f, 2.0, 3.0, 4.0);
+		Float4Struct target_result(-1.0f, -2.0f, -3.0f, -4.0f);
+		
+		testFloat4Struct(
+			"struct Float4Struct { vector<float, 4> v } \n\
+			def main(Float4Struct a, Float4Struct b) Float4Struct : \n\
+				Float4Struct(-v(a))", 
+			a, a, target_result
+		);
+	}
+
+
+
+
 	// Gather load:
 	testMainFloatArg("def main(float x) float : elem(  elem([1.0, 2.0, 3.0, 4.0]a, [2, 3]v)   , 0)", 0.1f, 3.0f);
 
@@ -1187,6 +1213,11 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 	testMainFloat("struct s { float x, float y } \n\
 				  def op_div(s a, s b) : s(a.x / b.x, a.y / b.y) \n\
 				  def main() float : x(s(2, 3) / s(3, 4))", 2.0f / 3.0f);
+
+	// Test op_unary_minus
+	testMainFloat("struct s { float x, float y } \n\
+				  def op_unary_minus(s a) : s(-a.x, -a.y) \n\
+				  def main() float : x(-s(2, 3))", -2.0f);
 
 	// ===================================================================
 	// Test Operator Overloading with two different structures

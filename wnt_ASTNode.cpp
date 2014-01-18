@@ -285,6 +285,26 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::v
 			}
 			break;
 	}
+	case ASTNode::UnaryMinusExpressionType:
+	{
+		UnaryMinusExpression* expr = static_cast<UnaryMinusExpression*>(e.getPointer());
+		if(expr->expr->type().nonNull())
+			if(expr->expr->type()->getType() == Type::StructureTypeType)
+			{
+				// Replace expr with a function call to op_unary_minus
+				e = ASTNodeRef(new FunctionExpression(expr->srcLocation(), "op_unary_minus", expr->expr));
+				payload.tree_changed = true;
+
+				// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
+				// This is needed now because we need to know the type of op_X, which is only available once bound.
+				TraversalPayload new_payload(TraversalPayload::BindVariables);
+				new_payload.top_lvl_frame = payload.top_lvl_frame;
+				new_payload.linker = payload.linker;
+				new_payload.func_def_stack = payload.func_def_stack;
+				e->traverse(new_payload, stack);
+			}
+			break;
+	}
 	};
 }
 
@@ -3109,21 +3129,49 @@ bool BinaryBooleanExpr::isConstant() const
 ValueRef UnaryMinusExpression::exec(VMState& vmstate)
 {
 	ValueRef aval = expr->exec(vmstate);
-	ValueRef retval;
 
 	if(this->type()->getType() == Type::FloatType)
 	{
-		retval = ValueRef(new FloatValue(-cast<FloatValue*>(aval)->value));
+		return new FloatValue(-cast<FloatValue*>(aval)->value);
 	}
 	else if(this->type()->getType() == Type::IntType)
 	{
-		retval = ValueRef(new IntValue(-cast<IntValue*>(aval)->value));
+		return new IntValue(-cast<IntValue*>(aval)->value);
+	}
+	else if(this->type()->getType() == Type::VectorTypeType)
+	{
+		TypeRef this_type = expr->type();
+		VectorType* vectype = static_cast<VectorType*>(this_type.getPointer());
+
+		VectorValue* aval_vec = static_cast<VectorValue*>(aval.getPointer());
+		
+		vector<ValueRef> elem_values(aval_vec->e.size());
+		switch(vectype->elem_type->getType())
+		{
+			case Type::FloatType:
+			{
+				for(unsigned int i=0; i<elem_values.size(); ++i)
+					elem_values[i] = new FloatValue(-static_cast<FloatValue*>(aval_vec->e[i].getPointer())->value);
+				break;
+			}
+			case Type::IntType:
+			{
+				// TODO: over/under float check
+				for(unsigned int i=0; i<elem_values.size(); ++i)
+					elem_values[i] = new IntValue(-static_cast<IntValue*>(aval_vec->e[i].getPointer())->value);
+				break;
+			}
+			default:
+			{
+				assert(0);
+			}
+		}
+		return new VectorValue(elem_values);
 	}
 	else
 	{
-		assert(!"UnaryMinusExpression type invalid!");
+		throw BaseException("UnaryMinusExpression type invalid!");
 	}
-	return retval;
 }
 
 
@@ -3137,25 +3185,25 @@ void UnaryMinusExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 			payload.tree_changed = true;
 		}
 	}
-	/*else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
-	{
-		convertOverloadedOperators(expr, payload, stack);
-	}*/
 
 	stack.push_back(this);
 	expr->traverse(payload, stack);
 	
 
-	/*if(payload.operation == TraversalPayload::TypeCheck)
-		if(this->type()->getType() == Type::GenericTypeType || *this->type() == Int() || *this->type() == Float())
+	if(payload.operation == TraversalPayload::TypeCheck)
+	{
+		if(this->type()->getType() == Type::GenericTypeType || this->type()->getType() == Type::IntType || this->type()->getType() == Type::FloatType)
 		{}
+		else if(this->type()->getType() == Type::VectorTypeType && 
+			(static_cast<VectorType*>(this->type().getPointer())->elem_type->getType() == Type::FloatType || static_cast<VectorType*>(this->type().getPointer())->elem_type->getType() == Type::IntType))
+		{
+		}
 		else
 		{
-			throw BaseException("Child type '" + this->type()->toString() + "' does not define binary operator '*'.");
+			throw BaseException("Type '" + this->type()->toString() + "' does not define unary operator '-'.");
 		}
-	*/
-
-	if(payload.operation == TraversalPayload::BindVariables)
+	}
+	else if(payload.operation == TraversalPayload::BindVariables)
 	{
 		convertOverloadedOperators(expr, payload, stack);
 	}
@@ -3193,7 +3241,37 @@ llvm::Value* UnaryMinusExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm
 			expr->emitLLVMCode(params)
 		);
 	}
-	else
+	else if(this->type()->getType() == Type::VectorTypeType)
+	{
+		Reference<VectorType> vec_type = this->type().downcast<VectorType>();
+
+		// Multiple with a vector of -1
+		if(vec_type->elem_type->getType() == Type::FloatType)
+		{
+			llvm::Value* neg_one_vec = llvm::ConstantVector::getSplat(
+				vec_type->num,
+				llvm::ConstantFP::get(*params.context, llvm::APFloat(-1.0f))
+			);
+
+			return params.builder->CreateFMul(
+				expr->emitLLVMCode(params), 
+				neg_one_vec
+			);
+		}
+		else if(vec_type->elem_type->getType() == Type::IntType)
+		{
+			llvm::Value* neg_one_vec = llvm::ConstantVector::getSplat(
+				vec_type->num,
+				llvm::ConstantInt::get(*params.context, llvm::APInt(32, -1, true))
+			);
+
+			return params.builder->CreateMul(
+				expr->emitLLVMCode(params), 
+				neg_one_vec
+			);
+		}
+
+	}
 	{
 		assert(!"UnaryMinusExpression type invalid!");
 		return NULL;

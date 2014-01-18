@@ -57,6 +57,22 @@ FunctionExpression::FunctionExpression(const SrcLocation& src_loc)
 }
 
 
+FunctionExpression::FunctionExpression(const SrcLocation& src_loc, const std::string& func_name, const ASTNodeRef& arg0) // 1-arg function
+:	ASTNode(FunctionExpressionType, src_loc),
+	target_function(NULL),
+	bound_index(-1),
+	binding_type(Unbound),
+	bound_let_block(NULL),
+	bound_function(NULL),
+	use_captured_var(false),
+	captured_var_index(0),
+	proven_defined(false)
+{
+	function_name = func_name;
+	argument_expressions.push_back(arg0);
+}
+
+
 FunctionExpression::FunctionExpression(const SrcLocation& src_loc, const std::string& func_name, const ASTNodeRef& arg0, const ASTNodeRef& arg1) // 2-arg function
 :	ASTNode(FunctionExpressionType, src_loc),
 	target_function(NULL),
