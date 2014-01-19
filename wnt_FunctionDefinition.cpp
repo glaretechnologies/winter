@@ -15,7 +15,7 @@ Generated at 2011-04-25 19:15:40 +0100
 #include "BuiltInFunctionImpl.h"
 #include "LLVMTypeUtils.h"
 #include "utils/stringutils.h"
-#if USE_LLVM
+#pragma warning(push, 0) // Disable warnings
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -30,9 +30,8 @@ Generated at 2011-04-25 19:15:40 +0100
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/Attributes.h>
-//#include <llvm/Target/TargetData.h>
 #include <llvm/IR/DataLayout.h>
-#endif
+#pragma warning(pop) // Re-enable warnings
 #include <iostream>
 
 
@@ -148,13 +147,13 @@ const std::string indent(VMState& vmstate)
 }
 
 
-static void printStack(VMState& vmstate)
-{
-	std::cout << indent(vmstate) << "arg Stack: [";
-	for(unsigned int i=0; i<vmstate.argument_stack.size(); ++i)
-		std::cout << vmstate.argument_stack[i]->toString() + (i + 1 < vmstate.argument_stack.size() ? string(",\n") : string("\n"));
-	std::cout << "]\n";
-}
+//static void printStack(VMState& vmstate)
+//{
+//	std::cout << indent(vmstate) << "arg Stack: [";
+//	for(unsigned int i=0; i<vmstate.argument_stack.size(); ++i)
+//		std::cout << vmstate.argument_stack[i]->toString() + (i + 1 < vmstate.argument_stack.size() ? string(",\n") : string("\n"));
+//	std::cout << "]\n";
+//}
 
 
 
@@ -606,7 +605,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			const int let_frame_offset = this->captured_vars[i].let_frame_offset;
 
 			// TEMP HACK USING 2 instead of 1.
-			const int let_index = params.let_block_stack.size() - 1 - let_frame_offset;
+			const int let_index = (int)params.let_block_stack.size() - 1 - let_frame_offset;
 			LetBlock* let_block = params.let_block_stack[let_index];
 	
 			//val = let_block->getLetExpressionLLVMValue(
@@ -744,8 +743,7 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 		}
 	}
 
-	//TEMP:
-	function_attr_builder.addAttribute(llvm::Attribute::AlwaysInline);
+	//function_attr_builder.addAttribute(llvm::Attribute::AlwaysInline);
 
 	llvm::Constant* llvm_func_constant = module->getOrInsertFunction(
 		makeSafeStringForFunctionName(this->sig.toString()), // Name
@@ -868,7 +866,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 
 	builder.SetFastMathFlags(flags);
 
-	const bool nsz = builder.getFastMathFlags().noSignedZeros();
+	// const bool nsz = builder.getFastMathFlags().noSignedZeros();
 
 	// Build body LLVM code
 	EmitLLVMCodeParams params;

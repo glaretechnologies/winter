@@ -25,7 +25,7 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "VirtualMachine.h"
 #include "LLVMTypeUtils.h"
 #if USE_LLVM
-#pragma warning( disable : 4800 ) // 'int' : forcing value to bool 'true' or 'false' (performance warning)
+#pragma warning(push, 0) // Disable warnings
 #include "llvm/IR/Module.h"
 #include "llvm/Analysis/Verifier.h"
 #include "llvm/PassManager.h"
@@ -63,15 +63,17 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/DynamicLibrary.h"
+#pragma warning(pop) // Re-enable warnings
 #endif
 
 
 using std::vector;
+//#define USE_LLVM_3_4 1
 
 
 namespace Winter
 {
-
+	
 
 static const bool DUMP_MODULE_IR = false;
 static const bool DUMP_ASSEMBLY = false;
@@ -144,7 +146,7 @@ static int stringLength(StringRep* str)
 
 static ValueRef stringLengthInterpreted(const vector<ValueRef>& args)
 {
-	return new IntValue( getStringArg(args, 0).size() );
+	return new IntValue( (int)getStringArg(args, 0).size() );
 }
 
 
@@ -184,6 +186,22 @@ class WinterMemoryManager : public llvm::SectionMemoryManager
 public:
 	virtual ~WinterMemoryManager() {}
 
+
+#if USE_LLVM_3_4
+	virtual uint64_t getSymbolAddress(const std::string& name)
+	{
+		std::map<std::string, void*>::iterator res = func_map->find(name);
+		if(res != func_map->end())
+			return (uint64_t)res->second;
+
+		// If function was not in func_map (i.e. was not an 'external' function), then use normal symbol resolution, for functions like sinf, cosf etc..
+
+		void* f = llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(name);
+
+		assert(f);
+		return (uint64_t)f;
+	}
+#else
 	virtual void *getPointerToNamedFunction(const std::string& name, bool AbortOnFailure = true)
 	{
 		std::map<std::string, void*>::iterator res = func_map->find(name);
@@ -197,6 +215,7 @@ public:
 		assert(f);
 		return f;
 	}
+#endif
 	
 	std::map<std::string, void*>* func_map;
 };
@@ -242,7 +261,11 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 		{
 			WinterMemoryManager* mem_manager = new WinterMemoryManager();
 			mem_manager->func_map = &func_map;
+#if USE_LLVM_3_4
+			engine_builder.setMCJITMemoryManager(mem_manager);
+#else
 			engine_builder.setJITMemoryManager(mem_manager);
+#endif
 		}
 
 		this->triple = llvm::sys::getProcessTriple();
@@ -848,9 +871,8 @@ void VirtualMachine::compileToNativeAssembly(llvm::Module* mod, const std::strin
 	pm.add(new llvm::DataLayout(*this->llvm_exec_engine->getDataLayout()));
 	pm.add(new llvm::TargetLibraryInfo(llvm::Triple(this->triple)));
 
-	bool disableVerify = true;
 	std::string err;
-	llvm::raw_fd_ostream raw_out(filename.c_str(), err, 0);
+	llvm::raw_fd_ostream raw_out(filename.c_str(), err, llvm::sys::fs::F_None);
 	if (!err.empty())
 		throw Winter::BaseException("Error when opening file to print assembly to: " + err);
 

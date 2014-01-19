@@ -9,9 +9,9 @@ Generated at Wed Oct 20 15:22:37 +1300 2010
 
 
 namespace llvm { class Function; class FunctionType; class Type; class LLVMContext; class Twine; }
-//#if USE_LLVM
+#pragma warning(push, 0) // Disable warnings
 #include <llvm/IR/IRBuilder.h>
-//#endif
+#pragma warning(pop) // Re-enable warnings
 #include "wnt_Type.h"
 
 

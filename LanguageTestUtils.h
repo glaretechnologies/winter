@@ -201,8 +201,7 @@ static void testMainFloatArgInvalidProgram(const std::string& src, float argumen
 		// Get main function
 		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
 
-		float(WINTER_JIT_CALLING_CONV*f)(float, void*) = (float(WINTER_JIT_CALLING_CONV*)(float, void*))vm.getJittedFunction(mainsig);
-
+		vm.getJittedFunction(mainsig);
 
 		std::cerr << "Test failed: Expected compilation failure." << std::endl;
 		exit(1);
@@ -442,7 +441,7 @@ static void testMainIntegerArgInvalidProgram(const std::string& src, int argumen
 		// Get main function
 		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
 
-		int(WINTER_JIT_CALLING_CONV*f)(int, void*) = (int(WINTER_JIT_CALLING_CONV*)(int, void*))vm.getJittedFunction(mainsig);
+		vm.getJittedFunction(mainsig);
 
 		std::cerr << "Test failed: Expected compilation failure." << std::endl;
 		exit(1);

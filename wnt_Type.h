@@ -1,16 +1,18 @@
-//Copyright 2009 Nicholas Chapman
+/*=====================================================================
+wnt_Type.h
+----------
+Copyright Glare Technologies Limited 2014 -
+=====================================================================*/
 #pragma once
 
 
-#include "llvm/IR/Type.h"
-#include "llvm/IR/DerivedTypes.h"
 #include <utils/Reference.h>
 #include <utils/RefCounted.h>
 #include <vector>
 #include <string>
 
 
-namespace llvm { class Type; class Constant; }
+namespace llvm { class Type; class Constant; class LLVMContext; class Value; }
 
 
 namespace Winter
@@ -73,7 +75,7 @@ public:
 	virtual const std::string toString() const { return "float"; }
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
-	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const { return llvm::Type::getFloatTy(context); }
+	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
 	virtual llvm::Value* getInvalidLLVMValue(llvm::LLVMContext& context) const; // For array out-of-bounds
 	virtual Reference<Value> getInvalidValue() const; // For array out-of-bounds
 };
@@ -113,7 +115,7 @@ public:
 	virtual const std::string toString() const { return "bool"; }
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
-	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const { return llvm::Type::getInt1Ty(context); }
+	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
 };
 
 

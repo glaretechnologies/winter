@@ -19,7 +19,9 @@ Copyright 2009 Nicholas Chapman
 #include <utils/Reference.h>
 #include <utils/RefCounted.h>
 #include <utils/platform.h>
+#pragma warning(push, 0) // Disable warnings
 #include <llvm/IR/IRBuilder.h>
+#pragma warning(pop) // Re-enable warnings
 #include <string>
 #include <vector>
 namespace llvm { class Function; };

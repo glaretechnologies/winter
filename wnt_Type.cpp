@@ -3,9 +3,11 @@
 
 #include "Value.h"
 #include "BaseException.h"
-#include "llvm/IR/Constants.h"
 #include "LLVMTypeUtils.h"
 #include "utils/stringutils.h"
+#pragma warning(push, 0) // Disable warnings
+#include "llvm/IR/Constants.h"
+#pragma warning(pop) // Re-enable warnings
 #include <vector>
 
 
@@ -38,6 +40,12 @@ llvm::Value* Type::getInvalidLLVMValue(llvm::LLVMContext& context) const // For 
 bool Float::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
 {
 	return this->getType() == b.getType();
+}
+
+
+llvm::Type* Float::LLVMType(llvm::LLVMContext& context) const
+{ 
+	return llvm::Type::getFloatTy(context);
 }
 
 
@@ -125,6 +133,12 @@ Reference<Value> Int::getInvalidValue() const // For array out-of-bounds
 bool Bool::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
 {
 	return this->getType() == b.getType();
+}
+
+
+llvm::Type* Bool::LLVMType(llvm::LLVMContext& context) const
+{ 
+	return llvm::Type::getInt1Ty(context);
 }
 
 

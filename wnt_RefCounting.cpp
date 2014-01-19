@@ -16,6 +16,7 @@ Generated at 2011-04-25 19:15:40 +0100
 #include "LLVMTypeUtils.h"
 #include "utils/stringutils.h"
 #if USE_LLVM
+#pragma warning(push, 0) // Disable warnings
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -31,6 +32,7 @@ Generated at 2011-04-25 19:15:40 +0100
 #include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/DataLayout.h>
+#pragma warning(pop) // Re-enable warnings
 #endif
 
 
@@ -268,7 +270,7 @@ void emitStructureCleanupLLVMCode(EmitLLVMCodeParams& params, const StructureTyp
 			// Emit code to load the string value:
 			structure_val->dump();
 			structure_val->getType()->dump();
-			llvm::Value* str_ptr = params.builder->CreateConstInBoundsGEP2_32(structure_val, 0, i, struct_type.name + ".str ptr");
+			llvm::Value* str_ptr = params.builder->CreateConstInBoundsGEP2_32(structure_val, 0, (unsigned int)i, struct_type.name + ".str ptr");
 
 			// Load the string value
 			str_ptr->dump();
