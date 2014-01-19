@@ -54,7 +54,8 @@ void LanguageTests::run()
 //	ProgramBuilder::test();
 	Timer timer;
 
-
+	// Test FMA codegen.
+	testMainFloatArg("def main(float x) float : sin(x) + sin(x + 0.02) * sin(x + 0.03)", 0.f, sin(0.f) + sin(0.02f) * sin(0.03f));
 
 	// Unary minus applied to vector:
 	// Test with no runtime values

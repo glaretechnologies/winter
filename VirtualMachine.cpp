@@ -272,7 +272,15 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 		if(USE_MCJIT) this->triple.append("-elf"); // MCJIT requires the -elf suffix currently, see https://groups.google.com/forum/#!topic/llvm-dev/DOmHEXhNNWw
 
 		
-		this->target_machine = engine_builder.selectTarget(llvm::Triple(this->triple), "", "", llvm::SmallVector<std::string, 4>());
+		this->target_machine = engine_builder.selectTarget(
+			llvm::Triple(this->triple), // target triple
+			"",  // march
+			"", // "core-avx2",  // mcpu
+			llvm::SmallVector<std::string, 4>());
+
+		// Enable floating point op fusion, to allow for FMA codegen.
+		this->target_machine->Options.AllowFPOpFusion = llvm::FPOpFusion::Fast;
+
 		this->llvm_exec_engine = engine_builder.create(target_machine);
 
 
@@ -872,7 +880,11 @@ void VirtualMachine::compileToNativeAssembly(llvm::Module* mod, const std::strin
 	pm.add(new llvm::TargetLibraryInfo(llvm::Triple(this->triple)));
 
 	std::string err;
+#if USE_LLVM_3_4
 	llvm::raw_fd_ostream raw_out(filename.c_str(), err, llvm::sys::fs::F_None);
+#else
+	llvm::raw_fd_ostream raw_out(filename.c_str(), err, 0);
+#endif
 	if (!err.empty())
 		throw Winter::BaseException("Error when opening file to print assembly to: " + err);
 
