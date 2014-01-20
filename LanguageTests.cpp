@@ -54,6 +54,18 @@ void LanguageTests::run()
 //	ProgramBuilder::test();
 	Timer timer;
 
+	// Check constant folding of a pow function that is inside another function
+	testMainFloatArg("def g(float x) float :  pow(2 + x, -(1.0 / 8.0))         def main(float x) float : g(0.5)", 1.f, std::pow(2.f + 0.5f, -(1.0f / 8.0f)));
+	
+	testMainFloatArg("def g(float x, float y) float : pow(x, y)         def main(float x) float : g(2.0, 3.0)", 1.f, 8.0f);
+
+	// Test promotion to match function return type:  
+	// Test in if statement
+	// TODO: Get this working testMainFloatArg("def g(float x) float : if x > 1.0 then 2 else 3         def main(float x) float : g(x)", 1.f, 2.f);
+
+	//testMainFloatArg("def g(float x) float : 2         def main(float x) float : g(2)", 1.f, 2.f);
+
+
 	// Test calling a function that will only be finished / correct when type promotion is done, but will be called during constant folding phase.
 	testMainFloatArg("def g(float x) float : 1 / x         def main(float x) float : g(2)", 1.f, 0.5f);
 	testMainFloatArg("def g(float x) float : 1 / x         def main(float x) float : g(x)", 4.f, 0.25f);

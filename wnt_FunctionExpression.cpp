@@ -146,6 +146,9 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 {
 	if(VERBOSE_EXEC) std::cout << indent(vmstate) << "FunctionExpression, target_name=" << this->function_name << "\n";
 
+	if(this->binding_type == Unbound)
+		throw BaseException("Function is not bound.");
+
 	//assert(target_function);
 	if(this->target_function != NULL && this->target_function->external_function.nonNull())
 	{
