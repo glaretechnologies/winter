@@ -973,7 +973,7 @@ Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDef
 		}
 
 		// Type check again
-		{
+		/*{
 			TraversalPayload payload(TraversalPayload::TypeCheck);
 			
 			std::vector<ASTNode*> stack;
@@ -981,7 +981,7 @@ Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDef
 				payload,
 				stack
 			);
-		}
+		}*/
 	}
 
 	return def;

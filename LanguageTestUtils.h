@@ -175,6 +175,7 @@ static void testMainFloat(const std::string& src, float target_return_val)
 	catch(Winter::BaseException& e)
 	{
 		std::cerr << e.what() << std::endl;
+		assert(0);
 		exit(1);
 	}
 }
@@ -204,6 +205,7 @@ static void testMainFloatArgInvalidProgram(const std::string& src, float argumen
 		vm.getJittedFunction(mainsig);
 
 		std::cerr << "Test failed: Expected compilation failure." << std::endl;
+		assert(0);
 		exit(1);
 	}
 	catch(Winter::BaseException& e)
@@ -270,12 +272,14 @@ static void testMainFloatArg(const std::string& src, float argument, float targe
 		if(!val)
 		{
 			std::cerr << "main() Return value was of unexpected type." << std::endl;
+			assert(0);
 			exit(1);
 		}
 
 		if(!epsEqual(val->value, target_return_val))
 		{
 			std::cerr << "Test failed: main returned " << val->value << ", target was " << target_return_val << std::endl;
+			assert(0);
 			exit(1);
 		}
 
@@ -336,12 +340,14 @@ static void testMainInteger(const std::string& src, int target_return_val)
 		if(!val)
 		{
 			std::cerr << "main() Return value was of unexpected type." << std::endl;
+			assert(0);
 			exit(1);
 		}
 
 		if(val->value != target_return_val)
 		{
 			std::cerr << "Test failed: main returned " << val->value << ", target was " << target_return_val << std::endl;
+			assert(0);
 			exit(1);
 		}
 
@@ -351,6 +357,7 @@ static void testMainInteger(const std::string& src, int target_return_val)
 	catch(Winter::BaseException& e)
 	{
 		std::cerr << e.what() << std::endl;
+		assert(0);
 		exit(1);
 	}
 }
@@ -402,12 +409,14 @@ static void testMainIntegerArg(const std::string& src, int x, int target_return_
 		if(!val)
 		{
 			std::cerr << "main() Return value was of unexpected type." << std::endl;
+			assert(0);
 			exit(1);
 		}
 
 		if(val->value != target_return_val)
 		{
 			std::cerr << "Test failed: main returned " << val->value << ", target was " << target_return_val << std::endl;
+			assert(0);
 			exit(1);
 		}
 	}
@@ -444,6 +453,7 @@ static void testMainIntegerArgInvalidProgram(const std::string& src, int argumen
 		vm.getJittedFunction(mainsig);
 
 		std::cerr << "Test failed: Expected compilation failure." << std::endl;
+		assert(0);
 		exit(1);
 	}
 	catch(Winter::BaseException& e)
@@ -561,6 +571,7 @@ static void testMainStruct(const std::string& src, const StructType& target_retu
 	catch(Winter::BaseException& e)
 	{
 		std::cerr << e.what() << std::endl;
+		assert(0);
 		exit(1);
 	}
 }
@@ -644,6 +655,7 @@ static void testMainStructInputAndOutput(const std::string& src, const InStructT
 	catch(Winter::BaseException& e)
 	{
 		std::cerr << e.what() << std::endl;
+		assert(0);
 		exit(1);
 	}
 }
@@ -864,6 +876,7 @@ static void testFloat4StructPairRetFloat(const std::string& src, const Float4Str
 	catch(Winter::BaseException& e)
 	{
 		std::cerr << e.what() << std::endl;
+		assert(0);
 		exit(1);
 	}
 }
@@ -953,6 +966,7 @@ static void testVectorInStruct(const std::string& src, const StructWithVec& stru
 	catch(Winter::BaseException& e)
 	{
 		std::cerr << e.what() << std::endl;
+		assert(0);
 		exit(1);
 	}
 }
@@ -1016,6 +1030,7 @@ static void testFloat4Struct(const std::string& src, const Float4Struct& a, cons
 	catch(Winter::BaseException& e)
 	{
 		std::cerr << e.what() << std::endl;
+		assert(0);
 		exit(1);
 	}
 }
@@ -1079,6 +1094,7 @@ static void testFloat8Struct(const std::string& src, const Float8Struct& a, cons
 	catch(Winter::BaseException& e)
 	{
 		std::cerr << e.what() << std::endl;
+		assert(0);
 		exit(1);
 	}
 }
@@ -1131,6 +1147,7 @@ static void testFloatArray(const std::string& src, const float* a, const float* 
 	catch(Winter::BaseException& e)
 	{
 		std::cerr << e.what() << std::endl;
+		assert(0);
 		exit(1);
 	}
 }

@@ -226,7 +226,6 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::v
 	case ASTNode::MulExpressionType:
 	{
 		MulExpression* expr = static_cast<MulExpression*>(e.getPointer());
-		assert(expr->a->type().nonNull() && expr->b->type().nonNull());
 		if(expr->a->type().nonNull() && expr->b->type().nonNull())
 			if(	expr->a->type()->getType() == Type::StructureTypeType || expr->a->type()->getType() == Type::ArrayTypeType ||
 				expr->b->type()->getType() == Type::StructureTypeType || expr->b->type()->getType() == Type::ArrayTypeType)
@@ -1134,16 +1133,8 @@ void MapLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 	{
 		for(size_t i=0; i<items.size(); ++i)
 		{
-			if(shouldFoldExpression(items[i].first, payload))
-			{
-				items[i].first = foldExpression(items[i].first, payload);
-				payload.tree_changed = true;
-			}
-			if(shouldFoldExpression(items[i].second, payload))
-			{
-				items[i].second = foldExpression(items[i].second, payload);
-				payload.tree_changed = true;
-			}
+			checkFoldExpression(items[i].first, payload);
+			checkFoldExpression(items[i].second, payload);
 		}
 	}
 	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
@@ -1249,11 +1240,7 @@ void ArrayLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 	{
 		for(size_t i=0; i<elements.size(); ++i)
 		{
-			if(shouldFoldExpression(elements[i], payload))
-			{
-				elements[i] = foldExpression(elements[i], payload);
-				payload.tree_changed = true;
-			}
+			checkFoldExpression(elements[i], payload);
 		}
 	}
 	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
@@ -1465,11 +1452,7 @@ void VectorLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	{
 		for(size_t i=0; i<elements.size(); ++i)
 		{
-			if(shouldFoldExpression(elements[i], payload))
-			{
-				elements[i] = foldExpression(elements[i], payload);
-				payload.tree_changed = true;
-			}
+			checkFoldExpression(elements[i], payload);
 		}
 	}
 	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
@@ -1833,13 +1816,15 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 					)));
 				return new VectorValue(elem_values);
 			}
-			else // Else float * float
+			else if(b->type()->getType() == Type::FloatType) // Else float * float
 			{
 				return new FloatValue(op(
 					static_cast<FloatValue*>(aval.getPointer())->value,
 					static_cast<FloatValue*>(bval.getPointer())->value
 				));
 			}
+			else
+				throw BaseException("Invalid types to binary op.");
 		}
 	case Type::IntType:
 		{
@@ -1854,13 +1839,15 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 					)));
 				return new VectorValue(elem_values);
 			}
-			else // Else int * int
+			else if(b->type()->getType() == Type::IntType) // Else int * int
 			{
 				return new IntValue(op(
 					static_cast<IntValue*>(aval.getPointer())->value,
 					static_cast<IntValue*>(bval.getPointer())->value
 				));
 			}
+			else
+				throw BaseException("Invalid types to binary op.");
 		}
 	case Type::VectorTypeType:
 		{
@@ -1893,7 +1880,7 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 					}
 					else
 					{
-						assert(0);
+						throw BaseException("Invalid types to binary op.");
 					}
 					break;
 				}
@@ -1918,18 +1905,17 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 					}
 					else
 					{
-						assert(0);
+						throw BaseException("Invalid types to binary op.");
 					}
 					break;
 				}
 			default:
-				assert(!"expression vector field type invalid!");
+				throw BaseException("expression vector field type invalid!");
 			};
 			return new VectorValue(elem_values);
 		}
 	default:
-		assert(!"expression type invalid!");
-		return ValueRef();
+		throw BaseException("expression type invalid!");
 	}
 }
 
@@ -1977,16 +1963,8 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 {
 	if(payload.operation == TraversalPayload::ConstantFolding)
 	{
-		if(shouldFoldExpression(a, payload))
-		{
-			a = foldExpression(a, payload);
-			payload.tree_changed = true;
-		}
-		if(shouldFoldExpression(b, payload))
-		{
-			b = foldExpression(b, payload);
-			payload.tree_changed = true;
-		}
+		checkFoldExpression(a, payload);
+		checkFoldExpression(b, payload);
 	}
 
 
@@ -2162,16 +2140,8 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 {
 	if(payload.operation == TraversalPayload::ConstantFolding)
 	{
-		if(shouldFoldExpression(a, payload))
-		{
-			a = foldExpression(a, payload);
-			payload.tree_changed = true;
-		}
-		if(shouldFoldExpression(b, payload))
-		{
-			b = foldExpression(b, payload);
-			payload.tree_changed = true;
-		}
+		checkFoldExpression(a, payload);
+		checkFoldExpression(b, payload);
 	}
 
 
@@ -2319,16 +2289,8 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 {
 	if(payload.operation == TraversalPayload::ConstantFolding)
 	{
-		if(shouldFoldExpression(a, payload))
-		{
-			a = foldExpression(a, payload);
-			payload.tree_changed = true;
-		}
-		if(shouldFoldExpression(b, payload))
-		{
-			b = foldExpression(b, payload);
-			payload.tree_changed = true;
-		}
+		checkFoldExpression(a, payload);
+		checkFoldExpression(b, payload);
 	}
 
 	stack.push_back(this);
@@ -2582,10 +2544,16 @@ ValueRef DivExpression::exec(VMState& vmstate)
 
 	if(this->type()->getType() == Type::FloatType)
 	{
-		retval = ValueRef(new FloatValue(static_cast<FloatValue*>(aval.getPointer())->value / static_cast<FloatValue*>(bval.getPointer())->value));
+		if(a->type()->getType() == Type::FloatType && b->type()->getType() == Type::FloatType)
+			return new FloatValue(static_cast<FloatValue*>(aval.getPointer())->value / static_cast<FloatValue*>(bval.getPointer())->value);
+		else
+			throw BaseException("invalid types for div op.");
 	}
 	else if(this->type()->getType() == Type::IntType)
 	{
+		if(!(a->type()->getType() == Type::IntType && b->type()->getType() == Type::IntType))
+			throw BaseException("invalid types for div op.");
+
 		const int a_int_val = static_cast<IntValue*>(aval.getPointer())->value;
 		const int b_int_val = static_cast<IntValue*>(bval.getPointer())->value;
 
@@ -2609,16 +2577,8 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 {
 	if(payload.operation == TraversalPayload::ConstantFolding)
 	{
-		if(shouldFoldExpression(a, payload))
-		{
-			a = foldExpression(a, payload);
-			payload.tree_changed = true;
-		}
-		if(shouldFoldExpression(b, payload))
-		{
-			b = foldExpression(b, payload);
-			payload.tree_changed = true;
-		}
+		checkFoldExpression(a, payload);
+		checkFoldExpression(b, payload);
 	}
 
 	stack.push_back(this);
@@ -2639,7 +2599,7 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 
 		// Type may be null if 'a' is a variable node that has not been bound yet.
 		const TypeRef a_type = a->type(); 
-		//const TypeRef b_type = b->type();
+		const TypeRef b_type = b->type();
 
 		if(a_type.nonNull() && a_type->getType() == Type::FloatType && b->nodeType() == ASTNode::IntLiteralType)
 		{
@@ -2651,8 +2611,8 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 			}
 		}
 
-		// 3 / 4.0
-		if(b->nodeType() == ASTNode::FloatLiteralType && a->nodeType() == ASTNode::IntLiteralType)
+		// 3 / 4.0 => 3.0 / 4.0
+		if(b_type.nonNull() && b_type->getType() == Type::FloatType && a->nodeType() == ASTNode::IntLiteralType)
 		{
 			IntLiteral* a_lit = static_cast<IntLiteral*>(a.getPointer());
 			if(isIntExactlyRepresentableAsFloat(a_lit->value))
@@ -3025,16 +2985,8 @@ void BinaryBooleanExpr::traverse(TraversalPayload& payload, std::vector<ASTNode*
 {
 	if(payload.operation == TraversalPayload::ConstantFolding)
 	{
-		if(shouldFoldExpression(a, payload))
-		{
-			a = foldExpression(a, payload);
-			payload.tree_changed = true;
-		}
-		if(shouldFoldExpression(b, payload))
-		{
-			b = foldExpression(b, payload);
-			payload.tree_changed = true;
-		}
+		checkFoldExpression(a, payload);
+		checkFoldExpression(b, payload);
 	}
 
 	stack.push_back(this);
@@ -3181,11 +3133,7 @@ void UnaryMinusExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 {
 	if(payload.operation == TraversalPayload::ConstantFolding)
 	{
-		if(shouldFoldExpression(expr, payload))
-		{
-			expr = foldExpression(expr, payload);
-			payload.tree_changed = true;
-		}
+		checkFoldExpression(expr, payload);
 	}
 
 	stack.push_back(this);
@@ -3326,11 +3274,7 @@ void LetASTNode::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 {
 	if(payload.operation == TraversalPayload::ConstantFolding)
 	{
-		if(shouldFoldExpression(expr, payload))
-		{
-			expr = foldExpression(expr, payload);
-			payload.tree_changed = true;
-		}
+		checkFoldExpression(expr, payload);
 	}
 	/*else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
@@ -3491,16 +3435,8 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 {
 	if(payload.operation == TraversalPayload::ConstantFolding)
 	{
-		if(shouldFoldExpression(a, payload))
-		{
-			a = foldExpression(a, payload);
-			payload.tree_changed = true;
-		}
-		if(shouldFoldExpression(b, payload))
-		{
-			b = foldExpression(b, payload);
-			payload.tree_changed = true;
-		}
+		checkFoldExpression(a, payload);
+		checkFoldExpression(b, payload);
 	}
 
 
@@ -3688,11 +3624,7 @@ void LetBlock::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
 	if(payload.operation == TraversalPayload::ConstantFolding)
 	{
-		if(shouldFoldExpression(expr, payload))
-		{
-			expr = foldExpression(expr, payload);
-			payload.tree_changed = true;
-		}
+		checkFoldExpression(expr, payload);
 	}
 
 	stack.push_back(this);
@@ -3816,11 +3748,7 @@ void ArraySubscript::traverse(TraversalPayload& payload, std::vector<ASTNode*>& 
 {
 	if(payload.operation == TraversalPayload::ConstantFolding)
 	{
-		if(shouldFoldExpression(subscript_expr, payload))
-		{
-			subscript_expr = foldExpression(subscript_expr, payload);
-			payload.tree_changed = true;
-		}
+		checkFoldExpression(subscript_expr, payload);
 	}
 
 	stack.push_back(this);

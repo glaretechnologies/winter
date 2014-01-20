@@ -54,6 +54,20 @@ void LanguageTests::run()
 //	ProgramBuilder::test();
 	Timer timer;
 
+	// Test calling a function that will only be finished / correct when type promotion is done, but will be called during constant folding phase.
+	testMainFloatArg("def g(float x) float : 1 / x         def main(float x) float : g(2)", 1.f, 0.5f);
+	testMainFloatArg("def g(float x) float : 1 / x         def main(float x) float : g(x)", 4.f, 0.25f);
+
+
+	// Test calling a function that will only be finished / correct when type promotion is done, but will be called during constant folding phase.
+	testMainFloatArg("def g(float x) float : 10 + x         def main(float x) float : g(1)", 2.f, 11.f);
+
+	// Test promotion from int to float
+	testMainFloatArg("def main(float x) float : 1 + x", 2.f, 3.f);
+
+	testMainFloatArg("def g(float x) float : x*x         def main(float x) float : g(1 + x)", 2.f, 9.f);
+
+
 	// Test FMA codegen.
 	testMainFloatArg("def main(float x) float : sin(x) + sin(x + 0.02) * sin(x + 0.03)", 0.f, sin(0.f) + sin(0.02f) * sin(0.03f));
 

@@ -284,6 +284,10 @@ static bool isNodeAncestor(const std::vector<ASTNode*>& stack, const ASTNode* no
 
 void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
+	// Return if we have already bound this function in an earlier pass.
+	if(this->binding_type != Unbound)
+		return;
+
 	bool found_binding = false;
 	bool in_current_func_def = true;
 	int use_let_frame_offset = 0;
@@ -383,61 +387,70 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 	if(!found_binding)
 	{
 		vector<TypeRef> argtypes;
+		bool all_argtypes_nonnull = true;
 		for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
+		{
 			argtypes.push_back(this->argument_expressions[i]->type());
-
-
-		const FunctionSignature sig(this->function_name, argtypes);
-
-		// Try and resolve to internal function.
-		this->target_function = linker.findMatchingFunction(sig).getPointer();
-		if(this->target_function)
-		{
-			this->binding_type = BoundToGlobalDef;
+			if(argtypes.back().isNull())
+				all_argtypes_nonnull = false;
 		}
-		else
+
+		if(all_argtypes_nonnull) // Don't try and bind if we have a null type
 		{
-			// Try and promote integer args to float args.
-			vector<FunctionDefinitionRef> funcs;
-			linker.getFuncsWithMatchingName(sig.name, funcs);
 
-			vector<FunctionDefinitionRef> possible_matches;
+			const FunctionSignature sig(this->function_name, argtypes);
 
-			for(size_t z=0; z<funcs.size(); ++z)
-				if(couldCoerceFunctionCall(argument_expressions, funcs[z]))
-					possible_matches.push_back(funcs[z]);
-
-			if(possible_matches.size() == 1)
+			// Try and resolve to internal function.
+			this->target_function = linker.findMatchingFunction(sig).getPointer();
+			if(this->target_function)
 			{
-				for(size_t i=0; i<argument_expressions.size(); ++i)
-				{
-					if(	possible_matches[0]->args[i].type->getType() == Type::FloatType &&
-						argument_expressions[i]->nodeType() == ASTNode::IntLiteralType &&
-						isIntExactlyRepresentableAsFloat(static_cast<IntLiteral*>(argument_expressions[i].getPointer())->value))
-					{
-						// Replace int literal with float literal
-						this->argument_expressions[i] = ASTNodeRef(new FloatLiteral(
-							(float)static_cast<IntLiteral*>(argument_expressions[i].getPointer())->value,
-							argument_expressions[i]->srcLocation()
-							));
-					}
-				}
-
-				
-				this->target_function = possible_matches[0].getPointer();
 				this->binding_type = BoundToGlobalDef;
 			}
-			else if(possible_matches.size() > 1)
+			else
 			{
-				string s = "Found more than one possible match for overloaded function: \n";
-				for(size_t z=0; z<possible_matches.size(); ++z)
-					s += possible_matches[z]->sig.toString() + "\n";
-				throw BaseException(s + "." + errorContext(*this));
-			}
-		}
+				// Try and promote integer args to float args.
+				vector<FunctionDefinitionRef> funcs;
+				linker.getFuncsWithMatchingName(sig.name, funcs);
 
-		if(this->binding_type == Unbound)
-			throw BaseException("Failed to find function '" + sig.toString() + "'." + errorContext(*this));
+				vector<FunctionDefinitionRef> possible_matches;
+
+				for(size_t z=0; z<funcs.size(); ++z)
+					if(couldCoerceFunctionCall(argument_expressions, funcs[z]))
+						possible_matches.push_back(funcs[z]);
+
+				if(possible_matches.size() == 1)
+				{
+					for(size_t i=0; i<argument_expressions.size(); ++i)
+					{
+						if(	possible_matches[0]->args[i].type->getType() == Type::FloatType &&
+							argument_expressions[i]->nodeType() == ASTNode::IntLiteralType &&
+							isIntExactlyRepresentableAsFloat(static_cast<IntLiteral*>(argument_expressions[i].getPointer())->value))
+						{
+							// Replace int literal with float literal
+							this->argument_expressions[i] = ASTNodeRef(new FloatLiteral(
+								(float)static_cast<IntLiteral*>(argument_expressions[i].getPointer())->value,
+								argument_expressions[i]->srcLocation()
+								));
+						}
+					}
+
+				
+					this->target_function = possible_matches[0].getPointer();
+					this->binding_type = BoundToGlobalDef;
+				}
+				else if(possible_matches.size() > 1)
+				{
+					string s = "Found more than one possible match for overloaded function: \n";
+					for(size_t z=0; z<possible_matches.size(); ++z)
+						s += possible_matches[z]->sig.toString() + "\n";
+					throw BaseException(s + "." + errorContext(*this));
+				}
+			}
+
+			//TEMP: don't fail now, maybe we can bind later.
+			//if(this->binding_type == Unbound)
+			//	throw BaseException("Failed to find function '" + sig.toString() + "'." + errorContext(*this));
+		} // end if all_argtypes_nonnull
 	}
 }
 
@@ -498,8 +511,16 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 		for(size_t i=0; i<argument_expressions.size(); ++i)
 			if(shouldFoldExpression(argument_expressions[i], payload))
 			{
-				argument_expressions[i] = foldExpression(argument_expressions[i], payload);
-				payload.tree_changed = true;
+				try
+				{
+					argument_expressions[i] = foldExpression(argument_expressions[i], payload);
+					payload.tree_changed = true;
+				}
+				catch(BaseException& )
+				{
+					// An invalid operation was performed, such as dividing by zero, while trying to eval the AST node.
+					// In this case we will consider the folding as not taking place.
+				}
 			}
 	}
 	else if(payload.operation == TraversalPayload::AddOpaqueEnvArg)
@@ -602,6 +623,17 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 	}
 	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
+		if(this->binding_type == Unbound)
+		{
+			vector<TypeRef> argtypes;
+			for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
+				argtypes.push_back(this->argument_expressions[i]->type());
+
+			const FunctionSignature sig(this->function_name, argtypes);
+		
+			throw BaseException("Failed to find function '" + sig.toString() + "'." + errorContext(*this));
+		}
+
 		// Check shuffle mask (arg 1) is a vector of ints
 		if(::hasPrefix(this->target_function->sig.name, "shuffle"))
 		{

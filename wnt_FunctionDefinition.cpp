@@ -240,29 +240,29 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 		payload.func_def_stack.pop_back();
 	}*/
 
-	if(payload.operation == TraversalPayload::TypeCheck)
-	{
-		if(this->isGenericFunction())
-			return; // Don't type check this.  Concrete versions of this func will be type checked individually.
+	//if(payload.operation == TraversalPayload::TypeCheck)
+	//{
+	//	if(this->isGenericFunction())
+	//		return; // Don't type check this.  Concrete versions of this func will be type checked individually.
 
-		if(this->body.nonNull())
-		{
-			if(this->declared_return_type.nonNull())
-			{
-				// Check that the return type of the body expression is equal to the declared return type
-				// of this function.
-				if(*this->body->type() != *this->declared_return_type)
-					throw BaseException("Type error for function '" + this->sig.toString() + "': Computed return type '" + this->body->type()->toString() + 
-						"' is not equal to the declared return type '" + this->declared_return_type->toString() + "'." + errorContext(*this));
-			}
-			else
-			{
-				// Else return type is NULL, so infer it
-				//this->return_type = this->body->type();
-			}
-		}
-	}
-	else if(payload.operation == TraversalPayload::AddOpaqueEnvArg)
+	//	if(this->body.nonNull())
+	//	{
+	//		if(this->declared_return_type.nonNull())
+	//		{
+	//			// Check that the return type of the body expression is equal to the declared return type
+	//			// of this function.
+	//			if(*this->body->type() != *this->declared_return_type)
+	//				throw BaseException("Type error for function '" + this->sig.toString() + "': Computed return type '" + this->body->type()->toString() + 
+	//					"' is not equal to the declared return type '" + this->declared_return_type->toString() + "'." + errorContext(*this));
+	//		}
+	//		else
+	//		{
+	//			// Else return type is NULL, so infer it
+	//			//this->return_type = this->body->type();
+	//		}
+	//	}
+	//}
+	if(payload.operation == TraversalPayload::AddOpaqueEnvArg)
 	{
 		// std::cout << "AddOpaqueEnvArg for func def " + sig.toString();
 
@@ -338,11 +338,45 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 	//	int a = 9;//TEMP
 
 	if(this->body.nonNull()) // !this->built_in_func_impl)
-		this->body->traverse(payload, stack);
+	{
+		if((payload.operation == TraversalPayload::TypeCheck) && this->isGenericFunction())
+		{
+			// Don't typecheck generic functions.
+		}
+		else
+			this->body->traverse(payload, stack);
+	}
 
 	
 
 	//payload.capture_variables = old_use_captured_vars;
+
+	if(payload.operation == TraversalPayload::TypeCheck)
+	{
+		if(this->isGenericFunction())
+		{
+			// Don't type check this.  Concrete versions of this func will be type checked individually.
+		}
+		else
+		{
+			if(this->body.nonNull())
+			{
+				if(this->declared_return_type.nonNull())
+				{
+					// Check that the return type of the body expression is equal to the declared return type
+					// of this function.
+					if(*this->body->type() != *this->declared_return_type)
+						throw BaseException("Type error for function '" + this->sig.toString() + "': Computed return type '" + this->body->type()->toString() + 
+							"' is not equal to the declared return type '" + this->declared_return_type->toString() + "'." + errorContext(*this));
+				}
+				else
+				{
+					// Else return type is NULL, so infer it
+					//this->return_type = this->body->type();
+				}
+			}
+		}
+	}
 
 	if(payload.operation == TraversalPayload::BindVariables)
 	{

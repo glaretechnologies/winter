@@ -612,6 +612,19 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 			tree_changed = tree_changed || payload.tree_changed;
 		}
 
+		// Do another bind pass as type coercion may have allowed some previously unbound functions to be bound now due to e.g. int->float type coercion.
+		{
+			std::vector<ASTNode*> stack;
+			TraversalPayload payload(TraversalPayload::BindVariables);
+			payload.top_lvl_frame = top_lvl_frame;
+			payload.linker = &linker;
+			for(size_t i=0; i<func_defs.size(); ++i)
+				if(!func_defs[i]->is_anon_func)
+					func_defs[i]->traverse(payload, stack);
+			//root->traverse(payload, stack);
+			assert(stack.size() == 0);
+		}
+
 //		rootref->print(0, std::cout);
 
 		if(!tree_changed)
@@ -679,7 +692,10 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		TraversalPayload payload(TraversalPayload::TypeCheck);
 		for(size_t i=0; i<func_defs.size(); ++i)
 			if(!func_defs[i]->is_anon_func)
+			{
 				func_defs[i]->traverse(payload, stack);
+				assert(stack.size() == 0);
+			}
 		
 		//root->traverse(payload, stack);
 		assert(stack.size() == 0);
