@@ -189,7 +189,7 @@ ValueRef FunctionDefinition::invoke(VMState& vmstate)
 	// Execute body of function
 	ValueRef ret = body->exec(vmstate);
 
-	if(*body->type() != *this->declared_return_type)
+	if(this->declared_return_type.nonNull() && (*body->type() != *this->declared_return_type))
 	{
 		// This may happen since type checking may not have been done yet.
 		throw BaseException("Returned object has invalid type.");
