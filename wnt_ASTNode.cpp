@@ -171,6 +171,66 @@ void checkFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
 	}
 }
 
+/*
+If node 'e' is a function expression, inline the target function by replacing e with the target function body.
+*/
+void checkInlineExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector<ASTNode*>& stack)
+{
+	if(e->nodeType() == ASTNode::FunctionExpressionType)
+	{
+		FunctionExpressionRef func_expr = e.downcast<FunctionExpression>();
+
+		if(func_expr->binding_type == FunctionExpression::BoundToGlobalDef && !func_expr->target_function->isExternalFunction() && func_expr->target_function->body.nonNull())
+		{
+		
+			//std::cout << "------------original expr: " << std::endl;
+			//e->print(0, std::cout);
+
+			// Replace e with a copy of the target function body.
+
+			e = func_expr->target_function->body->clone();
+
+			//std::cout << "------------new expr: " << std::endl;
+			//e->print(0, std::cout);
+
+			TraversalPayload sub_payload(TraversalPayload::SubstituteVariables);
+
+			sub_payload.variable_substitutes.resize(func_expr->argument_expressions.size());
+			for(size_t i=0; i<func_expr->argument_expressions.size(); ++i)
+			{
+				sub_payload.variable_substitutes[i] = func_expr->argument_expressions[i]; // NOTE: Don't clone now, will clone the expressions when they are pulled out of argument_expressions.
+
+				//std::cout << "------------sub_payload.variable_substitutes[i]: " << std::endl;
+				//sub_payload.variable_substitutes[i]->print(0, std::cout);
+			}
+
+			// Now replace all variables in the target function body with the argument values from func_expr
+			e->traverse(sub_payload, stack);
+
+			payload.tree_changed = true;
+
+			//std::cout << "------------final expr: " << std::endl;
+			//e->print(0, std::cout);
+		}
+	}
+}
+
+
+void checkSubstituteVariable(ASTNodeRef& e, TraversalPayload& payload)
+{
+	if(e->nodeType() == ASTNode::VariableASTNodeType)
+	{
+		Reference<Variable> var = e.downcast<Variable>();
+
+		if(var->vartype == Variable::ArgumentVariable)
+		{
+			e = payload.variable_substitutes[var->bound_index]->clone(); // Replace the variable with the argument value.	
+
+			payload.tree_changed = true;
+		}
+	}
+}
+
 
 void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
@@ -615,6 +675,8 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 						this->bound_function = def;
 					}
 
+					def->args[i].ref_count++;
+
 					return;
 				}
 
@@ -723,9 +785,12 @@ ValueRef Variable::exec(VMState& vmstate)
 	}
 	else if(this->vartype == LetVariable)
 	{
-		const int let_stack_start = (int)vmstate.let_stack_start[vmstate.let_stack_start.size() - 1 - this->let_frame_offset];
+		// Instead of computing the values and placing on let stack, let's just execute the let expressions directly.
 
-		return vmstate.let_stack[let_stack_start + this->bound_index];
+		//const int let_stack_start = (int)vmstate.let_stack_start[vmstate.let_stack_start.size() - 1 - this->let_frame_offset];
+		//return vmstate.let_stack[let_stack_start + this->bound_index];
+
+		return this->bound_let_block->lets[this->bound_index]->exec(vmstate);
 	}
 	else if(this->vartype == BoundToGlobalDefVariable)
 	{
@@ -945,6 +1010,24 @@ Reference<ASTNode> Variable::clone()
 
 	// NOTE: this direct copy seems to leak mem on Linux.
 	//return ASTNodeRef(new Variable(*this));
+}
+
+
+bool Variable::isConstant() const
+{
+	switch(vartype)
+	{
+	case UnboundVariable:
+		return false;
+	case ArgumentVariable:
+		return false;
+	case LetVariable:
+		{
+			return this->bound_let_block->lets[this->bound_index]->isConstant();
+		}
+	default:
+		return false;
+	}
 }
 
 
@@ -1239,9 +1322,7 @@ void ArrayLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 	if(payload.operation == TraversalPayload::ConstantFolding)
 	{
 		for(size_t i=0; i<elements.size(); ++i)
-		{
 			checkFoldExpression(elements[i], payload);
-		}
 	}
 	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
@@ -1257,7 +1338,18 @@ void ArrayLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 	}
 	stack.pop_back();
 
-	if(payload.operation == TraversalPayload::TypeCheck)
+
+	if(payload.operation == TraversalPayload::InlineFunctionCalls)
+	{
+		for(size_t i=0; i<elements.size(); ++i)
+			checkInlineExpression(elements[i], payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	{
+		for(size_t i=0; i<elements.size(); ++i)
+			checkSubstituteVariable(elements[i], payload);
+	}
+	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
 		// Check all the element expression types match the computed element type.
 		const TypeRef elem_type = this->elements[0]->type();
@@ -1451,9 +1543,7 @@ void VectorLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	if(payload.operation == TraversalPayload::ConstantFolding)
 	{
 		for(size_t i=0; i<elements.size(); ++i)
-		{
 			checkFoldExpression(elements[i], payload);
-		}
 	}
 	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
@@ -1492,7 +1582,18 @@ void VectorLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	}
 	stack.pop_back();
 
-	if(payload.operation == TraversalPayload::TypeCheck)
+
+	if(payload.operation == TraversalPayload::InlineFunctionCalls)
+	{
+		for(size_t i=0; i<elements.size(); ++i)
+			checkInlineExpression(elements[i], payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	{
+		for(size_t i=0; i<elements.size(); ++i)
+			checkSubstituteVariable(elements[i], payload);
+	}
+	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
 		// Check all the element expression types match the computed element type.
 		const TypeRef elem_type = this->elements[0]->type();
@@ -1966,7 +2067,7 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 		checkFoldExpression(a, payload);
 		checkFoldExpression(b, payload);
 	}
-
+	
 
 	stack.push_back(this);
 	a->traverse(payload, stack);
@@ -1977,6 +2078,16 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 	{
 		convertOverloadedOperators(a, payload, stack);
 		convertOverloadedOperators(b, payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::InlineFunctionCalls)
+	{
+		checkInlineExpression(a, payload, stack);
+		checkInlineExpression(b, payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	{
+		checkSubstituteVariable(a, payload);
+		checkSubstituteVariable(b, payload);
 	}
 	else if(payload.operation == TraversalPayload::TypeCoercion)
 	{
@@ -2150,7 +2261,17 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 	b->traverse(payload, stack);
 	
 
-	if(payload.operation == TraversalPayload::BindVariables)
+	if(payload.operation == TraversalPayload::InlineFunctionCalls)
+	{
+		checkInlineExpression(a, payload, stack);
+		checkInlineExpression(b, payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	{
+		checkSubstituteVariable(a, payload);
+		checkSubstituteVariable(b, payload);
+	}
+	else if(payload.operation == TraversalPayload::BindVariables)
 	{
 		convertOverloadedOperators(a, payload, stack);
 		convertOverloadedOperators(b, payload, stack);
@@ -2302,6 +2423,16 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	{
 		convertOverloadedOperators(a, payload, stack);
 		convertOverloadedOperators(b, payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::InlineFunctionCalls)
+	{
+		checkInlineExpression(a, payload, stack);
+		checkInlineExpression(b, payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	{
+		checkSubstituteVariable(a, payload);
+		checkSubstituteVariable(b, payload);
 	}
 	else if(payload.operation == TraversalPayload::TypeCoercion)
 	{
@@ -2581,12 +2712,23 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 		checkFoldExpression(b, payload);
 	}
 
+
 	stack.push_back(this);
 	a->traverse(payload, stack);
 	b->traverse(payload, stack);
 	
 
-	if(payload.operation == TraversalPayload::BindVariables)
+	if(payload.operation == TraversalPayload::InlineFunctionCalls)
+	{
+		checkInlineExpression(a, payload, stack);
+		checkInlineExpression(b, payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	{
+		checkSubstituteVariable(a, payload);
+		checkSubstituteVariable(b, payload);
+	}
+	else if(payload.operation == TraversalPayload::BindVariables)
 	{
 		convertOverloadedOperators(a, payload, stack);
 		convertOverloadedOperators(b, payload, stack);
@@ -2989,13 +3131,23 @@ void BinaryBooleanExpr::traverse(TraversalPayload& payload, std::vector<ASTNode*
 		checkFoldExpression(b, payload);
 	}
 
+
 	stack.push_back(this);
 	a->traverse(payload, stack);
 	b->traverse(payload, stack);
 	
 
-	
-	if(payload.operation == TraversalPayload::BindVariables)
+	if(payload.operation == TraversalPayload::InlineFunctionCalls)
+	{
+		checkInlineExpression(a, payload, stack);
+		checkInlineExpression(b, payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	{
+		checkSubstituteVariable(a, payload);
+		checkSubstituteVariable(b, payload);
+	}
+	else if(payload.operation == TraversalPayload::BindVariables)
 	{
 		convertOverloadedOperators(a, payload, stack);
 		convertOverloadedOperators(b, payload, stack);
@@ -3067,7 +3219,7 @@ llvm::Value* BinaryBooleanExpr::emitLLVMCode(EmitLLVMCodeParams& params, llvm::V
 
 Reference<ASTNode> BinaryBooleanExpr::clone()
 {
-	return ASTNodeRef(new BinaryBooleanExpr(t, a, b, srcLocation()));
+	return ASTNodeRef(new BinaryBooleanExpr(t, a->clone(), b->clone(), srcLocation()));
 }
 
 
@@ -3136,11 +3288,20 @@ void UnaryMinusExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 		checkFoldExpression(expr, payload);
 	}
 
+
 	stack.push_back(this);
 	expr->traverse(payload, stack);
 	
 
-	if(payload.operation == TraversalPayload::TypeCheck)
+	if(payload.operation == TraversalPayload::InlineFunctionCalls)
+	{
+		checkInlineExpression(expr, payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	{
+		checkSubstituteVariable(expr, payload);
+	}
+	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
 		if(this->type()->getType() == Type::GenericTypeType || this->type()->getType() == Type::IntType || this->type()->getType() == Type::FloatType)
 		{}
@@ -3281,10 +3442,20 @@ void LetASTNode::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 		convertOverloadedOperators(expr, payload, stack);
 	}*/
 
+
 	stack.push_back(this);
 	expr->traverse(payload, stack);
 
-	if(payload.operation == TraversalPayload::BindVariables)
+
+	if(payload.operation == TraversalPayload::InlineFunctionCalls)
+	{
+		checkInlineExpression(expr, payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	{
+		checkSubstituteVariable(expr, payload);
+	}
+	else if(payload.operation == TraversalPayload::BindVariables)
 	{
 		convertOverloadedOperators(expr, payload, stack);
 	}
@@ -3444,7 +3615,18 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 	a->traverse(payload, stack);
 	b->traverse(payload, stack);
 
-	if(payload.operation == TraversalPayload::BindVariables)
+
+	if(payload.operation == TraversalPayload::InlineFunctionCalls)
+	{
+		checkInlineExpression(a, payload, stack);
+		checkInlineExpression(b, payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	{
+		checkSubstituteVariable(a, payload);
+		checkSubstituteVariable(b, payload);
+	}
+	else if(payload.operation == TraversalPayload::BindVariables)
 	{
 		convertOverloadedOperators(a, payload, stack);
 		convertOverloadedOperators(b, payload, stack);
@@ -3552,7 +3734,7 @@ llvm::Value* ComparisonExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm
 
 Reference<ASTNode> ComparisonExpression::clone()
 {
-	return Reference<ASTNode>(new ComparisonExpression(token, a, b, this->srcLocation()));
+	return Reference<ASTNode>(new ComparisonExpression(token, a->clone(), b->clone(), this->srcLocation()));
 }
 
 
@@ -3582,22 +3764,22 @@ const std::string ComparisonExpression::getOverloadedFuncName() const // returns
 
 ValueRef LetBlock::exec(VMState& vmstate)
 {
-	const size_t let_stack_size = vmstate.let_stack.size();
-	vmstate.let_stack_start.push_back(let_stack_size); // Push let frame index
+	//const size_t let_stack_size = vmstate.let_stack.size();
+	//vmstate.let_stack_start.push_back(let_stack_size); // Push let frame index
 
 	// Evaluate let clauses, which will each push the result onto the let stack
-	for(unsigned int i=0; i<lets.size(); ++i)
-		vmstate.let_stack.push_back(lets[i]->exec(vmstate));
+	//for(unsigned int i=0; i<lets.size(); ++i)
+	//	vmstate.let_stack.push_back(lets[i]->exec(vmstate));
 
 
 	ValueRef retval = this->expr->exec(vmstate);
 
 	// Pop things off let stack
-	for(unsigned int i=0; i<lets.size(); ++i)
-		vmstate.let_stack.pop_back();
+	//for(unsigned int i=0; i<lets.size(); ++i)
+	//	vmstate.let_stack.pop_back();
 	
 	// Pop let frame index
-	vmstate.let_stack_start.pop_back();
+	//vmstate.let_stack_start.pop_back();
 
 	return retval;
 }
@@ -3627,6 +3809,7 @@ void LetBlock::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 		checkFoldExpression(expr, payload);
 	}
 
+
 	stack.push_back(this);
 
 	for(unsigned int i=0; i<lets.size(); ++i)
@@ -3638,11 +3821,18 @@ void LetBlock::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 
 	//payload.let_block_stack.pop_back();
 
-	
+	if(payload.operation == TraversalPayload::InlineFunctionCalls)
+	{
+		checkInlineExpression(expr, payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	{
+		checkSubstituteVariable(expr, payload);
+	}
 	// Convert overloaded operators before we pop this node off the stack.
 	// This node needs to be on the node stack if an operator overloading substitution is made,
 	// as the new op_X function will need to have a bind variables pass run on it.
-	if(payload.operation == TraversalPayload::BindVariables)
+	else if(payload.operation == TraversalPayload::BindVariables)
 	{
 		convertOverloadedOperators(expr, payload, stack);
 	}
@@ -3751,17 +3941,23 @@ void ArraySubscript::traverse(TraversalPayload& payload, std::vector<ASTNode*>& 
 		checkFoldExpression(subscript_expr, payload);
 	}
 
+	
 	stack.push_back(this);
-
-
 	subscript_expr->traverse(payload, stack);
 
 	
-	
+	if(payload.operation == TraversalPayload::InlineFunctionCalls)
+	{
+		checkInlineExpression(subscript_expr, payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	{
+		checkSubstituteVariable(subscript_expr, payload);
+	}
 	// Convert overloaded operators before we pop this node off the stack.
 	// This node needs to be on the node stack if an operator overloading substitution is made,
 	// as the new op_X function will need to have a bind variables pass run on it.
-	if(payload.operation == TraversalPayload::BindVariables)
+	else if(payload.operation == TraversalPayload::BindVariables)
 	{
 		convertOverloadedOperators(subscript_expr, payload, stack);
 	}

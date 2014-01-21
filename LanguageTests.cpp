@@ -54,6 +54,38 @@ void LanguageTests::run()
 //	ProgramBuilder::test();
 	Timer timer;
 
+
+	/*testMainFloatArg(
+		"def expensiveA(float x) float : cos(x * 2.0)			\n\
+		def main(float x) float: expensiveA(x)",
+		0.2f, cos(0.2 * 2.0f));
+
+	testMainFloatArg(
+		"def expensiveA(float x) float : cos(x * 2.0)			\n\
+		def main(float x) float: x + expensiveA(x)",
+		0.2f, 0.2f + cos(0.2 * 2.0f));
+*/
+	testMainFloatArg(
+		//"def expensiveA(float x) float : pow(x, 0.1 + pow(0.2, x))			\n
+		"def expensiveA(float x) float : cos(x * 0.456 + cos(x))			\n\
+		def expensiveB(float x) float : sin(x * 0.345 + sin(x))			\n\
+		def main(float x) float: if(x < 0.5, expensiveA(x + 0.145), expensiveB(x + 0.2435))",
+		0.2f, cos((0.2f + 0.145f) * 0.456f + cos((0.2f + 0.145f))));	
+
+
+	// Check constant folding for a function that is ostensibly a function of several arguments but does not actually depend on them.
+	//testMainFloatArg("def g(float x) float : pow(2.0, 3.0)             def main(float x) float :  g(x)",    1.f, 8.f);
+
+	//testMainFloatArg("def g(float x) float : pow(2.0, 3.0)             def main(float x) float :  pow(g(x), 2.0)",    1.f, 64.f);
+	testMainFloatArg("def g(float x) float : 8.f             def main(float x) float :  pow(g(x), 2.0)",    1.f, 64.f);
+
+	// Check constant folding for a let variable
+	//testMainFloatArg("def main(float x) float :  let y = pow(2.0, 3.0) in y", 1.f, 8.f);
+
+	// Check constant folding for expression involving a let variable
+	testMainFloatArg("def main(float x) float :  let y = (1.0 + 1.0) in pow(y, 3.0)", 1.f, 8.f);
+	
+
 	// Check constant folding of a pow function that is inside another function
 	testMainFloatArg("def g(float x) float :  pow(2 + x, -(1.0 / 8.0))         def main(float x) float : g(0.5)", 1.f, std::pow(2.f + 0.5f, -(1.0f / 8.0f)));
 	

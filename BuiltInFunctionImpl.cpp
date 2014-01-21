@@ -554,7 +554,7 @@ ValueRef ArraySubscriptBuiltInFunc::invoke(VMState& vmstate)
 		if(index->value >= 0 && index->value < arr->e.size())
 			return arr->e[index->value];
 		else
-			return this->array_type->elem_type->getInvalidValue();
+			throw BaseException("Array index out of bounds"); // return this->array_type->elem_type->getInvalidValue();
 	}
 	else
 	{
@@ -857,9 +857,10 @@ ValueRef VectorSubscriptBuiltInFunc::invoke(VMState& vmstate)
 	const VectorValue* vec = static_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back()    ].getPointer());
 	const IntValue* index  = static_cast<const IntValue*>   (vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
 
-	//if(index->value >= 0 && index->value < vec->e.size())
+	if(index->value >= 0 && index->value < vec->e.size())
 		return vec->e[index->value];
-	//else
+	else
+		throw BaseException("Vector index out of bounds");
 	//	return this->vec_type->elem_type->getInvalidValue();
 }
 

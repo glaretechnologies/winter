@@ -130,8 +130,10 @@ FunctionDefinition* FunctionExpression::runtimeBind(VMState& vmstate, FunctionVa
 	{
 		assert(this->binding_type == Let);
 
-		const int let_stack_start = (int)vmstate.let_stack_start[vmstate.let_stack_start.size() - 1 - this->let_frame_offset];
-		ValueRef arg = vmstate.let_stack[let_stack_start + this->bound_index];
+		//const int let_stack_start = (int)vmstate.let_stack_start[vmstate.let_stack_start.size() - 1 - this->let_frame_offset];
+		//ValueRef arg = vmstate.let_stack[let_stack_start + this->bound_index];
+
+		ValueRef arg = this->bound_let_block->lets[this->bound_index]->exec(vmstate);
 
 		//ValueRef arg = vmstate.let_stack[vmstate.let_stack_start.back() + this->bound_index];
 		assert(dynamic_cast<FunctionValue*>(arg.getPointer()));
@@ -550,6 +552,7 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 			}
 		}
 	}
+	
 	/*else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
 		for(size_t i=0; i<argument_expressions.size(); ++i)
@@ -567,8 +570,17 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 		this->argument_expressions[i]->traverse(payload, stack);
 
 	
-
-	if(payload.operation == TraversalPayload::BindVariables) // LinkFunctions)
+	if(payload.operation == TraversalPayload::InlineFunctionCalls)
+	{
+		for(size_t i=0; i<argument_expressions.size(); ++i)
+			checkInlineExpression(argument_expressions[i], payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	{
+		for(size_t i=0; i<argument_expressions.size(); ++i)
+			checkSubstituteVariable(argument_expressions[i], payload);
+	}
+	else if(payload.operation == TraversalPayload::BindVariables) // LinkFunctions)
 	{
 		// TEMP NEW: Do operator overloading now:
 		for(size_t i=0; i<argument_expressions.size(); ++i)
@@ -1440,9 +1452,6 @@ Reference<ASTNode> FunctionExpression::clone()
 
 bool FunctionExpression::isConstant() const
 {
-	//if(!this->provenDefined())
-	//	return false;
-
 	// For now, we'll say a function expression bound to an argument of let var is not constant.
 	if(this->binding_type != BoundToGlobalDef)
 		return false;

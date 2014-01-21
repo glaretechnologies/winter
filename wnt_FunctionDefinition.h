@@ -29,8 +29,8 @@ public:
 	class FunctionArg
 	{
 	public:
-		FunctionArg(){}
-		FunctionArg(TypeRef type_, const string& n) : type(type_), name(n) {}
+		FunctionArg() : referenced(true) {}
+		FunctionArg(TypeRef type_, const string& n) : type(type_), name(n), referenced(true) {}
 		/*enum TypeKind
 		{
 			GENERIC_TYPE,
@@ -41,6 +41,12 @@ public:
 		TypeRef type;
 		//int generic_type_param_index;
 		string name;
+
+		bool isReferenced() const { return referenced; }
+
+		bool referenced; // Is this argument bound to by a variable in the function body?  Will be conservatively set to true if unknown.
+
+		int ref_count;
 	};
 
 	

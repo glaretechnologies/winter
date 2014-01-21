@@ -18,6 +18,7 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "wnt_RefCounting.h"
 #include "wnt_ASTNode.h"
 #include "wnt_Frame.h"
+#include "wnt_LLVMVersion.h"
 #include "VMState.h"
 #include "Linker.h"
 #include "Value.h"
@@ -68,7 +69,6 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 
 
 using std::vector;
-//#define USE_LLVM_3_4 1
 
 
 namespace Winter
@@ -297,14 +297,17 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 		this->external_functions.push_back(alloc_ref);
 
 
-		// TEMP: There is a problem with LLVM 3.3 and earlier with the pow intrinsic getting turned into exp2f().
+		// There is a problem with LLVM 3.3 and earlier with the pow intrinsic getting turned into exp2f().
 		// So for now just use our own pow() external function.
+#if USE_LLVM_3_4
+#else
 		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
 			(void*)(float(*)(float, float))std::pow,
 			powInterpreted,
 			FunctionSignature("pow", vector<TypeRef>(2, new Float())),
 			new Float()
 		)));
+#endif
 
 
 		// Add allocateString
@@ -598,6 +601,18 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 
 			tree_changed = tree_changed || payload.tree_changed;
 		}
+
+		// Do Function inlining
+		/*{
+			std::vector<ASTNode*> stack;
+			TraversalPayload payload(TraversalPayload::InlineFunctionCalls);
+			for(size_t i=0; i<func_defs.size(); ++i)
+				if(!func_defs[i]->is_anon_func)
+					func_defs[i]->traverse(payload, stack);
+			assert(stack.size() == 0);
+
+			tree_changed = tree_changed || payload.tree_changed;
+		}*/
 
 		// Do another pass of type coercion, as constant folding may have made new literals that can be coerced.
 		{

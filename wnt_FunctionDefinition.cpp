@@ -117,11 +117,14 @@ ValueRef FunctionDefinition::exec(VMState& vmstate)
 		}
 		else if(this->captured_vars[i].vartype == CapturedVar::Let)
 		{
-			const int let_frame_offset = this->captured_vars[i].let_frame_offset;
-			assert(let_frame_offset < (int)vmstate.let_stack_start.size());
+			//const int let_frame_offset = this->captured_vars[i].let_frame_offset;
+			//assert(let_frame_offset < (int)vmstate.let_stack_start.size());
 
-			const int let_stack_start = (int)vmstate.let_stack_start[vmstate.let_stack_start.size() - 1 - let_frame_offset];
-			vals.push_back(vmstate.let_stack[let_stack_start + this->captured_vars[i].index]);
+			//const int let_stack_start = (int)vmstate.let_stack_start[vmstate.let_stack_start.size() - 1 - let_frame_offset];
+			//vals.push_back(vmstate.let_stack[let_stack_start + this->captured_vars[i].index]);
+
+			ValueRef val = this->captured_vars[i].bound_let_block->lets[this->captured_vars[i].index]->exec(vmstate);
+			vals.push_back(val);
 
 			//NOTE: this looks wrong, should use index here as well?
 		}
@@ -268,6 +271,7 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 	//		}
 	//	}
 	//}
+
 	if(payload.operation == TraversalPayload::AddOpaqueEnvArg)
 	{
 		// std::cout << "AddOpaqueEnvArg for func def " + sig.toString();
@@ -330,6 +334,12 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 		assert(the_alloc_func.nonNull());
 
 		this->alloc_func = the_alloc_func.getPointer();
+
+		payload.all_variables_bound = true; // Assume true until we find an unbound variable during the body traversal.
+
+		// Zero all arg ref counts.
+		for(size_t i=0; i<args.size(); ++i)
+			args[i].ref_count = 0;
 	}
 
 
@@ -405,6 +415,24 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 		{
 			Function* ftype = static_cast<Function*>(this->declared_return_type.getPointer());
 		}
+
+
+		/*
+		Detecting function arguments that aren't referenced
+		===================================================
+		Do a pass over function body.
+		At end of pass,
+		if all variables are bound:
+		any argument that is not referenced is not used.
+		*/
+		if(payload.all_variables_bound)
+		{
+			for(size_t i=0; i<args.size(); ++i)
+			{
+				args[i].referenced = args[i].ref_count > 0;
+			}
+		}
+
 	}
 
 

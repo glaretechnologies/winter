@@ -89,7 +89,9 @@ public:
 		OperatorOverloadConversion, // Converting '+' to op_add
 		GetCleanupNodes,
 		CheckInDomain, // Check that calls to elem() etc.. are in bounds.
-		AddOpaqueEnvArg
+		AddOpaqueEnvArg,
+		InlineFunctionCalls, // inline function calls
+		SubstituteVariables // Used in InlineFunctionCalls passes: replace all variables in the function body with the argument values.
 	};
 
 	TraversalPayload(Operation e) : 
@@ -110,6 +112,10 @@ public:
 
 	//vector<LetBlock*> let_block_stack;
 	std::vector<FunctionDefinition*> func_def_stack;
+
+	bool all_variables_bound; // Are all variables in a given function body bound?  Used in BindVariables pass.
+
+	std::vector<Reference<ASTNode> > variable_substitutes; // Used in SubstituteVariables pass
 };
 
 
@@ -117,6 +123,8 @@ const std::string indent(VMState& vmstate);
 void printMargin(int depth, std::ostream& s);
 bool isIntExactlyRepresentableAsFloat(int x);
 void checkFoldExpression(Reference<ASTNode>& e, TraversalPayload& payload);
+void checkSubstituteVariable(Reference<ASTNode>& e, TraversalPayload& payload);
+void checkInlineExpression(Reference<ASTNode>& e, TraversalPayload& payload, std::vector<ASTNode*>& stack);
 void convertOverloadedOperators(Reference<ASTNode>& e, TraversalPayload& payload, std::vector<ASTNode*>& stack);
 const std::string errorContext(const ASTNode& n);
 const std::string errorContext(const ASTNode& n, TraversalPayload& payload);
@@ -332,7 +340,7 @@ public:
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone();
-	virtual bool isConstant() const { return false; }
+	virtual bool isConstant() const;
 
 	// or for what it is a let of.
 	//AnonFunction* parent_anon_function;

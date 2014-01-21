@@ -6,6 +6,7 @@
 #include "utils/stringutils.h"
 #include "utils/platformutils.h"
 #include "wnt_ExternalFunction.h"
+#include "wnt_LLVMVersion.h"
 
 
 using std::vector;
@@ -435,9 +436,10 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 
 		if(sig.param_types[0]->getType() == Type::FloatType && sig.param_types[1]->getType() == Type::FloatType)
 		{
-			// TEMP: There is a problem with LLVM 3.3 and earlier with the pow intrinsic getting turned into exp2f().
+			// There is a problem with LLVM 3.3 and earlier with the pow intrinsic getting turned into exp2f() when the first argument is 2.
 			// So for now just use our own pow() external function.
-			/*if(sig.name == "pow")
+#if USE_LLVM_3_4
+			if(sig.name == "pow")
 			{
 				vector<FunctionDefinition::FunctionArg> args(2);
 				args[0].name = "x";
@@ -456,7 +458,8 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 
 				this->sig_to_function_map.insert(std::make_pair(sig, def));
 				return def;
-			}*/
+			}
+#endif
 		}
 
 		if(

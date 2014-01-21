@@ -2,6 +2,14 @@ Copyright 2009- Nicholas Chapman
 
 
 
+Detecting function arguments that aren't referenced
+===================================================
+Do a pass over function body.
+At end of pass,
+if all variables are bound:
+any argument that is not referenced is not used.
+
+
 
 
 Pattern Matching
