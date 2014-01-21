@@ -502,7 +502,7 @@ private:
 class VectorLiteral : public ASTNode
 {
 public:
-	VectorLiteral(const std::vector<ASTNodeRef>& elems, const SrcLocation& loc);
+	VectorLiteral(const std::vector<ASTNodeRef>& elems, const SrcLocation& loc, bool has_int_suffix, int int_suffix);
 
 	virtual ValueRef exec(VMState& vmstate);
 	virtual TypeRef type() const;
@@ -517,6 +517,8 @@ public:
 private:
 	bool areAllElementsConstant() const;
 	std::vector<ASTNodeRef> elements;
+	bool has_int_suffix;
+	int int_suffix;
 };
 
 

@@ -17,6 +17,7 @@ Copyright 2009 Nicholas Chapman
 #include "indigo/TestUtils.h"
 #include "indigo/globals.h"
 #include "utils/stringutils.h"
+#include "utils/Parser.h"
 #include <assert.h>
 #include <map>
 #include "maths/mathstypes.h"
@@ -1162,10 +1163,24 @@ ASTNodeRef LangParser::parseArrayOrVectorLiteralOrArraySubscriptExpression(const
 
 	//if(isTokenCurrent(IDENTIFIER_TOKEN, p))
 	const std::string id = parseIdentifier("square bracket literal suffix", p);
-	if(id == "a")
+	if(hasPrefix(id, "a"))
+	{
 		return ASTNodeRef(new ArrayLiteral(elems, loc));
-	else if(id == "v")
-		return ASTNodeRef(new VectorLiteral(elems, loc));
+	}
+	else if(hasPrefix(id, "v"))
+	{
+		int int_suffix = 0;
+		bool has_int_suffix = false;
+		Parser temp_p(id.c_str(), id.size());
+		temp_p.advance(); // Advance past v
+		if(!temp_p.eof())
+		{
+			has_int_suffix = true;
+			if(!temp_p.parseInt(int_suffix))
+				throw LangParserExcep("Invalid square bracket literal suffix '" + id + "'.");
+		}
+		return ASTNodeRef(new VectorLiteral(elems, loc, has_int_suffix, int_suffix));
+	}
 	else
 	{
 		//if(elems.size() > 1)

@@ -54,6 +54,34 @@ void LanguageTests::run()
 //	ProgramBuilder::test();
 	Timer timer;
 
+	
+
+	{
+		Float4Struct a(1.0f, 2.0, 3.0, 4.0);
+		Float4Struct target_result(3.f, 4.f, 5.f, 6.f);
+		
+		testFloat4Struct(
+			"struct Float4Struct { vector<float, 4> v } \n\
+			def main(Float4Struct a, Float4Struct b) Float4Struct : \n\
+				Float4Struct(a.v + [2.0]v4)", 
+			a, a, target_result
+		);
+	}
+
+	{
+		Float4Struct a(1.0f, 2.0, 3.0, 4.0);
+		Float4Struct target_result(2.f, 3.f, 4.f, 5.f);
+		
+		testFloat4Struct(
+			"struct Float4Struct { vector<float, 4> v } \n\
+			def main(Float4Struct a, Float4Struct b) Float4Struct : \n\
+				Float4Struct(a.v + [elem(b.v, 0)]v4)", 
+			a, a, target_result
+		);
+	}
+
+	// Check scalar initialisation of vector
+	testMainFloatArg("def main(float x) float :  elem(    [2.0]v8    , 5)", 1.0f, 2.0f);
 
 	/*testMainFloatArg(
 		"def expensiveA(float x) float : cos(x * 2.0)			\n\

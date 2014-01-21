@@ -166,6 +166,8 @@ static ValueRef concatStringsInterpreted(const vector<ValueRef>& args)
 }
 
 
+#if USE_LLVM_3_4
+#else
 static float getFloatArg(const vector<ValueRef>& arg_values, int i)
 {
 	assert(dynamic_cast<const FloatValue*>(arg_values[i].getPointer()) != NULL);
@@ -177,6 +179,7 @@ static ValueRef powInterpreted(const vector<ValueRef>& args)
 {
 	return new FloatValue(std::pow(getFloatArg(args, 0), getFloatArg(args, 1)));
 }
+#endif
 
 
 // We need to define our own memory manager so that we can supply our own getPointerToNamedFunction() method, that will return pointers to external functions.

@@ -1490,10 +1490,17 @@ bool ArrayLiteral::isConstant() const
 //------------------------------------------------------------------------------------------
 
 
-VectorLiteral::VectorLiteral(const std::vector<ASTNodeRef>& elems, const SrcLocation& loc)
+VectorLiteral::VectorLiteral(const std::vector<ASTNodeRef>& elems, const SrcLocation& loc, bool has_int_suffix_, int int_suffix_)
 :	ASTNode(VectorLiteralType, loc),
-	elements(elems)
+	elements(elems),
+	has_int_suffix(has_int_suffix_),
+	int_suffix(int_suffix_)
 {
+	if(has_int_suffix && int_suffix <= 0)
+		throw BaseException("Vector literal int suffix must be > 0." + errorContext(*this));
+	if(has_int_suffix && elems.size() != 1)
+		throw BaseException("Vector literal with int suffix must have only one explicit elem." + errorContext(*this));
+
 	if(elems.empty())
 		throw BaseException("Vector literal can't be empty." + errorContext(*this));
 }
@@ -1501,20 +1508,32 @@ VectorLiteral::VectorLiteral(const std::vector<ASTNodeRef>& elems, const SrcLoca
 
 TypeRef VectorLiteral::type() const
 {
-	return TypeRef(new VectorType(elements[0]->type(), (int)elements.size()));
+	if(has_int_suffix)
+		return new VectorType(elements[0]->type(), this->int_suffix);
+	else
+		return new VectorType(elements[0]->type(), (int)elements.size());
 }
 
 
 ValueRef VectorLiteral::exec(VMState& vmstate)
 {
-	vector<ValueRef> elem_values(elements.size());
-
-	for(unsigned int i=0; i<this->elements.size(); ++i)
+	if(has_int_suffix)
 	{
-		elem_values[i] = this->elements[i]->exec(vmstate);
-	}
+		ValueRef v = this->elements[0]->exec(vmstate);
 
-	return ValueRef(new VectorValue(elem_values));
+		vector<ValueRef> elem_values(int_suffix, v);
+
+		return new VectorValue(elem_values);
+	}
+	else
+	{
+		vector<ValueRef> elem_values(elements.size());
+
+		for(unsigned int i=0; i<this->elements.size(); ++i)
+			elem_values[i] = this->elements[i]->exec(vmstate);
+
+		return new VectorValue(elem_values);
+	}
 }
 
 
@@ -1646,29 +1665,39 @@ llvm::Value* VectorLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 		return params.builder->CreateLoad(global);
 	}*/
 
-
-	//NOTE TODO: Can just use get() here to create the constant vector immediately?
-
-	// Start with a vector of Undefs.
-	llvm::Value* v = llvm::ConstantVector::getSplat(
-		(unsigned int)this->elements.size(),
-		llvm::UndefValue::get(this->elements[0]->type()->LLVMType(*params.context))
-	);
-
-	// Insert elements one-by-one.
-	llvm::Value* vec = v;
-	for(unsigned int i=0; i<this->elements.size(); ++i)
+	if(has_int_suffix)
 	{
-		llvm::Value* elem_llvm_code = this->elements[i]->emitLLVMCode(params);
-
-		vec = params.builder->CreateInsertElement(
-			vec, // vec
-			elem_llvm_code, // new element
-			llvm::ConstantInt::get(*params.context, llvm::APInt(32, i)) // index
+		return params.builder->CreateVectorSplat(
+			this->int_suffix, // num elements
+			this->elements[0]->emitLLVMCode(params), // value
+			"vector literal"
 		);
 	}
+	else
+	{
+		//NOTE TODO: Can just use get() here to create the constant vector immediately?
 
-	return vec;
+		// Start with a vector of Undefs.
+		llvm::Value* v = llvm::ConstantVector::getSplat(
+			(unsigned int)this->elements.size(),
+			llvm::UndefValue::get(this->elements[0]->type()->LLVMType(*params.context))
+		);
+
+		// Insert elements one-by-one.
+		llvm::Value* vec = v;
+		for(unsigned int i=0; i<this->elements.size(); ++i)
+		{
+			llvm::Value* elem_llvm_code = this->elements[i]->emitLLVMCode(params);
+
+			vec = params.builder->CreateInsertElement(
+				vec, // vec
+				elem_llvm_code, // new element
+				llvm::ConstantInt::get(*params.context, llvm::APInt(32, i)) // index
+			);
+		}
+
+		return vec;
+	}
 }
 
 
@@ -1677,7 +1706,7 @@ Reference<ASTNode> VectorLiteral::clone()
 	std::vector<ASTNodeRef> elems(this->elements.size());
 	for(size_t i=0; i<elements.size(); ++i)
 		elems[i] = this->elements[i]->clone();
-	return ASTNodeRef(new VectorLiteral(elems, srcLocation()));
+	return ASTNodeRef(new VectorLiteral(elems, srcLocation(), has_int_suffix, int_suffix));
 }
 
 
