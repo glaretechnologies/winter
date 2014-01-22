@@ -9,7 +9,7 @@
 #include <vector>
 #include "LLVMTypeUtils.h"
 #include "utils/platformutils.h"
-#if USE_LLVM
+#pragma warning(push, 0) // Disable warnings
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -23,7 +23,8 @@
 #include <llvm/IR/CallingConv.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Intrinsics.h>
-#endif
+#pragma warning(pop) // Re-enable warnings
+
 
 #include <iostream>//TEMP
 
@@ -474,7 +475,7 @@ llvm::Value* ArrayMapBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 
 
-	llvm::Value* initial_value = return_ptr;
+	//llvm::Value* initial_value = return_ptr;
 	
 	ArrayMapBuiltInFunc_CreateLoopBodyCallBack callback;
 	callback.return_ptr = return_ptr;
@@ -811,7 +812,7 @@ llvm::Value* ArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 				return NULL;
 			}
 		}
-		else if(index_type->getType() == Type::ArrayTypeType);
+		else if(index_type->getType() == Type::VectorTypeType)
 		{
 			// Gather (vector) index.
 			// Since we are returning a vector, and we are assuming vectors are not pass by pointer, we know the return type is not pass by pointer.
@@ -823,7 +824,7 @@ llvm::Value* ArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 				params, 
 				0, // arg offset - we have an sret arg.
 				this->array_type->elem_type,
-				this->index_type.downcast<ArrayType>()->num_elems // index_vec_num_elems
+				this->index_type.downcast<VectorType>()->num // index_vec_num_elems
 			);
 
 			//TEMP:
@@ -837,6 +838,11 @@ llvm::Value* ArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 			//);
 
 			return result_vector;
+		}
+		else
+		{
+			assert(0);
+			return NULL;
 		}
 	}
 }
@@ -1181,8 +1187,8 @@ ValueRef VectorMinBuiltInFunc::invoke(VMState& vmstate)
 	{
 		for(unsigned int i=0; i<vector_type->num; ++i)
 		{
-			const float x = static_cast<const IntValue*>(a->e[i].getPointer())->value;
-			const float y = static_cast<const IntValue*>(b->e[i].getPointer())->value;
+			const int x = static_cast<const IntValue*>(a->e[i].getPointer())->value;
+			const int y = static_cast<const IntValue*>(b->e[i].getPointer())->value;
 			res_values[i] = ValueRef(new IntValue(x > y ? x : y));
 		}
 	}
@@ -1213,6 +1219,7 @@ llvm::Value* VectorMinBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 	else
 	{
 		assert(0);
+		throw BaseException("Internal error - VectorMinBuiltInFunc");
 	}
 
 	return params.builder->CreateSelect(condition, a, b);
@@ -1285,8 +1292,8 @@ ValueRef VectorMaxBuiltInFunc::invoke(VMState& vmstate)
 	{
 		for(unsigned int i=0; i<vector_type->num; ++i)
 		{
-			const float x = static_cast<const IntValue*>(a->e[i].getPointer())->value;
-			const float y = static_cast<const IntValue*>(b->e[i].getPointer())->value;
+			const int x = static_cast<const IntValue*>(a->e[i].getPointer())->value;
+			const int y = static_cast<const IntValue*>(b->e[i].getPointer())->value;
 			res_values[i] = ValueRef(new IntValue(x > y ? x : y));
 		}
 	}
@@ -1317,6 +1324,7 @@ llvm::Value* VectorMaxBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 	else
 	{
 		assert(0);
+		throw BaseException("Internal error - VectorMaxBuiltInFunc");
 	}
 
 	return params.builder->CreateSelect(condition, a, b);
@@ -1347,7 +1355,7 @@ ValueRef ShuffleBuiltInFunc::invoke(VMState& vmstate)
 llvm::Value* ShuffleBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
 	llvm::Value* a = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
-	llvm::Value* index_vec = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
+	//llvm::Value* index_vec = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
 
 
 	llvm::Constant* mask;

@@ -513,7 +513,7 @@ bool SumType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) cons
 		return false;
 
 	// So b is a SumType as well.
-	const SumType* b_ = static_cast<const SumType*>(&b);
+	// const SumType* b_ = static_cast<const SumType*>(&b);
 
 	assert(0);
 	// TODO

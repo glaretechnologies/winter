@@ -275,7 +275,7 @@ IntervalSetFloat ProofUtils::getFloatRange(TraversalPayload& payload, std::vecto
 
 				if(if_node->condition->nodeType() == ASTNode::FunctionExpressionType)
 				{
-					FunctionExpression* condition_func_express = static_cast<FunctionExpression*>(if_node->condition.getPointer());
+					// FunctionExpression* condition_func_express = static_cast<FunctionExpression*>(if_node->condition.getPointer());
 				}
 				else if(if_node->condition->nodeType() == ASTNode::BinaryBooleanType)
 				{

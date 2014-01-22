@@ -1482,7 +1482,7 @@ llvm::Value* ArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 		{
 			// Element is pass-by-pointer, for example a structure.
 			// So just emit code that will store it directly in the array.
-			llvm::Value* element_value = this->elements[i]->emitLLVMCode(params, element_ptr);
+			this->elements[i]->emitLLVMCode(params, element_ptr);
 		}
 	}
 
@@ -3430,7 +3430,7 @@ llvm::Value* UnaryMinusExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm
 		{
 			llvm::Value* neg_one_vec = llvm::ConstantVector::getSplat(
 				vec_type->num,
-				llvm::ConstantInt::get(*params.context, llvm::APInt(32, -1, true))
+				llvm::ConstantInt::get(*params.context, llvm::APInt(32, (uint64_t)-1, true))
 			);
 
 			return params.builder->CreateMul(

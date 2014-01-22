@@ -415,10 +415,10 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 		//this->captured_vars = payload.captured_vars;
 
 		//this->declared_return_type = 
-		if(this->declared_return_type.nonNull() && this->declared_return_type->getType() == Type::FunctionType)
+		/*if(this->declared_return_type.nonNull() && this->declared_return_type->getType() == Type::FunctionType)
 		{
 			Function* ftype = static_cast<Function*>(this->declared_return_type.getPointer());
-		}
+		}*/
 
 
 		/*

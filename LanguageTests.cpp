@@ -54,8 +54,6 @@ void LanguageTests::run()
 //	ProgramBuilder::test();
 	Timer timer;
 
-	
-
 	// Test int->float type coercion in various ways	
 
 	// Test int->float coercion in an if statement as required for an argument to another function. (truncateToInt in this case).
