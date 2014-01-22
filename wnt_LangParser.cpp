@@ -1,10 +1,8 @@
 /*=====================================================================
 LangParser.cpp
 --------------
+Copyright Glare Technologies Limited 2014 -
 File created by ClassTemplate on Wed Jun 11 02:56:20 2008
-Code By Nicholas Chapman.
-
-Copyright 2009 Nicholas Chapman
 =====================================================================*/
 #include "wnt_LangParser.h"
 
@@ -65,96 +63,7 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 {
 	try
 	{
-		BufferRoot* root = new BufferRoot(SrcLocation(0, source_buffer.getPointer()));
-
-		Reference<Type> float_type(new Float());
-		Reference<VectorType> vec4f_type(new VectorType(float_type, 4));
-		//Reference<VectorType> vec8f_type(new VectorType(float_type, 8));
-		
-
-		//TEMP:
-		// Create float array map definition
-		/*{
-			vector<FunctionDefinition::FunctionArg> args(2);
-			args[0].type = TypeRef(new Function(vector<TypeRef>(1, TypeRef(new Float())), TypeRef(new Float())));
-			args[0].name = "f";
-			args[1].type = TypeRef(new ArrayType(TypeRef(new Float)));
-			args[1].name = "array";
-
-			FunctionDefinition* def = new FunctionDefinition(
-				"map",
-				args,
-				vector<Reference<LetASTNode> >(),
-				ASTNodeRef(NULL), // body expr
-				TypeRef(new ArrayType(TypeRef(new Float))), // return type
-				new ArrayMapBuiltInFunc(
-					TypeRef(new ArrayType(TypeRef(new Float))),
-					Reference<Function>(new Function(vector<TypeRef>(1, TypeRef(new Float())), TypeRef(new Float())))
-				)
-			);
-
-			root->func_defs.push_back(Reference<FunctionDefinition>(def));
-		}*/
-
-		// TEMP: Create float array fold definition
-		// #decl fold<T>(function<T, T, T>, array<T>, T) T
-		/*{
-			vector<FunctionDefinition::FunctionArg> args(3);
-			TypeRef T(new GenericType(0));
-			args[0].type = TypeRef(new Function(
-				vector<TypeRef>(2, T), // arg types
-				T, // return type
-				//vector<TypeRef>(), // captured var types
-				false // use_captured_vars
-			));
-			args[0].name = "f";
-			args[1].type = TypeRef(new ArrayType(T));
-			args[1].name = "array";
-			args[2].type = T;
-			args[2].name = "initial_val";
-
-			FunctionDefinition* def = new FunctionDefinition(
-				"fold",
-				args,
-				//vector<Reference<LetASTNode> >(),
-				ASTNodeRef(NULL), // body expr
-				T, // return type
-				//new ArrayFoldBuiltInFunc(
-				//	TypeRef(new Float)
-				//)
-				NULL // built in impl.
-			);
-
-			root->func_defs.push_back(Reference<FunctionDefinition>(def));
-		}*/
-		/*
-		// Create 'if' built in function
-		{
-			vector<FunctionDefinition::FunctionArg> args(3);
-			args[0].name = "condition";
-			args[0].type = TypeRef(new Bool());
-
-			TypeRef T(new GenericType(
-				0 // generic_type_param_index
-			));
-
-			args[1].type = T;
-			args[1].name = "a";
-			args[2].type = T;
-			args[2].name = "b";
-
-			FunctionDefinitionRef def = new FunctionDefinition(
-				SrcLocation::invalidLocation(),
-				"if", // name
-				args, // args
-				ASTNodeRef(NULL), // body expr
-				T, // return type
-				new IfBuiltInFunc(T) // built in impl.
-			);
-
-			root->func_defs.push_back(def);
-		}
-		*/
+		Reference<BufferRoot> root = new BufferRoot(SrcLocation(0, source_buffer.getPointer()));
 
 		func_defs_out = root->func_defs;
 
@@ -224,7 +133,7 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 				throw LangParserExcep("Expected 'def'." + errorPosition(*source_buffer, tokens[i]->char_index));
 		}
 
-		return Reference<ASTNode>(root);
+		return root;
 	}
 	catch(TokenBaseExcep& e)
 	{
@@ -266,7 +175,6 @@ bool LangParser::isTokenCurrent(unsigned int token_type, const ParseInfo& p)
 
 ASTNodeRef LangParser::parseFieldExpression(const ParseInfo& p)
 {
-//	ASTNodeRef var_expression = parseVariableExpression(p);
 	ASTNodeRef var_expression;
 
 	if(p.tokens[p.i]->getType() == IDENTIFIER_TOKEN && p.tokens[p.i]->getIdentifierValue() == "if")
@@ -284,18 +192,6 @@ ASTNodeRef LangParser::parseFieldExpression(const ParseInfo& p)
 		}
 	}
 
-
-	/*if(isTokenCurrent(DOT_TOKEN, p))
-	{
-		parseToken(DOT_TOKEN, p);
-
-		const std::string field_name = parseIdentifier("field name", p);
-
-		FunctionExpression* func_expr(new FunctionExpression());
-		func_expr->function_name = field_name;
-		func_expr->argument_expressions.push_back(var_expression);
-		return ASTNodeRef(func_expr);
-	}*/
 	while(isTokenCurrent(DOT_TOKEN, p))
 	{
 		SrcLocation src_loc = locationForParseInfo(p);
@@ -1350,10 +1246,9 @@ const std::string LangParser::errorPositionPrevToken(const ParseInfo& p)
 
 #if BUILD_TESTS
 
+
 void LangParser::test()
 {
-
-#if BUILD_TESTS
 	const std::string s = "def lerp(real a, real b, real t) real : add(mul(a, sub(1.0, t)), mul(b, t))";
 	SourceBufferRef buffer(new SourceBuffer("buffer", s));
 	//const std::string s = "def lerp(real a, real b, real t) real : add(a, b, t())";
@@ -1403,10 +1298,10 @@ void LangParser::test()
 		conPrint("LangParserExcep: " + e.what());
 		testAssert(false);
 	}
-#endif
 }
 
-#endif
+
+#endif // BUILD_TESTS
 
 
-} //end namespace Winter
+} // end namespace Winter

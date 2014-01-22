@@ -1,24 +1,22 @@
 /*=====================================================================
 LangParser.h
 ------------
+Copyright Glare Technologies Limited 2014 -
 File created by ClassTemplate on Wed Jun 11 02:56:20 2008
-Code By Nicholas Chapman.
-
-Copyright 2009 Nicholas Chapman
 =====================================================================*/
 #pragma once
 
 
-#include <string>
-#include <vector>
-#include <map>
 #include "TokenBase.h"
 #include "BaseException.h"
 #include "wnt_ASTNode.h"
 #include "wnt_FunctionDefinition.h"
-#include <utils/Reference.h>
 #include "wnt_Type.h"
 #include "wnt_SourceBuffer.h"
+#include <utils/Reference.h>
+#include <string>
+#include <vector>
+#include <map>
 
 
 namespace Winter
@@ -126,4 +124,3 @@ private:
 
 
 }
-
