@@ -3,6 +3,7 @@
 
 #include "wnt_FunctionExpression.h"
 #include "wnt_FunctionDefinition.h"
+#include "wnt_IfExpression.h"
 #include "VMState.h"
 
 
@@ -158,25 +159,24 @@ IntervalSetInt ProofUtils::getIntegerRange(TraversalPayload& payload, std::vecto
 		ASTNode* stack_node = stack[z];
 
 		// Get next node up the call stack
-		if(stack_node->nodeType() == ASTNode::FunctionExpressionType && 
-			static_cast<FunctionExpression*>(stack_node)->target_function->sig.name == "if")
+		if(stack_node->nodeType() == ASTNode::IfExpressionType)
 		{
 			// AST node above this one is an "if" expression
-			FunctionExpression* if_node = static_cast<FunctionExpression*>(stack_node);
+			IfExpression* if_node = static_cast<IfExpression*>(stack_node);
 
 			// Is this node the 1st arg of the if expression?
 			// e.g. if condition then this_node else other_node
 			// Or is this node a child of the 1st arg?
-			if(/*if_node->argument_expressions[1].getPointer() == this || */((z+1) < (int)stack.size() && if_node->argument_expressions[1].getPointer() == stack[z+1]))
+			if(/*if_node->argument_expressions[1].getPointer() == this || */((z+1) < (int)stack.size() && if_node->then_expr.getPointer() == stack[z+1]))
 			{
 				// Ok, now we need to check the condition of the if expression.
 				// A valid proof condition will be of form
 				// inBounds(array, index)
 				// Where array and index are the same as the ones for this elem() call.
 
-				if(if_node->argument_expressions[0]->nodeType() == ASTNode::FunctionExpressionType)
+				if(if_node->condition->nodeType() == ASTNode::FunctionExpressionType)
 				{
-					FunctionExpression* condition_func_express = static_cast<FunctionExpression*>(if_node->argument_expressions[0].getPointer());
+					FunctionExpression* condition_func_express = static_cast<FunctionExpression*>(if_node->condition.getPointer());
 					
 					if(condition_func_express->target_function->sig.name == "inBounds")
 					{
@@ -213,9 +213,9 @@ IntervalSetInt ProofUtils::getIntegerRange(TraversalPayload& payload, std::vecto
 						}*/
 					}
 				}
-				else if(if_node->argument_expressions[0]->nodeType() == ASTNode::BinaryBooleanType)
+				else if(if_node->condition->nodeType() == ASTNode::BinaryBooleanType)
 				{
-					BinaryBooleanExpr* bin = static_cast<BinaryBooleanExpr*>(if_node->argument_expressions[0].getPointer());
+					BinaryBooleanExpr* bin = static_cast<BinaryBooleanExpr*>(if_node->condition.getPointer());
 					if(bin->t == BinaryBooleanExpr::AND)
 					{
 						// We know condition expression is of type A AND B
@@ -235,9 +235,9 @@ IntervalSetInt ProofUtils::getIntegerRange(TraversalPayload& payload, std::vecto
 						}
 					}
 				}
-				else if(if_node->argument_expressions[0]->nodeType() == ASTNode::ComparisonExpressionType)
+				else if(if_node->condition->nodeType() == ASTNode::ComparisonExpressionType)
 				{
-					ComparisonExpression* comp = static_cast<ComparisonExpression*>(if_node->argument_expressions[0].getPointer());
+					ComparisonExpression* comp = static_cast<ComparisonExpression*>(if_node->condition.getPointer());
 					bounds = updateIndexBounds(payload, *comp, integer_value, bounds);
 				}
 			}
@@ -258,29 +258,28 @@ IntervalSetFloat ProofUtils::getFloatRange(TraversalPayload& payload, std::vecto
 		ASTNode* stack_node = stack[z];
 
 		// Get next node up the call stack
-		if(stack_node->nodeType() == ASTNode::FunctionExpressionType && 
-			static_cast<FunctionExpression*>(stack_node)->target_function->sig.name == "if")
+		if(stack_node->nodeType() == ASTNode::IfExpressionType)
 		{
 			// AST node above this one is an "if" expression
-			FunctionExpression* if_node = static_cast<FunctionExpression*>(stack_node);
+			IfExpression* if_node = static_cast<IfExpression*>(stack_node);
 
 			// Is this node the 1st arg of the if expression?
 			// e.g. if condition then this_node else other_node
 			// Or is this node a child of the 1st arg?
-			if(/*if_node->argument_expressions[1].getPointer() == this || */((z+1) < (int)stack.size() && if_node->argument_expressions[1].getPointer() == stack[z+1]))
+			if(/*if_node->argument_expressions[1].getPointer() == this || */((z+1) < (int)stack.size() && if_node->then_expr.getPointer() == stack[z+1]))
 			{
 				// Ok, now we need to check the condition of the if expression.
 				// A valid proof condition will be of form
 				// inBounds(array, index)
 				// Where array and index are the same as the ones for this elem() call.
 
-				if(if_node->argument_expressions[0]->nodeType() == ASTNode::FunctionExpressionType)
+				if(if_node->condition->nodeType() == ASTNode::FunctionExpressionType)
 				{
-					FunctionExpression* condition_func_express = static_cast<FunctionExpression*>(if_node->argument_expressions[0].getPointer());
+					FunctionExpression* condition_func_express = static_cast<FunctionExpression*>(if_node->condition.getPointer());
 				}
-				else if(if_node->argument_expressions[0]->nodeType() == ASTNode::BinaryBooleanType)
+				else if(if_node->condition->nodeType() == ASTNode::BinaryBooleanType)
 				{
-					BinaryBooleanExpr* bin = static_cast<BinaryBooleanExpr*>(if_node->argument_expressions[0].getPointer());
+					BinaryBooleanExpr* bin = static_cast<BinaryBooleanExpr*>(if_node->condition.getPointer());
 					if(bin->t == BinaryBooleanExpr::AND)
 					{
 						// We know condition expression is of type A AND B
@@ -300,9 +299,9 @@ IntervalSetFloat ProofUtils::getFloatRange(TraversalPayload& payload, std::vecto
 						}
 					}
 				}
-				else if(if_node->argument_expressions[0]->nodeType() == ASTNode::ComparisonExpressionType)
+				else if(if_node->condition->nodeType() == ASTNode::ComparisonExpressionType)
 				{
-					ComparisonExpression* comp = static_cast<ComparisonExpression*>(if_node->argument_expressions[0].getPointer());
+					ComparisonExpression* comp = static_cast<ComparisonExpression*>(if_node->condition.getPointer());
 					bounds = updateBounds(payload, *comp, float_value, bounds);
 				}
 			}

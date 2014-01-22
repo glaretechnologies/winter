@@ -407,6 +407,24 @@ static void doImplicitIntToFloatTypeCoercion(ASTNodeRef& a, ASTNodeRef& b, Trave
 }
 
 
+void doImplicitIntToFloatTypeCoercionForFloatReturn(ASTNodeRef& expr, TraversalPayload& payload)
+{
+	const FunctionDefinition* current_func = payload.func_def_stack.back();
+
+	if(expr->nodeType() == ASTNode::IntLiteralType && 
+		current_func->declared_return_type.nonNull() && current_func->declared_return_type->getType() == Type::FloatType
+		)
+	{
+		IntLiteral* body_lit = static_cast<IntLiteral*>(expr.getPointer());
+		if(isIntExactlyRepresentableAsFloat(body_lit->value))
+		{
+			expr = new FloatLiteral((float)body_lit->value, body_lit->srcLocation());
+			payload.tree_changed = true;
+		}
+	}
+}
+
+
 template <class T> 
 T cast(ValueRef& v)
 {
@@ -597,6 +615,12 @@ bool BufferRoot::isConstant() const
 
 
 //----------------------------------------------------------------------------------
+const std::string errorContext(const ASTNode* n)
+{
+	return errorContext(*n);
+}
+
+
 const std::string errorContext(const ASTNode& n)
 {
 	//if(!payload.func_def_stack.empty())

@@ -452,7 +452,6 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 				payload.tree_changed = true;
 			}
 		}
-
 	}
 
 	stack.pop_back();

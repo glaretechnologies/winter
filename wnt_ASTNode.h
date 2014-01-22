@@ -126,6 +126,8 @@ void checkFoldExpression(Reference<ASTNode>& e, TraversalPayload& payload);
 void checkSubstituteVariable(Reference<ASTNode>& e, TraversalPayload& payload);
 void checkInlineExpression(Reference<ASTNode>& e, TraversalPayload& payload, std::vector<ASTNode*>& stack);
 void convertOverloadedOperators(Reference<ASTNode>& e, TraversalPayload& payload, std::vector<ASTNode*>& stack);
+void doImplicitIntToFloatTypeCoercionForFloatReturn(Reference<ASTNode>& expr, TraversalPayload& payload);
+const std::string errorContext(const ASTNode* n);
 const std::string errorContext(const ASTNode& n);
 const std::string errorContext(const ASTNode& n, TraversalPayload& payload);
 
@@ -225,7 +227,8 @@ public:
 		ComparisonExpressionType,
 		AnonFunctionType,
 		LetBlockType,
-		ArraySubscriptType
+		ArraySubscriptType,
+		IfExpressionType
 	};
 
 	ASTNode(ASTNodeType node_type_, const SrcLocation& loc_) : node_type(node_type_), location(loc_) {}

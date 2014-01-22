@@ -16,6 +16,7 @@ Generated at 2011-04-30 18:53:38 +0100
 #include "BuiltInFunctionImpl.h"
 #include "LLVMTypeUtils.h"
 #include "ProofUtils.h"
+#include "wnt_IfExpression.h"
 #include "utils/stringutils.h"
 #include "maths/mathstypes.h"
 #if USE_LLVM
@@ -150,6 +151,7 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 
 	if(this->binding_type == Unbound)
 		throw BaseException("Function is not bound.");
+	
 
 	//assert(target_function);
 	if(this->target_function != NULL && this->target_function->external_function.nonNull())
@@ -168,24 +170,7 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 	FunctionValue* function_value = NULL;
 	FunctionDefinition* use_target_func = runtimeBind(vmstate, function_value);
 
-	if(this->target_function->sig.name == "if")
-	{
-		// Special case handling for 'if' function, since we can't eargerly eval the args since they may not be defined
 
-		ValueRef condition_val = this->argument_expressions[0]->exec(vmstate);
-		assert(dynamic_cast<BoolValue*>(condition_val.getPointer()));
-
-		if(static_cast<BoolValue*>(condition_val.getPointer())->value)
-		{
-			// If condition is true:
-			return this->argument_expressions[1]->exec(vmstate);
-		}
-		else
-		{
-			// Else if condition is false:
-			return this->argument_expressions[2]->exec(vmstate);
-		}
-	}
 
 	// Push arguments onto argument stack
 	const unsigned int initial_arg_stack_size = (unsigned int)vmstate.argument_stack.size();
@@ -254,7 +239,7 @@ bool FunctionExpression::doesFunctionTypeMatch(const TypeRef& type)
 }
 
 
-static bool couldCoerceFunctionCall(vector<ASTNodeRef>& argument_expressions, FunctionDefinitionRef func)
+/*static bool couldCoerceFunctionCall(vector<ASTNodeRef>& argument_expressions, FunctionDefinitionRef func)
 {
 	if(func->args.size() != argument_expressions.size())
 		return false;
@@ -275,7 +260,7 @@ static bool couldCoerceFunctionCall(vector<ASTNodeRef>& argument_expressions, Fu
 	}
 
 	return true;
-}
+}*/
 
 
 static bool isNodeAncestor(const std::vector<ASTNode*>& stack, const ASTNode* node)
@@ -402,7 +387,6 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 
 		if(all_argtypes_nonnull) // Don't try and bind if we have a null type
 		{
-
 			const FunctionSignature sig(this->function_name, argtypes);
 
 			// Try and resolve to internal function.
@@ -414,7 +398,45 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 			else
 			{
 				// Try and promote integer args to float args.
-				vector<FunctionDefinitionRef> funcs;
+				// TODO: try all possible coercion combinations.
+				// This is not really the best way of doing this type coercion, the old approach of matching by name is better.
+				
+				vector<TypeRef> coerced_argtypes = argtypes;
+
+				for(size_t i=0; i<argtypes.size(); ++i)
+				{
+					if(	argument_expressions[i]->nodeType() == ASTNode::IntLiteralType &&
+						isIntExactlyRepresentableAsFloat(static_cast<IntLiteral*>(argument_expressions[i].getPointer())->value))
+					{
+						coerced_argtypes[i] = new Float();
+					}
+				}
+
+				// Try again with our coerced arguments
+				const FunctionSignature coerced_sig(this->function_name, coerced_argtypes);
+
+				this->target_function = linker.findMatchingFunction(coerced_sig).getPointer();
+				if(this->target_function)
+				{
+					this->binding_type = BoundToGlobalDef;
+
+					// Success!  We need to actually change the argument expressions now
+					for(size_t i=0; i<argument_expressions.size(); ++i)
+					{
+						if(	argument_expressions[i]->nodeType() == ASTNode::IntLiteralType &&
+							isIntExactlyRepresentableAsFloat(static_cast<IntLiteral*>(argument_expressions[i].getPointer())->value))
+						{
+							// Replace int literal with float literal
+							this->argument_expressions[i] = new FloatLiteral(
+								(float)static_cast<IntLiteral*>(argument_expressions[i].getPointer())->value,
+								argument_expressions[i]->srcLocation()
+								);
+						}
+					}
+				}
+
+
+				/*vector<FunctionDefinitionRef> funcs;
 				linker.getFuncsWithMatchingName(sig.name, funcs);
 
 				vector<FunctionDefinitionRef> possible_matches;
@@ -449,7 +471,7 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 					for(size_t z=0; z<possible_matches.size(); ++z)
 						s += possible_matches[z]->sig.toString() + "\n";
 					throw BaseException(s + "." + errorContext(*this));
-				}
+				}*/
 			}
 
 			//TEMP: don't fail now, maybe we can bind later.
@@ -552,6 +574,9 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 			}
 		}
 	}
+	else if(payload.operation == TraversalPayload::TypeCoercion)
+	{
+	}
 	
 	/*else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
@@ -648,11 +673,13 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 		
 			throw BaseException("Failed to find function '" + sig.toString() + "'." + errorContext(*this));
 		}
-
-		// Check shuffle mask (arg 1) is a vector of ints
-		if(::hasPrefix(this->target_function->sig.name, "shuffle"))
+		else if(this->binding_type == BoundToGlobalDef)
 		{
-			// TODO
+			// Check shuffle mask (arg 1) is a vector of ints
+			if(::hasPrefix(this->target_function->sig.name, "shuffle"))
+			{
+				// TODO
+			}
 		}
 	}
 	
@@ -844,7 +871,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 
 				const int index_val = static_cast<IntValue*>(retval.getPointer())->value;
 
-				if(index_val >= 0 && index_val < vector_type->num)
+				if(index_val >= 0 && index_val < (int)vector_type->num)
 				{
 					// Vector index is in-bounds!
 					return;
@@ -863,7 +890,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 				);
 
 				// Now check our bounds against the array
-				if(i_bounds.lower() >= 0 && i_bounds.upper() < vector_type->num)
+				if(i_bounds.lower() >= 0 && i_bounds.upper() < (int)vector_type->num)
 				{
 					// Array index is proven to be in-bounds.
 					return;
@@ -871,25 +898,24 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 
 
 				// Get next node up the call stack
-				if(stack.back()->nodeType() == ASTNode::FunctionExpressionType && 
-					static_cast<FunctionExpression*>(stack.back())->target_function->sig.name == "if")
+				if(stack.back()->nodeType() == ASTNode::IfExpressionType)
 				{
 					// AST node above this one is an "if" expression
-					FunctionExpression* if_node = static_cast<FunctionExpression*>(stack.back());
+					IfExpression* if_node = static_cast<IfExpression*>(stack.back());
 
 					// Is this node the 1st arg of the if expression?
 					// e.g. if condition then this_node else other_node
 
-					if(if_node->argument_expressions[1].getPointer() == this)
+					if(if_node->then_expr.getPointer() == this)
 					{
 						// Ok, now we need to check the condition of the if expression.
 						// A valid proof condition will be of form
 						// inBounds(array, index)
 						// Where array and index are the same as the ones for this elem() call.
 
-						if(if_node->argument_expressions[0]->nodeType() == ASTNode::FunctionExpressionType)
+						if(if_node->condition->nodeType() == ASTNode::FunctionExpressionType)
 						{
-							FunctionExpression* condition_func_express = static_cast<FunctionExpression*>(if_node->argument_expressions[0].getPointer());
+							FunctionExpression* condition_func_express = static_cast<FunctionExpression*>(if_node->condition.getPointer());
 							if(condition_func_express->target_function->sig.name == "inBounds")
 							{
 								// Is the array the same? 
@@ -1015,24 +1041,15 @@ TypeRef FunctionExpression::type() const
 		Function* func_type = static_cast<Function*>(this->bound_function->args[this->bound_index].type.getPointer());
 		return func_type->return_type;
 	}
-
-	// If got here, binding type is probably unbound.
-	//assert(0);
-	return TypeRef(NULL);
-
-	//if(target_function_return_type.nonNull())
-	//	return target_function_return_type;
-	//else
-	//{
-	//	return this->target_function ? this->target_function->returnType() : TypeRef(NULL);
-	//}
-/*
-	if(!target_function)
+	else if(this->binding_type == Unbound)
+	{
+		return TypeRef(NULL);
+	}
+	else
 	{
 		assert(0);
-		throw BaseException("Tried to get type from an unlinked function expression.");
+		return TypeRef(NULL);
 	}
-	return this->target_function->type();*/
 }
 
 
@@ -1197,127 +1214,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 	
 
 
-	//==================================== Special case if code ============================================
-	if(this->target_function->sig.name == "if") // Check anything more? && this->target_function->built_in_func_impl)
-	{
-		llvm::Value* return_val_addr = NULL;
-		if(!target_ret_type->passByValue())
-		{
-			if(ret_space_ptr)
-				return_val_addr = ret_space_ptr;
-			else
-			{
-				// Allocate return value on stack
-
-				// Emit the alloca in the entry block for better code-gen.
-				// We will emit the alloca at the start of the block, so that it doesn't go after any terminator instructions already created which have to be at the end of the block.
-				llvm::IRBuilder<> entry_block_builder(&params.currently_building_func->getEntryBlock(), params.currently_building_func->getEntryBlock().getFirstInsertionPt());
-
-				return_val_addr = entry_block_builder.Insert(new llvm::AllocaInst(
-					target_ret_type->LLVMType(*params.context), // type
-					NULL, // ArraySize
-					16 // alignment
-					//"return_val_addr" // target_sig.toString() + " return_val_addr"
-				),
-				"" + this->target_function->sig.name + "() ret");
-			}
-		}
-
-		llvm::Value* condition_code = argument_expressions[0]->emitLLVMCode(params, NULL);
-
-		
-		// Get a pointer to the current function
-		llvm::Function* the_function = params.currently_building_func; // params.builder->GetInsertBlock()->getParent();
-
-		// Create blocks for the then and else cases.  Insert the 'then' block at the end of the function.
-		llvm::BasicBlock* ThenBB  = llvm::BasicBlock::Create(*params.context, "then", the_function);
-		llvm::BasicBlock* ElseBB  = llvm::BasicBlock::Create(*params.context, "else");
-		llvm::BasicBlock* MergeBB = llvm::BasicBlock::Create(*params.context, "ifcont");
-
-		params.builder->CreateCondBr(condition_code, ThenBB, ElseBB);
-
-		// Emit then value.
-		params.builder->SetInsertPoint(ThenBB);
-
-		llvm::Value* then_value = argument_expressions[1]->emitLLVMCode(params, return_val_addr);
-
-		params.builder->CreateBr(MergeBB);
-
-		// Codegen of 'Then' can change the current block, update ThenBB for the PHI.
-		ThenBB = params.builder->GetInsertBlock();
-
-		// Emit else block.
-		the_function->getBasicBlockList().push_back(ElseBB);
-		params.builder->SetInsertPoint(ElseBB);
-
-		llvm::Value* else_value = argument_expressions[2]->emitLLVMCode(params, return_val_addr);
-
-		params.builder->CreateBr(MergeBB);
-
-		// Codegen of 'Else' can change the current block, update ElseBB for the PHI.
-		ElseBB = params.builder->GetInsertBlock();
-
-		// Emit merge block.
-		the_function->getBasicBlockList().push_back(MergeBB);
-		params.builder->SetInsertPoint(MergeBB);
-
-		// Create phi node for result value
-		llvm::PHINode* phi_node = params.builder->CreatePHI(
-			target_ret_type->passByValue() ? target_ret_type->LLVMType(*params.context) : LLVMTypeUtils::pointerType(*target_ret_type->LLVMType(*params.context)),
-			0, // num reserved values
-			"iftmp"
-		);
-
-		phi_node->addIncoming(then_value, ThenBB);
-		phi_node->addIncoming(else_value, ElseBB);
-
-		if(target_ret_type->passByValue())
-		{
-			
-
-			//TEMP:
-			//std::cout << "\nthen_value: " << std::endl;
-			//then_value->dump();
-			//std::cout << "\nelse_value: " << std::endl;
-			//else_value->dump();
-
-			
-
-		//	return phi_node;
-		}
-		else
-		{
-			//the_function->getBasicBlockList().push_back(MergeBB);
-			//params.builder->SetInsertPoint(MergeBB);
-
-		//	return phi_node;
-
-			//return return_val_addr;
-
-
-			/*llvm::Value* arg_val = params.builder->CreateLoad(
-				phi_result
-			);
-
-			llvm::Value* return_val_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
-
-			return params.builder->CreateStore(
-				arg_val, // value
-				return_val_ptr // ptr
-			);*/
-			//llvm::Value* return_val_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
-			//return return_val_ptr;
-		}
-
-		// If this is a string value, need to decr ref count at end of func.
-		if(target_ret_type->getType() == Type::StringType)
-		{
-			params.cleanup_values.push_back(CleanUpInfo(this, phi_node));
-		}
-
-		return phi_node;
-	}
-	//==================================== End special case if code ============================================
+	
 
 
 	if(target_ret_type->passByValue())

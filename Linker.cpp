@@ -681,32 +681,6 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 	} // End if two params
 	else if(sig.param_types.size() == 3)
 	{
-		// Create 'if' built in function
-		if(sig.name == "if")
-		{
-			vector<FunctionDefinition::FunctionArg> args(3);
-			args[0].name = "condition";
-			args[0].type = TypeRef(new Bool());
-
-			args[1].type = sig.param_types[1];
-			args[1].name = "a";
-			args[2].type = sig.param_types[1];
-			args[2].name = "b";
-
-			FunctionDefinitionRef def = new FunctionDefinition(
-				SrcLocation::invalidLocation(),
-				"if", // name
-				args, // args
-				ASTNodeRef(NULL), // body expr
-				sig.param_types[1], // return type
-				new IfBuiltInFunc(sig.param_types[1]) // built in impl.
-			);
-
-			this->sig_to_function_map.insert(std::make_pair(sig, def));
-			return def;
-		}
-
-
 	} // End if three params
 
 
@@ -927,7 +901,7 @@ Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDef
 		else if(generic_func->sig.name == "if")
 		{
 			assert(type_mappings.size() >= 1);
-			built_in_impl = new IfBuiltInFunc(type_mappings[0]);
+			//built_in_impl = new IfBuiltInFunc(type_mappings[0]);
 		}
 		else
 		{

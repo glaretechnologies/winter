@@ -56,6 +56,65 @@ void LanguageTests::run()
 
 	
 
+	// Test int->float type coercion in various ways	
+
+	// Test int->float coercion in an if statement as required for an argument to another function. (truncateToInt in this case).
+	// NOTE: this seems to be too hard to do.
+	
+	// testMainIntegerArg("def main(int x) int : truncateToInt(if(true, 3, 4))", 2, 3);
+
+	// Test int->float coercion in an if statement as required for an argument to another function. ('if' in this case).
+	// testMainFloatArg("def main(float x) float : if(false, if(false, 1, 2), 3)", 2.0f, 3.0f);
+
+
+	// Test int->float coercion for an argument to a built-in function like sqrt
+	testMainFloatArg("def main(float x) float : sqrt(4)", 2.0f, 2.0f);
+	testMainFloatArg("def main(float x) float : cos(4)", 2.0f, std::cos(4.f));
+	testMainFloatArg("def main(float x) float : pow(2, 3)", 2.0f, 8.f);
+	testMainFloatArg("def main(float x) float : pow(x, 3)", 2.0f, 8.f);
+	testMainFloatArg("def main(float x) float : pow(2, x)", 2.0f, 4.f);
+
+	// Test int->float coercion for an argument to a function
+	testMainFloatArg("def f(float x) float : x*x                   def main(float x) float : f(3)", 2.0f, 9.f);
+	testMainFloatArg("def f(float x) float : x*x                   def main(float x) float : f(x + 1)", 2.0f, 9.f);
+	testMainFloatArg("def f(float x) float : x*x                   def main(float x) float : f(1 + x)", 2.0f, 9.f);
+	testMainFloatArg("def f(float x) float : x*x                   def main(float x) float : f(2 * x)", 2.0f, 16.f);
+	testMainFloatArg("def f(float x) float : x*x                   def main(float x) float : f(x * 2)", 2.0f, 16.f);
+	testMainFloatArg("def f(float x) float : x*x                   def main(float x) float : f(1 / x)", 2.0f, 0.25f);
+	testMainFloatArg("def f(float x) float : x + 2.0               def main(float x) float : f(1)", 2.0f, 3.f);
+	testMainFloatArg("def f(float x, float y) float : x + y        def main(float x) float : f(1, x)", 2.0f, 3.f);
+	testMainFloatArg("def f(float x, float y) float : x + y        def main(float x) float : f(x, 1)", 2.0f, 3.f);
+
+	testMainFloatArg("def main(float x) float : sqrt(2 + x)", 2.0f, 2.0f);
+
+	// Test int->float coercion in an if statement as the function body.
+	testMainFloatArg("def main(float x) float : if(true, 3, 4)", 2.0f, 3.0f);
+	testMainFloatArg("def main(float x) float : if(x < 10.0, 3, 4)", 2.0f, 3.0f);
+	
+	testMainFloatArg("def main(float x) float : 3", 2.0f, 3.0f);
+	testMainFloatArg("def main(float x) float : 3", 2.0f, 3.0f);
+
+	testMainFloatArg("def main(float x) float : x + 1", 2.0f, 3.0f);
+	testMainFloatArg("def main(float x) float : 1 + x", 2.0f, 3.0f);
+	testMainFloatArg("def main(float x) float : 2 * (x + 1)", 2.0f, 6.0f);
+	testMainFloatArg("def main(float x) float : 2 * (1 + x)", 2.0f, 6.0f);
+
+	testMainFloatArg("def main(float x) float : (1 + x) + (2 + x) * 3", 2.0f, 15.0f);
+
+	// Test type checking for if() statements:
+	testMainFloatArgInvalidProgram("def main(float x) float : if(x < 1.0, 3.0, true)", 2.0f);
+	testMainFloatArgInvalidProgram("def main(float x) float : if(x < 1.0, true, 3.0)", 2.0f);
+	testMainFloatArgInvalidProgram("def main(float x) float : if(3.0, 2.0, 3.0)", 2.0f);
+
+	// Test wrong number of args to if
+	testMainFloatArgInvalidProgram("def main(float x) float : if(x < 1.0)", 2.0f);
+	testMainFloatArgInvalidProgram("def main(float x) float : if(x < 1.0, 2.0)", 2.0f);
+	testMainFloatArgInvalidProgram("def main(float x) float : if(x < 1.0, 2.0, 3.0, 4.0)", 2.0f);
+
+
+	// Test if LLVM combined multiple sqrts into a sqrtps instruction (doesn't do this as of LLVM 3.4)
+	testMainFloatArg("def main(float x) float : sqrt(x) + sqrt(x + 1.0) + sqrt(x + 2.0) + sqrt(x + 3.0)", 1.0f, sqrt(1.0f) + sqrt(1.0f + 1.0f) + sqrt(1.0f + 2.0f) + sqrt(1.0f + 3.0f));
+
 	{
 		Float4Struct a(1.0f, 2.0, 3.0, 4.0);
 		Float4Struct target_result(3.f, 4.f, 5.f, 6.f);

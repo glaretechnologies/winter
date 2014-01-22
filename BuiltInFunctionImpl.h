@@ -175,19 +175,6 @@ private:
 };
 
 
-class IfBuiltInFunc : public BuiltInFunctionImpl
-{
-public:
-	IfBuiltInFunc(const TypeRef& T_) : T(T_) {}
-	virtual ~IfBuiltInFunc(){}
-
-	virtual ValueRef invoke(VMState& vmstate);
-	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
-private:
-	TypeRef T;
-};
-
-
 class DotProductBuiltInFunc : public BuiltInFunctionImpl
 {
 public:

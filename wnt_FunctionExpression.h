@@ -7,10 +7,6 @@ Generated at 2011-04-30 18:53:38 +0100
 #pragma once
 
 
-#include <string>
-#include <vector>
-using std::string;
-using std::vector;
 #include <utils/Reference.h>
 #include <utils/RefCounted.h>
 #include "wnt_Type.h"
@@ -24,6 +20,8 @@ using std::vector;
 #if USE_LLVM
 #include <llvm/IR/IRBuilder.h>
 #endif
+#include <string>
+#include <vector>
 namespace llvm { class Function; };
 namespace llvm { class Value; };
 namespace llvm { class Module; };

@@ -12,6 +12,7 @@ Copyright 2009 Nicholas Chapman
 #include "wnt_Lexer.h"
 #include "wnt_ASTNode.h"
 #include "wnt_FunctionExpression.h"
+#include "wnt_IfExpression.h"
 #include "wnt_Diagnostics.h"
 #include "BuiltInFunctionImpl.h"
 #include "indigo/TestUtils.h"
@@ -268,7 +269,7 @@ ASTNodeRef LangParser::parseFieldExpression(const ParseInfo& p)
 //	ASTNodeRef var_expression = parseVariableExpression(p);
 	ASTNodeRef var_expression;
 
-	if(p.else_token_present && p.tokens[p.i]->getType() == IDENTIFIER_TOKEN && p.tokens[p.i]->getIdentifierValue() == "if")
+	if(p.tokens[p.i]->getType() == IDENTIFIER_TOKEN && p.tokens[p.i]->getIdentifierValue() == "if")
 	{
 		var_expression = parseIfExpression(p);
 	}
@@ -327,21 +328,6 @@ a
 
 	return var_expression;
 }
-
-
-ASTNodeRef LangParser::parseVariableOrIfExpression(const ParseInfo& p)
-{
-	if(p.tokens[p.i]->getType() == IDENTIFIER_TOKEN)
-	{
-		if(p.tokens[p.i]->getIdentifierValue() == "if")
-			return parseIfExpression(p);
-		else
-			return parseVariableExpression(p);
-	}
-	
-	assert(0);
-	throw LangParserExcep("Internal error: expected identifier.");
-}
 		
 
 ASTNodeRef LangParser::parseIfExpression(const ParseInfo& p)
@@ -355,35 +341,58 @@ ASTNodeRef LangParser::parseIfExpression(const ParseInfo& p)
 		throw LangParserExcep("Internal error: expected identifier 'if'.");
 	}
 
-	// Parse condition
-	ASTNodeRef condition = parseLetBlock(p);
-
-	// Parse optional 'then'
-	if(p.i < p.tokens.size() && p.tokens[p.i]->isIdentifier() && p.tokens[p.i]->getIdentifierValue() == "then")
+	if(p.else_token_present) // If an 'else' token is present, assume this is the new form of if: "if a then b else c"
 	{
-		id = parseIdentifier("then", p);
-		if(id != "then")
-			throw LangParserExcep("Internal error: expected 'then', found " + tokenName(p.tokens[p.i]->getType()) + errorPosition(*p.text_buffer, p.tokens[p.i]->char_index));
+		// Parse condition
+		ASTNodeRef condition = parseLetBlock(p);
+
+		// Parse optional 'then'
+		if(p.i < p.tokens.size() && p.tokens[p.i]->isIdentifier() && p.tokens[p.i]->getIdentifierValue() == "then")
+		{
+			id = parseIdentifier("then", p);
+			if(id != "then")
+				throw LangParserExcep("Internal error: expected 'then', found " + tokenName(p.tokens[p.i]->getType()) + errorPosition(*p.text_buffer, p.tokens[p.i]->char_index));
+		}
+
+		// Parse then expression
+		ASTNodeRef then_expr = parseLetBlock(p);
+
+		// Parse mandatory 'else'
+		id = parseIdentifier("else", p);
+		if(id != "else")
+			throw LangParserExcep("Internal error: expected 'else', found " + tokenName(p.tokens[p.i]->getType()) + errorPosition(*p.text_buffer, p.tokens[p.i]->char_index));
+
+		// Parse else expression
+		ASTNodeRef else_expr = parseLetBlock(p);
+
+		return new IfExpression(loc, condition, then_expr, else_expr);
 	}
+	else
+	{
+		// else if should assume old form of if with parens, like "if(a, b, c)
+		
+		parseToken(OPEN_PARENTHESIS_TOKEN, p); // '('
 
-	// Parse if(true) expression
-	ASTNodeRef true_expr = parseLetBlock(p);
+		if(p.i == p.tokens.size())
+			throw LangParserExcep("Expected ')'");
 
-	// Parse 'else'
-	id = parseIdentifier("else", p);
-	if(id != "else")
-		throw LangParserExcep("Internal error: expected 'else', found " + tokenName(p.tokens[p.i]->getType()) + errorPosition(*p.text_buffer, p.tokens[p.i]->char_index));
+		// Parse condition
+		ASTNodeRef condition = parseLetBlock(p);
 
-	// Parse if(false) expression
-	ASTNodeRef false_expr = parseLetBlock(p);
+		parseToken(COMMA_TOKEN, p);
 
-	FunctionExpressionRef func = new FunctionExpression(loc);
-	func->argument_expressions.resize(3);
-	func->argument_expressions[0] = condition;
-	func->argument_expressions[1] = true_expr;
-	func->argument_expressions[2] = false_expr;
-	func->function_name = "if";
-	return func;
+		// Parse then expression
+		ASTNodeRef then_expr = parseLetBlock(p);
+
+		parseToken(COMMA_TOKEN, p);
+	
+		// Parse else expression
+		ASTNodeRef else_expr = parseLetBlock(p);
+		
+		parseToken(CLOSE_PARENTHESIS_TOKEN, p); // ')'
+
+		return new IfExpression(loc, condition, then_expr, else_expr);
+	}
 }
 
 
@@ -1171,7 +1180,7 @@ ASTNodeRef LangParser::parseArrayOrVectorLiteralOrArraySubscriptExpression(const
 	{
 		int int_suffix = 0;
 		bool has_int_suffix = false;
-		Parser temp_p(id.c_str(), id.size());
+		Parser temp_p(id.c_str(), (int)id.size());
 		temp_p.advance(); // Advance past v
 		if(!temp_p.eof())
 		{
