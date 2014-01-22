@@ -370,6 +370,8 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::v
 			}
 			break;
 	}
+	default:
+		break;
 	};
 }
 
@@ -2025,6 +2027,7 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 						for(unsigned int i=0; i<elem_values.size(); ++i)
 							elem_values[i] = ValueRef(new FloatValue(op(
 								static_cast<FloatValue*>(aval_vec->e[i].getPointer())->value,
+
 								static_cast<FloatValue*>(bval_vec->e[i].getPointer())->value
 							)));
 					}

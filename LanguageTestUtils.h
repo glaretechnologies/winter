@@ -586,7 +586,7 @@ static void testMainStructInputAndOutput(const std::string& src, const InStructT
 		VMConstructionArgs vm_args;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
 
-		vector<string> field_names;
+		std::vector<std::string> field_names;
 		field_names.push_back("x");
 		field_names.push_back("y");
 
