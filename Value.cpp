@@ -7,6 +7,9 @@
 #include "llvm/IR/Constants.h"
 
 
+using std::vector;
+
+
 namespace Winter
 {
 

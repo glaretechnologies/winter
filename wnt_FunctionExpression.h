@@ -69,8 +69,8 @@ private:
 	void checkInDomain(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 public:
 
-	string function_name;
-	vector<Reference<ASTNode> > argument_expressions;
+	std::string function_name;
+	std::vector<Reference<ASTNode> > argument_expressions;
 
 	//Reference<ASTNode> target_function;
 	//ASTNode* target_function;

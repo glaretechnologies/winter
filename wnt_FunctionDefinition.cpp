@@ -35,6 +35,10 @@ Generated at 2011-04-25 19:15:40 +0100
 #include <iostream>
 
 
+using std::vector;
+using std::string;
+
+
 namespace Winter
 {
 

@@ -22,6 +22,10 @@ File created by ClassTemplate on Wed Jun 11 02:56:20 2008
 #include "maths/mathstypes.h"
 
 
+using std::vector;
+using std::string;
+
+
 namespace Winter
 {
 

@@ -36,7 +36,7 @@ class ParseInfo
 {
 public:
 	ParseInfo(unsigned int& i_, const std::vector<Reference<TokenBase> >& t, std::map<std::string, TypeRef>& named_types_,
-		vector<FunctionDefinitionRef>& func_defs_) 
+		std::vector<FunctionDefinitionRef>& func_defs_) 
 		: i(i_), tokens(t), named_types(named_types_), func_defs(func_defs_), else_token_present(false) {}
 	const std::vector<Reference<TokenBase> >& tokens;
 	//const char* text_buffer;
@@ -44,7 +44,7 @@ public:
 	const SourceBuffer* text_buffer;
 	unsigned int& i;
 	std::map<std::string, TypeRef>& named_types;
-	vector<FunctionDefinitionRef>& func_defs;
+	std::vector<FunctionDefinitionRef>& func_defs;
 	bool else_token_present;
 };
 
@@ -63,7 +63,7 @@ public:
 
 	Reference<ASTNode> parseBuffer(const std::vector<Reference<TokenBase> >& tokens, 
 		const SourceBufferRef& source_buffer,
-		vector<FunctionDefinitionRef>& func_defs_out, 
+		std::vector<FunctionDefinitionRef>& func_defs_out, 
 		std::map<std::string, TypeRef>& named_types);
 
 	static void test();

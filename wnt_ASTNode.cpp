@@ -42,6 +42,10 @@ Copyright 2009 Nicholas Chapman
 #endif
 
 
+using std::vector;
+using std::string;
+
+
 static const bool VERBOSE_EXEC = false;
 
 

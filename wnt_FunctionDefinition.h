@@ -9,6 +9,7 @@ Generated at 2011-04-25 19:15:39 +0100
 
 #include "wnt_ASTNode.h"
 #include "BuiltInFunctionImpl.h"
+#include <string>
 
 
 namespace Winter
@@ -30,7 +31,7 @@ public:
 	{
 	public:
 		FunctionArg() : referenced(true) {}
-		FunctionArg(TypeRef type_, const string& n) : type(type_), name(n), referenced(true) {}
+		FunctionArg(TypeRef type_, const std::string& n) : type(type_), name(n), referenced(true) {}
 		/*enum TypeKind
 		{
 			GENERIC_TYPE,
@@ -40,7 +41,7 @@ public:
 		TypeKind type_kind;*/
 		TypeRef type;
 		//int generic_type_param_index;
-		string name;
+		std::string name;
 
 		bool isReferenced() const { return referenced; }
 
@@ -60,7 +61,7 @@ public:
 
 	TypeRef returnType() const;
 
-	vector<FunctionArg> args;
+	std::vector<FunctionArg> args;
 	ASTNodeRef body;
 	TypeRef declared_return_type;
 	//TypeRef function_type;
@@ -71,7 +72,7 @@ public:
 	ExternalFunctionRef external_function;
 
 	bool use_captured_vars; // Set to true if this is an anonymous function, in which case we will always pass it in a closure.
-	vector<CapturedVar> captured_vars; // For when parsing anon functions
+	std::vector<CapturedVar> captured_vars; // For when parsing anon functions
 
 
 	virtual ValueRef invoke(VMState& vmstate);

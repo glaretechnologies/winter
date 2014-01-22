@@ -303,7 +303,7 @@ class BufferRoot : public ASTNode
 public:
 	BufferRoot(const SrcLocation& loc) : ASTNode(BufferRootType, loc) 
 	{}
-	vector<Reference<FunctionDefinition> > func_defs;
+	std::vector<Reference<FunctionDefinition> > func_defs;
 
 	virtual ValueRef exec(VMState& vmstate){ return ValueRef(); }
 	virtual TypeRef type() const { throw BaseException("root has no type."); }
@@ -708,7 +708,7 @@ public:
 class LetBlock : public ASTNode
 {
 public:
-	LetBlock(const ASTNodeRef& e, const vector<Reference<LetASTNode> > lets_, const SrcLocation& loc) : 
+	LetBlock(const ASTNodeRef& e, const std::vector<Reference<LetASTNode> > lets_, const SrcLocation& loc) : 
 	  ASTNode(LetBlockType, loc), expr(e), lets(lets_) 
 	{
 		//let_exprs_llvm_value = vector<llvm::Value*>(lets_.size(), NULL); 
@@ -723,7 +723,7 @@ public:
 	virtual Reference<ASTNode> clone();
 	virtual bool isConstant() const;
 
-	vector<Reference<LetASTNode> > lets;
+	std::vector<Reference<LetASTNode> > lets;
 
 	//llvm::Value* getLetExpressionLLVMValue(EmitLLVMCodeParams& params, unsigned int let_index, llvm::Value* ret_space_ptr);
 

@@ -9,10 +9,6 @@
 #include <map>
 
 
-using std::string;
-using std::vector;
-
-
 namespace Winter
 {
 class FunctionDefinition;
@@ -106,13 +102,13 @@ public:
 class StructureValue : public Value
 {
 public:
-	StructureValue(const vector<ValueRef>& fields_) : fields(fields_) {}
+	StructureValue(const std::vector<ValueRef>& fields_) : fields(fields_) {}
 	~StructureValue();
 	virtual Value* clone() const;
 	virtual const std::string toString() const { return "struct"; }
 	virtual llvm::Constant* getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const;
 
-	vector<ValueRef> fields;
+	std::vector<ValueRef> fields;
 };
 
 
@@ -140,13 +136,13 @@ class ArrayValue : public Value
 {
 public:
 	ArrayValue(){}
-	ArrayValue(const vector<ValueRef>& e_) : e(e_) {}
+	ArrayValue(const std::vector<ValueRef>& e_) : e(e_) {}
 	~ArrayValue();
 	virtual Value* clone() const;
 	virtual const std::string toString() const;
 	virtual llvm::Constant* getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const;
 
-	vector<ValueRef> e;
+	std::vector<ValueRef> e;
 };
 
 
@@ -154,13 +150,13 @@ class VectorValue : public Value
 {
 public:
 	VectorValue(){}
-	VectorValue(const vector<ValueRef>& e_) : e(e_) {}
+	VectorValue(const std::vector<ValueRef>& e_) : e(e_) {}
 	~VectorValue();
 	virtual Value* clone() const;
 	virtual const std::string toString() const;
 	virtual llvm::Constant* getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const;
 
-	vector<ValueRef> e;
+	std::vector<ValueRef> e;
 };
 
 

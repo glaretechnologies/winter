@@ -51,7 +51,7 @@ static float testExternalFunc(float x/*, TestEnv* env*/)
 }
 
 
-static ValueRef testExternalFuncInterpreted(const vector<ValueRef>& arg_values)
+static ValueRef testExternalFuncInterpreted(const std::vector<ValueRef>& arg_values)
 {
 	assert(arg_values.size() == 1);
 	assert(dynamic_cast<const FloatValue*>(arg_values[0].getPointer()));
@@ -105,7 +105,7 @@ static void testMainFloat(const std::string& src, float target_return_val)
 			f->func = (void*)testExternalFunc;
 			f->interpreted_func = testExternalFuncInterpreted;
 			f->return_type = TypeRef(new Float());
-			f->sig = FunctionSignature("testExternalFunc", vector<TypeRef>(1, TypeRef(new Float())));
+			f->sig = FunctionSignature("testExternalFunc", std::vector<TypeRef>(1, TypeRef(new Float())));
 			vm_args.external_functions.push_back(f);
 		}
 		//{
@@ -233,7 +233,7 @@ static void testMainFloatArg(const std::string& src, float argument, float targe
 			f->func = (void*)testExternalFunc;
 			f->interpreted_func = testExternalFuncInterpreted;
 			f->return_type = TypeRef(new Float());
-			f->sig = FunctionSignature("testExternalFunc", vector<TypeRef>(1, TypeRef(new Float())));
+			f->sig = FunctionSignature("testExternalFunc", std::vector<TypeRef>(1, TypeRef(new Float())));
 			vm_args.external_functions.push_back(f);
 		}
 		const FunctionSignature mainsig("main", std::vector<TypeRef>(1, TypeRef(new Float())));
@@ -796,10 +796,10 @@ static void testFloat4StructPairRetFloat(const std::string& src, const Float4Str
 		// Create Float4Struct type
 		TypeRef float_4_struct_type;
 		{
-			vector<string> field_names;
+			std::vector<std::string> field_names;
 			field_names.push_back("v");
 
-			vector<TypeRef> field_types;
+			std::vector<TypeRef> field_types;
 			field_types.push_back(TypeRef(new VectorType(TypeRef(new Float), 4)));
 
 			float_4_struct_type = new StructureType(
@@ -810,11 +810,11 @@ static void testFloat4StructPairRetFloat(const std::string& src, const Float4Str
 		}
 
 		// Create Float4StructPair type
-		vector<string> field_names;
+		std::vector<std::string> field_names;
 		field_names.push_back("a");
 		field_names.push_back("b");
 
-		vector<TypeRef> field_types(2, float_4_struct_type);
+		std::vector<TypeRef> field_types(2, float_4_struct_type);
 
 		TypeRef Float4StructPair_type = new StructureType(
 			"Float4StructPair", 
@@ -890,12 +890,12 @@ static void testVectorInStruct(const std::string& src, const StructWithVec& stru
 		VMConstructionArgs vm_args;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
 
-		vector<string> field_names;
+		std::vector<std::string> field_names;
 		field_names.push_back("a");
 		field_names.push_back("b");
 		field_names.push_back("data2");
 
-		vector<TypeRef> field_types;
+		std::vector<TypeRef> field_types;
 		field_types.push_back(TypeRef(new VectorType(TypeRef(new Float), 4)));
 		field_types.push_back(TypeRef(new VectorType(TypeRef(new Float), 4)));
 		field_types.push_back(TypeRef(new Float));
@@ -980,10 +980,10 @@ static void testFloat4Struct(const std::string& src, const Float4Struct& a, cons
 		VMConstructionArgs vm_args;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
 
-		vector<string> field_names;
+		std::vector<std::string> field_names;
 		field_names.push_back("v");
 
-		vector<TypeRef> field_types;
+		std::vector<TypeRef> field_types;
 		field_types.push_back(TypeRef(new VectorType(TypeRef(new Float), 4)));
 
 
@@ -1044,10 +1044,10 @@ static void testFloat8Struct(const std::string& src, const Float8Struct& a, cons
 		VMConstructionArgs vm_args;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
 
-		vector<string> field_names;
+		std::vector<std::string> field_names;
 		field_names.push_back("v");
 
-		vector<TypeRef> field_types;
+		std::vector<TypeRef> field_types;
 		field_types.push_back(TypeRef(new VectorType(TypeRef(new Float), 8)));
 
 
