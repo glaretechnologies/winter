@@ -9,9 +9,13 @@ Generated at Wed Oct 20 15:22:37 +1300 2010
 
 
 namespace llvm { class Function; class FunctionType; class Type; class LLVMContext; class Twine; }
+#ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
+#endif
 #include <llvm/IR/IRBuilder.h>
+#ifdef _MSC_VER
 #pragma warning(pop) // Re-enable warnings
+#endif
 #include "wnt_Type.h"
 
 

@@ -15,8 +15,9 @@ Generated at 2011-04-25 19:15:40 +0100
 #include "BuiltInFunctionImpl.h"
 #include "LLVMTypeUtils.h"
 #include "utils/stringutils.h"
-#if USE_LLVM
+#ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
+#endif
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -32,6 +33,7 @@ Generated at 2011-04-25 19:15:40 +0100
 #include <llvm/IR/Intrinsics.h>
 #include <llvm/IR/Attributes.h>
 #include <llvm/IR/DataLayout.h>
+#ifdef _MSC_VER
 #pragma warning(pop) // Re-enable warnings
 #endif
 

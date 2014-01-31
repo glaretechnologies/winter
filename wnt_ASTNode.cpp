@@ -23,8 +23,9 @@ Copyright 2009 Nicholas Chapman
 #include "utils/stringutils.h"
 #include "maths/mathstypes.h"
 #include "maths/vec2.h"
-#if USE_LLVM
+#ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
+#endif
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -38,6 +39,7 @@ Copyright 2009 Nicholas Chapman
 #include <llvm/IR/CallingConv.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Intrinsics.h>
+#ifdef _MSC_VER
 #pragma warning(pop) // Re-enable warnings
 #endif
 

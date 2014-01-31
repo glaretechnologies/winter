@@ -19,9 +19,13 @@ Copyright 2009 Nicholas Chapman
 #include <utils/Reference.h>
 #include <utils/RefCounted.h>
 #include <utils/platform.h>
+#ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
+#endif
 #include <llvm/IR/IRBuilder.h>
+#ifdef _MSC_VER
 #pragma warning(pop) // Re-enable warnings
+#endif
 #include <string>
 #include <vector>
 namespace llvm { class Function; };

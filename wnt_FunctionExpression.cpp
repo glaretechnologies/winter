@@ -19,8 +19,9 @@ Generated at 2011-04-30 18:53:38 +0100
 #include "wnt_IfExpression.h"
 #include "utils/stringutils.h"
 #include "maths/mathstypes.h"
-#if USE_LLVM
+#ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
+#endif
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -34,6 +35,7 @@ Generated at 2011-04-30 18:53:38 +0100
 #include <llvm/IR/CallingConv.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Intrinsics.h>
+#ifdef _MSC_VER
 #pragma warning(pop) // Re-enable warnings
 #endif
 #include <iostream>

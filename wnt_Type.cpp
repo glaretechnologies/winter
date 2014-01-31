@@ -5,9 +5,13 @@
 #include "BaseException.h"
 #include "LLVMTypeUtils.h"
 #include "utils/stringutils.h"
+#ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
+#endif
 #include "llvm/IR/Constants.h"
+#ifdef _MSC_VER
 #pragma warning(pop) // Re-enable warnings
+#endif
 #include <vector>
 
 

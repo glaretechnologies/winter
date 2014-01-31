@@ -7,7 +7,9 @@ Generated at Wed Oct 20 15:22:37 +1300 2010
 #include "LLVMTypeUtils.h"
 
 
+#ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
+#endif
 #include "llvm/IR/Module.h"
 #include "llvm/Analysis/Verifier.h"
 #include "llvm/PassManager.h"
@@ -19,7 +21,9 @@ Generated at Wed Oct 20 15:22:37 +1300 2010
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/raw_ostream.h"
+#ifdef _MSC_VER
 #pragma warning(pop) // Re-enable warnings
+#endif
 
 
 using std::vector;

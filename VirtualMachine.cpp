@@ -25,8 +25,9 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "LanguageTests.h"
 #include "VirtualMachine.h"
 #include "LLVMTypeUtils.h"
-#if USE_LLVM
+#ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
+#endif
 #include "llvm/IR/Module.h"
 #include "llvm/Analysis/Verifier.h"
 #include "llvm/PassManager.h"
@@ -64,6 +65,7 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/DynamicLibrary.h"
+#ifdef _MSC_VER
 #pragma warning(pop) // Re-enable warnings
 #endif
 
