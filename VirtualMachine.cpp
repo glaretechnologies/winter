@@ -82,7 +82,7 @@ static const bool DUMP_MODULE_IR = false;
 static const bool DUMP_ASSEMBLY = false;
 
 
-static const bool USE_MCJIT = true;
+static const bool USE_MCJIT = false;
 
 
 static void* allocateRefCountedStructure(uint32 size, void* env)
