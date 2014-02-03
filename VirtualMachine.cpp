@@ -231,15 +231,15 @@ public:
 			return (void*)logf;
 
 		// For OS X:
-		if(name == "_sin_float_")
+		if(name == "_sinf")
 			return (void*)sinf;
-		else if(name == "_cos_float_")
+		else if(name == "_cosf")
 			return (void*)cosf;
 		else if(name == "_pow_float__float_")
 			return (void*)powf;
-		else if(name == "_exp_float_")
+		else if(name == "_expf")
 			return (void*)expf;
-		else if(name == "_log_float_")
+		else if(name == "_logf")
 			return (void*)logf;
 
 		void* f = llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(name);
