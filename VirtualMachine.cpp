@@ -205,6 +205,8 @@ public:
 		void* f = llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(name);
 
 		assert(f);
+		if(!f)
+			throw BaseException("Internal error: failed to find symbol '" + name + "'");
 		return (uint64_t)f;
 	}
 #else
@@ -216,9 +218,23 @@ public:
 
 		// If function was not in func_map (i.e. was not an 'external' function), then use normal symbol resolution, for functions like sinf, cosf etc..
 
+		// For some reason, DynamicLibrary::SearchForAddressOfSymbol() doesn't seem to work on Windows 32-bit.  So just manually resolve these symbols.
+		if(name == "sinf")
+			return sinf;
+		else if(name == "cosf")
+			return cosf;
+		else if(name == "powf")
+			return powf;
+		else if(name == "expf")
+			return expf;
+		else if(name == "logf")
+			return logf;
+
 		void* f = llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(name);
 
 		assert(f);
+		if(!f)
+			throw BaseException("Internal error: failed to find symbol '" + name + "'");
 		return f;
 	}
 #endif
