@@ -230,6 +230,18 @@ public:
 		else if(name == "logf")
 			return (void*)logf;
 
+		// For OS X:
+		if(name == "_sin_float_")
+			return (void*)sinf;
+		else if(name == "_cos_float_")
+			return (void*)cosf;
+		else if(name == "_pow_float__float_")
+			return (void*)powf;
+		else if(name == "_exp_float_")
+			return (void*)expf;
+		else if(name == "_log_float_")
+			return (void*)logf;
+
 		void* f = llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(name);
 
 		assert(f);
