@@ -82,7 +82,7 @@ static const bool DUMP_MODULE_IR = false;
 static const bool DUMP_ASSEMBLY = false;
 
 
-static const bool USE_MCJIT = false;
+static const bool USE_MCJIT = true;
 
 
 static void* allocateRefCountedStructure(uint32 size, void* env)
@@ -235,7 +235,7 @@ public:
 			return (void*)sinf;
 		else if(name == "_cosf")
 			return (void*)cosf;
-		else if(name == "_pow_float__float_" || name == "_powf")
+		else if(name == "_powf")
 			return (void*)powf;
 		else if(name == "_expf")
 			return (void*)expf;
@@ -436,6 +436,9 @@ void VirtualMachine::addExternalFunction(const ExternalFunctionRef& f, llvm::LLV
 	if(USE_MCJIT)
 	{
 		func_map[makeSafeStringForFunctionName(f->sig.toString())] = f->func;
+
+		// On OS X, the requested symbol names seem to have an underscore prepended, so add an entry with a leading underscore.
+		func_map["_" + makeSafeStringForFunctionName(f->sig.toString())] = f->func;
 	}
 	else
 	{
