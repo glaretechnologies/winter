@@ -220,15 +220,15 @@ public:
 
 		// For some reason, DynamicLibrary::SearchForAddressOfSymbol() doesn't seem to work on Windows 32-bit.  So just manually resolve these symbols.
 		if(name == "sinf")
-			return sinf;
+			return (void*)sinf;
 		else if(name == "cosf")
-			return cosf;
+			return (void*)cosf;
 		else if(name == "powf")
-			return powf;
+			return (void*)powf;
 		else if(name == "expf")
-			return expf;
+			return (void*)expf;
 		else if(name == "logf")
-			return logf;
+			return (void*)logf;
 
 		void* f = llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(name);
 
