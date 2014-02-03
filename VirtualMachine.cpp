@@ -235,7 +235,7 @@ public:
 			return (void*)sinf;
 		else if(name == "_cosf")
 			return (void*)cosf;
-		else if(name == "_pow_float__float_")
+		else if(name == "_pow_float__float_" || name == "_powf")
 			return (void*)powf;
 		else if(name == "_expf")
 			return (void*)expf;
