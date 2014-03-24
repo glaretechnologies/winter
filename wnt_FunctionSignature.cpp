@@ -9,7 +9,7 @@ Copyright 2009 Nicholas Chapman
 #include "wnt_FunctionSignature.h"
 
 
-#include "utils/stringutils.h"
+#include "utils/StringUtils.h"
 
 
 namespace Winter

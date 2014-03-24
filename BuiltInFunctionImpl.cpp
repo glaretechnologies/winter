@@ -8,7 +8,7 @@
 #include "wnt_RefCounting.h"
 #include <vector>
 #include "LLVMTypeUtils.h"
-#include "utils/platformutils.h"
+#include "utils/PlatformUtils.h"
 #ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
 #endif

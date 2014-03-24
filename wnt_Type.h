@@ -407,7 +407,7 @@ public:
 				{
 					if((*this->types[i]) < (*b_sumtype.types[i]))
 						return true;
-					else if(*this->types[i] < *b_sumtype.types[i])
+					else if((*b_sumtype.types[i]) < (*this->types[i]))
 						return false;
 				}
 

@@ -9,7 +9,7 @@ Generated at 2011-06-11 19:54:39 +0100
 
 #include "wnt_SourceBuffer.h"
 #include <string>
-#include <utils/platform.h>
+#include <utils/Platform.h>
 
 
 namespace Winter

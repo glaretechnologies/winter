@@ -15,7 +15,7 @@ File created by ClassTemplate on Wed Jun 11 02:56:20 2008
 #include "BuiltInFunctionImpl.h"
 #include "indigo/TestUtils.h"
 #include "indigo/globals.h"
-#include "utils/stringutils.h"
+#include "utils/StringUtils.h"
 #include "utils/Parser.h"
 #include <assert.h>
 #include <map>

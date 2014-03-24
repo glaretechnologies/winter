@@ -7,7 +7,7 @@ Generated at 2011-06-11 19:54:39 +0100
 #include "wnt_Diagnostics.h"
 
 
-#include <utils/stringutils.h>
+#include <utils/StringUtils.h>
 
 
 namespace Winter

@@ -12,7 +12,7 @@ extern "C"
 #include <iostream>
 #include <cassert>
 #include <fstream>
-#include "utils/fileutils.h"
+#include "utils/FileUtils.h"
 #include "wnt_Lexer.h"
 #include "TokenBase.h"
 #include "wnt_LangParser.h"

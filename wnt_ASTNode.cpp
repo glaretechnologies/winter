@@ -20,7 +20,7 @@ Copyright 2009 Nicholas Chapman
 #include "BuiltInFunctionImpl.h"
 #include "LLVMTypeUtils.h"
 #include "ProofUtils.h"
-#include "utils/stringutils.h"
+#include "utils/StringUtils.h"
 #include "maths/mathstypes.h"
 #include "maths/vec2.h"
 #ifdef _MSC_VER // If compiling with Visual C++
@@ -3618,7 +3618,7 @@ static BoolValue* compare(unsigned int token_type, Value* a, Value* b)
 		return new BoolValue(gte<T>(a, b));
 	default:
 		assert(!"Unknown comparison token type.");
-		return false;
+		return NULL;
 	}
 }
 

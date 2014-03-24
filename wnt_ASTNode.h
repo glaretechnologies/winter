@@ -18,7 +18,7 @@ Copyright 2009 Nicholas Chapman
 #include "Value.h"
 #include <utils/Reference.h>
 #include <utils/RefCounted.h>
-#include <utils/platform.h>
+#include <utils/Platform.h>
 #ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
 #endif

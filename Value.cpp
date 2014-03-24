@@ -3,7 +3,7 @@
 
 #include "wnt_ASTNode.h"
 #include "wnt_FunctionDefinition.h"
-#include "utils/stringutils.h"
+#include "utils/StringUtils.h"
 #include "llvm/IR/Constants.h"
 
 

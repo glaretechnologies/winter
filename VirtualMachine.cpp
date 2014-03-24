@@ -10,8 +10,8 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include <iostream>
 #include <cassert>
 #include <fstream>
-#include "utils/fileutils.h"
-#include "utils/stringutils.h"
+#include "utils/FileUtils.h"
+#include "utils/StringUtils.h"
 #include "wnt_Lexer.h"
 #include "TokenBase.h"
 #include "wnt_LangParser.h"

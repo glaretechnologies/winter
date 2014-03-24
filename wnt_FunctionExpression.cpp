@@ -17,7 +17,7 @@ Generated at 2011-04-30 18:53:38 +0100
 #include "LLVMTypeUtils.h"
 #include "ProofUtils.h"
 #include "wnt_IfExpression.h"
-#include "utils/stringutils.h"
+#include "utils/StringUtils.h"
 #include "maths/mathstypes.h"
 #ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings

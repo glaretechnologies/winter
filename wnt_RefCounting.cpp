@@ -14,7 +14,7 @@ Generated at 2011-04-25 19:15:40 +0100
 #include "Linker.h"
 #include "BuiltInFunctionImpl.h"
 #include "LLVMTypeUtils.h"
-#include "utils/stringutils.h"
+#include "utils/StringUtils.h"
 #ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
 #endif

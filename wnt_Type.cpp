@@ -4,7 +4,7 @@
 #include "Value.h"
 #include "BaseException.h"
 #include "LLVMTypeUtils.h"
-#include "utils/stringutils.h"
+#include "utils/StringUtils.h"
 #ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
 #endif

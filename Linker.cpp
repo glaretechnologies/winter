@@ -3,8 +3,8 @@
 
 
 #include "BuiltInFunctionImpl.h"
-#include "utils/stringutils.h"
-#include "utils/platformutils.h"
+#include "utils/StringUtils.h"
+#include "utils/PlatformUtils.h"
 #include "wnt_ExternalFunction.h"
 #include "wnt_LLVMVersion.h"
 

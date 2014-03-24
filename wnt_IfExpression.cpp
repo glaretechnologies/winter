@@ -15,7 +15,7 @@ Copyright Glare Technologies Limited 2014 -
 #include "BuiltInFunctionImpl.h"
 #include "LLVMTypeUtils.h"
 #include "ProofUtils.h"
-#include "utils/stringutils.h"
+#include "utils/StringUtils.h"
 #include "maths/mathstypes.h"
 #ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
