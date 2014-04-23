@@ -1751,8 +1751,8 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 					y = 2.0 \
 				  in \
 					y \
-				  def main() float : f()", 2.0);*/
-/*
+				  def main() float : f()", 2.0);
+
 	//testMainFloat("def f() float : \
 	//			  let	\
 	//				z = y \
@@ -1850,18 +1850,18 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 					f(3.0)", 5.0);
 
 	// Test capture of let variable.
-	/*
+	
 	NOTE: Disabled, because these tests leak due to call to allocateRefCountedStructure().
 	testMainFloat("	def main() float :                          \n\
 					let z = 3.0 in                     \n\
 					let f = \\() : z  in                    \n\
 					f()", 3.0);
-	*/
+	
 
 	// TODO: test two lets varables at same level
 
 	// Test capture of let variable up one level.
-	/*
+	
 	NOTE: Disabled, because these tests leak due to call to allocateRefCountedStructure().
 	testMainFloat("	def main() float :                          \n\
 					let x = 3.0 in                         \n\
