@@ -717,20 +717,27 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 		else if(stack[s]->nodeType() == ASTNode::LetBlockType)
 		{
 			LetBlock* let_block = static_cast<LetBlock*>(stack[s]);
-
+			
 			for(unsigned int i=0; i<let_block->lets.size(); ++i)
 			{
-				// If 'this' is in the let expression for the current Let Block, then don't bind to it's variable name
+				// If the variable we are tring to bind is in a let expression for the current Let Block, then
+				// we only want to bind to let variables from let expressions that are *before* the current let expression.
 				// In cases like
 				// let
 				//   x = x
 				// This avoids the x expression on the right binding to the x Let node on the left.
+				// In cases like this:
+				// let
+				//	z = y
+				//	y = x
+				// it also prevent y from binding to the y from the line below. (which could cause a cycle of references)
 				if((s + 1 < stack.size()) && (stack[s+1]->nodeType() == ASTNode::LetType) && (let_block->lets[i].getPointer() == stack[s+1]))
 				{
+					// We have reached the let expression for the current variable we are tring to bind, so don't try and bind with let variables equal to or past this one.
+					break;
 				}
 				else
 				{
-
 					if(let_block->lets[i]->variable_name == this->name)
 					{
 						if(!in_current_func_def && payload.func_def_stack.back()->use_captured_vars)

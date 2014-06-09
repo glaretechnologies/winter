@@ -1140,6 +1140,27 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 		);
 	}
 
+	// Test using a let variable (y) before it is defined:
+	testMainFloatArgInvalidProgram("									\n\
+		def main(float x) float :		\n\
+			let							\n\
+				z = y					\n\
+				y = x					\n\
+			in							\n\
+				z						",
+		2.0f
+	);
+
+	// Test using a let variable (y) before it is defined, that would have created a cycle:
+	testMainFloatArgInvalidProgram("									\n\
+		def main(float x) float :		\n\
+			let							\n\
+				z = y					\n\
+				y = z					\n\
+			in							\n\
+				z						",
+		2.0f
+	);
 
 	// Test avoidance of circular let definition: 
 	testMainFloatArgInvalidProgram("									\n\
@@ -1850,12 +1871,12 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 					f(3.0)", 5.0);
 
 	// Test capture of let variable.
-	
-	NOTE: Disabled, because these tests leak due to call to allocateRefCountedStructure().
-	testMainFloat("	def main() float :                          \n\
-					let z = 3.0 in                     \n\
-					let f = \\() : z  in                    \n\
-					f()", 3.0);
+
+	//NOTE: Disabled, because these tests leak due to call to allocateRefCountedStructure().
+	//testMainFloat("	def main() float :                          \n\
+	//				let z = 3.0 in                     \n\
+	//				let f = \\() : z  in                    \n\
+	//				f()", 3.0);
 	
 
 	// TODO: test two lets varables at same level
