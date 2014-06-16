@@ -65,7 +65,8 @@ FunctionDefinition::FunctionDefinition(const SrcLocation& src_loc, const std::st
 	use_captured_vars(false),
 	closure_type(NULL),
 	alloc_func(NULL),
-	is_anon_func(false)
+	is_anon_func(false),
+	num_uses(0)
 {
 	sig.name = name;
 	for(unsigned int i=0; i<args_.size(); ++i)

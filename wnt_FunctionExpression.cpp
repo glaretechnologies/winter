@@ -480,6 +480,9 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 				}*/
 			}
 
+			if(this->target_function)
+				this->target_function->num_uses++;
+
 			//TEMP: don't fail now, maybe we can bind later.
 			//if(this->binding_type == Unbound)
 			//	throw BaseException("Failed to find function '" + sig.toString() + "'." + errorContext(*this));

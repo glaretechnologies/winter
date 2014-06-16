@@ -72,6 +72,8 @@ public:
 	void* getJittedFunction(const FunctionSignature& sig);
 	void* getJittedFunctionByName(const std::string& name);
 
+	bool isFunctionCalled(const std::string& name);
+
 private:
 	void loadSource(const VMConstructionArgs& args, const std::vector<SourceBufferRef>& s, const std::vector<FunctionDefinitionRef>& preconstructed_func_defs);
 	void build(const VMConstructionArgs& args);

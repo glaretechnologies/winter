@@ -107,6 +107,9 @@ public:
 		//bool hidden_voidptr_arg
 	) const;
 
+	// Conservative, >= than the actual num uses.
+	inline int getNumUses() const { return num_uses; }
+
 
 	// NOTE: type() returns the 
 
@@ -131,6 +134,7 @@ public:
 	// in the AST, so that vars can succesfully bind to the parent function.
 	bool is_anon_func;
 
+	int num_uses; // Conservative, >= than the actual num uses.
 private:
 	FunctionDefinition* alloc_func; // NOTE: make this just a ptr?
 };

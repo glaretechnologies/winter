@@ -980,4 +980,14 @@ void* VirtualMachine::getJittedFunctionByName(const std::string& name)
 }
 
 
+bool VirtualMachine::isFunctionCalled(const std::string& name)
+{
+	FunctionDefinitionRef f = linker.findMatchingFunctionByName(name);
+	if(f.isNull())
+		return false;
+
+	return f->getNumUses() > 0;
+}
+
+
 } // end namespace Winter
