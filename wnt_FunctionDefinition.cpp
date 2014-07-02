@@ -994,7 +994,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 
 			// We want to do something here like,
 			// If we haven't computed the result, but are merely returning it, then need to copy the arg to return ptr.
-			if(this->body->nodeType() == ASTNode::VariableASTNodeType)
+			if(true) // this->body->nodeType() == ASTNode::VariableASTNodeType || this->body->nodeType() == ASTNode::IfExpressionType)
 			{
 				// Load value
 				llvm::Value* val = params.builder->CreateLoad(

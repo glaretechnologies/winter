@@ -262,6 +262,58 @@ void LanguageTests::run()
 
 
 
+	// Test a function (f) that just returns an arg directly
+	testMainIntegerArg(
+		"struct teststruct { int y }										\n\
+		def f(teststruct a, teststruct b, bool condition) teststruct : a      \n\
+		def main(int x) int : y( f(teststruct(1), teststruct(2), x < 5) ) ",
+		2, 1);
+
+	// Test a function (f) that just returns a new struct
+	testMainIntegerArg(
+		"struct teststruct { int y }										\n\
+		def f(teststruct a, teststruct b, bool condition) teststruct : teststruct(1)      \n\
+		def main(int x) int : y( f(teststruct(1), teststruct(2), x < 5) ) ",
+		2, 1);
+
+	// Test a function (f) that is just an if expression that returns pass-by-reference arguments directly.
+	testMainIntegerArg(
+		"struct teststruct { int y }										\n\
+		def f(teststruct a, teststruct b, bool condition) teststruct : if(condition, a, b)      \n\
+		def main(int x) int : y( f(teststruct(1), teststruct(2), x < 5) ) ",
+		2, 1);
+
+	// Test a function (f) that is just an if expression that returns pass-by-reference arguments directly, in a let block
+	testMainIntegerArg(
+		"struct teststruct { int y }										\n\
+		def f(teststruct a, teststruct b, bool condition) teststruct :      \n\
+			let																\n\
+				x = if(condition, a, b)										\n\
+			in																\n\
+				x															\n\
+		def main(int x) int : y( f(teststruct(1), teststruct(2), x < 5) ) ",
+		2, 1);
+
+	// Test a function (f) that is just an if expression that returns pass-by-reference arguments directly, in a let block
+	testMainIntegerArg(
+		"struct teststruct { int y }										\n\
+		def f(teststruct a, teststruct b, bool condition) teststruct :      \n\
+			let																\n\
+				x = teststruct( y(if(condition, a, b))	)									\n\
+			in																\n\
+				x															\n\
+		def main(int x) int : y( f(teststruct(1), teststruct(2), x < 5) ) ",
+		2, 1);
+
+
+	testMainIntegerArg(
+		"struct teststruct { int y }										\n\
+		def g(teststruct a, teststruct b, bool condition) teststruct : if(condition, a, b)      \n\
+		def f(teststruct a, teststruct b, bool condition) teststruct : if(condition, g(a, b, condition), g(a, b, condition))      \n\
+		def main(int x) int : y( f(teststruct(1), teststruct(2), x < 5) ) ",
+		2, 1);
+
+
 
 	// truncateToInt with runtime args, with bounds checking
 	testMainFloatArg("def main(float x) float : toFloat(if x >= -2147483648.0 && x < 2147483647.0 then truncateToInt(x) else 0)", 3.1f, 3.0f);

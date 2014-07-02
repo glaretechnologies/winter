@@ -78,8 +78,8 @@ namespace Winter
 {
 	
 
-static const bool DUMP_MODULE_IR = false;
-static const bool DUMP_ASSEMBLY = false;
+static const bool DUMP_MODULE_IR = false; // Dumps to "unoptimised_module.txt", "module.txt" in current working dir.
+static const bool DUMP_ASSEMBLY = false; // Dumpts to "module_assembly.txt" in current working dir.
 
 
 static const bool USE_MCJIT = true;
