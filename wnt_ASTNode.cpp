@@ -23,6 +23,7 @@ Copyright 2009 Nicholas Chapman
 #include "utils/StringUtils.h"
 #include "maths/mathstypes.h"
 #include "maths/vec2.h"
+#include <ostream>
 #ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
 #endif
