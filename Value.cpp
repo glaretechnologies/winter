@@ -4,7 +4,13 @@
 #include "wnt_ASTNode.h"
 #include "wnt_FunctionDefinition.h"
 #include "utils/StringUtils.h"
+#ifdef _MSC_VER // If compiling with Visual C++
+#pragma warning(push, 0) // Disable warnings
+#endif
 #include "llvm/IR/Constants.h"
+#ifdef _MSC_VER
+#pragma warning(pop) // Re-enable warnings
+#endif
 
 
 using std::vector;
