@@ -506,10 +506,10 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 static const char* plain_func_names[] = { "floor", "ceil", "sqrt", "sin", "cos", "exp", "log", "abs", "truncateToInt", "toFloat", "map", "elem", "inBounds", "shuffle", "min", "max", "pow", "dot", "if", 
 	"vec2", "op_add", "op_sub", "op_mul", "op_eq", "vec3", "vec4", "x", "y", "z", "w", "mat2x2", "mul", "mat3x3", "mat4x4", "col0", "col1", "col2", "col3", "or", "and", "not", "xor", "add", "sub", "div",
 	"lt", "lte", "gt", "gte", "eq", "neq", "doti", "dotj", "dotk", "fract", "floorToInt", "ceilToInt", "lerp", "step", "get_t", "smoothstep", "smootherstep", "pulse", "smoothPulse", "clamp", "cross",
-	"length", "dist", "neg", "recip", "normalise", "real", "pi", "noise", "noise3Valued", "fbm", "fbm3Valued", "noise01", "fbm01", "gridNoise", "voronoiDist", "randomCellShade",
+	"length", "dist", "neg", "recip", "normalise", "real", "pi", "noise", "noise3Valued", "fbm", "fbm3Valued", "noise01", "fbm01", "gridNoise", "voronoiDist", "randomCellShade", 
 
 	// From WinterExternalFuncs.cpp:
-	"print", "rotationMatrix", "fbm", "fbm4Valued", "multifractal", "noise", "noise4Valued", "voronoi", "voronoi3d", "gridNoise", "tan", "asin", "acos", "atan", "atan2", "fastPow", "mod",
+	"print", "rotationMatrix", "fbm", "fbm4Valued", "multifractal", "noise", "noise4Valued", "voronoi", "voronoi3d", "gridNoise", "tan", "asin", "acos", "atan", "atan2", "fastPow", "mod", "inverse",
 	NULL};
 
 
