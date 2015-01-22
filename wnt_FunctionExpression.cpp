@@ -269,15 +269,6 @@ bool FunctionExpression::doesFunctionTypeMatch(const TypeRef& type)
 }*/
 
 
-static bool isNodeAncestor(const std::vector<ASTNode*>& stack, const ASTNode* node)
-{
-	for(size_t i=0; i<stack.size(); ++i)
-		if(node == stack[i])
-			return true;
-	return false;
-}
-
-
 void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
 	// Return if we have already bound this function in an earlier pass.
@@ -336,35 +327,50 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 
 				for(unsigned int i=0; i<let_block->lets.size(); ++i)
 				{
-					if(let_block->lets[i]->variable_name == this->function_name && 
-						!isNodeAncestor(stack, let_block->lets[i].getPointer()) && // Don't try to bind to ancestor let variables, because their type will not be computed yet.
-																					// Also binding to such a variable would result in a circular definition of the form
-																					// let  x = x()
-						doesFunctionTypeMatch(let_block->lets[i]->type()))
+					// If the function we are tring to bind is in a let expression for the current Let Block, then
+					// we only want to bind to let functions from let expressions that are *before* the current let expression.
+					// In cases like
+					// let
+					//   x = x
+					// This avoids the x expression on the right binding to the x Let node on the left.
+					// In cases like this:
+					// let
+					//	z = y
+					//	y = x
+					// it also prevent y from binding to the y from the line below. (which could cause a cycle of references)
+					if((s + 1 < stack.size()) && (stack[s+1]->nodeType() == ASTNode::LetType) && (let_block->lets[i].getPointer() == stack[s+1]))
 					{
-						this->bound_index = i;
-						this->binding_type = Let;
-						this->bound_let_block = let_block;
-						this->let_frame_offset = use_let_frame_offset;
-						found_binding = true;
-
-						if(!in_current_func_def && payload.func_def_stack.back()->use_captured_vars)
-						{
-							this->captured_var_index = (int)payload.func_def_stack.back()->captured_vars.size(); // payload.captured_vars.size();
-							this->use_captured_var = true;
-
-							// Add this function argument as a variable that has to be captured for closures.
-							CapturedVar var;
-							var.vartype = CapturedVar::Let;
-							var.bound_let_block = let_block;
-							var.index = i;
-							var.let_frame_offset = use_let_frame_offset;
-							//payload.captured_vars.push_back(var);
-							payload.func_def_stack.back()->captured_vars.push_back(var);
-						}
-
+						// We have reached the let expression for the current variable we are tring to bind, so don't try and bind with let variables equal to or past this one.
+						break;
 					}
-				
+					else
+					{
+						if(let_block->lets[i]->variable_name == this->function_name && 
+							doesFunctionTypeMatch(let_block->lets[i]->type()))
+						{
+							this->bound_index = i;
+							this->binding_type = Let;
+							this->bound_let_block = let_block;
+							this->let_frame_offset = use_let_frame_offset;
+							found_binding = true;
+
+							if(!in_current_func_def && payload.func_def_stack.back()->use_captured_vars)
+							{
+								this->captured_var_index = (int)payload.func_def_stack.back()->captured_vars.size(); // payload.captured_vars.size();
+								this->use_captured_var = true;
+
+								// Add this function argument as a variable that has to be captured for closures.
+								CapturedVar var;
+								var.vartype = CapturedVar::Let;
+								var.bound_let_block = let_block;
+								var.index = i;
+								var.let_frame_offset = use_let_frame_offset;
+								//payload.captured_vars.push_back(var);
+								payload.func_def_stack.back()->captured_vars.push_back(var);
+							}
+
+						}
+					}
 				}
 
 				// We only want to count an ancestor let block as an offsetting block if we are not currently in a let clause of it.

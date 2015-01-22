@@ -49,6 +49,13 @@ if next token == ')', then it's if-then-else.
 if next token == ',', then it's if(,,)
 */
 
+
+void LanguageTests::doLLVMInit()
+{
+	testMainFloatArg("def main(float x) float : sqrt(4)", 2.0f, 2.0f);
+}
+
+
 void LanguageTests::run()
 {
 //	ProgramBuilder::test();
@@ -1231,6 +1238,19 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 				x = 1.0 + x				\n\
 			in							\n\
 				x						",
+		2.0f
+	);
+
+	// Test avoidance of circular let definition for functions
+	testMainFloatArg("						\n\
+		def f(float x) float : x		\n\
+		def main(float y) float :		\n\
+			let							\n\
+				f1 = f(1.0) + 1.0				\n\
+				f = f(1.0) + 1.0				\n\
+			in							\n\
+				f						",
+		1.0f,
 		2.0f
 	);
 

@@ -14,6 +14,8 @@ class LanguageTests
 public:
 	LanguageTests();
 	~LanguageTests();
+
+	static void doLLVMInit();
 	
 	static void run();
 private:
