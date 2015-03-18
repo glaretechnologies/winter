@@ -413,9 +413,16 @@ VirtualMachine::~VirtualMachine()
 }
 
 
+void VirtualMachine::init()
+{
+	// Since we will be calling LLVM functions from multiple threads, we need to call this.
+	llvm::llvm_start_multithreaded();
+}
+
+
 void VirtualMachine::shutdown() // Calls llvm_shutdown()
 {
-	llvm::llvm_shutdown();
+	llvm::llvm_shutdown(); // This calls llvm::llvm_stop_multithreaded() as well.
 }
 
 

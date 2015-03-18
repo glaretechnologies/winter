@@ -65,6 +65,7 @@ public:
 	~VirtualMachine();
 
 
+	static void init(); // Initialise LLVM
 	static void shutdown(); // Calls llvm_shutdown()
 
 	Reference<FunctionDefinition> findMatchingFunction(const FunctionSignature& sig);
