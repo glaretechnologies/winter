@@ -181,14 +181,7 @@ llvm::Value* Constructor::emitLLVMCode(EmitLLVMCodeParams& params) const
 		for(unsigned int i=0; i<this->struct_type->component_types.size(); ++i)
 		{
 			// Get the pointer to the structure field.
-			vector<llvm::Value*> indices;
-			indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true)));
-			indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, i, true)));
-			
-			llvm::Value* field_ptr = params.builder->CreateGEP(
-				struct_ptr, // ptr
-				indices
-			);
+			llvm::Value* field_ptr = params.builder->CreateConstInBoundsGEP2_32(struct_ptr, 0, i);
 
 			llvm::Value* arg_value = LLVMTypeUtils::getNthArg(params.currently_building_func, i + 1);
 			if(!this->struct_type->component_types[i]->passByValue())
@@ -271,15 +264,7 @@ llvm::Value* GetField::emitLLVMCode(EmitLLVMCodeParams& params) const
 			// Pointer to structure will be in 0th argument.
 			llvm::Value* struct_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
 
-			vector<llvm::Value*> indices;
-			indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true)));
-			indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, this->index, true)));
-
-			llvm::Value* field_ptr = params.builder->CreateGEP(
-				struct_ptr, // ptr
-				indices,
-				field_name + " ptr" // name
-			);
+			llvm::Value* field_ptr = params.builder->CreateConstInBoundsGEP2_32(struct_ptr, 0, this->index, field_name + " ptr");
 
 			llvm::Value* loaded_val = params.builder->CreateLoad(
 				field_ptr,
@@ -300,15 +285,7 @@ llvm::Value* GetField::emitLLVMCode(EmitLLVMCodeParams& params) const
 			// Pointer to structure will be in 1st argument.
 			llvm::Value* struct_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
 
-			vector<llvm::Value*> indices;
-			indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true)));
-			indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, this->index, true)));
-
-			llvm::Value* field_ptr = params.builder->CreateGEP(
-				struct_ptr, // ptr
-				indices,
-				field_name + " ptr" // name
-			);
+			llvm::Value* field_ptr = params.builder->CreateConstInBoundsGEP2_32(struct_ptr, 0, this->index, field_name + " ptr");
 
 			llvm::Value* field_val = params.builder->CreateLoad(
 				field_ptr,
@@ -363,15 +340,7 @@ llvm::Value* GetTupleElementBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 			// Pointer to structure will be in 0th argument.
 			llvm::Value* struct_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
 
-			vector<llvm::Value*> indices;
-			indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true)));
-			indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, this->index, true)));
-
-			llvm::Value* field_ptr = params.builder->CreateGEP(
-				struct_ptr, // ptr
-				indices,
-				field_name + " ptr" // name
-			);
+			llvm::Value* field_ptr = params.builder->CreateConstInBoundsGEP2_32(struct_ptr, 0, this->index, field_name + " ptr");
 
 			llvm::Value* loaded_val = params.builder->CreateLoad(
 				field_ptr,
@@ -392,15 +361,7 @@ llvm::Value* GetTupleElementBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 			// Pointer to structure will be in 1st argument.
 			llvm::Value* struct_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
 
-			vector<llvm::Value*> indices;
-			indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true)));
-			indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, this->index, true)));
-
-			llvm::Value* field_ptr = params.builder->CreateGEP(
-				struct_ptr, // ptr
-				indices,
-				field_name + " ptr" // name
-			);
+			llvm::Value* field_ptr = params.builder->CreateConstInBoundsGEP2_32(struct_ptr, 0, this->index, field_name + " ptr");
 
 			llvm::Value* field_val = params.builder->CreateLoad(
 				field_ptr,
@@ -500,7 +461,7 @@ public:
 		indices[1] = i; // get the indexed element in the array
 
 		// Get pointer to input element
-		llvm::Value* elem_ptr = params.builder->CreateGEP(
+		llvm::Value* elem_ptr = params.builder->CreateInBoundsGEP(
 			input_array, // ptr
 			indices
 		);
@@ -522,7 +483,7 @@ public:
 		);
 
 		// Get pointer to output element
-		llvm::Value* out_elem_ptr = params.builder->CreateGEP(
+		llvm::Value* out_elem_ptr = params.builder->CreateInBoundsGEP(
 			return_ptr, // ptr
 			indices
 		);

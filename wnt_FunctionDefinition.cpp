@@ -621,18 +621,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			//params.hidden_voidptr_arg
 		);
 
-		//std::cout << "closure_pointer: " << std::endl;
-		//TEMP
-		//closure_pointer->dump();
-
-		vector<llvm::Value*> indices;
-		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))); // array index
-		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1, true))); // field index
-		
-		llvm::Value* func_field_ptr = params.builder->CreateGEP(
-			closure_pointer, // ptr
-			indices
-		);
+		llvm::Value* func_field_ptr = params.builder->CreateConstInBoundsGEP2_32(closure_pointer, 0, 1);
 
 		// Do the store.
 		params.builder->CreateStore(
@@ -641,17 +630,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		);
 	}
 
-	llvm::Value* captured_var_struct_ptr = NULL;
-	{
-	vector<llvm::Value*> indices;
-	indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))); // array index
-	indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 2, true))); // field index
-		
-	captured_var_struct_ptr = params.builder->CreateGEP(
-		closure_pointer, // ptr
-		indices
-	);
-	}
+	llvm::Value* captured_var_struct_ptr = params.builder->CreateConstInBoundsGEP2_32(closure_pointer, 0, 2);
 
 	// for each captured var
 	for(size_t i=0; i<this->captured_vars.size(); ++i)
@@ -689,20 +668,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		}
 			
 		// store in captured var structure field
-		vector<llvm::Value*> indices;
-		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true)));
-		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, i, true)));
-		
-		llvm::Value* field_ptr = params.builder->CreateGEP(
-			captured_var_struct_ptr, // ptr
-			indices
-		);
-
-		//TEMP:
-		//std::cout << "val: " << std::endl;
-		//val->dump();
-		//std::cout << "field_ptr: " << std::endl;
-		//field_ptr->dump();
+		llvm::Value* field_ptr = params.builder->CreateConstInBoundsGEP2_32(captured_var_struct_ptr, 0, i);
 
 		params.builder->CreateStore(
 			val, // value

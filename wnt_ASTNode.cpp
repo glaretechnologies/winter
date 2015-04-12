@@ -1039,20 +1039,7 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 		);
 
 		// Load the value from the correct field.
-
-		vector<llvm::Value*> indices;
-		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))); // array index
-		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, this->bound_index, true))); // field index
-		
-		//TEMP
-		//params.currently_building_func->dump();
-		//base_cap_var_structure->dump();
-		//cap_var_structure->dump();
-
-		llvm::Value* field_ptr = params.builder->CreateGEP(
-			cap_var_structure, // ptr
-			indices
-		);
+		llvm::Value* field_ptr = params.builder->CreateConstInBoundsGEP2_32(cap_var_structure, 0, this->bound_index);
 
 		return params.builder->CreateLoad(field_ptr);
 	}
@@ -1578,14 +1565,7 @@ llvm::Value* ArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 	// For each element in the literal
 	for(unsigned int i=0; i<this->elements.size(); ++i)
 	{
-		vector<llvm::Value*> indices(2);
-		indices[0] = llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true)); // Zeroth array
-		indices[1] = llvm::ConstantInt::get(*params.context, llvm::APInt(32, i, true)); // i-th element in array
-			
-		llvm::Value* element_ptr = params.builder->CreateGEP(
-			array_addr, // ptr
-			indices
-		);
+		llvm::Value* element_ptr = params.builder->CreateConstInBoundsGEP2_32(array_addr, 0, i);
 
 		if(this->elements[i]->type()->passByValue())
 		{
@@ -2059,16 +2039,8 @@ llvm::Value* TupleLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 	for(unsigned int i=0; i<tuple_type->component_types.size(); ++i)
 	{
 		// Get the pointer to the structure field.
-		vector<llvm::Value*> indices;
-		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true)));
-		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, i, true)));
-			
-		llvm::Value* field_ptr = params.builder->CreateGEP(
-			result_struct_val, // ptr
-			indices
-		);
+		llvm::Value* field_ptr = params.builder->CreateConstInBoundsGEP2_32(result_struct_val, 0, i);
 
-		//llvm::Value* arg_value = LLVMTypeUtils::getNthArg(params.currently_building_func, i + 1);
 		llvm::Value* arg_value = this->elements[i]->emitLLVMCode(params);
 
 		if(!tuple_type->component_types[i]->passByValue())

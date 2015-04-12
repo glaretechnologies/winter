@@ -1146,40 +1146,42 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 	}
 	else if(function_name.size() >= 2 && function_name[0] == 'e' && isNumeric(function_name[1]))
 	{
-		// eN() function
-		const int index = stringToInt(function_name.substr(1, function_name.size() - 1));
-
-		if(this->argument_expressions[0]->type()->getType() == Type::VectorTypeType)
+		try
 		{
-			/*
-			e0(v)		=>		v.s0
-			e1(v)		=>		v.s1
+			// eN() function
+			const int index = stringToInt(function_name.substr(1, function_name.size() - 1));
 
-			e9(v)		=>		v.s9
-			e10(v)		=>		v.sA
-			e11(v)		=>		v.sB
-
-			e12(v)		=>		v.sF
-			*/
-
-			try
+			if(this->argument_expressions[0]->type()->getType() == Type::VectorTypeType)
 			{
+				/*
+				e0(v)		=>		v.s0
+				e1(v)		=>		v.s1
+
+				e9(v)		=>		v.s9
+				e10(v)		=>		v.sA
+				e11(v)		=>		v.sB
+
+				e12(v)		=>		v.sF
+				*/
+
+			
 				return argument_expressions[0]->emitOpenCLC(params) + ".s" + std::string(1, ::intToHexChar((int)index));
+				
 			}
-			catch(StringUtilsExcep& e)
+			else if(this->argument_expressions[0]->type()->getType() == Type::ArrayTypeType)
 			{
-				throw BaseException("Error while emitting OpenCL C: invalid eN() function '" + function_name + "'.");
+				/*
+				eN(a)		=>		a[N]
+				*/
+				return argument_expressions[0]->emitOpenCLC(params) + "[" + ::intToHexChar((int)index) + "]";
 			}
+			else
+				throw BaseException("Error while emitting OpenCL C: eN() function first arg must be vector or array type.");
 		}
-		else if(this->argument_expressions[0]->type()->getType() == Type::ArrayTypeType)
+		catch(StringUtilsExcep&)
 		{
-			/*
-			eN(a)		=>		a[N]
-			*/
-			return argument_expressions[0]->emitOpenCLC(params) + "[" + ::intToHexChar((int)index) + "]";
+			throw BaseException("Error while emitting OpenCL C: invalid eN() function '" + function_name + "'.");
 		}
-		else
-			throw BaseException("Error while emitting OpenCL C: eN() function first arg must be vector or array type.");
 	}
 	else if(target_function && target_function->built_in_func_impl.nonNull() && dynamic_cast<GetField*>(target_function->built_in_func_impl.getPointer()))
 	{
@@ -1322,22 +1324,14 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		target_llvm_func = LLVMTypeUtils::createFieldLoad(
 			closure_pointer,
 			1, // field index
-			params.builder, *params.context,
+			params.builder,
 			"target_llvm_func"
 		);
 
-		{
-		vector<llvm::Value*> indices;
-		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))); // array index
 		// NOTE: index 2 should hold the captured vars struct.
-		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 2, true))); // field index
-		
-		captured_var_struct_ptr = params.builder->CreateGEP(
-			closure_pointer, // ptr
-			indices,
-			"captured_var_struct_ptr"
-		);
-		}
+		captured_var_struct_ptr = params.builder->CreateConstInBoundsGEP2_32(closure_pointer, 
+			0, // array index
+			2); // field index
 
 	}
 	else if(binding_type == Arg)
@@ -1376,22 +1370,14 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		target_llvm_func = LLVMTypeUtils::createFieldLoad(
 			closure_pointer,
 			1, // field index
-			params.builder, *params.context,
+			params.builder,
 			"target_llvm_func"
 		);
 
-		{
-		vector<llvm::Value*> indices;
-		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))); // array index
 		// NOTE: index 2 should hold the captured vars struct.
-		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 2, true))); // field index
-		
-		captured_var_struct_ptr = params.builder->CreateGEP(
-			closure_pointer, // ptr
-			indices,
-			"captured_var_struct_ptr"
-		);
-		}
+		captured_var_struct_ptr = params.builder->CreateConstInBoundsGEP2_32(closure_pointer, 
+			0, // array index
+			2); // field index
 	}
 	else if(binding_type == BoundToGlobalDef)
 	{

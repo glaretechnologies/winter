@@ -49,7 +49,7 @@ llvm::FunctionType* llvmFunctionType(const std::vector<TypeRef>& arg_types,
 									 //bool hidden_voidptr_arg
 									 );
 
-llvm::Value* createFieldLoad(llvm::Value* structure_ptr, int field_index, llvm::IRBuilder<>* builder, llvm::LLVMContext& context, const llvm::Twine& Name);
+llvm::Value* createFieldLoad(llvm::Value* structure_ptr, int field_index, llvm::IRBuilder<>* builder, const llvm::Twine& name);
 
 
 }; // end namespace LLVMTypeUtils
