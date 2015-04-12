@@ -309,7 +309,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 		this->target_machine = engine_builder.selectTarget(
 			llvm::Triple(this->triple), // target triple
 			"",  // march
-			"", // "core-avx2",  // mcpu
+			"", // "corei7", //"", // "core-avx2",  // mcpu
 			llvm::SmallVector<std::string, 4>());
 
 		// Enable floating point op fusion, to allow for FMA codegen.
@@ -483,44 +483,13 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		Lexer::process(source_buffers[i], tokens);
 
 		vector<FunctionDefinitionRef> buffer_func_defs;
-		parser.parseBuffer(tokens, source_buffers[i], buffer_func_defs, named_types);
+		parser.parseBuffer(tokens, source_buffers[i], buffer_func_defs, named_types, named_types_ordered);
 
-		// Do AddOpaqueEnvArg pass.
-		// This is a backwards-compatibility hack for old Indigo shaders that don't have an explicit 'opaque env' arg.
-		if(args.add_opaque_env_arg)
-		{
-			// Look for a method called eval.  If last arg does not have type opaque, then we need to do the add_opaque_env_arg stuff
-			bool need_to_do_add_opaque_env_arg = false;
-			for(size_t z=0; z<buffer_func_defs.size(); ++z)
-			{
-				if(buffer_func_defs[z]->sig.name == "eval")
-				{
-					if(buffer_func_defs[z]->sig.param_types.empty() || buffer_func_defs[z]->sig.param_types.back()->getType() != Type::OpaqueTypeType) // if zero args or last arg is not opaque env:
-						need_to_do_add_opaque_env_arg = true;
-				}
-			}
+		// Add named_types 
 
-			// If we are loading from a shader string (and not ISL_stdlib.txt), and there is no function that takes an arg with type opaque, this is probably old code.
-			bool any_func_has_opaque_arg = false;
-			if(!hasSuffix(source_buffers[i]->name, "ISL_stdlib.txt"))
-				for(size_t z=0; z<buffer_func_defs.size(); ++z)
-					for(size_t m=0; m<buffer_func_defs[z]->sig.param_types.size(); ++m)
-						if(buffer_func_defs[z]->sig.param_types[m]->getType() == Type::OpaqueTypeType)
-							any_func_has_opaque_arg = true;
-
-			need_to_do_add_opaque_env_arg = need_to_do_add_opaque_env_arg || !any_func_has_opaque_arg;
-
-
-			if(need_to_do_add_opaque_env_arg)
-			{
-				std::vector<ASTNode*> stack;
-				TraversalPayload payload(TraversalPayload::AddOpaqueEnvArg);
-				for(size_t i=0; i<buffer_func_defs.size(); ++i)
-					if(!buffer_func_defs[i]->is_anon_func)
-						buffer_func_defs[i]->traverse(payload, stack);
-				assert(stack.size() == 0);
-			}
-		}
+		// Run any function rewriters passed in by the user on the parsed function definitions.
+		for(size_t z=0; z<args.function_rewriters.size(); ++z)
+			args.function_rewriters[z]->rewrite(buffer_func_defs, source_buffers[i]);
 
 		func_defs.insert(func_defs.end(), buffer_func_defs.begin(), buffer_func_defs.end());
 	}
@@ -745,7 +714,7 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		assert(stack.size() == 0);
 	}
 
-		// TypeCheck
+	// TypeCheck
 	{
 		std::vector<ASTNode*> stack;
 		TraversalPayload payload(TraversalPayload::TypeCheck);
@@ -922,6 +891,32 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 		this->compileToNativeAssembly(this->llvm_module, "module_assembly.txt");
 
 	this->llvm_exec_engine->finalizeObject();
+}
+
+
+const std::string VirtualMachine::buildOpenCLCode()
+{
+	std::string s;
+
+	// Add some Winter built-in functions
+	s +=
+"float toFloat_int_(int x) { return (float)x; } \n\
+int truncateToInt_float_(float x) { return (int)x; } \n\
+\n";
+
+	// Spit out structure definitions and constructors
+	for(size_t i = 0; i != named_types_ordered.size(); ++i)
+		if(named_types_ordered[i]->getType() == Type::StructureTypeType)
+		{
+			StructureType* struct_type = static_cast<StructureType*>(named_types_ordered[i].getPointer());
+			s += struct_type->getOpenCLCDefinition();
+
+		}
+
+
+	// Spit out function definitions
+	s += linker.buildOpenCLCode();
+	return s;
 }
 
 

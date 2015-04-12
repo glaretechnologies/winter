@@ -507,45 +507,6 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 }*/
 
 
-// Return true iff the function requires an opaque env arg.  This will be the case for all functions, *unless* they are calling 'special' functions from Linker.
-
-static const char* plain_func_names[] = { "floor", "ceil", "sqrt", "sin", "cos", "exp", "log", "abs", "truncateToInt", "toFloat", "map", "elem", "inBounds", "shuffle", "min", "max", "pow", "dot", "if", 
-	"vec2", "op_add", "op_sub", "op_mul", "op_eq", "vec3", "vec4", "x", "y", "z", "w", "mat2x2", "mul", "mat3x3", "mat4x4", "col0", "col1", "col2", "col3", "or", "and", "not", "xor", "add", "sub", "div",
-	"lt", "lte", "gt", "gte", "eq", "neq", "doti", "dotj", "dotk", "fract", "floorToInt", "ceilToInt", "lerp", "step", "get_t", "smoothstep", "smootherstep", "pulse", "smoothPulse", "clamp", "cross",
-	"length", "dist", "neg", "recip", "normalise", "real", "pi", "noise", "noise3Valued", "fbm", "fbm3Valued", "noise01", "fbm01", "gridNoise", "voronoiDist", "randomCellShade", "transpose",
-
-	// From WinterExternalFuncs.cpp:
-	"print", "rotationMatrix", "fbm", "fbm4Valued", "multifractal", "noise", "noise4Valued", "voronoi", "voronoi3d", "gridNoise", "tan", "asin", "acos", "atan", "atan2", "fastPow", "mod", "inverse",
-	NULL};
-
-
-static bool doesFunctionRequireOpaqueEnvArg(const FunctionExpression& f)
-{
-	if(f.function_name.empty())
-		return false;
-
-	// Check for eN functions
-	if(f.function_name[0] == 'e' && f.function_name.size() >= 2 && isNumeric(f.function_name[1]))
-		return false;
-
-	for(size_t i=0; plain_func_names[i] != NULL; ++i)
-	{
-		if(f.function_name == plain_func_names[i])
-			return false;
-	}
-
-	return true;
-}
-
-
-// Some functions from e.g. ISL_stdlib may be correct already
-static bool isFunctionAlreadyCorrect(const FunctionDefinition& f)
-{
-	// If this function def is from ISL_stdlib.txt, then it should be fine.
-	return f.srcLocation().isValid() && ::hasSuffix(f.srcLocation().source_buffer->name, "ISL_stdlib.txt");
-}
-
-
 void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
 	if(payload.operation == TraversalPayload::ConstantFolding)
@@ -565,32 +526,13 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 				}
 			}
 	}
-	else if(payload.operation == TraversalPayload::AddOpaqueEnvArg)
-	{
-		const bool target_requires_opaque_arg = doesFunctionRequireOpaqueEnvArg(*this);
-
-		if(target_requires_opaque_arg)
-		{
-			FunctionDefinition* current_func = payload.func_def_stack.back();
-
-			if(!isFunctionAlreadyCorrect(*current_func))
-			{
-				assert(!current_func->args.empty() && current_func->args.back().type->getType() == Type::OpaqueTypeType);
-
-				bool last_arg_is_opaque_arg = false;
-				if(!argument_expressions.empty() && argument_expressions.back()->nodeType() == ASTNode::VariableASTNodeType)
-				{
-					if(argument_expressions.back().downcast<Variable>()->name == "env")
-						last_arg_is_opaque_arg = true;
-				}
-					
-				if(!last_arg_is_opaque_arg)
-					argument_expressions.push_back(new Variable(current_func->args.back().name, SrcLocation::invalidLocation()));
-			}
-		}
-	}
 	else if(payload.operation == TraversalPayload::TypeCoercion)
 	{
+	}
+	else if(payload.operation == TraversalPayload::CustomVisit)
+	{
+		if(payload.custom_visitor.nonNull())
+			payload.custom_visitor->visit(*this, payload);
 	}
 	
 	/*else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
@@ -669,6 +611,48 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 			{
 				throw BaseException("Failed to eval second arg of shuffle: " + e.what());
 			}
+		}
+		// Set second arg now for elem(tuple, i)
+		if(this->target_function && this->target_function->sig.name == "elem" && target_function->sig.param_types[0]->getType() == Type::TupleTypeType)
+		{
+			assert(this->argument_expressions.size() == 2);
+			if(!this->argument_expressions[1]->isConstant())
+				throw BaseException("Second arg to elem(tuple, i) must be constant");
+
+			int index;
+			try
+			{
+				VMState vmstate;
+				vmstate.func_args_start.push_back(0);
+
+				ValueRef res = this->argument_expressions[1]->exec(vmstate);
+
+				assert(dynamic_cast<IntValue*>(res.getPointer()));
+
+				IntValue* res_i = static_cast<IntValue*>(res.getPointer());
+
+				index = res_i->value;
+			}
+			catch(BaseException& e)
+			{
+				throw BaseException("Failed to eval second arg of elem(tuple, i): " + e.what());
+			}	
+
+			assert(this->target_function->built_in_func_impl.nonNull());
+			assert(dynamic_cast<GetTupleElementBuiltInFunc*>(this->target_function->built_in_func_impl.getPointer()));
+			GetTupleElementBuiltInFunc* tuple_elem_func = static_cast<GetTupleElementBuiltInFunc*>(this->target_function->built_in_func_impl.getPointer());
+				
+
+			// bounds check index.
+			if(index < 0 || index >= tuple_elem_func->tuple_type->component_types.size())
+				throw BaseException("Second argument to tuple elem() function is out of range." + errorContext(*this));
+
+
+			tuple_elem_func->setIndex(index);
+
+			// Set proper return type for function definition.
+			this->target_function->declared_return_type = tuple_elem_func->tuple_type->component_types[index];
+			
 		}
 	}
 	else if(payload.operation == TraversalPayload::CheckInDomain)
@@ -981,6 +965,12 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 				}
 			}
 		}
+		if(this->argument_expressions[0]->type()->getType() == Type::TupleTypeType &&
+			this->argument_expressions[1]->type()->getType() == Type::IntType)
+		{
+			// Second arg must be constant, and is (or should be) checked during binding that it is in range.
+			return;
+		}
 
 		throw BaseException("Failed to prove elem() argument is in-bounds." + errorContext(*this));
 	}
@@ -1035,6 +1025,228 @@ std::string FunctionExpression::sourceString() const
 			s += ", ";
 	}
 	return s + ")";
+}
+
+
+// From https://www.khronos.org/registry/cl/sdk/1.0/docs/man/xhtml/mathFunctions.html
+static const char* opencl_built_in_func_names[] = { 
+	"acos", "acosh", "acospi", "asin",
+	"asinh", "asinpi", "atan", "atan2",
+	"atanh", "atanpi", "atan2pi", "cbrt",
+	"ceil", "copysign", "cos", "cosh",
+	"cospi", "erfc", "erf", "exp",
+	"exp2", "exp10", "expm1", "fabs",
+	"fdim", "floor", "fma", "fmax",
+	"fmin", "fmod", "fract", "frexp",
+	"hypot", "ilogb", "ldexp", "lgamma",
+	"lgamma_r", "log", "log2", "log10",
+	"log1p", "logb", "mad", "modf",
+	"nan", "nextafter", "pow", "pown",
+	"powr", "remainder", "remquo", "rint",
+	"rootn", "round", "rsqrt", "sin",
+	"sincos", "sinh", "sinpi", "sqrt",
+	"tan", "tanh", "tanpi", "tgamma",
+
+	"cross", "dot", "distance", "length", "normalize", "fast_distance", "fast_length", "fast_normalize",
+
+	NULL};
+
+
+static bool doesFunctionRequireTypeMangling(const std::string& name)
+{
+	for(size_t i=0; opencl_built_in_func_names[i] != NULL; ++i)
+		if(name == opencl_built_in_func_names[i])
+			return false;
+	return true;
+}
+
+
+std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
+{
+	if(this->function_name == "elem")
+	{
+		if(argument_expressions.size() != 2)
+			throw BaseException("Error while emitting OpenCL C: elem() function with != 2 args.");
+
+		if(this->argument_expressions[0]->type()->getType() == Type::VectorTypeType)
+		{
+			/*
+			elem(v, 0)		=>		v.s0
+			elem(v, 1)		=>		v.s1
+
+			elem(v, 9)		=>		v.s9
+			elem(v, 10)		=>		v.sA
+			elem(v, 11)		=>		v.sB
+
+			elem(v, 15)		=>		v.sF
+			*/
+
+			if(argument_expressions[1]->nodeType() != ASTNode::IntLiteralType)
+				throw BaseException("Error while emitting OpenCL C: elem() function with 2nd arg that is not an Int literal.");
+
+			const int64 index = static_cast<const IntLiteral*>(argument_expressions[1].getPointer())->value;
+
+			if(index < 0 || index >= 16)
+				throw BaseException("Error while emitting OpenCL C: elem() function has invalid index: " + toString(index));
+
+			return argument_expressions[0]->emitOpenCLC(params) + ".s" + ::intToHexChar((int)index);
+		}
+		else if(this->argument_expressions[0]->type()->getType() == Type::ArrayTypeType)
+		{
+			/*
+			elem(a, i)		=>		a[i]
+			*/
+			//if(argument_expressions[1]->nodeType() != ASTNode::IntLiteralType)
+			//	throw BaseException("Error while emitting OpenCL C: elem() function with 2nd arg that is not an Int literal.");
+
+			//const int64 index = static_cast<const IntLiteral*>(argument_expressions[1].getPointer())->value;
+
+			//return argument_expressions[0]->emitOpenCLC(params) + "[" + ::intToHexChar((int)index) + "]";
+			return argument_expressions[0]->emitOpenCLC(params) + "[" + argument_expressions[1]->emitOpenCLC(params) + "]";
+		}
+		else if(this->argument_expressions[0]->type()->getType() == Type::TupleTypeType)
+		{
+			/*
+			elem(a, i)		=>		a.field_i
+			*/
+
+			if(argument_expressions[1]->nodeType() != ASTNode::IntLiteralType)
+				throw BaseException("Error while emitting OpenCL C: elem(tuple, i) function with 2nd arg that is not an Int literal.");
+
+			const int64 index = static_cast<const IntLiteral*>(argument_expressions[1].getPointer())->value;
+
+			return argument_expressions[0]->emitOpenCLC(params) + ".field_" + ::toString(index);
+		}
+		else
+			throw BaseException("Error while emitting OpenCL C: elem() function first arg must be vector or array type.");
+	}
+	else if(this->function_name == "shuffle")
+	{
+		if(argument_expressions.size() != 2)
+			throw BaseException("Error while emitting OpenCL C: shuffle() function with != 2 args.");
+
+		if(argument_expressions[1]->nodeType() != ASTNode::VectorLiteralType)
+			throw BaseException("Error while emitting OpenCL C: shuffle() function with 2nd arg that is not a Vector literal.");
+
+		const VectorLiteral* vec_literal = static_cast<const VectorLiteral*>(argument_expressions[1].getPointer());
+
+		std::string s = argument_expressions[0]->emitOpenCLC(params) + ".s";
+
+		for(size_t i=0; i<vec_literal->getElements().size(); ++i)
+		{
+			if(vec_literal->getElements()[i]->nodeType() != ASTNode::IntLiteralType)
+				throw BaseException("Error while emitting OpenCL C: shuffle() function with 2nd arg that does not have an int literal in the vector literal.");
+
+			const int64 index = static_cast<const IntLiteral*>(vec_literal->getElements()[i].getPointer())->value;
+
+			s.push_back(::intToHexChar((int)index));
+		}
+
+		return s;
+	}
+	else if(function_name.size() >= 2 && function_name[0] == 'e' && isNumeric(function_name[1]))
+	{
+		// eN() function
+		const int index = stringToInt(function_name.substr(1, function_name.size() - 1));
+
+		if(this->argument_expressions[0]->type()->getType() == Type::VectorTypeType)
+		{
+			/*
+			e0(v)		=>		v.s0
+			e1(v)		=>		v.s1
+
+			e9(v)		=>		v.s9
+			e10(v)		=>		v.sA
+			e11(v)		=>		v.sB
+
+			e12(v)		=>		v.sF
+			*/
+
+			try
+			{
+				return argument_expressions[0]->emitOpenCLC(params) + ".s" + std::string(1, ::intToHexChar((int)index));
+			}
+			catch(StringUtilsExcep& e)
+			{
+				throw BaseException("Error while emitting OpenCL C: invalid eN() function '" + function_name + "'.");
+			}
+		}
+		else if(this->argument_expressions[0]->type()->getType() == Type::ArrayTypeType)
+		{
+			/*
+			eN(a)		=>		a[N]
+			*/
+			return argument_expressions[0]->emitOpenCLC(params) + "[" + ::intToHexChar((int)index) + "]";
+		}
+		else
+			throw BaseException("Error while emitting OpenCL C: eN() function first arg must be vector or array type.");
+	}
+	else if(target_function && target_function->built_in_func_impl.nonNull() && dynamic_cast<GetField*>(target_function->built_in_func_impl.getPointer()))
+	{
+		// Transform get field built-in functions like so:
+		// struct s { int x; }
+		// 
+		// x(s)			=>		s.x
+
+		if(argument_expressions.size() != 1)
+			throw BaseException("Error while emitting OpenCL C: get field function with != 1 args.");
+
+		return argument_expressions[0]->emitOpenCLC(params) + "." +  function_name;
+	}
+	else if(function_name == "inBounds")
+	{
+		// inBounds(a, i)			=>		i >= 0 && i < N
+
+		if(argument_expressions.size() != 2)
+			throw BaseException("Error while emitting OpenCL C: inBounds function with != 2 args.");
+
+		size_t N;
+		if(this->argument_expressions[0]->type()->getType() == Type::VectorTypeType)
+		{
+			N = static_cast<VectorType*>(this->argument_expressions[0]->type().getPointer())->num;
+		}
+		else if(this->argument_expressions[0]->type()->getType() == Type::ArrayTypeType)
+		{
+			N = static_cast<ArrayType*>(this->argument_expressions[0]->type().getPointer())->num_elems;
+		}
+		else
+			throw BaseException("Error while emitting OpenCL C: inBounds arg 1 type must be vector array.");
+
+		return "((" + argument_expressions[1]->emitOpenCLC(params) + " >= 0) && (" + argument_expressions[1]->emitOpenCLC(params) + " < " + toString(N) + "))";
+	}
+	else if(function_name == "abs")
+	{
+		if(argument_expressions.size() != 1)
+			throw BaseException("Error while emitting OpenCL C: abs function with != 1 arg.");
+
+		if(argument_expressions[0]->type()->getType() == Type::FloatType)
+			return "fabs(" + argument_expressions[0]->emitOpenCLC(params) + ")";
+		else
+			return "abs(" + argument_expressions[0]->emitOpenCLC(params) + ")";
+	}
+	else
+	{
+		//std::string use_func_name;
+		//if(function_name == "abs" && (argument_expressions.size() >= 1) && (argument_expressions[0]->type()->getType() == Type::FloatType))
+		//	use_func_name = "fabs";
+		//else
+		//	use_func_name = function_name;
+
+		//// If this is a call to a constructor built-in function, add the _cnstr suffix we will use in OpenCL code.
+		//if(target_function && target_function->built_in_func_impl.nonNull() && dynamic_cast<Constructor*>(target_function->built_in_func_impl.getPointer()))
+		//	use_func_name += "_cnstr";
+
+		std::string use_func_name = doesFunctionRequireTypeMangling(this->function_name) ? this->target_function->sig.typeMangledName() : this->target_function->sig.name;
+
+		std::string s = use_func_name + "(";
+		for(unsigned int i=0; i<argument_expressions.size(); ++i)
+		{
+			s += argument_expressions[i]->emitOpenCLC(params);
+			if(i + 1 < argument_expressions.size())
+				s += ", ";
+		}
+		return s + ")";
+	}
 }
 
 

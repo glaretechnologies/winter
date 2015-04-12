@@ -37,6 +37,8 @@ public:
 
 	const std::string toString() const;
 
+	const std::string typeMangledName() const; // Return something like f_float_int
+
 	std::string name;
 	std::vector<TypeRef> param_types;
 };

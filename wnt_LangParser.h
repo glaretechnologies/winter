@@ -37,7 +37,7 @@ class ParseInfo
 public:
 	ParseInfo(unsigned int& i_, const std::vector<Reference<TokenBase> >& t, std::map<std::string, TypeRef>& named_types_,
 		std::vector<FunctionDefinitionRef>& func_defs_) 
-		: i(i_), tokens(t), named_types(named_types_), func_defs(func_defs_), else_token_present(false) {}
+		: i(i_), tokens(t), named_types(named_types_), func_defs(func_defs_)/*, else_token_present(false)*/ {}
 	const std::vector<Reference<TokenBase> >& tokens;
 	//const char* text_buffer;
 	//const std::string* text_buffer;
@@ -45,7 +45,7 @@ public:
 	unsigned int& i;
 	std::map<std::string, TypeRef>& named_types;
 	std::vector<FunctionDefinitionRef>& func_defs;
-	bool else_token_present;
+	//bool else_token_present;
 };
 
 
@@ -64,7 +64,8 @@ public:
 	Reference<ASTNode> parseBuffer(const std::vector<Reference<TokenBase> >& tokens, 
 		const SourceBufferRef& source_buffer,
 		std::vector<FunctionDefinitionRef>& func_defs_out, 
-		std::map<std::string, TypeRef>& named_types);
+		std::map<std::string, TypeRef>& named_types,
+		std::vector<TypeRef>& named_types_ordered_out);
 
 	static void test();
 
@@ -103,6 +104,7 @@ private:
 	TypeRef parseFunctionType(const ParseInfo& p, const std::vector<std::string>& generic_type_params);
 	Reference<StructureType> parseStructType(const ParseInfo& p, const std::vector<std::string>& generic_type_params);
 	TypeRef parseVectorType(const ParseInfo& p, const std::vector<std::string>& generic_type_params);
+	TypeRef parseTupleType(const ParseInfo& p, const std::vector<std::string>& generic_type_params);
 
 	ASTNodeRef parseComparisonExpression(const ParseInfo& parseinfo);
 	ASTNodeRef parseUnaryExpression(const ParseInfo& parseinfo);

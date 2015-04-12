@@ -56,7 +56,7 @@ public:
 
 	virtual const std::string& getIdentifierValue() const { throw TokenBaseExcep("getIdentifierValue()"); }
 	virtual float getFloatLiteralValue() const { throw TokenBaseExcep("getRealLiteralValue()"); }
-	virtual int getIntLiteralValue() const { throw TokenBaseExcep("getIntLiteralValue()"); }
+	virtual int64 getIntLiteralValue() const { throw TokenBaseExcep("getIntLiteralValue()"); }
 	virtual bool getBoolLiteralValue() const { throw TokenBaseExcep("getBoolLiteralValue()"); }
 	virtual const std::string& getStringLiteralValue() const { throw TokenBaseExcep("getStringLiteralValue()"); }
 	virtual const std::string& getCharLiteralValue() const { throw TokenBaseExcep("getCharLiteralValue()"); }
@@ -101,15 +101,16 @@ private:
 class IntLiteralToken : public TokenBase
 {
 public:
-	IntLiteralToken(int x, unsigned int char_index) : TokenBase(char_index, INT_LITERAL_TOKEN), val(x) {}
+	IntLiteralToken(int64 x, int num_bits_, unsigned int char_index) : TokenBase(char_index, INT_LITERAL_TOKEN), val(x), num_bits(num_bits_) {}
 	
 	virtual bool isLiteral() const { return true; }
 	virtual bool isParanthesis() const { return false; }
 	virtual bool isBinaryInfixOp() const { return false; }
 
-	virtual int getIntLiteralValue() const { return val; }
-private:
-	int val;
+	virtual int64 getIntLiteralValue() const { return val; }
+//private:
+	int64 val;
+	int num_bits;
 };
 
 

@@ -60,6 +60,22 @@ private:
 };
 
 
+class GetTupleElementBuiltInFunc : public BuiltInFunctionImpl
+{
+public:
+	GetTupleElementBuiltInFunc(const Reference<TupleType>& tuple_type_, unsigned int index_) : tuple_type(tuple_type_), index(index_) {}
+	virtual ~GetTupleElementBuiltInFunc(){}
+
+	virtual ValueRef invoke(VMState& vmstate);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+
+	void setIndex(unsigned int i) { index = i; }
+//private:
+	Reference<TupleType> tuple_type;
+	unsigned int index;
+};
+
+
 class GetVectorElement : public BuiltInFunctionImpl
 {
 public:
@@ -172,6 +188,46 @@ public:
 private:
 	Reference<VectorType> vector_type;
 	TypeRef index_type;
+};
+
+
+class IterateBuiltInFunc : public BuiltInFunctionImpl
+{
+public:
+	/*
+		
+	iterate(function<State, int, tuple<State, bool>> f, State initial_state) State
+
+
+	Where f is
+	def f(State current_state, int iteration) : tuple<State, bool>
+
+	and returns the new state, and if iteration should continue.
+
+
+	equivalent to
+
+	State state = initial_state;
+	iteration = 0;
+	while(1)
+	{
+		res = iterate(state, iteration);
+		if(res.second == false)
+			return res.first;
+		iteration++;
+		state = res.first;
+	}
+	
+
+	*/
+	IterateBuiltInFunc(const Reference<Function>& func_type_, const Reference<StructureType>& structure_type_);
+	virtual ~IterateBuiltInFunc(){}
+
+	virtual ValueRef invoke(VMState& vmstate);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+private:
+	Reference<Function> func_type;
+	Reference<StructureType> structure_type;
 };
 
 

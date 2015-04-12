@@ -458,6 +458,13 @@ structs, etc.), thus frontend should lower such constructs as needed."
 From http://old.nabble.com/Passing-structures-by-value-on-Windows-td28766193.html
 
 
+Return structures by value directly from functions.
+===========================
+LLVM can return structures by value directly from functions.
+However if this is done on external functions, then it needs to match the platform ABI.
+
+
+
 
 
 Expression type depends on:

@@ -4,6 +4,7 @@
 #include "Value.h"
 #include "BaseException.h"
 #include "LLVMTypeUtils.h"
+#include "wnt_FunctionDefinition.h"
 #include "utils/StringUtils.h"
 #ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
@@ -99,16 +100,41 @@ llvm::Type* GenericType::LLVMType(llvm::LLVMContext& context) const
 //==========================================================================
 
 
+const std::string Int::toString() const
+{
+	if(num_bits == 32)
+		return "int";
+	else
+		return "int" + ::toString(num_bits);
+}
+
+
 llvm::Type* Int::LLVMType(llvm::LLVMContext& context) const
 { 
 	// Note that integer types in LLVM just specify a bit-width, but not if they are signed or not.
-	return llvm::Type::getInt32Ty(context);
+	return llvm::Type::getIntNTy(context, num_bits);
+}
+
+
+const std::string Int::OpenCLCType() const
+{
+	if(num_bits == 32)
+		return "int";
+	else if(num_bits == 64)
+		return "long";
+	else
+		throw BaseException("No OpenCL type for int with num bits=" + ::toString(num_bits));
 }
 
 
 bool Int::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
 {
-	return this->getType() == b.getType();
+	if(this->getType() != b.getType())
+		return false;
+
+	// So b is an Int as well.
+	const Int& b_ = static_cast<const Int&>(b);
+	return num_bits == b_.num_bits;
 }
 
 
@@ -117,7 +143,7 @@ llvm::Value* Int::getInvalidLLVMValue(llvm::LLVMContext& context) const // For a
 	return llvm::ConstantInt::get(
 		context, 
 		llvm::APInt(
-			32, // num bits
+			num_bits, // num bits
 			0, // value
 			true // signed
 		)
@@ -338,12 +364,26 @@ llvm::Type* Function::LLVMType(llvm::LLVMContext& context) const
 }
 
 
+const std::string Function::OpenCLCType() const
+{
+	assert(0);
+	return "";
+}
+
+
 //==========================================================================
 
 
 const std::string ArrayType::toString() const
 { 
 	return "array<" + elem_type->toString() + ", " + ::toString(num_elems) + ">";
+}
+
+
+const std::string ArrayType::OpenCLCType() const
+{
+	// For e.g. an array of floats, use type 'float*'.
+	return elem_type->OpenCLCType() + "*";
 }
 
 
@@ -385,7 +425,22 @@ llvm::Type* Map::LLVMType(llvm::LLVMContext& context) const
 }
 
 
+const std::string Map::OpenCLCType() const
+{
+	assert(0);
+	return "";
+}
+
+
 //==========================================================================
+
+
+StructureType::StructureType(const std::string& name_, const std::vector<TypeRef>& component_types_, const std::vector<std::string>& component_names_) 
+:	Type(StructureTypeType), name(name_), component_types(component_types_), component_names(component_names_)
+{
+	if(component_types_.size() != component_names_.size())
+		throw Winter::BaseException("component_types_.size() != component_names_.size()");
+}
 
 
 bool StructureType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
@@ -446,12 +501,171 @@ llvm::Type* StructureType::LLVMType(llvm::LLVMContext& context) const
 }*/
 
 
+const std::string StructureType::getOpenCLCDefinition() // Get full definition string, e.g. struct a { float b; };
+{
+	std::string s = "typedef struct\n{\n";
+
+	for(size_t i=0; i<component_types.size(); ++i)
+	{
+		s += "\t" + component_types[i]->OpenCLCType() + " " + component_names[i] + ";\n";
+	}
+
+	s += "} " + name + ";\n";
+
+
+	// Make constructor.
+	// for struct S { float a, float b }, will look like    
+	// S S_float_float(float a, float b) { S s;  s.a = a; s.b = b; return s; }
+
+	// FunctionDefinition::Funct
+	FunctionSignature sig(name, component_types);
+
+	s += name + " " + sig.typeMangledName() + "(";
+
+	for(size_t i=0; i<component_types.size(); ++i)
+	{
+		s += component_types[i]->OpenCLCType() + " " + component_names[i];
+		if(i + 1 < component_types.size())
+			s += ", ";
+	}
+
+	s += ") { " + name + " s_; ";
+
+	for(size_t i=0; i<component_types.size(); ++i)
+		s += "s_." + component_names[i] + " = " + component_names[i] + "; ";
+
+	s += "return s_; }\n";
+
+	return s;
+}
+
+
+//==========================================================================
+
+
+TupleType::TupleType(const std::vector<TypeRef>& component_types_) 
+:	Type(TupleTypeType), component_types(component_types_)
+{
+}
+
+
+bool TupleType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
+{
+	if(this->getType() != b.getType())
+		return false;
+	// So b is a TupleType as well.
+	const TupleType* b_ = static_cast<const TupleType*>(&b);
+
+	if(b_->component_types.size() != component_types.size())
+		return false;
+
+	for(size_t i=0; i<this->component_types.size(); ++i)
+	{
+		if(!this->component_types[i]->matchTypes(*b_->component_types[i], type_mapping))
+			return false;
+	}
+
+	return true;
+}
+
+
+llvm::Type* TupleType::LLVMType(llvm::LLVMContext& context) const
+{
+	vector<llvm::Type*> field_types(this->component_types.size());
+	for(size_t i=0; i<this->component_types.size(); ++i)
+		field_types[i] = this->component_types[i]->LLVMType(context);
+
+	return llvm::StructType::get(
+		context,
+		field_types
+		// NOTE: is_packed is default = false.
+	);
+}
+
+
+const std::string TupleType::toString() const 
+{ 
+	std::string s = "tuple<";
+	std::vector<std::string> typestrings;
+	for(unsigned int i=0;i<component_types.size(); ++i)
+		typestrings.push_back(component_types[i]->toString());
+	s += StringUtils::join(typestrings, ", ");
+	return s + ">";
+}
+
+
+// TEMP: copied from FunctionSignature
+//static const std::string makeSafeStringForFunctionName(const std::string& s)
+//{
+//	std::string res = s;
+//
+//	for(size_t i=0; i<s.size(); ++i)
+//		if(!(::isAlphaNumeric(s[i]) || s[i] == '_'))
+//			res[i] = '_';
+//
+//	return res;
+//}
+
+
+const std::string TupleType::OpenCLCType() const
+{
+	return makeSafeStringForFunctionName(this->toString());
+}
+
+
+const std::string TupleType::getOpenCLCDefinition() // Get full definition string, e.g. struct a { float b; };
+{
+	std::string s = "typedef struct\n{\n";
+
+	const std::string tuple_typename = OpenCLCType(); // makeSafeStringForFunctionName(this->toString());
+
+	for(size_t i=0; i<component_types.size(); ++i)
+	{
+		s += "\t" + component_types[i]->OpenCLCType() + " field_" + ::toString(i) + ";\n";
+	}
+
+	s += "} " + tuple_typename + ";\n";
+
+
+	// Make constructor.
+	// for struct tuple_float__float_ { float a, float b }, will look like    
+	// tuple_float__float_ tuple_float__float_cnstr(float a, float b) { tuple_float__float_ s;  s.a = a; s.b = b; return s; }
+
+	const std::string constructor_name = makeSafeStringForFunctionName(this->toString()) + "_cnstr";
+
+	s += tuple_typename + " " + constructor_name + "(";
+
+	for(size_t i=0; i<component_types.size(); ++i)
+	{
+		s += component_types[i]->OpenCLCType() + " field_" + ::toString(i);
+		if(i + 1 < component_types.size())
+			s += ", ";
+	}
+
+	s += ") { " + tuple_typename + " s_; ";
+
+	for(size_t i=0; i<component_types.size(); ++i)
+		s += "s_.field_" + ::toString(i) + " = field_" + ::toString(i) + "; ";
+
+	s += "return s_; }\n";
+
+	return s;
+}
+
+
 //==========================================================================
 
 
 const std::string VectorType::toString() const
 {
 	return "vector<" + this->elem_type->toString() + ", " + ::toString(this->num) + ">";
+}
+
+
+const std::string VectorType::OpenCLCType() const
+{
+	// float4, float8 etc..
+	return this->elem_type->OpenCLCType() + ::toString(this->num);
 }
 
 
@@ -511,6 +725,13 @@ const std::string SumType::toString() const
 }
 
 
+const std::string SumType::OpenCLCType() const
+{
+	assert(0);
+	return "";
+}
+
+
 bool SumType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
 {
 	if(this->getType() != b.getType())
@@ -550,6 +771,13 @@ llvm::Type* SumType::LLVMType(llvm::LLVMContext& context) const
 const std::string ErrorType::toString() const
 {
 	return "error";
+}
+
+
+const std::string ErrorType::OpenCLCType() const
+{
+	assert(0);
+	return "";
 }
 
 

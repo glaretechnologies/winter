@@ -245,6 +245,53 @@ llvm::Constant* VectorValue::getConstantLLVMValue(EmitLLVMCodeParams& params, co
 //------------------------------------------------------------------------------------------
 
 
+TupleValue::~TupleValue()
+{
+}
+
+
+Value* TupleValue::clone() const
+{
+	TupleValue* ret = new TupleValue();
+	ret->e.resize(this->e.size());
+
+	for(unsigned int i=0; i<this->e.size(); ++i)
+		ret->e[i] = ValueRef(this->e[i]->clone());
+
+	return ret;
+}
+
+
+const std::string TupleValue::toString() const
+{
+	std::string s = "tuple[";
+	for(unsigned int i=0; i<this->e.size(); ++i)
+	{
+		s += this->e[i]->toString() + (i + 1 < e.size() ? ", " : "");
+	}
+	return s + "]";
+}
+
+
+llvm::Constant* TupleValue::getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const
+{
+	assert(type->getType() == Type::TupleTypeType);
+
+	vector<llvm::Constant*> llvm_fields(this->e.size());
+	for(unsigned int i=0; i<this->e.size(); ++i)
+		llvm_fields[i] = this->e[i]->getConstantLLVMValue(params, type.downcast<TupleType>()->component_types[i]);
+
+
+	return llvm::ConstantStruct::get(
+		(llvm::StructType*)type->LLVMType(*params.context),
+		llvm_fields
+	);
+}
+
+
+//------------------------------------------------------------------------------------------
+
+
 const std::string VoidPtrValue::toString() const
 {
 	return "void* " + ::toString((uint64)this->value);

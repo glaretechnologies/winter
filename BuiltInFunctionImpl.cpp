@@ -9,6 +9,7 @@
 #include <vector>
 #include "LLVMTypeUtils.h"
 #include "utils/PlatformUtils.h"
+#include "utils/StringUtils.h"
 #ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
 #endif
@@ -264,6 +265,98 @@ llvm::Value* GetField::emitLLVMCode(EmitLLVMCodeParams& params) const
 	{
 		TypeRef field_type = this->struct_type->component_types[this->index];
 		const std::string field_name = this->struct_type->component_names[this->index];
+
+		if(field_type->passByValue())
+		{
+			// Pointer to structure will be in 0th argument.
+			llvm::Value* struct_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+
+			vector<llvm::Value*> indices;
+			indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true)));
+			indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, this->index, true)));
+
+			llvm::Value* field_ptr = params.builder->CreateGEP(
+				struct_ptr, // ptr
+				indices,
+				field_name + " ptr" // name
+			);
+
+			llvm::Value* loaded_val = params.builder->CreateLoad(
+				field_ptr,
+				field_name // name
+			);
+
+			// TEMP NEW: increment ref count if this is a string
+			if(field_type->getType() == Type::StringType)
+				RefCounting::emitIncrementStringRefCount(params, loaded_val);
+
+			return loaded_val;
+		}
+		else
+		{
+			// Pointer to memory for return value will be 0th argument.
+			llvm::Value* return_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+
+			// Pointer to structure will be in 1st argument.
+			llvm::Value* struct_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
+
+			vector<llvm::Value*> indices;
+			indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true)));
+			indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, this->index, true)));
+
+			llvm::Value* field_ptr = params.builder->CreateGEP(
+				struct_ptr, // ptr
+				indices,
+				field_name + " ptr" // name
+			);
+
+			llvm::Value* field_val = params.builder->CreateLoad(
+				field_ptr,
+				field_name // name
+			);
+
+			params.builder->CreateStore(
+				field_val, // value
+				return_ptr // ptr
+			);
+
+			return NULL;
+		}
+	}
+}
+
+
+ValueRef GetTupleElementBuiltInFunc::invoke(VMState& vmstate)
+{
+	const size_t func_args_start = vmstate.func_args_start.back();
+
+	// Top param on arg stack should be a tuple
+	assert(dynamic_cast<const TupleValue*>(vmstate.argument_stack[func_args_start].getPointer()));
+	const TupleValue* s = static_cast<const TupleValue*>(vmstate.argument_stack[func_args_start].getPointer());
+
+	assert(s);
+	assert(this->index < s->e.size());
+
+	return s->e[this->index];
+}
+
+
+llvm::Value* GetTupleElementBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	if(this->tuple_type->passByValue())
+	{
+		assert(0);
+		//return params.builder->CreateExtractValue(
+		//	LLVMTypeUtils::getNthArg(params.currently_building_func, 0),
+		//	this->index,
+		//	this->tuple_type->component_names[this->index] // name
+		//);
+		return NULL;
+	}
+	else
+	{
+		TypeRef field_type = this->tuple_type->component_types[this->index];
+		const std::string field_name = "field " + ::toString(this->index);
 
 		if(field_type->passByValue())
 		{
@@ -1050,6 +1143,177 @@ llvm::Value* VectorInBoundsBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 }
 
 
+//------------------------------------------------------------------------------------
+
+
+IterateBuiltInFunc::IterateBuiltInFunc(const Reference<Function>& func_type_, const Reference<StructureType>& structure_type_)
+:	func_type(func_type_), structure_type(structure_type_)
+{}
+
+
+ValueRef IterateBuiltInFunc::invoke(VMState& vmstate)
+{
+	// iterate(function<State, int, tuple<State, bool>> f, State initial_state) State
+
+	const FunctionValue* f = dynamic_cast<const FunctionValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+	const StructureValue* initial_state = dynamic_cast<const StructureValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
+
+	assert(f && initial_state);
+
+	ValueRef running_val = initial_state->clone();
+	int64 iteration = 0;
+	while(1)
+	{
+		// Set up arg stack
+		vmstate.func_args_start.push_back((unsigned int)vmstate.argument_stack.size());
+		vmstate.argument_stack.push_back(running_val); // Push value arg
+		vmstate.argument_stack.push_back(new IntValue(iteration)); // Push iteration
+		
+		// Call f
+		ValueRef result = f->func_def->invoke(vmstate);
+		
+		// Unpack result
+		assert(dynamic_cast<const TupleValue*>(result.ptr()));
+		const TupleValue* tuple_result = static_cast<const TupleValue*>(result.ptr());
+
+		assert(dynamic_cast<const StructureValue*>(tuple_result->e[0].ptr()));
+		assert(dynamic_cast<const BoolValue*>(tuple_result->e[1].ptr()));
+
+		ValueRef new_running_val = static_cast<StructureValue*>(tuple_result->e[0].ptr());
+		bool continue_bool = static_cast<const BoolValue*>(tuple_result->e[1].ptr())->value;
+
+		vmstate.argument_stack.pop_back(); // Pop Value arg
+		vmstate.argument_stack.pop_back(); // Pop Value arg
+		vmstate.func_args_start.pop_back();
+
+		if(!continue_bool)
+			return new_running_val;
+
+		running_val = new_running_val;
+		iteration++;
+	}
+
+	return running_val;
+}
+
+
+// iterate(function<State, int, tuple<State, bool>> f, State initial_state) State
+llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	// Get argument pointers
+	llvm::Value* return_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0); // Pointer to result structure
+	llvm::Value* function = LLVMTypeUtils::getNthArg(params.currently_building_func, 1); // Pointer to function
+	llvm::Value* initial_state_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 2); // Pointer to initial state
+
+
+	// Allocate space on stack for tuple<State, bool> returned from f.
+		
+	// Emit the alloca in the entry block for better code-gen.
+	// We will emit the alloca at the start of the block, so that it doesn't go after any terminator instructions already created which have to be at the end of the block.
+	llvm::IRBuilder<> entry_block_builder(&params.currently_building_func->getEntryBlock(), params.currently_building_func->getEntryBlock().getFirstInsertionPt());
+
+	llvm::Value* tuple_alloca = entry_block_builder.CreateAlloca(
+		func_type->return_type->LLVMType(*params.context), // tuple<State, bool>
+		llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1, true)), // num elems
+		"Tuple space"
+	);
+
+	// Allocate space on stack for the running state
+	llvm::Value* running_state_alloca = entry_block_builder.CreateAlloca(
+		structure_type->LLVMType(*params.context), // State
+		llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1, true)), // num elems
+		"Running state"
+	);
+	
+
+	// Load and store initial state in running state
+	llvm::Value* initial_state = params.builder->CreateLoad(initial_state_ptr);
+	params.builder->CreateStore(initial_state, running_state_alloca);
+
+
+	// Make the new basic block for the loop header, inserting after current
+	// block.
+	llvm::IRBuilder<>& Builder = *params.builder;
+
+	llvm::Function* TheFunction = Builder.GetInsertBlock()->getParent();
+	llvm::BasicBlock* PreheaderBB = Builder.GetInsertBlock();
+	llvm::BasicBlock* LoopBB = llvm::BasicBlock::Create(*params.context, "loop", TheFunction);
+  
+	// Insert an explicit fall through from the current block to the LoopBB.
+	Builder.CreateBr(LoopBB);
+
+	// Start insertion in LoopBB.
+	Builder.SetInsertPoint(LoopBB);
+  
+	
+
+	// Create loop index (i) variable phi node
+	llvm::PHINode* loop_index_var = Builder.CreatePHI(llvm::Type::getInt32Ty(*params.context), 2, "loop_index_var");
+	llvm::Value* initial_loop_index_value = llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0)); // Initial induction loop index value: Zero
+	loop_index_var->addIncoming(initial_loop_index_value, PreheaderBB);
+
+
+	//=========================== Emit the body of the loop. =========================
+
+	// Call function on element
+	vector<llvm::Value*> args;
+	args.push_back(tuple_alloca); // SRET return value arg
+	args.push_back(running_state_alloca); // current state
+	args.push_back(loop_index_var); // iteration
+
+	params.builder->CreateCall(
+		function, // Callee
+		args // Args
+		//"iterate function call" // Name
+	);
+
+	// The result of the function should now be stored in 'tuple_alloca'.
+	// Load the state
+	llvm::Value* state_ptr = params.builder->CreateConstInBoundsGEP2_32(tuple_alloca, 0, 0);
+	llvm::Value* state = params.builder->CreateLoad(state_ptr);
+
+	// Store the state in running_state_alloca
+	params.builder->CreateStore(state, running_state_alloca);
+
+	// Load the 'continue boolean'
+	llvm::Value* continue_bool_ptr = params.builder->CreateConstInBoundsGEP2_32(tuple_alloca, 0, 1);
+	llvm::Value* continue_bool = params.builder->CreateLoad(continue_bool_ptr);
+
+  
+	// Create increment of loop index
+	llvm::Value* step_val = llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1));
+	llvm::Value* next_var = Builder.CreateAdd(loop_index_var, step_val, "next_var");
+
+	// Compute the end condition.
+	llvm::Value* false_value = llvm::ConstantInt::get(*params.context, llvm::APInt(1, 0));
+  
+	llvm::Value* end_cond = Builder.CreateICmpNE(
+		false_value, 
+		continue_bool,
+		"loopcond"
+	);
+  
+	// Create the "after loop" block and insert it.
+	llvm::BasicBlock* LoopEndBB = Builder.GetInsertBlock();
+	llvm::BasicBlock* AfterBB = llvm::BasicBlock::Create(*params.context, "afterloop", TheFunction);
+  
+	// Insert the conditional branch into the end of LoopEndBB.
+	Builder.CreateCondBr(end_cond, LoopBB, AfterBB);
+  
+	// Any new code will be inserted in AfterBB.
+	Builder.SetInsertPoint(AfterBB);
+  
+	// Add a new entry to the PHI node for the backedge.
+	loop_index_var->addIncoming(next_var, LoopEndBB);
+
+
+	// Finally load and store the running state value to the SRET return ptr.
+	llvm::Value* running_state = params.builder->CreateLoad(running_state_alloca);
+	params.builder->CreateStore(running_state, return_ptr);
+	return return_ptr;
+}
+
+
 //----------------------------------------------------------------------------------------------
 
 
@@ -1191,8 +1455,8 @@ ValueRef VectorMinBuiltInFunc::invoke(VMState& vmstate)
 	{
 		for(unsigned int i=0; i<vector_type->num; ++i)
 		{
-			const int x = static_cast<const IntValue*>(a->e[i].getPointer())->value;
-			const int y = static_cast<const IntValue*>(b->e[i].getPointer())->value;
+			const int64 x = static_cast<const IntValue*>(a->e[i].getPointer())->value;
+			const int64 y = static_cast<const IntValue*>(b->e[i].getPointer())->value;
 			res_values[i] = ValueRef(new IntValue(x > y ? x : y));
 		}
 	}
@@ -1296,8 +1560,8 @@ ValueRef VectorMaxBuiltInFunc::invoke(VMState& vmstate)
 	{
 		for(unsigned int i=0; i<vector_type->num; ++i)
 		{
-			const int x = static_cast<const IntValue*>(a->e[i].getPointer())->value;
-			const int y = static_cast<const IntValue*>(b->e[i].getPointer())->value;
+			const int64 x = static_cast<const IntValue*>(a->e[i].getPointer())->value;
+			const int64 y = static_cast<const IntValue*>(b->e[i].getPointer())->value;
 			res_values[i] = ValueRef(new IntValue(x > y ? x : y));
 		}
 	}

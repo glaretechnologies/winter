@@ -36,11 +36,11 @@ typedef Reference<Value> ValueRef;
 class IntValue : public Value
 {
 public:
-	IntValue(int v) : value(v) { /*std::cout << "IntValue(), this=" << this << ", value = " << value << "\n";*/ }
+	IntValue(int64 v) : value(v) { /*std::cout << "IntValue(), this=" << this << ", value = " << value << "\n";*/ }
 	~IntValue() { /*std::cout << "~IntValue(), this=" << this << ", value = " << value << "\n";*/ }
 	virtual Value* clone() const { return new IntValue(value); }
 	virtual llvm::Constant* getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const;
-	int value;
+	int64 value;
 };
 
 
@@ -152,6 +152,20 @@ public:
 	VectorValue(){}
 	VectorValue(const std::vector<ValueRef>& e_) : e(e_) {}
 	~VectorValue();
+	virtual Value* clone() const;
+	virtual const std::string toString() const;
+	virtual llvm::Constant* getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const;
+
+	std::vector<ValueRef> e;
+};
+
+
+class TupleValue : public Value
+{
+public:
+	TupleValue(){}
+	TupleValue(const std::vector<ValueRef>& e_) : e(e_) {}
+	~TupleValue();
 	virtual Value* clone() const;
 	virtual const std::string toString() const;
 	virtual llvm::Constant* getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const;

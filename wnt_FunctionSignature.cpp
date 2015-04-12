@@ -9,6 +9,7 @@ Copyright 2009 Nicholas Chapman
 #include "wnt_FunctionSignature.h"
 
 
+#include "wnt_FunctionDefinition.h"
 #include "utils/StringUtils.h"
 
 
@@ -41,6 +42,12 @@ const std::string FunctionSignature::toString() const
 			s += ", ";
 	}
 	return s + ")";
+}
+
+
+const std::string FunctionSignature::typeMangledName() const // Return something like f_float_int
+{
+	return makeSafeStringForFunctionName(this->toString());
 }
 
 

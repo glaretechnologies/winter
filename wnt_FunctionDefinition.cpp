@@ -257,7 +257,6 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 		stack.pop_back();
 		payload.func_def_stack.pop_back();
 	}*/
-
 	//if(payload.operation == TraversalPayload::TypeCheck)
 	//{
 	//	if(this->isGenericFunction())
@@ -281,40 +280,10 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 	//	}
 	//}
 
-	if(payload.operation == TraversalPayload::AddOpaqueEnvArg)
+	else if(payload.operation == TraversalPayload::CustomVisit)
 	{
-		// std::cout << "AddOpaqueEnvArg for func def " + sig.toString();
-
-		// If this function is defined in ISL_stdlib.txt is should be fine already.
-		if(this->srcLocation().isValid() && ::hasSuffix(this->srcLocation().source_buffer->name, "ISL_stdlib.txt"))
-		{
-			//std::cout << " Skipped." << std::endl;
-		}
-		else
-		{
-			// Built-in functions should be correct already. 
-			// Also external functions should be correct already.
-			if(this->built_in_func_impl.nonNull() || this->external_function.nonNull())
-			{
-				//std::cout << " Skipped." << std::endl;
-			}
-			else
-			{
-				// Add an opaque env arg if it isn't there already
-				if(this->args.empty() || this->args.back().type->getType() != Type::OpaqueTypeType)
-				{
-					this->args.push_back(FunctionArg(new OpaqueType(), "env"));
-
-					this->sig.param_types.push_back(new OpaqueType());
-
-					//std::cout << " Added!!!!" << std::endl;
-				}
-				else
-				{
-					//std::cout << " Already there." << std::endl;
-				}
-			}
-		}
+		if(payload.custom_visitor.nonNull())
+			payload.custom_visitor->visit(*this, payload);
 	}
 
 	//if(payload.operation == TraversalPayload::BindVariables) // LinkFunctions)
@@ -510,6 +479,31 @@ std::string FunctionDefinition::sourceString() const
 		s += this->declared_return_type->toString() + " ";
 	s += ": ";
 	return s + body->sourceString();
+}
+
+
+std::string FunctionDefinition::emitOpenCLC(EmitOpenCLCodeParams& params) const
+{
+	assert(declared_return_type.nonNull());
+
+
+	// Emit forwards declaration to file scope code:
+	std::string opencl_sig = this->declared_return_type->OpenCLCType() + " ";
+	opencl_sig += sig.typeMangledName() + "(";
+	for(unsigned int i=0; i<args.size(); ++i)
+	{
+		opencl_sig += args[i].type->OpenCLCType() + " " + args[i].name;
+		if(i + 1 < args.size())
+			opencl_sig += ", ";
+	}
+	opencl_sig += ")";
+
+	params.file_scope_code += opencl_sig + ";\n";
+
+
+	std::string s = opencl_sig + "\n{\n\treturn ";
+
+	return s + body->emitOpenCLC(params) + ";\n}";
 }
 
 
@@ -739,17 +733,6 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 //	}
 //}
 
-const std::string makeSafeStringForFunctionName(const std::string& s)
-{
-	std::string res = s;
-
-	for(size_t i=0; i<s.size(); ++i)
-		if(!(::isAlphaNumeric(s[i]) || s[i] == '_'))
-			res[i] = '_';
-
-	return res;
-}
-
 
 llvm::Function* FunctionDefinition::getOrInsertFunction(
 		llvm::Module* module,
@@ -798,6 +781,7 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 #else
 
 	// NOTE: Check this code works somehow!
+	// NOTE: It looks like function attributes are being removed from function declarations in the IR, when the function is not called anywhere.
 
 	llvm::AttrBuilder function_attr_builder;
 	function_attr_builder.addAttribute(llvm::Attribute::NoUnwind); // Does not throw exceptions
@@ -819,10 +803,14 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 		}
 	}
 
+
+	//TEMP HACK:
+	//function_attr_builder.addAttribute(llvm::Attribute::ReadOnly); // This attribute indicates that the function does not write through any pointer arguments etc..
+
 	//function_attr_builder.addAttribute(llvm::Attribute::AlwaysInline);
 
 	llvm::Constant* llvm_func_constant = module->getOrInsertFunction(
-		makeSafeStringForFunctionName(this->sig.toString()), // Name
+		this->sig.typeMangledName(), //makeSafeStringForFunctionName(this->sig.toString()), // Name
 		functype // Type
 	);
 
@@ -873,6 +861,14 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 			else if(i > this->args.size()) // Hidden pointer to env arg.
 			{
 				AI->setName("hidden");
+
+				// Mark arg as NoAlias.
+				llvm::AttrBuilder builder;
+				//builder.addAttribute(llvm::Attribute::NoAlias);
+				//builder.addAttribute(llvm::Attribute::ReadOnly); // "On an argument, this attribute indicates that the function does not write through this pointer argument, even though it may write to the memory that the pointer points to."
+				//builder.addAttribute(llvm::Attribute::ByVal);
+				llvm::AttributeSet set = llvm::AttributeSet::get(module->getContext(), 1 + i, builder);
+				AI->addAttr(set);
 			}
 			else // Normal arg.  Due to arg zero being the SRET arg, the index is offset by one.
 			{
@@ -889,6 +885,20 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 					//builder.addAttribute(llvm::Attribute::ReadOnly); // "On an argument, this attribute indicates that the function does not write through this pointer argument, even though it may write to the memory that the pointer points to."
 					llvm::AttributeSet set = llvm::AttributeSet::get(module->getContext(), 1 + i, builder);
 					AI->addAttr(set);
+				}
+
+				if(this->args[i-1].type->getType() == Type::OpaqueTypeType)
+				{
+					// Mark arg as NoAlias.
+					llvm::AttrBuilder builder;
+					//builder.addAttribute(llvm::Attribute::NoAlias);
+
+					//builder.addAttribute(llvm::Attribute::ByVal);
+
+					//NOTE: in trunk, not in LLVM 3.3 yet.
+					//builder.addAttribute(llvm::Attribute::ReadOnly); // "On an argument, this attribute indicates that the function does not write through this pointer argument, even though it may write to the memory that the pointer points to."
+				//	llvm::AttributeSet set = llvm::AttributeSet::get(module->getContext(), 1 + i, builder);
+				//	AI->addAttr(set);
 				}
 			}
 		}
@@ -1269,6 +1279,18 @@ int FunctionDefinition::getCapturedVarStructLLVMArgIndex()
 		return (int)this->args.size();
 	else
 		return (int)this->args.size() + 1; // allow room for sret argument.
+}
+
+
+const std::string makeSafeStringForFunctionName(const std::string& s)
+{
+	std::string res = s;
+
+	for(size_t i=0; i<s.size(); ++i)
+		if(!(::isAlphaNumeric(s[i]) || s[i] == '_'))
+			res[i] = '_';
+
+	return res;
 }
 
 

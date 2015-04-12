@@ -79,9 +79,9 @@ void printMargin(int depth, std::ostream& s)
 }
 
 
-bool isIntExactlyRepresentableAsFloat(int x)
+bool isIntExactlyRepresentableAsFloat(int64 x)
 {
-	return ((int)((float)x)) == x;
+	return ((int64)((float)x)) == x;
 }
 
 
@@ -144,7 +144,7 @@ ASTNodeRef foldExpression(ASTNodeRef& e, TraversalPayload& payload)
 		assert(dynamic_cast<IntValue*>(retval.getPointer()));
 		IntValue* val = static_cast<IntValue*>(retval.getPointer());
 
-		return ASTNodeRef(new IntLiteral(val->value, e->srcLocation()));
+		return ASTNodeRef(new IntLiteral(val->value, static_cast<const Int*>(e->type().getPointer())->numBits(), e->srcLocation()));
 	}
 	else if(e->type()->getType() == Type::BoolType)
 	{
@@ -393,6 +393,8 @@ static void doImplicitIntToFloatTypeCoercion(ASTNodeRef& a, ASTNodeRef& b, Trave
 	const TypeRef a_type = a->type(); 
 	const TypeRef b_type = b->type();
 
+	// TODO: Handle bitness
+
 	if(a_type.nonNull() && a_type->getType() == Type::FloatType && b->nodeType() == ASTNode::IntLiteralType)
 	{
 		IntLiteral* b_lit = static_cast<IntLiteral*>(b.getPointer());
@@ -601,6 +603,19 @@ std::string BufferRoot::sourceString() const
 	}
 	return s;
 }
+
+
+std::string BufferRoot::emitOpenCLC(EmitOpenCLCodeParams& params) const
+{
+	std::string s;
+	for(unsigned int i=0; i<func_defs.size(); ++i)
+	{
+		s += func_defs[i]->emitOpenCLC(params);
+		s += "\n";
+	}
+	return s;
+}
+
 
 
 llvm::Value* BufferRoot::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
@@ -910,6 +925,21 @@ std::string Variable::sourceString() const
 }
 
 
+std::string Variable::emitOpenCLC(EmitOpenCLCodeParams& params) const
+{
+	if(vartype == LetVariable)
+	{
+		assert(params.let_block_expressions.find(this->bound_let_block) != params.let_block_expressions.end());
+
+		return params.let_block_expressions[this->bound_let_block][this->bound_index];
+	}
+	else
+	{
+		return this->name;
+	}
+}
+
+
 llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
 #if USE_LLVM
@@ -1093,6 +1123,18 @@ std::string FloatLiteral::sourceString() const
 }
 
 
+std::string FloatLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
+{
+	const std::string s = toString(this->value);
+
+	// OpenCL seems fussy about types so make sure we have a 'f' suffix on our float literals.
+	if(StringUtils::containsChar(s, '.'))
+		return s + "f"; // e.g '2.3' -> '2.3f'
+	else
+		return s + ".f"; // e.g. '2'  ->  '2.f'
+}
+
+
 llvm::Value* FloatLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
 #if USE_LLVM
@@ -1134,13 +1176,19 @@ std::string IntLiteral::sourceString() const
 }
 
 
+std::string IntLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
+{
+	return toString(this->value); // TODO: handle bitness suffix
+}
+
+
 llvm::Value* IntLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
 #if USE_LLVM
 	return llvm::ConstantInt::get(
 		*params.context, 
 		llvm::APInt(
-			32, // num bits
+			this->num_bits, // num bits
 			this->value, // value
 			true // signed
 		)
@@ -1178,6 +1226,11 @@ std::string BoolLiteral::sourceString() const
 	return boolToString(this->value);
 }
 
+
+std::string BoolLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
+{
+	return boolToString(this->value);
+}
 
 
 llvm::Value* BoolLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
@@ -1244,6 +1297,13 @@ void MapLiteral::print(int depth, std::ostream& s) const
 
 
 std::string MapLiteral::sourceString() const
+{
+	assert(0);
+	return "";
+}
+
+
+std::string MapLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
 	assert(0);
 	return "";
@@ -1354,6 +1414,53 @@ std::string ArrayLiteral::sourceString() const
 {
 	assert(0);
 	return "";
+}
+
+
+std::string ArrayLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
+{
+	// Work out which type this is
+	/*Type::TypeType type;
+	for(size_t i=0; i<this->elements.size(); ++i)
+	{
+		if(this->elements[i]->nodeType() == ASTNode::FloatLiteralType)
+		{
+			type = Type::FloatType;
+			break;
+		}
+		else if(this->elements[i]->nodeType() == ASTNode::IntLiteralType)
+		{
+			type = Type::IntType;
+			// don't break, keep going to see if we hit a float literal.
+		}
+	}*/
+	TypeRef this_type = this->type();
+	assert(this_type->getType() == Type::ArrayTypeType);
+
+	ArrayType* array_type = static_cast<ArrayType*>(this_type.getPointer());
+
+	std::string s = "__constant ";
+	if(array_type->elem_type->getType() == Type::FloatType)
+		s += "float ";
+	else if(array_type->elem_type->getType() == Type::IntType)
+		s += "int ";
+	else
+		throw BaseException("Array literal must be of int or float type for OpenCL emission currently.");
+	
+
+	const std::string name = "array_literal_" + toString((uint64)this);
+	s += name + "[] = {";
+	for(size_t i=0; i<this->elements.size(); ++i)
+	{
+		s += this->elements[i]->emitOpenCLC(params);
+		if(i + 1 < this->elements.size())
+			s += ", ";
+	}
+	s += "};\n";
+
+	params.file_scope_code += s;
+
+	return name;
 }
 
 
@@ -1597,6 +1704,30 @@ std::string VectorLiteral::sourceString() const
 }
 
 
+std::string VectorLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
+{
+	//return "";
+	/*if(elements.size() == 4)
+	{
+		return "(float4)(" + elements[0]->emitOpenCLC(params) + ", " + elements[1]->emitOpenCLC(params) + ", " + elements[2]->emitOpenCLC(params) + ", " + elements[3]->emitOpenCLC(params) + ")";
+	}
+	else
+	{
+		assert(0);
+		return "";
+	}*/
+	std::string s = "(float" + toString(elements.size()) + ")(";
+	for(size_t i=0; i<elements.size(); ++i)
+	{
+		s += elements[i]->emitOpenCLC(params);
+		if(i + 1 < elements.size())
+			s += ", ";
+	}
+	s += ")";
+	return s;
+}
+
+
 void VectorLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
 	if(payload.operation == TraversalPayload::ConstantFolding)
@@ -1762,6 +1893,227 @@ bool VectorLiteral::isConstant() const
 //------------------------------------------------------------------------------------------
 
 
+TupleLiteral::TupleLiteral(const std::vector<ASTNodeRef>& elems, const SrcLocation& loc)
+:	ASTNode(TupleLiteralType, loc),
+	elements(elems)
+{
+	if(elems.empty())
+		throw BaseException("Tuple literal can't be empty." + errorContext(*this));
+}
+
+
+TypeRef TupleLiteral::type() const
+{
+	vector<TypeRef> component_types(elements.size());
+	for(size_t i=0; i<component_types.size(); ++i)
+		component_types[i] = elements[i]->type();
+
+	return new TupleType(component_types);
+}
+
+
+ValueRef TupleLiteral::exec(VMState& vmstate)
+{
+	vector<ValueRef> elem_values(elements.size());
+
+	for(unsigned int i=0; i<this->elements.size(); ++i)
+		elem_values[i] = this->elements[i]->exec(vmstate);
+
+	return new TupleValue(elem_values);
+}
+
+
+void TupleLiteral::print(int depth, std::ostream& s) const
+{
+	printMargin(depth, s);
+	s << "Tuple literal\n";
+
+	for(unsigned int i=0; i<this->elements.size(); ++i)
+	{
+		printMargin(depth+1, s);
+		this->elements[i]->print(depth+2, s);
+	}
+}
+
+
+std::string TupleLiteral::sourceString() const
+{
+	assert(0);
+	return "";
+}
+
+
+std::string TupleLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
+{
+	TypeRef t = this->type();
+
+	const std::string constructor_name = t.downcast<TupleType>()->OpenCLCType() + "_cnstr";
+
+	std::string s = constructor_name + "(";
+	for(size_t i=0; i<elements.size(); ++i)
+	{
+		s += elements[i]->emitOpenCLC(params);
+		if(i + 1 < elements.size())
+			s += ", ";
+	}
+	s += ")";
+	return s;
+}
+
+
+void TupleLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
+{
+	if(payload.operation == TraversalPayload::ConstantFolding)
+	{
+		for(size_t i=0; i<elements.size(); ++i)
+			checkFoldExpression(elements[i], payload);
+	}
+	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	{
+		for(size_t i=0; i<elements.size(); ++i)
+			convertOverloadedOperators(elements[i], payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::TypeCoercion)
+	{
+		// Convert e.g. [1.0, 2.0, 3]t to [1.0, 2.0, 3.0]t
+
+		// Do we have any floats in this vector?
+		bool have_float = false;
+		for(size_t i=0; i<elements.size(); ++i)
+			have_float = have_float || (elements[i]->nodeType() == ASTNode::FloatLiteralType);
+
+		if(have_float)
+		{
+			for(size_t i=0; i<elements.size(); ++i)
+				if(elements[i]->nodeType() == ASTNode::IntLiteralType)
+				{
+					const IntLiteral* int_lit = static_cast<const IntLiteral*>(elements[i].getPointer());
+					if(isIntExactlyRepresentableAsFloat(int_lit->value))
+					{
+						elements[i] = ASTNodeRef(new FloatLiteral((float)int_lit->value, int_lit->srcLocation()));
+						payload.tree_changed = true;
+					}
+				}
+		}
+	}
+
+
+	stack.push_back(this);
+	for(unsigned int i=0; i<this->elements.size(); ++i)
+	{
+		this->elements[i]->traverse(payload, stack);
+	}
+	stack.pop_back();
+
+
+	if(payload.operation == TraversalPayload::InlineFunctionCalls)
+	{
+		for(size_t i=0; i<elements.size(); ++i)
+			checkInlineExpression(elements[i], payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	{
+		for(size_t i=0; i<elements.size(); ++i)
+			checkSubstituteVariable(elements[i], payload);
+	}
+	else if(payload.operation == TraversalPayload::TypeCheck)
+	{
+	}
+}
+
+
+bool TupleLiteral::areAllElementsConstant() const
+{
+	for(size_t i=0; i<this->elements.size(); ++i)
+		if(!this->elements[i]->isConstant())
+			return false;
+	return true;
+}
+
+
+llvm::Value* TupleLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
+{
+	TypeRef t_ = type();
+	const TupleType* tuple_type = static_cast<const TupleType*>(t_.getPointer());
+
+
+	llvm::Value* result_struct_val;
+	if(ret_space_ptr)
+		result_struct_val = ret_space_ptr;
+	else
+	{
+		// Allocate space on stack for result structure/tuple
+		
+		// Emit the alloca in the entry block for better code-gen.
+		// We will emit the alloca at the start of the block, so that it doesn't go after any terminator instructions already created which have to be at the end of the block.
+		llvm::IRBuilder<> entry_block_builder(&params.currently_building_func->getEntryBlock(), params.currently_building_func->getEntryBlock().getFirstInsertionPt());
+
+		result_struct_val = entry_block_builder.CreateAlloca(
+			tuple_type->LLVMType(*params.context), // This type (tuple type)
+			llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1, true)), // num elems
+			"Tuple literal space"
+		);
+	}
+
+	// For each field in the structure
+	for(unsigned int i=0; i<tuple_type->component_types.size(); ++i)
+	{
+		// Get the pointer to the structure field.
+		vector<llvm::Value*> indices;
+		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true)));
+		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, i, true)));
+			
+		llvm::Value* field_ptr = params.builder->CreateGEP(
+			result_struct_val, // ptr
+			indices
+		);
+
+		//llvm::Value* arg_value = LLVMTypeUtils::getNthArg(params.currently_building_func, i + 1);
+		llvm::Value* arg_value = this->elements[i]->emitLLVMCode(params);
+
+		if(!tuple_type->component_types[i]->passByValue())
+		{
+			// Load the value from memory
+			arg_value = params.builder->CreateLoad(
+				arg_value // ptr
+			);
+		}
+
+		params.builder->CreateStore(
+			arg_value, // value
+			field_ptr // ptr
+		);
+
+		// If the field is of string type, we need to increment its reference count
+		if(tuple_type->component_types[i]->getType() == Type::StringType)
+			RefCounting::emitIncrementStringRefCount(params, arg_value);
+	}
+
+	return result_struct_val;
+}
+
+
+Reference<ASTNode> TupleLiteral::clone()
+{
+	std::vector<ASTNodeRef> elems(this->elements.size());
+	for(size_t i=0; i<elements.size(); ++i)
+		elems[i] = this->elements[i]->clone();
+	return ASTNodeRef(new TupleLiteral(elems, srcLocation()));
+}
+
+
+bool TupleLiteral::isConstant() const
+{
+	for(size_t i=0; i<elements.size(); ++i)
+		if(!elements[i]->isConstant())
+			return false;
+	return true;
+}
+
+
+//------------------------------------------------------------------------------------------
+
+
 StringLiteral::StringLiteral(const std::string& v, const SrcLocation& loc) 
 :	ASTNode(StringLiteralType, loc), value(v)
 {
@@ -1783,6 +2135,13 @@ void StringLiteral::print(int depth, std::ostream& s) const
 
 
 std::string StringLiteral::sourceString() const
+{
+	assert(0);
+	return "";
+}
+
+
+std::string StringLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
 	assert(0);
 	return "";
@@ -1916,6 +2275,13 @@ std::string CharLiteral::sourceString() const
 }
 
 
+std::string CharLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
+{
+	assert(0);
+	return "";
+}
+
+
 void CharLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
 }
@@ -1945,7 +2311,7 @@ class AddOp
 {
 public:
 	float operator() (float x, float y) { return x + y; }
-	int operator() (int x, int y) { return x + y; }
+	int64 operator() (int64 x, int64 y) { return x + y; }
 };
 
 
@@ -1953,7 +2319,7 @@ class SubOp
 {
 public:
 	float operator() (float x, float y) { return x - y; }
-	int operator() (int x, int y) { return x - y; }
+	int64 operator() (int64 x, int64 y) { return x - y; }
 };
 
 
@@ -1961,7 +2327,7 @@ class MulOp
 {
 public:
 	float operator() (float x, float y) { return x * y; }
-	int operator() (int x, int y) { return x * y; }
+	int64 operator() (int64 x, int64 y) { return x * y; }
 };
 
 
@@ -2109,6 +2475,12 @@ void AdditionExpression::print(int depth, std::ostream& s) const
 std::string AdditionExpression::sourceString() const
 {
 	return "(" + a->sourceString() + " + " + b->sourceString() + ")";
+}
+
+
+std::string AdditionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
+{
+	return "(" + a->emitOpenCLC(params) + " + " + b->emitOpenCLC(params) + ")";
 }
 
 
@@ -2298,6 +2670,12 @@ void SubtractionExpression::print(int depth, std::ostream& s) const
 std::string SubtractionExpression::sourceString() const
 {
 	return a->sourceString() + " - " + b->sourceString();
+}
+
+
+std::string SubtractionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
+{
+	return a->emitOpenCLC(params) + " - " + b->emitOpenCLC(params);
 }
 
 
@@ -2585,6 +2963,12 @@ void MulExpression::print(int depth, std::ostream& s) const
 std::string MulExpression::sourceString() const
 {
 	return "(" + a->sourceString() + " * " + b->sourceString() + ")";
+}
+
+
+std::string MulExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
+{
+	return "(" + a->emitOpenCLC(params) + " * " + b->emitOpenCLC(params) + ")";
 }
 
 
@@ -3109,6 +3493,12 @@ std::string DivExpression::sourceString() const
 }
 
 
+std::string DivExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
+{
+	return a->emitOpenCLC(params) + " / " + b->emitOpenCLC(params);
+}
+
+
 llvm::Value* DivExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
 #if USE_LLVM
@@ -3253,6 +3643,12 @@ void BinaryBooleanExpr::print(int depth, std::ostream& s) const
 std::string BinaryBooleanExpr::sourceString() const
 {
 	return a->sourceString() + (this->t == OR ? " || " : " && ") + b->sourceString();
+}
+
+
+std::string BinaryBooleanExpr::emitOpenCLC(EmitOpenCLCodeParams& params) const
+{
+	return a->emitOpenCLC(params) + (this->t == OR ? " || " : " && ") + b->emitOpenCLC(params);
 }
 
 
@@ -3407,6 +3803,12 @@ std::string UnaryMinusExpression::sourceString() const
 }
 
 
+std::string UnaryMinusExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
+{
+	return "-" + expr->emitOpenCLC(params);
+}
+
+
 llvm::Value* UnaryMinusExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
 #if USE_LLVM
@@ -3498,6 +3900,12 @@ std::string LetASTNode::sourceString() const
 {
 	assert(0);
 	return "";
+}
+
+
+std::string LetASTNode::emitOpenCLC(EmitOpenCLCodeParams& params) const
+{
+	return this->expr->emitOpenCLC(params);
 }
 
 
@@ -3666,9 +4074,38 @@ void ComparisonExpression::print(int depth, std::ostream& s) const
 }
 
 
+static const std::string tokenString(unsigned int token_type)
+{
+	switch(token_type)
+	{
+	case LEFT_ANGLE_BRACKET_TOKEN:
+		return " < ";
+	case RIGHT_ANGLE_BRACKET_TOKEN:
+		return " > ";
+	case DOUBLE_EQUALS_TOKEN:
+		return " == ";
+	case NOT_EQUALS_TOKEN:
+		return " != ";
+	case LESS_EQUAL_TOKEN:
+		return " <= ";
+	case GREATER_EQUAL_TOKEN:
+		return " >= ";
+	default:
+		assert(!"Unknown comparison token type.");
+		return NULL;
+	}
+}
+
+
 std::string ComparisonExpression::sourceString() const
 {
-	return a->sourceString() + tokenName(this->token->getType()) + b->sourceString();
+	return a->sourceString() + tokenString(this->token->getType()) + b->sourceString();
+}
+
+
+std::string ComparisonExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
+{
+	return a->emitOpenCLC(params) + tokenString(this->token->getType()) + b->emitOpenCLC(params);
 }
 
 
@@ -3865,10 +4302,27 @@ void LetBlock::print(int depth, std::ostream& s) const
 	this->expr->print(depth+1, s);
 }
 
+
 std::string LetBlock::sourceString() const
 {
 	assert(0);
 	return "";
+}
+
+
+std::string LetBlock::emitOpenCLC(EmitOpenCLCodeParams& params) const
+{
+	// Compute and store expressions for the let variable names
+	params.let_block_expressions.insert(std::make_pair(this, std::vector<std::string>()));
+
+	for(size_t i=0; i<lets.size(); ++i)
+	{
+		std::string let_expression = this->lets[i]->emitOpenCLC(params);
+
+		params.let_block_expressions[this].push_back(let_expression);
+	}
+
+	return this->expr->emitOpenCLC(params);
 }
 
 
@@ -3914,7 +4368,7 @@ void LetBlock::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 llvm::Value* LetBlock::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
 	// NEW: Emit code for the let statements now.
-	// We need to do this now, otherwise we will get "instruction does not dominate all uses", if a let statement has it's code emitted in a if statement block.
+	// We need to do this now, otherwise we will get "instruction does not dominate all uses", if a let statement has its code emitted in a if statement block.
 	
 	//for(size_t i=0; i<lets.size(); ++i)
 	//	let_exprs_llvm_value[i] = this->lets[i]->emitLLVMCode(params, ret_space_ptr);
@@ -3998,6 +4452,13 @@ void ArraySubscript::print(int depth, std::ostream& s) const
 
 
 std::string ArraySubscript::sourceString() const
+{
+	assert(0);
+	return "";
+}
+
+
+std::string ArraySubscript::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
 	assert(0);
 	return "";

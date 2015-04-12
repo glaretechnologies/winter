@@ -63,7 +63,8 @@ static const SrcLocation prevTokenLoc(const ParseInfo& p)
 
 Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase> >& tokens, 
 										   const SourceBufferRef& source_buffer,
-										   vector<FunctionDefinitionRef>& func_defs_out, std::map<std::string, TypeRef>& named_types)
+										   vector<FunctionDefinitionRef>& func_defs_out, std::map<std::string, TypeRef>& named_types,
+											std::vector<TypeRef>& named_types_ordered_out)
 {
 	try
 	{
@@ -77,12 +78,12 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 		parseinfo.text_buffer = source_buffer.getPointer();
 
 		// NEW: go through buffer and see if there is a 'else' token
-		for(size_t z=0; z<tokens.size(); ++z)
+		/*for(size_t z=0; z<tokens.size(); ++z)
 			if(tokens[z]->getType() == IDENTIFIER_TOKEN && tokens[z]->getIdentifierValue() == "else")
 			{
 				parseinfo.else_token_present = true;
 				break;
-			}
+			}*/
 
 		while(i < tokens.size())
 		{
@@ -92,7 +93,8 @@ Reference<ASTNode> LangParser::parseBuffer(const std::vector<Reference<TokenBase
 			{
 				Reference<StructureType> t = parseStructType(parseinfo, vector<string>());
 				// TODO: check to see if it has already been defined.
-				named_types[t->name] = TypeRef(t.getPointer()); 
+				named_types[t->name] = t;
+				named_types_ordered_out.push_back(t);
 
 				// Make constructor function for this structure
 				vector<FunctionDefinition::FunctionArg> args(t->component_types.size());
@@ -229,7 +231,21 @@ a
 	return var_expression;
 }
 		
+/*
+There are several forms of if to parse:
+New form with optional 'then':
+if a then b else c
+if a b else c
 
+old form:
+if(a, b, c)
+
+
+New form may also happen to have parens at the start of condition expression:
+if (x < 5) then b else c
+if (x * 2) < 5 then b else c
+
+*/
 ASTNodeRef LangParser::parseIfExpression(const ParseInfo& p)
 {
 	const SrcLocation loc = locationForParseInfo(p);
@@ -241,8 +257,71 @@ ASTNodeRef LangParser::parseIfExpression(const ParseInfo& p)
 		throw LangParserExcep("Internal error: expected identifier 'if'.");
 	}
 
-	if(p.else_token_present) // If an 'else' token is present, assume this is the new form of if: "if a then b else c"
+	if(p.tokens[p.i]->getType() == OPEN_PARENTHESIS_TOKEN)
 	{
+		unsigned int open_paren_pos = p.i;
+
+		p.i++; // Advance
+
+		// We are either parsing an old form of if: 'if(a, b, c)', or the new form with the condition expression in parens: 'if (a) then b else c' or 'if (a_0) binop a_1 then b else c'
+		// We can distinguish the two by parsing the condition 'a', then seeing if the next token is ','.
+
+		// Parse condition
+		ASTNodeRef condition = parseLetBlock(p);
+
+		if(p.tokens[p.i]->getType() == COMMA_TOKEN)
+		{
+			// We are parsing the old form of if.
+			p.i++; // Advance past ','.
+
+			// Parse then expression
+			ASTNodeRef then_expr = parseLetBlock(p);
+
+			parseToken(COMMA_TOKEN, p);
+	
+			// Parse else expression
+			ASTNodeRef else_expr = parseLetBlock(p);
+		
+			parseToken(CLOSE_PARENTHESIS_TOKEN, p);
+
+			return new IfExpression(loc, condition, then_expr, else_expr);
+		}
+		else
+		{
+			// We are parsing the new form of if.  
+			// Go back and parse condition expression again.
+			p.i = open_paren_pos;
+			assert(p.tokens[p.i]->getType() == OPEN_PARENTHESIS_TOKEN);
+			
+			// Parse condition
+			ASTNodeRef condition = parseLetBlock(p);
+
+			// Parse optional 'then'
+			if(p.i < p.tokens.size() && p.tokens[p.i]->isIdentifier() && p.tokens[p.i]->getIdentifierValue() == "then")
+			{
+				id = parseIdentifier("then", p);
+				if(id != "then")
+					throw LangParserExcep("Internal error: expected 'then', found " + tokenName(p.tokens[p.i]->getType()) + errorPosition(*p.text_buffer, p.tokens[p.i]->char_index));
+			}
+
+			// Parse then expression
+			ASTNodeRef then_expr = parseLetBlock(p);
+
+			// Parse mandatory 'else'
+			id = parseIdentifier("else", p);
+			if(id != "else")
+				throw LangParserExcep("Internal error: expected 'else', found " + tokenName(p.tokens[p.i]->getType()) + errorPosition(*p.text_buffer, p.tokens[p.i]->char_index));
+
+			// Parse else expression
+			ASTNodeRef else_expr = parseLetBlock(p);
+
+			return new IfExpression(loc, condition, then_expr, else_expr);
+		}
+	}
+	else
+	{
+		// No opening '(', so we are parsing the new form of if.
+
 		// Parse condition
 		ASTNodeRef condition = parseLetBlock(p);
 
@@ -264,32 +343,6 @@ ASTNodeRef LangParser::parseIfExpression(const ParseInfo& p)
 
 		// Parse else expression
 		ASTNodeRef else_expr = parseLetBlock(p);
-
-		return new IfExpression(loc, condition, then_expr, else_expr);
-	}
-	else
-	{
-		// else if should assume old form of if with parens, like "if(a, b, c)
-		
-		parseToken(OPEN_PARENTHESIS_TOKEN, p); // '('
-
-		if(p.i == p.tokens.size())
-			throw LangParserExcep("Expected ')'");
-
-		// Parse condition
-		ASTNodeRef condition = parseLetBlock(p);
-
-		parseToken(COMMA_TOKEN, p);
-
-		// Parse then expression
-		ASTNodeRef then_expr = parseLetBlock(p);
-
-		parseToken(COMMA_TOKEN, p);
-	
-		// Parse else expression
-		ASTNodeRef else_expr = parseLetBlock(p);
-		
-		parseToken(CLOSE_PARENTHESIS_TOKEN, p); // ')'
 
 		return new IfExpression(loc, condition, then_expr, else_expr);
 	}
@@ -502,7 +555,10 @@ ASTNodeRef LangParser::parseLiteral(const ParseInfo& p)
 
 	if(p.tokens[p.i]->getType() == INT_LITERAL_TOKEN)
 	{
-		return ASTNodeRef( new IntLiteral(p.tokens[p.i++]->getIntLiteralValue(), loc) );
+		const IntLiteralToken* token = static_cast<const IntLiteralToken*>(p.tokens[p.i].getPointer());
+		ASTNodeRef n = new IntLiteral(token->getIntLiteralValue(), token->num_bits, loc);
+		p.i++;
+		return n;
 	}
 	else if(p.tokens[p.i]->getType() == FLOAT_LITERAL_TOKEN)
 	{
@@ -533,7 +589,10 @@ Reference<IntLiteral> LangParser::parseIntLiteral(const ParseInfo& p)
 
 	if(p.tokens[p.i]->getType() == INT_LITERAL_TOKEN)
 	{
-		return Reference<IntLiteral>( new IntLiteral(p.tokens[p.i++]->getIntLiteralValue(), loc) );
+		const IntLiteralToken* token = static_cast<const IntLiteralToken*>(p.tokens[p.i].getPointer());
+		Reference<IntLiteral> n = new IntLiteral(token->getIntLiteralValue(), token->num_bits, loc);
+		p.i++;
+		return n;
 	}
 	else
 	{
@@ -634,7 +693,7 @@ ASTNodeRef LangParser::parseBasicExpression(const ParseInfo& p)
 	}
 	else
 	{
-		throw LangParserExcep("Expected literal or identifier in expression.");
+		throw LangParserExcep("Expected literal or identifier in expression." + errorPosition(*p.text_buffer, p.tokens[p.i]->char_index));
 	}
 }
 
@@ -672,6 +731,8 @@ TypeRef LangParser::parseElementaryType(const ParseInfo& p, const std::vector<st
 		return TypeRef(new Float());
 	else if(t == "int")
 		return TypeRef(new Int());
+	else if(t == "int64")
+		return TypeRef(new Int(64));
 	else if(t == "string")
 		return TypeRef(new String());
 	else if(t == "char")
@@ -690,6 +751,8 @@ TypeRef LangParser::parseElementaryType(const ParseInfo& p, const std::vector<st
 		return parseFunctionType(p, generic_type_params);
 	else if(t == "vector")
 		return parseVectorType(p, generic_type_params);
+	else if(t == "tuple")
+		return parseTupleType(p, generic_type_params);
 	else
 	{
 		// Then this might be the name of a named type.
@@ -814,14 +877,35 @@ TypeRef LangParser::parseVectorType(const ParseInfo& p, const std::vector<std::s
 	parseToken(COMMA_TOKEN, p);
 
 	Reference<IntLiteral> int_literal = parseIntLiteral(p);
-	int num = int_literal->value;
+	int64 num = int_literal->value;
 
 	if(num <= 0 || num >= 128) // || !Maths::isPowerOfTwo(num))
 		throw LangParserExcep("num must be > 0, < 128");
 
 	parseToken(RIGHT_ANGLE_BRACKET_TOKEN, p);
 
-	return TypeRef(new VectorType(t, num));
+	return TypeRef(new VectorType(t, (int)num));
+}
+
+
+TypeRef LangParser::parseTupleType(const ParseInfo& p, const std::vector<std::string>& generic_type_params)
+{
+	parseToken(LEFT_ANGLE_BRACKET_TOKEN, p);
+
+	std::vector<TypeRef> types;
+
+	types.push_back(parseType(p, generic_type_params));
+
+	while(isTokenCurrent(COMMA_TOKEN, p))
+	{
+		parseToken(COMMA_TOKEN, p);
+
+		types.push_back(parseType(p, generic_type_params));
+	}
+
+	parseToken(RIGHT_ANGLE_BRACKET_TOKEN, p);
+
+	return Reference<TupleType>(new TupleType(types));
 }
 
 
@@ -1089,6 +1173,10 @@ ASTNodeRef LangParser::parseArrayOrVectorLiteralOrArraySubscriptExpression(const
 				throw LangParserExcep("Invalid square bracket literal suffix '" + id + "'.");
 		}
 		return ASTNodeRef(new VectorLiteral(elems, loc, has_int_suffix, int_suffix));
+	}
+	if(hasPrefix(id, "t"))
+	{
+		return ASTNodeRef(new TupleLiteral(elems, loc));
 	}
 	else
 	{

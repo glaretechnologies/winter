@@ -39,6 +39,8 @@ public:
 
 	void buildLLVMCode(llvm::Module* module, const llvm::DataLayout/*TargetData*/* target_data, const CommonFunctions& common_functions);
 
+	const std::string buildOpenCLCode();
+
 	std::vector<FunctionDefinitionRef> concrete_funcs;
 private:
 	void addFunction(const FunctionDefinitionRef& f);

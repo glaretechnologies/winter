@@ -42,10 +42,21 @@ VirtualMachine
 -------------------
 
 =====================================================================*/
+
+// This class allows a user to rewrite the AST as they see fit.  Function rewriting is done immediately after parsing, before any other passes.
+class FunctionRewriter : public RefCounted
+{
+public:
+	virtual ~FunctionRewriter() {}
+
+	virtual void rewrite(std::vector<FunctionDefinitionRef>& function_definitions, const SourceBufferRef& source_buffer) = 0;
+};
+
+
 class VMConstructionArgs
 {
 public:
-	VMConstructionArgs() : env(NULL), allow_unsafe_operations(false), add_opaque_env_arg(false) {}
+	VMConstructionArgs() : env(NULL), allow_unsafe_operations(false)/*, add_opaque_env_arg(false)*/ {}
 	std::vector<ExternalFunctionRef> external_functions;
 	std::vector<SourceBufferRef> source_buffers;
 	std::vector<FunctionSignature> entry_point_sigs;
@@ -54,8 +65,9 @@ public:
 	void* env;
 	bool allow_unsafe_operations; // If this is true, in-bounds proof requirements of elem() etc.. are disabled.
 
-	bool add_opaque_env_arg; // This is a backwards-compatibility hack for old Indigo shaders that don't have an explicit 'opaque env' arg.
+	std::vector<Reference<FunctionRewriter> > function_rewriters;
 };
+
 
 
 class VirtualMachine
@@ -75,6 +87,8 @@ public:
 
 	bool isFunctionCalled(const std::string& name);
 
+	const std::string buildOpenCLCode();
+
 private:
 	void loadSource(const VMConstructionArgs& args, const std::vector<SourceBufferRef>& s, const std::vector<FunctionDefinitionRef>& preconstructed_func_defs);
 	void build(const VMConstructionArgs& args);
@@ -92,6 +106,8 @@ private:
 	void* env;
 	std::string triple;
 	std::map<std::string, void*> func_map;
+
+	std::vector<TypeRef> named_types_ordered;
 };
 
 

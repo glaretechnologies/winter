@@ -40,7 +40,8 @@ public:
 		VectorTypeType,
 		OpaqueTypeType,
 		SumTypeType,
-		ErrorTypeType
+		ErrorTypeType,
+		TupleTypeType
 	};
 
 	Type(TypeType t) : type(t) {}
@@ -50,6 +51,7 @@ public:
 	virtual bool lessThan(const Type& b) const = 0;
 	virtual bool matchTypes(const Type& b, std::vector<Reference<Type> >& type_mapping) const = 0;
 	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const = 0;
+	virtual const std::string OpenCLCType() const = 0;
 	virtual bool passByValue() const { return true; }
 	virtual Reference<Value> getInvalidValue() const; // For array out-of-bounds
 	virtual llvm::Value* getInvalidLLVMValue(llvm::LLVMContext& context) const; // For array out-of-bounds
@@ -64,6 +66,7 @@ typedef Reference<Type> TypeRef;
 
 
 inline bool operator < (const Type& a, const Type& b);
+inline bool operator > (const Type& a, const Type& b);
 inline bool operator == (const Type& a, const Type& b);
 inline bool operator != (const Type& a, const Type& b);
 
@@ -76,6 +79,7 @@ public:
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+	virtual const std::string OpenCLCType() const { return "float"; }
 	virtual llvm::Value* getInvalidLLVMValue(llvm::LLVMContext& context) const; // For array out-of-bounds
 	virtual Reference<Value> getInvalidValue() const; // For array out-of-bounds
 };
@@ -89,6 +93,7 @@ public:
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+	virtual const std::string OpenCLCType() const { return "generic"; }
 	const int genericTypeParamIndex() const { return generic_type_param_index; }
 private:
 	int generic_type_param_index;
@@ -98,13 +103,31 @@ private:
 class Int : public Type
 {
 public:
-	Int() : Type(IntType) {}
-	virtual const std::string toString() const { return "int"; }
-	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
+	Int(int num_bits_ = 32) : Type(IntType), num_bits(num_bits_) { assert(num_bits == 32 || num_bits == 64); }
+	virtual const std::string toString() const;
+	virtual bool lessThan(const Type& b) const
+	{ 
+		if(getType() < b.getType())
+			return true;
+		else if(b.getType() < getType())
+			return false;
+		else
+		{
+			// else b is an Int as well.
+			const Int& b_int = static_cast<const Int&>(b);
+			return num_bits < b_int.num_bits;
+		}
+	}
+
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+	virtual const std::string OpenCLCType() const;
 	virtual llvm::Value* getInvalidLLVMValue(llvm::LLVMContext& context) const; // For array out-of-bounds
 	virtual Reference<Value> getInvalidValue() const; // For array out-of-bounds
+
+	int numBits() const { return num_bits; }
+private:
+	int num_bits; // Should be 32 or 64
 };
 
 
@@ -116,6 +139,7 @@ public:
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+	virtual const std::string OpenCLCType() const { return "bool"; }
 };
 
 
@@ -139,6 +163,7 @@ public:
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+	virtual const std::string OpenCLCType() const { return "string"; }
 	virtual bool passByValue() const { return true; } // Pass the pointer 'by value'
 };
 
@@ -151,6 +176,7 @@ public:
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+	virtual const std::string OpenCLCType() const { return "char"; }
 	virtual bool passByValue() const { return true; }
 };
 
@@ -175,6 +201,7 @@ public:
 	virtual const std::string toString() const; // { return "function"; }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+	virtual const std::string OpenCLCType() const;
 	// Pass by reference, because the actual value passed/returned is a closure structure.
 	virtual bool passByValue() const { return true; }
 	virtual bool lessThan(const Type& b) const
@@ -247,6 +274,7 @@ public:
 	}
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+	virtual const std::string OpenCLCType() const;
 	virtual bool passByValue() const { return false; }
 
 	TypeRef from_type;
@@ -281,6 +309,7 @@ public:
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 
 	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+	virtual const std::string OpenCLCType() const;
 	virtual bool passByValue() const { return false; }
 
 
@@ -292,8 +321,7 @@ public:
 class StructureType : public Type
 {
 public:
-	StructureType(const std::string& name_, const std::vector<TypeRef>& component_types_, const std::vector<std::string>& component_names_) 
-	: Type(StructureTypeType), name(name_), component_types(component_types_), component_names(component_names_) {}
+	StructureType(const std::string& name_, const std::vector<TypeRef>& component_types_, const std::vector<std::string>& component_names_);
 
 	virtual const std::string toString() const { return /*"struct " + */name; }
 	virtual bool lessThan(const Type& b) const
@@ -313,12 +341,60 @@ public:
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 
 	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+	virtual const std::string OpenCLCType() const { return name; }
 	virtual bool passByValue() const { return false; }
+
+	const std::string getOpenCLCDefinition(); // Get full definition string, e.g. struct a { float b; };
 
 
 	std::string name;
 	std::vector<TypeRef> component_types;
 	std::vector<std::string> component_names;
+};
+
+
+class TupleType : public Type
+{
+public:
+	TupleType(const std::vector<TypeRef>& component_types_);
+
+	virtual const std::string toString() const;
+	virtual bool lessThan(const Type& b) const
+	{
+		if(getType() < b.getType())
+			return true;
+		else if(b.getType() < getType())
+			return false;
+		else
+		{
+			// else b is a structure as well
+			const TupleType& b_tuple = static_cast<const TupleType&>(b);
+
+			if(component_types.size() < b_tuple.component_types.size())
+				return true;
+			else if(component_types.size() > b_tuple.component_types.size())
+				return false;
+
+			for(size_t i=0; i<component_types.size(); ++i)
+			{
+				if(*component_types[i] < *b_tuple.component_types[i])
+					return true;
+				else if(*component_types[i] > *b_tuple.component_types[i])
+					return false;
+			}
+
+			return false; // equal
+		}
+	}
+	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
+
+	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+	virtual const std::string OpenCLCType() const;
+	virtual bool passByValue() const { return false; }
+
+	const std::string getOpenCLCDefinition(); // Get full definition string, e.g. struct a { float b; };
+
+	std::vector<TypeRef> component_types;
 };
 
 
@@ -350,6 +426,7 @@ public:
 	}
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+	virtual const std::string OpenCLCType() const;
 
 	TypeRef elem_type;
 	unsigned int num;
@@ -376,6 +453,7 @@ public:
 	}
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+	virtual const std::string OpenCLCType() const { return "void*"; }
 };
 
 
@@ -419,6 +497,7 @@ public:
 	virtual bool passByValue() const { return false; }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+	virtual const std::string OpenCLCType() const;
 
 	std::vector<TypeRef> types;
 };
@@ -443,6 +522,7 @@ public:
 	}
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 	virtual llvm::Type* LLVMType(llvm::LLVMContext& context) const;
+	virtual const std::string OpenCLCType() const;
 };
 
 
@@ -453,6 +533,11 @@ TypeRef errorTypeSum(const TypeRef& t);
 inline bool operator < (const Type& a, const Type& b)
 {
 	return a.lessThan(b);
+}
+
+inline bool operator > (const Type& a, const Type& b)
+{
+	return b.lessThan(a);
 }
 
 inline bool operator == (const Type& a, const Type& b)

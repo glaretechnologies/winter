@@ -171,6 +171,12 @@ std::string IfExpression::sourceString() const
 }
 
 
+std::string IfExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
+{
+	return "(" + condition->emitOpenCLC(params) + " ? " + then_expr->emitOpenCLC(params) + " : " + else_expr->emitOpenCLC(params) + ")";
+}
+
+
 TypeRef IfExpression::type() const
 {
 	return this->then_expr->type();

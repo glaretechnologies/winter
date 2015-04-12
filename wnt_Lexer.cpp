@@ -109,8 +109,8 @@ void Lexer::parseNumericLiteral(const SourceBufferRef& buffer, Parser& parser, s
 	}
 	else
 	{
-		int x;
-		if(!parser.parseInt(x))
+		int64 x;
+		if(!parser.parseInt64(x))
 		{
 			const unsigned int pos = parser.currentPos();
 			std::string next_token;
@@ -118,7 +118,21 @@ void Lexer::parseNumericLiteral(const SourceBufferRef& buffer, Parser& parser, s
 			throw LexerExcep("Failed to parse int.  (Next chars '" + next_token + "')" + errorPosition(buffer, pos));
 		}
 
-		tokens_out.push_back(Reference<TokenBase>(new IntLiteralToken(x, char_index)));
+		int num_bits = 32;
+		// Parse suffix if present
+		if(parser.currentIsChar('i'))
+		{
+			parser.advance();
+			if(!parser.parseInt(num_bits))
+			{
+				const unsigned int pos = parser.currentPos();
+				std::string next_token;
+				parser.parseNonWSToken(next_token);
+				throw LexerExcep("Failed to parse integer suffix after 'i':.  (Next chars '" + next_token + "')" + errorPosition(buffer, pos));
+			}
+		}
+
+		tokens_out.push_back(Reference<TokenBase>(new IntLiteralToken(x, num_bits, char_index)));
 	}
 }
 

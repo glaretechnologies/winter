@@ -124,6 +124,40 @@ void Linker::buildLLVMCode(llvm::Module* module, const llvm::DataLayout/*TargetD
 }
 
 
+const std::string Linker::buildOpenCLCode()
+{
+	std::string s;
+
+	EmitOpenCLCodeParams params;
+
+	for(Linker::SigToFuncMapType::iterator it = sig_to_function_map.begin(); it != sig_to_function_map.end(); ++it)
+	{
+		FunctionDefinition& f = *(*it).second;
+
+		if(!f.isGenericFunction() && !f.isExternalFunction() && f.built_in_func_impl.isNull())
+		{
+			s += f.emitOpenCLC(params) + "\n";
+		}
+	}
+
+	// Build concrete funcs
+	for(unsigned int i=0; i<concrete_funcs.size(); ++i)
+	{
+		assert(!concrete_funcs[i]->isGenericFunction());
+
+		s += concrete_funcs[i]->emitOpenCLC(params) + "\n";
+	}
+
+	// Build 'unique' functions (like shuffle())
+	//for(unsigned int i=0; i<unique_functions.size(); ++i)
+	//{
+	//	s += unique_functions[i]->emitOpenCLC() + "\n";
+	//}
+
+	return params.file_scope_code + "\n\n" + s;
+}
+
+
 /*
 void Linker::linkFunctions(BufferRoot& root)
 {
@@ -264,6 +298,36 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 	}
 	else if(sig.param_types.size() == 2)
 	{
+		if(sig.name == "iterate" && sig.param_types[0]->getType() == Type::FunctionType && sig.param_types[1]->getType() == Type::StructureTypeType)
+		{
+			const Reference<Function> func_type = sig.param_types[0].downcast<Function>();
+			const Reference<StructureType> structure_type = sig.param_types[1].downcast<StructureType>();
+			
+			// TODO: typecheck elems and function arg and return types
+
+			vector<FunctionDefinition::FunctionArg> args(2);
+			args[0].type = func_type;
+			args[0].name = "f";
+			args[1].type = structure_type;
+			args[1].name = "initial_state";
+
+			FunctionDefinitionRef def = new FunctionDefinition(
+				SrcLocation::invalidLocation(),
+				"iterate",
+				args,
+				ASTNodeRef(NULL), // body expr
+				structure_type, // return type
+				new IterateBuiltInFunc(
+					func_type, // func type
+					structure_type
+				)
+			);
+
+			this->sig_to_function_map.insert(std::make_pair(sig, def));
+			return def;
+		}
+
+
 		if(sig.param_types[0]->getType() == Type::FunctionType && sig.param_types[1]->getType() == Type::ArrayTypeType)
 		{
 			const Reference<ArrayType> array_type = sig.param_types[1].downcast<ArrayType>();
@@ -401,6 +465,33 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 				);
 
 				this->sig_to_function_map.insert(std::make_pair(sig, def));
+				return def;
+			}
+		}
+
+		if(sig.param_types[0]->getType() == Type::TupleTypeType && sig.param_types[1]->getType() == Type::IntType)
+		{
+			if(sig.name == "elem")
+			{
+				vector<FunctionDefinition::FunctionArg> args(2);
+				args[0].name = "tuple";
+				args[0].type = sig.param_types[0];
+				args[1].name = "index";
+				args[1].type = sig.param_types[1];
+
+				FunctionDefinitionRef def = new FunctionDefinition(
+					SrcLocation::invalidLocation(),
+					"elem", // name
+					args, // args
+					NULL, // body expr
+					NULL, // sig.param_types[0].downcast<TupleType>()->component_types, // return type
+					new GetTupleElementBuiltInFunc(sig.param_types[0].downcast<TupleType>(), std::numeric_limits<unsigned int>::max()) // built in impl.
+				);
+
+				// NOTE: because shuffle is unusual in that it has the shuffle mask 'baked into it', we need a unique ShuffleBuiltInFunc impl each time.
+				// So don't add to function map, so that it isn't reused.
+				// However, we need to add it to unique_functions to prevent it from being deleted, as calling function expr doesn't hold a ref to it.
+				unique_functions.push_back(def);
 				return def;
 			}
 		}
