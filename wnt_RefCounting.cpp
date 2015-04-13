@@ -101,7 +101,7 @@ void emitRefCountingFunctions(llvm::Module* module, const llvm::DataLayout* targ
 
 		// Load ref count
 		//string_val->dump();
-		llvm::Value* ref_ptr = builder.CreateConstInBoundsGEP2_32(string_val, 0, 0, "ref ptr");
+		llvm::Value* ref_ptr = builder.CreateStructGEP(string_val, 0, "ref ptr");
 
 		llvm::Value* ref_count = builder.CreateLoad(ref_ptr, "ref count");
 
@@ -213,7 +213,7 @@ void emitRefCountingFunctions(llvm::Module* module, const llvm::DataLayout* targ
 		llvm::Value* string_val = LLVMTypeUtils::getNthArg(llvm_func, 0);
 
 		// Get pointer to ref count
-		llvm::Value* ref_ptr = builder.CreateConstInBoundsGEP2_32(string_val, 0, 0, "ref ptr");
+		llvm::Value* ref_ptr = builder.CreateStructGEP(string_val, 0, "ref ptr");
 
 		// Load the ref count
 		llvm::Value* ref_count = builder.CreateLoad(ref_ptr, "ref count");
@@ -276,7 +276,7 @@ void emitStructureCleanupLLVMCode(EmitLLVMCodeParams& params, const StructureTyp
 			// Emit code to load the string value:
 			structure_val->dump();
 			structure_val->getType()->dump();
-			llvm::Value* str_ptr = params.builder->CreateConstInBoundsGEP2_32(structure_val, 0, (unsigned int)i, struct_type.name + ".str ptr");
+			llvm::Value* str_ptr = params.builder->CreateStructGEP(structure_val, (unsigned int)i, struct_type.name + ".str ptr");
 
 			// Load the string value
 			str_ptr->dump();

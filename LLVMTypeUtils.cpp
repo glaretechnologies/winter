@@ -138,8 +138,7 @@ llvm::FunctionType* llvmFunctionType(const vector<TypeRef>& arg_types,
 llvm::Value* createFieldLoad(llvm::Value* structure_ptr, int field_index, 
 							 llvm::IRBuilder<>* builder, const llvm::Twine& name)
 {
-	llvm::Value* field_ptr = builder->CreateConstInBoundsGEP2_32(structure_ptr, 
-		0, // array index
+	llvm::Value* field_ptr = builder->CreateStructGEP(structure_ptr, 
 		field_index, // field index
 		name
 	);

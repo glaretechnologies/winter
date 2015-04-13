@@ -220,14 +220,14 @@ public:
 	
 
 	*/
-	IterateBuiltInFunc(const Reference<Function>& func_type_, const Reference<StructureType>& structure_type_);
+	IterateBuiltInFunc(const Reference<Function>& func_type_, const TypeRef& state_type_);
 	virtual ~IterateBuiltInFunc(){}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
 	Reference<Function> func_type;
-	Reference<StructureType> structure_type;
+	TypeRef state_type;
 };
 
 

@@ -181,7 +181,7 @@ llvm::Value* Constructor::emitLLVMCode(EmitLLVMCodeParams& params) const
 		for(unsigned int i=0; i<this->struct_type->component_types.size(); ++i)
 		{
 			// Get the pointer to the structure field.
-			llvm::Value* field_ptr = params.builder->CreateConstInBoundsGEP2_32(struct_ptr, 0, i);
+			llvm::Value* field_ptr = params.builder->CreateStructGEP(struct_ptr, i);
 
 			llvm::Value* arg_value = LLVMTypeUtils::getNthArg(params.currently_building_func, i + 1);
 			if(!this->struct_type->component_types[i]->passByValue())
@@ -264,7 +264,7 @@ llvm::Value* GetField::emitLLVMCode(EmitLLVMCodeParams& params) const
 			// Pointer to structure will be in 0th argument.
 			llvm::Value* struct_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
 
-			llvm::Value* field_ptr = params.builder->CreateConstInBoundsGEP2_32(struct_ptr, 0, this->index, field_name + " ptr");
+			llvm::Value* field_ptr = params.builder->CreateStructGEP(struct_ptr, this->index, field_name + " ptr");
 
 			llvm::Value* loaded_val = params.builder->CreateLoad(
 				field_ptr,
@@ -285,7 +285,7 @@ llvm::Value* GetField::emitLLVMCode(EmitLLVMCodeParams& params) const
 			// Pointer to structure will be in 1st argument.
 			llvm::Value* struct_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
 
-			llvm::Value* field_ptr = params.builder->CreateConstInBoundsGEP2_32(struct_ptr, 0, this->index, field_name + " ptr");
+			llvm::Value* field_ptr = params.builder->CreateStructGEP(struct_ptr, this->index, field_name + " ptr");
 
 			llvm::Value* field_val = params.builder->CreateLoad(
 				field_ptr,
@@ -340,7 +340,7 @@ llvm::Value* GetTupleElementBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 			// Pointer to structure will be in 0th argument.
 			llvm::Value* struct_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
 
-			llvm::Value* field_ptr = params.builder->CreateConstInBoundsGEP2_32(struct_ptr, 0, this->index, field_name + " ptr");
+			llvm::Value* field_ptr = params.builder->CreateStructGEP(struct_ptr, this->index, field_name + " ptr");
 
 			llvm::Value* loaded_val = params.builder->CreateLoad(
 				field_ptr,
@@ -361,7 +361,7 @@ llvm::Value* GetTupleElementBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 			// Pointer to structure will be in 1st argument.
 			llvm::Value* struct_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
 
-			llvm::Value* field_ptr = params.builder->CreateConstInBoundsGEP2_32(struct_ptr, 0, this->index, field_name + " ptr");
+			llvm::Value* field_ptr = params.builder->CreateStructGEP(struct_ptr, this->index, field_name + " ptr");
 
 			llvm::Value* field_val = params.builder->CreateLoad(
 				field_ptr,
@@ -666,7 +666,7 @@ static llvm::Value* loadGatherElements(EmitLLVMCodeParams& params, int arg_offse
 	std::cout << std::endl;*/
 
 	// TEMP: Get pointer to index 0 of the array:
-	llvm::Value* array_elem0_ptr = params.builder->CreateConstInBoundsGEP2_32(array_ptr, 0, 0);
+	llvm::Value* array_elem0_ptr = params.builder->CreateStructGEP(array_ptr, 0);
 
 	/*std::cout << "array_elem0_ptr" << std::endl;
 	array_elem0_ptr->dump();
@@ -1107,8 +1107,8 @@ llvm::Value* VectorInBoundsBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 //------------------------------------------------------------------------------------
 
 
-IterateBuiltInFunc::IterateBuiltInFunc(const Reference<Function>& func_type_, const Reference<StructureType>& structure_type_)
-:	func_type(func_type_), structure_type(structure_type_)
+IterateBuiltInFunc::IterateBuiltInFunc(const Reference<Function>& func_type_, const TypeRef& state_type_)
+:	func_type(func_type_), state_type(state_type_)
 {}
 
 
@@ -1117,11 +1117,11 @@ ValueRef IterateBuiltInFunc::invoke(VMState& vmstate)
 	// iterate(function<State, int, tuple<State, bool>> f, State initial_state) State
 
 	const FunctionValue* f = dynamic_cast<const FunctionValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
-	const StructureValue* initial_state = dynamic_cast<const StructureValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
+	const ValueRef initial_state = vmstate.argument_stack[vmstate.func_args_start.back() + 1];
 
-	assert(f && initial_state);
+	assert(f && initial_state.nonNull());
 
-	ValueRef running_val = initial_state->clone();
+	ValueRef running_val = initial_state;
 	int64 iteration = 0;
 	while(1)
 	{
@@ -1137,10 +1137,9 @@ ValueRef IterateBuiltInFunc::invoke(VMState& vmstate)
 		assert(dynamic_cast<const TupleValue*>(result.ptr()));
 		const TupleValue* tuple_result = static_cast<const TupleValue*>(result.ptr());
 
-		assert(dynamic_cast<const StructureValue*>(tuple_result->e[0].ptr()));
 		assert(dynamic_cast<const BoolValue*>(tuple_result->e[1].ptr()));
 
-		ValueRef new_running_val = static_cast<StructureValue*>(tuple_result->e[0].ptr());
+		ValueRef new_running_val = tuple_result->e[0];
 		bool continue_bool = static_cast<const BoolValue*>(tuple_result->e[1].ptr())->value;
 
 		vmstate.argument_stack.pop_back(); // Pop Value arg
@@ -1161,10 +1160,22 @@ ValueRef IterateBuiltInFunc::invoke(VMState& vmstate)
 // iterate(function<State, int, tuple<State, bool>> f, State initial_state) State
 llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
-	// Get argument pointers
-	llvm::Value* return_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0); // Pointer to result structure
-	llvm::Value* function = LLVMTypeUtils::getNthArg(params.currently_building_func, 1); // Pointer to function
-	llvm::Value* initial_state_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 2); // Pointer to initial state
+	// Get argument pointers/values
+	llvm::Value* return_ptr = NULL;
+	llvm::Value* function;
+	llvm::Value* initial_state_ptr_or_value;
+
+	if(state_type->passByValue())
+	{
+		function = LLVMTypeUtils::getNthArg(params.currently_building_func, 0); // Pointer to function
+		initial_state_ptr_or_value = LLVMTypeUtils::getNthArg(params.currently_building_func, 1); // Pointer to, or value of initial state
+	}
+	else
+	{
+		return_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0); // Pointer to result structure
+		function = LLVMTypeUtils::getNthArg(params.currently_building_func, 1); // Pointer to function
+		initial_state_ptr_or_value = LLVMTypeUtils::getNthArg(params.currently_building_func, 2); // Pointer to, or value of initial state
+	}
 
 
 	// Allocate space on stack for tuple<State, bool> returned from f.
@@ -1179,37 +1190,47 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 		"Tuple space"
 	);
 
-	// Allocate space on stack for the running state
-	llvm::Value* running_state_alloca = entry_block_builder.CreateAlloca(
-		structure_type->LLVMType(*params.context), // State
-		llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1, true)), // num elems
-		"Running state"
-	);
+	// Allocate space on stack for the running state, if the state type is not pass-by-value.
+	llvm::Value* running_state_alloca = NULL;
+
+	if(!state_type->passByValue())
+	{
+		running_state_alloca = entry_block_builder.CreateAlloca(
+			state_type->LLVMType(*params.context), // State
+			llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1, true)), // num elems
+			"Running state"
+		);
+
+		// Load and store initial state in running state
+		llvm::Value* initial_state = params.builder->CreateLoad(initial_state_ptr_or_value);
+		params.builder->CreateStore(initial_state, running_state_alloca);
+	}
 	
-
-	// Load and store initial state in running state
-	llvm::Value* initial_state = params.builder->CreateLoad(initial_state_ptr);
-	params.builder->CreateStore(initial_state, running_state_alloca);
-
 
 	// Make the new basic block for the loop header, inserting after current
 	// block.
-	llvm::IRBuilder<>& Builder = *params.builder;
-
-	llvm::Function* TheFunction = Builder.GetInsertBlock()->getParent();
-	llvm::BasicBlock* PreheaderBB = Builder.GetInsertBlock();
+	llvm::Function* TheFunction = params.builder->GetInsertBlock()->getParent();
+	llvm::BasicBlock* PreheaderBB = params.builder->GetInsertBlock();
 	llvm::BasicBlock* LoopBB = llvm::BasicBlock::Create(*params.context, "loop", TheFunction);
   
 	// Insert an explicit fall through from the current block to the LoopBB.
-	Builder.CreateBr(LoopBB);
+	params.builder->CreateBr(LoopBB);
 
 	// Start insertion in LoopBB.
-	Builder.SetInsertPoint(LoopBB);
+	params.builder->SetInsertPoint(LoopBB);
+
+	// Create running state value variable phi node
+	llvm::PHINode* running_state_value = NULL;
+	if(state_type->passByValue())
+	{
+		running_state_value = params.builder->CreatePHI(state_type->LLVMType(*params.context), 2, "running_state_value");
+		running_state_value->addIncoming(initial_state_ptr_or_value, PreheaderBB);
+	}
   
 	
 
 	// Create loop index (i) variable phi node
-	llvm::PHINode* loop_index_var = Builder.CreatePHI(llvm::Type::getInt32Ty(*params.context), 2, "loop_index_var");
+	llvm::PHINode* loop_index_var = params.builder->CreatePHI(llvm::Type::getInt32Ty(*params.context), 2, "loop_index_var");
 	llvm::Value* initial_loop_index_value = llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0)); // Initial induction loop index value: Zero
 	loop_index_var->addIncoming(initial_loop_index_value, PreheaderBB);
 
@@ -1219,59 +1240,77 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	// Call function on element
 	vector<llvm::Value*> args;
 	args.push_back(tuple_alloca); // SRET return value arg
-	args.push_back(running_state_alloca); // current state
+	args.push_back(state_type->passByValue() ? running_state_value : running_state_alloca); // current state
 	args.push_back(loop_index_var); // iteration
 
 	params.builder->CreateCall(
 		function, // Callee
 		args // Args
-		//"iterate function call" // Name
 	);
 
-	// The result of the function should now be stored in 'tuple_alloca'.
-	// Load the state
-	llvm::Value* state_ptr = params.builder->CreateConstInBoundsGEP2_32(tuple_alloca, 0, 0);
-	llvm::Value* state = params.builder->CreateLoad(state_ptr);
+	// The result of the function (tuple<State, bool>) should now be stored in 'tuple_alloca'.
+	llvm::Value* next_running_state_value = NULL;
+	if(state_type->passByValue())
+	{
+		// Load the state
+		llvm::Value* state_ptr = params.builder->CreateStructGEP(tuple_alloca, 0);
+		next_running_state_value = params.builder->CreateLoad(state_ptr);
+	}
+	else
+	{
+		// Load the state
+		llvm::Value* state_ptr = params.builder->CreateStructGEP(tuple_alloca, 0);
+		llvm::Value* state = params.builder->CreateLoad(state_ptr);
 
-	// Store the state in running_state_alloca
-	params.builder->CreateStore(state, running_state_alloca);
+		// Store the state in running_state_alloca
+		params.builder->CreateStore(state, running_state_alloca);
+	}
 
 	// Load the 'continue boolean'
-	llvm::Value* continue_bool_ptr = params.builder->CreateConstInBoundsGEP2_32(tuple_alloca, 0, 1);
+	llvm::Value* continue_bool_ptr = params.builder->CreateStructGEP(tuple_alloca, 1);
 	llvm::Value* continue_bool = params.builder->CreateLoad(continue_bool_ptr);
+
 
   
 	// Create increment of loop index
 	llvm::Value* step_val = llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1));
-	llvm::Value* next_var = Builder.CreateAdd(loop_index_var, step_val, "next_var");
+	llvm::Value* next_var = params.builder->CreateAdd(loop_index_var, step_val, "next_var");
 
 	// Compute the end condition.
 	llvm::Value* false_value = llvm::ConstantInt::get(*params.context, llvm::APInt(1, 0));
   
-	llvm::Value* end_cond = Builder.CreateICmpNE(
+	llvm::Value* end_cond = params.builder->CreateICmpNE(
 		false_value, 
 		continue_bool,
 		"loopcond"
 	);
   
 	// Create the "after loop" block and insert it.
-	llvm::BasicBlock* LoopEndBB = Builder.GetInsertBlock();
+	llvm::BasicBlock* LoopEndBB = params.builder->GetInsertBlock();
 	llvm::BasicBlock* AfterBB = llvm::BasicBlock::Create(*params.context, "afterloop", TheFunction);
   
 	// Insert the conditional branch into the end of LoopEndBB.
-	Builder.CreateCondBr(end_cond, LoopBB, AfterBB);
+	params.builder->CreateCondBr(end_cond, LoopBB, AfterBB);
   
 	// Any new code will be inserted in AfterBB.
-	Builder.SetInsertPoint(AfterBB);
+	params.builder->SetInsertPoint(AfterBB);
   
 	// Add a new entry to the PHI node for the backedge.
 	loop_index_var->addIncoming(next_var, LoopEndBB);
 
 
-	// Finally load and store the running state value to the SRET return ptr.
-	llvm::Value* running_state = params.builder->CreateLoad(running_state_alloca);
-	params.builder->CreateStore(running_state, return_ptr);
-	return return_ptr;
+	if(state_type->passByValue())
+	{
+		running_state_value->addIncoming(next_running_state_value, LoopEndBB);
+		return running_state_value;
+	}
+	else
+	{
+		// Finally load and store the running state value to the SRET return ptr.
+		llvm::Value* running_state = params.builder->CreateLoad(running_state_alloca);
+		params.builder->CreateStore(running_state, return_ptr);
+		return return_ptr;
+	}
 }
 
 

@@ -38,7 +38,7 @@ void Lexer::parseStringLiteral(const SourceBufferRef& buffer, Parser& parser, st
 
 	parser.advance();
 
-	std::string s = "";
+	std::string s;
 	while(1)
 	{
 		if(parser.eof())
@@ -50,7 +50,7 @@ void Lexer::parseStringLiteral(const SourceBufferRef& buffer, Parser& parser, st
 			break;
 		}
 
-		s = ::appendChar(s, parser.current());
+		s.push_back(parser.current());
 		parser.advance();
 	}
 
@@ -79,7 +79,7 @@ void Lexer::parseCharLiteral(const SourceBufferRef& buffer, Parser& parser, std:
 			break;
 		}
 
-		s = ::appendChar(s, parser.current());
+		s.push_back(parser.current());
 		parser.advance();
 	}
 
@@ -147,7 +147,7 @@ void Lexer::parseIdentifier(const SourceBufferRef& buffer, Parser& parser, std::
 	std::string s;
 	while(parser.notEOF() && (::isAlphaNumeric(parser.current()) || parser.current() == '_'))
 	{
-		s = ::appendChar(s, parser.current());
+		s.push_back(parser.current());
 		parser.advance();
 	}
 

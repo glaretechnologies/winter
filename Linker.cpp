@@ -298,36 +298,6 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 	}
 	else if(sig.param_types.size() == 2)
 	{
-		if(sig.name == "iterate" && sig.param_types[0]->getType() == Type::FunctionType && sig.param_types[1]->getType() == Type::StructureTypeType)
-		{
-			const Reference<Function> func_type = sig.param_types[0].downcast<Function>();
-			const Reference<StructureType> structure_type = sig.param_types[1].downcast<StructureType>();
-			
-			// TODO: typecheck elems and function arg and return types
-
-			vector<FunctionDefinition::FunctionArg> args(2);
-			args[0].type = func_type;
-			args[0].name = "f";
-			args[1].type = structure_type;
-			args[1].name = "initial_state";
-
-			FunctionDefinitionRef def = new FunctionDefinition(
-				SrcLocation::invalidLocation(),
-				"iterate",
-				args,
-				ASTNodeRef(NULL), // body expr
-				structure_type, // return type
-				new IterateBuiltInFunc(
-					func_type, // func type
-					structure_type
-				)
-			);
-
-			this->sig_to_function_map.insert(std::make_pair(sig, def));
-			return def;
-		}
-
-
 		if(sig.param_types[0]->getType() == Type::FunctionType && sig.param_types[1]->getType() == Type::ArrayTypeType)
 		{
 			const Reference<ArrayType> array_type = sig.param_types[1].downcast<ArrayType>();
@@ -773,6 +743,36 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 	else if(sig.param_types.size() == 3)
 	{
 	} // End if three params
+
+
+	if(sig.name == "iterate" && sig.param_types.size() == 2	&& sig.param_types[0]->getType() == Type::FunctionType)
+	{
+		const Reference<Function> func_type = sig.param_types[0].downcast<Function>();
+		const TypeRef state_type = sig.param_types[1];
+			
+		// TODO: typecheck elems and function arg and return types
+
+		vector<FunctionDefinition::FunctionArg> args(2);
+		args[0].type = func_type;
+		args[0].name = "f";
+		args[1].type = state_type;
+		args[1].name = "initial_state";
+
+		FunctionDefinitionRef def = new FunctionDefinition(
+			SrcLocation::invalidLocation(),
+			"iterate",
+			args,
+			ASTNodeRef(NULL), // body expr
+			state_type, // return type
+			new IterateBuiltInFunc(
+				func_type, // func type
+				state_type
+			)
+		);
+
+		this->sig_to_function_map.insert(std::make_pair(sig, def));
+		return def;
+	}
 
 
 	// Match against vector element access functions of name 'eN' where N is an integer.

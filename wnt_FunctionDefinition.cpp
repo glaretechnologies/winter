@@ -621,7 +621,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			//params.hidden_voidptr_arg
 		);
 
-		llvm::Value* func_field_ptr = params.builder->CreateConstInBoundsGEP2_32(closure_pointer, 0, 1);
+		llvm::Value* func_field_ptr = params.builder->CreateStructGEP(closure_pointer, 1);
 
 		// Do the store.
 		params.builder->CreateStore(
@@ -630,7 +630,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		);
 	}
 
-	llvm::Value* captured_var_struct_ptr = params.builder->CreateConstInBoundsGEP2_32(closure_pointer, 0, 2);
+	llvm::Value* captured_var_struct_ptr = params.builder->CreateStructGEP(closure_pointer, 2);
 
 	// for each captured var
 	for(size_t i=0; i<this->captured_vars.size(); ++i)
@@ -668,7 +668,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		}
 			
 		// store in captured var structure field
-		llvm::Value* field_ptr = params.builder->CreateConstInBoundsGEP2_32(captured_var_struct_ptr, 0, i);
+		llvm::Value* field_ptr = params.builder->CreateStructGEP(captured_var_struct_ptr, i);
 
 		params.builder->CreateStore(
 			val, // value

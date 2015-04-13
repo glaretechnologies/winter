@@ -1329,8 +1329,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		);
 
 		// NOTE: index 2 should hold the captured vars struct.
-		captured_var_struct_ptr = params.builder->CreateConstInBoundsGEP2_32(closure_pointer, 
-			0, // array index
+		captured_var_struct_ptr = params.builder->CreateStructGEP(closure_pointer, 
 			2); // field index
 
 	}
@@ -1375,8 +1374,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		);
 
 		// NOTE: index 2 should hold the captured vars struct.
-		captured_var_struct_ptr = params.builder->CreateConstInBoundsGEP2_32(closure_pointer, 
-			0, // array index
+		captured_var_struct_ptr = params.builder->CreateStructGEP(closure_pointer, 
 			2); // field index
 	}
 	else if(binding_type == BoundToGlobalDef)

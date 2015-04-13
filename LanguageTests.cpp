@@ -64,6 +64,15 @@ void LanguageTests::run()
 	// ===================================================================
 	// Test iterate built-in function
 	// ===================================================================
+
+	testMainIntegerArg("															\n\
+		def f(int current_state, int iteration) tuple<int, bool> :					\n\
+			if iteration >= 100														\n\
+				[current_state, false]t # break										\n\
+			else																	\n\
+				[current_state + 1, true]t											\n\
+		def main(int x) int :  iterate(f, 0)", 17, 100);
+
 	testMainIntegerArg("struct State { int bound, int i }							\n\
 		def f(State current_state, int iteration) tuple<State, bool> :				\n\
 			if iteration >= current_state.bound 									\n\

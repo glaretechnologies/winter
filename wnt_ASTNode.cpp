@@ -1039,7 +1039,7 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 		);
 
 		// Load the value from the correct field.
-		llvm::Value* field_ptr = params.builder->CreateConstInBoundsGEP2_32(cap_var_structure, 0, this->bound_index);
+		llvm::Value* field_ptr = params.builder->CreateStructGEP(cap_var_structure, this->bound_index);
 
 		return params.builder->CreateLoad(field_ptr);
 	}
@@ -1565,7 +1565,7 @@ llvm::Value* ArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 	// For each element in the literal
 	for(unsigned int i=0; i<this->elements.size(); ++i)
 	{
-		llvm::Value* element_ptr = params.builder->CreateConstInBoundsGEP2_32(array_addr, 0, i);
+		llvm::Value* element_ptr = params.builder->CreateStructGEP(array_addr, i);
 
 		if(this->elements[i]->type()->passByValue())
 		{
@@ -2039,7 +2039,7 @@ llvm::Value* TupleLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 	for(unsigned int i=0; i<tuple_type->component_types.size(); ++i)
 	{
 		// Get the pointer to the structure field.
-		llvm::Value* field_ptr = params.builder->CreateConstInBoundsGEP2_32(result_struct_val, 0, i);
+		llvm::Value* field_ptr = params.builder->CreateStructGEP(result_struct_val, i);
 
 		llvm::Value* arg_value = this->elements[i]->emitLLVMCode(params);
 
@@ -2151,7 +2151,7 @@ llvm::Value* StringLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 	);
 
 	// Get a pointer to the zeroth elem
-	llvm::Value* elem_0 = params.builder->CreateConstInBoundsGEP2_32(string_global, 0, 0);
+	llvm::Value* elem_0 = params.builder->CreateStructGEP(string_global, 0);
 
 	//elem_0->dump();
 
@@ -2185,7 +2185,7 @@ llvm::Value* StringLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 	call_inst->setCallingConv(llvm::CallingConv::C);
 
 	// Set the reference count to 1
-	llvm::Value* ref_ptr = params.builder->CreateConstInBoundsGEP2_32(call_inst, 0, 0, "ref ptr");
+	llvm::Value* ref_ptr = params.builder->CreateStructGEP(call_inst, 0, "ref ptr");
 
 	llvm::Value* one = llvm::ConstantInt::get(
 		*params.context,
