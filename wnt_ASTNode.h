@@ -190,6 +190,8 @@ public:
 	std::vector<CleanUpInfo> cleanup_values; // A list of ASTNodes that need to emit cleanup code (Ref decrement code) at the end of the function
 
 	CommonFunctions common_functions;
+
+	std::vector<llvm::Value*> argument_values; // Use for function specialisation in Array fold().
 };
 
 
@@ -520,7 +522,7 @@ public:
 class ArrayLiteral : public ASTNode
 {
 public:
-	ArrayLiteral(const std::vector<ASTNodeRef>& elems, const SrcLocation& loc);
+	ArrayLiteral(const std::vector<ASTNodeRef>& elems, const SrcLocation& loc, bool has_int_suffix, int int_suffix);
 
 	virtual ValueRef exec(VMState& vmstate);
 	virtual TypeRef type() const;// { return array_type; }
@@ -539,6 +541,8 @@ private:
 	bool areAllElementsConstant() const;
 	//TypeRef array_type;
 	std::vector<ASTNodeRef> elements;
+	bool has_int_suffix;
+	int int_suffix; // e.g. number of elements
 };
 
 

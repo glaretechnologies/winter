@@ -29,7 +29,12 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #pragma warning(push, 0) // Disable warnings
 #endif
 #include "llvm/IR/Module.h"
+#if TARGET_LLVM_VERSION >= 36
+#include "llvm/IR/Verifier.h"
+#else
 #include "llvm/Analysis/Verifier.h"
+#include "llvm/ExecutionEngine/ObjectImage.h"
+#endif
 #include "llvm/PassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/PassManager.h"
@@ -38,7 +43,6 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "llvm/Transforms/IPO.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
-#include "llvm/ExecutionEngine/ObjectImage.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/raw_ostream.h"
@@ -169,7 +173,7 @@ static ValueRef concatStringsInterpreted(const vector<ValueRef>& args)
 }
 
 
-#if USE_LLVM_3_4
+#if TARGET_LLVM_VERSION >= 34
 #else
 static float getFloatArg(const vector<ValueRef>& arg_values, int i)
 {
@@ -193,7 +197,7 @@ public:
 	virtual ~WinterMemoryManager() {}
 
 
-#if USE_LLVM_3_4
+#if TARGET_LLVM_VERSION >= 34
 	virtual uint64_t getSymbolAddress(const std::string& name)
 	{
 		std::map<std::string, void*>::iterator res = func_map->find(name);
@@ -285,17 +289,24 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 		//const char* argv[] = { "dummyprogname", "-debug"};
 		//llvm::cl::ParseCommandLineOptions(2, argv, "my tool");
 
-
+#if TARGET_LLVM_VERSION >= 36
+		llvm::EngineBuilder engine_builder(std::unique_ptr<llvm::Module>(this->llvm_module));
+#else
 		llvm::EngineBuilder engine_builder(this->llvm_module);
+#endif
 		engine_builder.setEngineKind(llvm::EngineKind::JIT);
+#if TARGET_LLVM_VERSION <= 34
 		if(USE_MCJIT) engine_builder.setUseMCJIT(true);
+#endif
 
 
 		if(USE_MCJIT)
 		{
 			WinterMemoryManager* mem_manager = new WinterMemoryManager();
 			mem_manager->func_map = &func_map;
-#if USE_LLVM_3_4
+#if TARGET_LLVM_VERSION >= 36
+			engine_builder.setMCJITMemoryManager(std::unique_ptr<llvm::SectionMemoryManager>(mem_manager));
+#elif TARGET_LLVM_VERSION >= 34
 			engine_builder.setMCJITMemoryManager(mem_manager);
 #else
 			engine_builder.setJITMemoryManager(mem_manager);
@@ -305,11 +316,11 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 		this->triple = llvm::sys::getProcessTriple();
 		if(USE_MCJIT) this->triple.append("-elf"); // MCJIT requires the -elf suffix currently, see https://groups.google.com/forum/#!topic/llvm-dev/DOmHEXhNNWw
 
-		
+		// Select the host computer architecture as the target.
 		this->target_machine = engine_builder.selectTarget(
 			llvm::Triple(this->triple), // target triple
 			"",  // march
-			"", // "corei7", //"", // "core-avx2",  // mcpu
+			llvm::sys::getHostCPUName(), // mcpu - e.g. "corei7", "core-avx2"
 			llvm::SmallVector<std::string, 4>());
 
 		// Enable floating point op fusion, to allow for FMA codegen.
@@ -333,8 +344,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 
 		// There is a problem with LLVM 3.3 and earlier with the pow intrinsic getting turned into exp2f().
 		// So for now just use our own pow() external function.
-#if USE_LLVM_3_4
-#else
+#if TARGET_LLVM_VERSION < 34
 		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
 			(void*)(float(*)(float, float))std::pow,
 			powInterpreted,
@@ -416,13 +426,17 @@ VirtualMachine::~VirtualMachine()
 void VirtualMachine::init()
 {
 	// Since we will be calling LLVM functions from multiple threads, we need to call this.
+#if TARGET_LLVM_VERSION < 36
 	llvm::llvm_start_multithreaded();
+#endif
 }
 
 
 void VirtualMachine::shutdown() // Calls llvm_shutdown()
 {
+#if TARGET_LLVM_VERSION < 36
 	llvm::llvm_shutdown(); // This calls llvm::llvm_stop_multithreaded() as well.
+#endif
 }
 
 
@@ -761,16 +775,31 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 	// Dump unoptimised module bitcode to 'unoptimised_module.txt'
 	if(DUMP_MODULE_IR)
 	{
+#if TARGET_LLVM_VERSION >= 36
+		std::error_code errorinfo;
+		llvm::raw_fd_ostream f(
+			"unoptimised_module.txt",
+			errorinfo,
+			llvm::sys::fs::F_Text
+		);
+#else
 		std::string errorinfo;
 		llvm::raw_fd_ostream f(
 			"unoptimised_module.txt",
 			errorinfo
 		);
+#endif
 		this->llvm_module->print(f, NULL);
 	}
 
 	// Verify module
 	{
+#if TARGET_LLVM_VERSION >= 36
+		const bool ver_errors = llvm::verifyModule(
+			*this->llvm_module
+			// TODO: pass std out
+		);
+#else
 		string error_str;
 		const bool ver_errors = llvm::verifyModule(
 			*this->llvm_module, 
@@ -785,6 +814,7 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 
 			throw BaseException("Module verification errors: " + error_str);
 		}
+#endif
 		assert(!ver_errors);
 	}
 
@@ -803,12 +833,16 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 
 		// Set up the optimizer pipeline.  Start with registering info about how the
 		// target lays out data structures.
+#if TARGET_LLVM_VERSION <= 34
 		fpm.add(new llvm::DataLayout(*this->llvm_exec_engine->getDataLayout()));
+#endif
 		//std:: cout << ("Setting triple to " + this->triple) << std::endl;
 		fpm.add(new llvm::TargetLibraryInfo(llvm::Triple(this->triple)));
 
 		llvm::PassManager pm;
+#if TARGET_LLVM_VERSION <= 34
 		pm.add(new llvm::DataLayout(*this->llvm_exec_engine->getDataLayout()));
+#endif
 		pm.add(new llvm::TargetLibraryInfo(llvm::Triple(this->triple)));
 
 		llvm::PassManagerBuilder builder;
@@ -863,6 +897,12 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 
 	// Verify module again.
 	{
+#if TARGET_LLVM_VERSION >= 36
+		const bool ver_errors = llvm::verifyModule(
+			*this->llvm_module
+			// TODO: pass std out
+		);
+#else
 		string error_str;
 		const bool ver_errors = llvm::verifyModule(
 			*this->llvm_module, 
@@ -872,18 +912,32 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 		if(ver_errors)
 		{
 			std::cout << "Module verification errors: " << error_str << std::endl;
+
+			this->llvm_module->dump();
+
+			throw BaseException("Module verification errors: " + error_str);
 		}
+#endif
 		assert(!ver_errors);
 	}
 
 	// Dump module bitcode to 'module.txt'
 	if(DUMP_MODULE_IR)
 	{
+#if TARGET_LLVM_VERSION >= 36
+		std::error_code errorinfo;
+		llvm::raw_fd_ostream f(
+			"module.txt",
+			errorinfo,
+			llvm::sys::fs::F_Text
+		);
+#else
 		std::string errorinfo;
 		llvm::raw_fd_ostream f(
 			"module.txt",
 			errorinfo
 		);
+#endif
 		this->llvm_module->print(f, NULL);
 	}
 
@@ -946,16 +1000,23 @@ void VirtualMachine::compileToNativeAssembly(llvm::Module* mod, const std::strin
 	target_machine->setAsmVerbosityDefault(true);
 
 	llvm::PassManager pm;
+#if TARGET_LLVM_VERSION < 36
 	pm.add(new llvm::DataLayout(*this->llvm_exec_engine->getDataLayout()));
+#endif
 	pm.add(new llvm::TargetLibraryInfo(llvm::Triple(this->triple)));
 
 	std::string err;
-#if USE_LLVM_3_4
+#if TARGET_LLVM_VERSION >= 36
+	std::error_code errcode;
+	llvm::raw_fd_ostream raw_out(filename.c_str(), errcode, llvm::sys::fs::F_None);
+	if(errcode)
+		throw Winter::BaseException("Error when opening file to print assembly to: " + errcode.message());
+#elif TARGET_LLVM_VERSION == 34
 	llvm::raw_fd_ostream raw_out(filename.c_str(), err, llvm::sys::fs::F_None);
 #else
 	llvm::raw_fd_ostream raw_out(filename.c_str(), err, 0);
 #endif
-	if (!err.empty())
+	if(!err.empty())
 		throw Winter::BaseException("Error when opening file to print assembly to: " + err);
 
 

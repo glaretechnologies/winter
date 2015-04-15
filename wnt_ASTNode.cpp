@@ -13,6 +13,7 @@ Copyright 2009 Nicholas Chapman
 #include "wnt_SourceBuffer.h"
 #include "wnt_Diagnostics.h"
 #include "wnt_RefCounting.h"
+#include "wnt_LLVMVersion.h"
 #include "VMState.h"
 #include "Value.h"
 #include "VMState.h"
@@ -32,8 +33,10 @@ Copyright 2009 Nicholas Chapman
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
+#if TARGET_LLVM_VERSION < 36
 #include "llvm/Analysis/Verifier.h"
 #include "llvm/ExecutionEngine/JIT.h"
+#endif
 #include "llvm/ExecutionEngine/Interpreter.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
 #include "llvm/Support/raw_ostream.h"
@@ -954,6 +957,10 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 	{
 		assert(this->bound_function);
 
+		// See if we should use the overriden argument values (used for function specialisation in array fold etc..)
+		if(!params.argument_values.empty())
+			return params.argument_values[this->bound_index];
+
 		//if(shouldPassByValue(*this->type()))
 		//{
 			// If the current function returns its result via pointer, then all args are offset by one.
@@ -1355,11 +1362,17 @@ bool MapLiteral::isConstant() const
 //----------------------------------------------------------------------------------------------
 
 
-ArrayLiteral::ArrayLiteral(const std::vector<ASTNodeRef>& elems, const SrcLocation& loc)
+ArrayLiteral::ArrayLiteral(const std::vector<ASTNodeRef>& elems, const SrcLocation& loc, bool has_int_suffix_, int int_suffix_)
 :	ASTNode(ArrayLiteralType, loc),
-	elements(elems)
+	elements(elems),
+	has_int_suffix(has_int_suffix_),
+	int_suffix(int_suffix_)
 {
-	//this->t
+	if(has_int_suffix && int_suffix <= 0)
+		throw BaseException("Array literal int suffix must be > 0." + errorContext(*this));
+	if(has_int_suffix && elems.size() != 1)
+		throw BaseException("Array literal with int suffix must have only one explicit elem." + errorContext(*this));
+
 	if(elems.empty())
 		throw BaseException("Array literal can't be empty." + errorContext(*this));
 }
@@ -1367,20 +1380,33 @@ ArrayLiteral::ArrayLiteral(const std::vector<ASTNodeRef>& elems, const SrcLocati
 
 TypeRef ArrayLiteral::type() const
 {
-	return new ArrayType(elements[0]->type(), elements.size());
+	if(has_int_suffix)
+		return new ArrayType(elements[0]->type(), this->int_suffix);
+	else
+		return new ArrayType(elements[0]->type(), elements.size());
 }
 
 
 ValueRef ArrayLiteral::exec(VMState& vmstate)
 {
-	vector<ValueRef> elem_values(elements.size());
-
-	for(unsigned int i=0; i<this->elements.size(); ++i)
+	if(has_int_suffix)
 	{
-		elem_values[i] = this->elements[i]->exec(vmstate);
-	}
+		ValueRef v = this->elements[0]->exec(vmstate);
 
-	return ValueRef(new ArrayValue(elem_values));
+		vector<ValueRef> elem_values(int_suffix, v);
+
+		return new ArrayValue(elem_values);
+	}
+	else
+	{
+
+		vector<ValueRef> elem_values(elements.size());
+
+		for(unsigned int i=0; i<this->elements.size(); ++i)
+			elem_values[i] = this->elements[i]->exec(vmstate);
+
+		return new ArrayValue(elem_values);
+	}
 }
 
 
@@ -1512,15 +1538,33 @@ llvm::Value* ArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 	// Check if all elements in the array are constant.  If so, use a constant global array.
 	if(this->areAllElementsConstant())
 	{
-		vector<llvm::Constant*> array_llvm_values(this->elements.size());
+		vector<llvm::Constant*> array_llvm_values;
 
-		for(size_t i=0; i<elements.size(); ++i)
+		if(has_int_suffix)
 		{
+			array_llvm_values.resize(int_suffix);
+
 			VMState vm_state; // hidden_voidptr_arg
 			vm_state.func_args_start.push_back(0);
 			vm_state.argument_stack.push_back(ValueRef(new VoidPtrValue(NULL)));
-			ValueRef value = this->elements[i]->exec(vm_state);
-			array_llvm_values[i] = value->getConstantLLVMValue(params, this->type().downcast<ArrayType>()->elem_type);
+			ValueRef value = this->elements[0]->exec(vm_state);
+			llvm::Constant* llvm_val = value->getConstantLLVMValue(params, this->type().downcast<ArrayType>()->elem_type);
+
+			for(size_t i=0; i<int_suffix; ++i)
+				array_llvm_values[i] = llvm_val;
+		}
+		else
+		{
+			array_llvm_values.resize(elements.size());
+
+			for(size_t i=0; i<elements.size(); ++i)
+			{
+				VMState vm_state; // hidden_voidptr_arg
+				vm_state.func_args_start.push_back(0);
+				vm_state.argument_stack.push_back(ValueRef(new VoidPtrValue(NULL)));
+				ValueRef value = this->elements[i]->exec(vm_state);
+				array_llvm_values[i] = value->getConstantLLVMValue(params, this->type().downcast<ArrayType>()->elem_type);
+			}
 		}
 
 		assert(this->type()->LLVMType(*params.context)->isArrayTy());
@@ -1563,25 +1607,53 @@ llvm::Value* ArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 	}
 
 	// For each element in the literal
-	for(unsigned int i=0; i<this->elements.size(); ++i)
+	if(has_int_suffix)
 	{
-		llvm::Value* element_ptr = params.builder->CreateStructGEP(array_addr, i);
-
-		if(this->elements[i]->type()->passByValue())
+		// NOTE: could optimise this more (share value etc..)
+		for(int i=0; i<int_suffix; ++i)
 		{
-			llvm::Value* element_value = this->elements[i]->emitLLVMCode(params);
+			llvm::Value* element_ptr = params.builder->CreateStructGEP(array_addr, i);
 
-			// Store the element in the array
-			params.builder->CreateStore(
-				element_value, // value
-				element_ptr // ptr
-			);
+			if(this->elements[0]->type()->passByValue())
+			{
+				llvm::Value* element_value = this->elements[0]->emitLLVMCode(params);
+
+				// Store the element in the array
+				params.builder->CreateStore(
+					element_value, // value
+					element_ptr // ptr
+				);
+			}
+			else
+			{
+				// Element is pass-by-pointer, for example a structure.
+				// So just emit code that will store it directly in the array.
+				this->elements[0]->emitLLVMCode(params, element_ptr);
+			}
 		}
-		else
+	}
+	else
+	{
+		for(unsigned int i=0; i<this->elements.size(); ++i)
 		{
-			// Element is pass-by-pointer, for example a structure.
-			// So just emit code that will store it directly in the array.
-			this->elements[i]->emitLLVMCode(params, element_ptr);
+			llvm::Value* element_ptr = params.builder->CreateStructGEP(array_addr, i);
+
+			if(this->elements[i]->type()->passByValue())
+			{
+				llvm::Value* element_value = this->elements[i]->emitLLVMCode(params);
+
+				// Store the element in the array
+				params.builder->CreateStore(
+					element_value, // value
+					element_ptr // ptr
+				);
+			}
+			else
+			{
+				// Element is pass-by-pointer, for example a structure.
+				// So just emit code that will store it directly in the array.
+				this->elements[i]->emitLLVMCode(params, element_ptr);
+			}
 		}
 	}
 
@@ -1601,7 +1673,7 @@ Reference<ASTNode> ArrayLiteral::clone()
 	std::vector<ASTNodeRef> elems(this->elements.size());
 	for(size_t i=0; i<elements.size(); ++i)
 		elems[i] = this->elements[i]->clone();
-	return ASTNodeRef(new ArrayLiteral(elems, srcLocation()));
+	return ASTNodeRef(new ArrayLiteral(elems, srcLocation(), has_int_suffix, int_suffix));
 }
 
 
@@ -1696,6 +1768,8 @@ std::string VectorLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 		assert(0);
 		return "";
 	}*/
+	// TODO: handle int suffix
+	assert(!has_int_suffix);
 	std::string s = "(float" + toString(elements.size()) + ")(";
 	for(size_t i=0; i<elements.size(); ++i)
 	{
@@ -3111,8 +3185,8 @@ ValueRef DivExpression::exec(VMState& vmstate)
 		if(!(a->type()->getType() == Type::IntType && b->type()->getType() == Type::IntType))
 			throw BaseException("invalid types for div op.");
 
-		const int a_int_val = static_cast<IntValue*>(aval.getPointer())->value;
-		const int b_int_val = static_cast<IntValue*>(bval.getPointer())->value;
+		const int64 a_int_val = static_cast<IntValue*>(aval.getPointer())->value;
+		const int64 b_int_val = static_cast<IntValue*>(bval.getPointer())->value;
 
 		if(b_int_val == 0)
 			throw BaseException("Divide by zero.");
@@ -3246,7 +3320,7 @@ void DivExpression::checkNoOverflow(TraversalPayload& payload, std::vector<ASTNo
 
 			assert(dynamic_cast<IntValue*>(retval.getPointer()));
 
-			const int numerator_val = static_cast<IntValue*>(retval.getPointer())->value;
+			const int64 numerator_val = static_cast<IntValue*>(retval.getPointer())->value;
 
 			if(numerator_val != std::numeric_limits<int32>::min())
 				return; // Success
@@ -3263,7 +3337,7 @@ void DivExpression::checkNoOverflow(TraversalPayload& payload, std::vector<ASTNo
 
 			assert(dynamic_cast<IntValue*>(retval.getPointer()));
 
-			const int divisor_val = static_cast<IntValue*>(retval.getPointer())->value;
+			const int64 divisor_val = static_cast<IntValue*>(retval.getPointer())->value;
 
 			if(divisor_val != -1)
 				return; // Success
@@ -3367,7 +3441,7 @@ void DivExpression::checkNoZeroDivide(TraversalPayload& payload, std::vector<AST
 
 			assert(dynamic_cast<IntValue*>(retval.getPointer()));
 
-			const int divisor_val = static_cast<IntValue*>(retval.getPointer())->value;
+			const int64 divisor_val = static_cast<IntValue*>(retval.getPointer())->value;
 
 			if(divisor_val == 0)
 			{

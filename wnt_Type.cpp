@@ -400,9 +400,6 @@ bool ArrayType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) co
 
 llvm::Type* ArrayType::LLVMType(llvm::LLVMContext& context) const
 {
-	// Since Array is pass-by-pointer, return the element value type here.
-	// Then Array will be passed as pointer to this type.
-	//return this->t->LLVMType(context); //pointerToVoidLLVMType(context);
 	return llvm::ArrayType::get(
 		this->elem_type->LLVMType(context), // Element type
 		this->num_elems // Num elements

@@ -23,8 +23,6 @@ Generated at 2011-04-25 19:15:40 +0100
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
-#include "llvm/Analysis/Verifier.h"
-#include "llvm/ExecutionEngine/JIT.h"
 #include "llvm/ExecutionEngine/Interpreter.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
 #include "llvm/Support/raw_ostream.h"
@@ -972,16 +970,25 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 			// If we haven't computed the result, but are merely returning it, then need to copy the arg to return ptr.
 			if(true) // this->body->nodeType() == ASTNode::VariableASTNodeType || this->body->nodeType() == ASTNode::IfExpressionType)
 			{
-				// Load value
-				llvm::Value* val = params.builder->CreateLoad(
-					body_code
-				);
+				if(return_val_ptr != body_code)
+				//if(this->returnType()->getType() == Type::ArrayTypeType)
+				//{
+				//	llvm::Value* size = llvm::ConstantInt::get(*params.context, llvm::APInt(32, sizeof(int) * state_type.downcast<ArrayType>()->num_elems, true)); // TEMP HACK
+				//	params.builder->CreateMemCpy(return_val_ptr, body_code, size, 4);
+				//}
+				//else
+				{
+					// Load value
+					llvm::Value* val = params.builder->CreateLoad(
+						body_code
+					);
 
-				// And store at return_val_ptr
-				params.builder->CreateStore(
-					val, // value
-					return_val_ptr // ptr
-				);
+					// And store at return_val_ptr
+					params.builder->CreateStore(
+						val, // value
+						return_val_ptr // ptr
+					);
+				}
 
 				/*if(this->body->type()->getType() == Type::ArrayTypeType)
 				{

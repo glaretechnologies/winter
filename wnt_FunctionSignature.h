@@ -72,5 +72,4 @@ inline bool operator < (const FunctionSignature& a, const FunctionSignature& b)
 }
 
 
-} //end namespace Lang
-
+} //end namespace Winter

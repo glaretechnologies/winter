@@ -11,8 +11,6 @@ Generated at Wed Oct 20 15:22:37 +1300 2010
 #pragma warning(push, 0) // Disable warnings
 #endif
 #include "llvm/IR/Module.h"
-#include "llvm/Analysis/Verifier.h"
-#include "llvm/PassManager.h"
 #include "llvm/PassManager.h"
 #include <llvm/IR/DataLayout.h>
 #include "llvm/Transforms/Scalar.h"

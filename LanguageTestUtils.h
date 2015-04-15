@@ -484,12 +484,13 @@ static void testMainInteger(const std::string& src, int target_return_val)
 }
 
 
-static void testMainIntegerArg(const std::string& src, int x, int target_return_val)
+static void testMainIntegerArg(const std::string& src, int x, int target_return_val, bool allow_unsafe_operations = false)
 {
 	std::cout << "===================== Winter testMainIntegerArg() =====================" << std::endl;
 	try
 	{
 		VMConstructionArgs vm_args;
+		vm_args.allow_unsafe_operations = allow_unsafe_operations;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
 
 		const FunctionSignature mainsig("main", std::vector<TypeRef>(1, new Int()));
@@ -1330,6 +1331,63 @@ static void testFloat8Struct(const std::string& src, const Float8Struct& a, cons
 			std::cerr << "Test failed: jitted_result != target_return_val  " << std::endl;
 			assert(0);
 			exit(1);
+		}
+	}
+	catch(Winter::BaseException& e)
+	{
+		std::cerr << e.what() << std::endl;
+		assert(0);
+		exit(1);
+	}
+}
+
+
+static void testIntArray(const std::string& src, const int* a, const int* b, const int* target_return_val, size_t len, bool allow_unsafe_operations = false)
+{
+	std::cout << "===================== Winter testIntArray() =====================" << std::endl;
+	try
+	{
+		VMConstructionArgs vm_args;
+		vm_args.allow_unsafe_operations = allow_unsafe_operations;
+		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
+
+		// Get main function
+		const FunctionSignature mainsig(
+			"main", 
+			std::vector<TypeRef>(2, new ArrayType(new Int(), len)) // 2 float arrays of len elems each
+		);
+
+		vm_args.entry_point_sigs.push_back(mainsig);
+
+		VirtualMachine vm(vm_args);
+
+		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
+
+		// __cdecl
+		void (WINTER_JIT_CALLING_CONV *f)(int*, const int*, const int*, void*) = 
+			(void (WINTER_JIT_CALLING_CONV *)(int*, const int*, const int*, void*))vm.getJittedFunction(mainsig);
+
+		// Call the JIT'd function
+		js::Vector<int, 32> jitted_result(len);
+		int* jitted_result_ptr = &jitted_result[0];
+
+		TestEnv test_env;
+		test_env.val = 10;
+
+		f(jitted_result_ptr, a, b, &test_env);
+
+		// Check JIT'd result.
+		for(size_t i=0; i<len; ++i)
+		{
+			if(jitted_result[i] != target_return_val[i])
+			{
+				std::cerr << "Test failed: jitted_result[i] != target_return_val[i]  " << std::endl;
+				std::cerr << "i: " << i << std::endl;
+				std::cerr << "jitted_result[i]: " << jitted_result[i] << std::endl;
+				std::cerr << "target_return_val[i]: " << target_return_val[i] << std::endl;
+				assert(0);
+				exit(1);
+			}
 		}
 	}
 	catch(Winter::BaseException& e)

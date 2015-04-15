@@ -60,6 +60,32 @@ private:
 };
 
 
+class UpdateElementBuiltInFunc : public BuiltInFunctionImpl
+{
+public:
+	/*
+		def update(CollectionType c, int index, T newval) CollectionType
+
+
+		is equivalent to 
+
+		def update(CollectionType c, int index, T newval) CollectionType
+			new_c = clone(c)
+			new_c[index] = newval
+			return new_c
+		end
+	*/
+	UpdateElementBuiltInFunc(const TypeRef& collection_type/*, const TypeRef& value_type*/);
+	virtual ~UpdateElementBuiltInFunc(){}
+
+	virtual ValueRef invoke(VMState& vmstate);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+
+	TypeRef collection_type; // Should be one of array, vector, or tuple
+	//TypeRef value_type; // T
+};
+
+
 class GetTupleElementBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
@@ -109,17 +135,39 @@ class ArrayFoldBuiltInFunc : public BuiltInFunctionImpl
 public:
 	/*
 		suppose T = array_elem_type
+		
 		then fold is
-		fold(function<T, T, T> func, array<T> array, T initial val) T
 
+		fold(function<State, T, State> f, array<T> array, State initial_state) State
+
+		Where f is
+		def f(State current_state, T array_element) : State
+
+		and returns the new state.
+
+
+		Fold is equivalent to:
+
+		State state = initial_state;
+		for each element elem in array:
+		{
+			state = f(state, elem);
+		}
 	*/
-	ArrayFoldBuiltInFunc(TypeRef& T_) : T(T_) {}
+	ArrayFoldBuiltInFunc(const Reference<Function>& func_type_, const Reference<ArrayType>& array_type_, const TypeRef& state_type_);
 	virtual ~ArrayFoldBuiltInFunc(){}
+
+	// Specialise for a particular first argument.
+	void specialiseForFunctionArg(FunctionDefinition* f);
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
-	TypeRef T;
+	Reference<Function> func_type;
+	Reference<ArrayType> array_type;
+	TypeRef state_type;
+
+	FunctionDefinition* specialised_f;
 };
 
 
@@ -211,7 +259,7 @@ public:
 	iteration = 0;
 	while(1)
 	{
-		res = iterate(state, iteration);
+		res = f(state, iteration);
 		if(res.second == false)
 			return res.first;
 		iteration++;

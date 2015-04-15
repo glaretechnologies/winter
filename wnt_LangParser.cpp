@@ -1158,14 +1158,24 @@ ASTNodeRef LangParser::parseArrayOrVectorLiteralOrArraySubscriptExpression(const
 	const std::string id = parseIdentifier("square bracket literal suffix", p);
 	if(hasPrefix(id, "a"))
 	{
-		return ASTNodeRef(new ArrayLiteral(elems, loc));
+		int int_suffix = 0;
+		bool has_int_suffix = false;
+		Parser temp_p(id.c_str(), (int)id.size());
+		temp_p.advance(); // Advance past 'a'
+		if(!temp_p.eof())
+		{
+			has_int_suffix = true;
+			if(!temp_p.parseInt(int_suffix))
+				throw LangParserExcep("Invalid square bracket literal suffix '" + id + "'.");
+		}
+		return ASTNodeRef(new ArrayLiteral(elems, loc, has_int_suffix, int_suffix));
 	}
 	else if(hasPrefix(id, "v"))
 	{
 		int int_suffix = 0;
 		bool has_int_suffix = false;
 		Parser temp_p(id.c_str(), (int)id.size());
-		temp_p.advance(); // Advance past v
+		temp_p.advance(); // Advance past 'v'
 		if(!temp_p.eof())
 		{
 			has_int_suffix = true;

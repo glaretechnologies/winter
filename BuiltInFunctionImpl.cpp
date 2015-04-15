@@ -5,7 +5,9 @@
 #include "Value.h"
 #include "wnt_ASTNode.h"
 #include "wnt_FunctionDefinition.h"
+#include "wnt_FunctionExpression.h"
 #include "wnt_RefCounting.h"
+#include "wnt_LLVMVersion.h"
 #include <vector>
 #include "LLVMTypeUtils.h"
 #include "utils/PlatformUtils.h"
@@ -18,8 +20,10 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
+#if TARGET_LLVM_VERSION <= 34
 #include "llvm/Analysis/Verifier.h"
 #include "llvm/ExecutionEngine/JIT.h"
+#endif
 #include "llvm/ExecutionEngine/Interpreter.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
 #include "llvm/Support/raw_ostream.h"
@@ -303,6 +307,89 @@ llvm::Value* GetField::emitLLVMCode(EmitLLVMCodeParams& params) const
 }
 
 
+//------------------------------------------------------------------------------------
+
+
+UpdateElementBuiltInFunc::UpdateElementBuiltInFunc(const TypeRef& collection_type_)
+:	collection_type(collection_type_)
+{}
+
+
+// def update(CollectionType c, int index, T newval) CollectionType
+ValueRef UpdateElementBuiltInFunc::invoke(VMState& vmstate)
+{
+	const size_t func_args_start = vmstate.func_args_start.back();
+
+	const Value* collection = vmstate.argument_stack[func_args_start].getPointer();
+
+	assert(dynamic_cast<const IntValue*>(vmstate.argument_stack[func_args_start + 1].getPointer()));
+	const IntValue* inv_val = static_cast<const IntValue*>(vmstate.argument_stack[func_args_start + 1].getPointer());
+	const int64 index = inv_val->value;
+
+	const ValueRef newval = vmstate.argument_stack[func_args_start + 2];
+
+	if(collection_type->getType() == Type::ArrayTypeType)
+	{
+		assert(dynamic_cast<const ArrayValue*>(collection));
+		const ArrayValue* array_val = static_cast<const ArrayValue*>(collection);
+
+		assert(index >= 0 && index < array_val->e.size());
+
+		ValueRef new_collection = array_val->clone();
+		static_cast<ArrayValue*>(new_collection.getPointer())->e[index] = newval;
+
+		return new_collection;
+	}
+	else
+	{
+		// TODO: handle other types.
+		assert(0);
+		return NULL;
+	}
+}
+
+
+// def update(CollectionType c, int index, T newval) CollectionType
+llvm::Value* UpdateElementBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	if(collection_type->getType() == Type::ArrayTypeType)
+	{
+		// Pointer to memory for return value will be 0th argument.
+		llvm::Value* return_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+
+		// Pointer to structure will be in 1st argument.
+		llvm::Value* struct_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
+
+		// Index will be in 2nd argument.
+		llvm::Value* index = LLVMTypeUtils::getNthArg(params.currently_building_func, 2);
+
+		// New val will be in 3rd argument.  TEMP: assuming pass by value.
+		llvm::Value* newval = LLVMTypeUtils::getNthArg(params.currently_building_func, 3);
+
+
+		// Copy old collection to new collection
+//		llvm::Value* collection_val = params.builder->CreateLoad(struct_ptr, "collection val");
+//		params.builder->CreateStore(collection_val, return_ptr);
+	
+		llvm::Value* size = llvm::ConstantInt::get(*params.context, llvm::APInt(32, sizeof(int) * collection_type.downcast<ArrayType>()->num_elems, true)); // TEMP HACK
+		params.builder->CreateMemCpy(return_ptr, struct_ptr, size, 4);
+
+		// Update element with new val
+		vector<llvm::Value*> indices(2);
+		indices[0] = llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0)); // get the zero-th array
+		indices[1] = index; // get the indexed element in the array
+		llvm::Value* new_elem_ptr = params.builder->CreateInBoundsGEP(return_ptr, indices, "new elem ptr");
+
+		params.builder->CreateStore(newval, new_elem_ptr);
+	}
+
+	return NULL;
+}
+
+
+//------------------------------------------------------------------------------------
+
+
 ValueRef GetTupleElementBuiltInFunc::invoke(VMState& vmstate)
 {
 	const size_t func_args_start = vmstate.func_args_start.back();
@@ -377,6 +464,9 @@ llvm::Value* GetTupleElementBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 		}
 	}
 }
+
+
+//------------------------------------------------------------------------------------
 
 
 ValueRef GetVectorElement::invoke(VMState& vmstate)
@@ -554,9 +644,21 @@ llvm::Value* ArrayMapBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 //------------------------------------------------------------------------------------
 
 
+ArrayFoldBuiltInFunc::ArrayFoldBuiltInFunc(const Reference<Function>& func_type_, const Reference<ArrayType>& array_type_, const TypeRef& state_type_)
+:	func_type(func_type_), array_type(array_type_), state_type(state_type_)
+{}
+
+
+void ArrayFoldBuiltInFunc::specialiseForFunctionArg(FunctionDefinition* f)
+{
+	specialised_f = f;
+}
+
+
 ValueRef ArrayFoldBuiltInFunc::invoke(VMState& vmstate)
 {
-	// fold(function<T, T, T> func, array<T> array, T initial val) T
+	// fold(function<State, T, State> f, array<T> array, State initial_state) State
+
 	const FunctionValue* f = dynamic_cast<const FunctionValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 	const ArrayValue* arr = dynamic_cast<const ArrayValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
 	const ValueRef initial_val = vmstate.argument_stack[vmstate.func_args_start.back() + 2];
@@ -577,7 +679,6 @@ ValueRef ArrayFoldBuiltInFunc::invoke(VMState& vmstate)
 		vmstate.argument_stack.pop_back(); // Pop Value arg
 		vmstate.func_args_start.pop_back();
 
-		//delete running_val;
 		running_val = new_running_val;
 	}
 
@@ -585,10 +686,351 @@ ValueRef ArrayFoldBuiltInFunc::invoke(VMState& vmstate)
 }
 
 
+// fold(function<State, T, State> f, array<T> array, State initial_state) State
 llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
-	assert(0);
-	return NULL;
+	// Get argument pointers/values
+	llvm::Value* return_ptr = NULL;
+	llvm::Value* function;
+	llvm::Value* array_arg;
+	llvm::Value* initial_state_ptr_or_value;
+
+	if(state_type->passByValue())
+	{
+		function = LLVMTypeUtils::getNthArg(params.currently_building_func, 0); // Pointer to function
+		array_arg = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
+		initial_state_ptr_or_value = LLVMTypeUtils::getNthArg(params.currently_building_func, 2); // Pointer to, or value of initial state
+	}
+	else
+	{
+		return_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0); // Pointer to result structure
+		function = LLVMTypeUtils::getNthArg(params.currently_building_func, 1); // Pointer to function
+		array_arg = LLVMTypeUtils::getNthArg(params.currently_building_func, 2);
+		initial_state_ptr_or_value = LLVMTypeUtils::getNthArg(params.currently_building_func, 3); // Pointer to, or value of initial state
+	}
+
+
+	// Emit the alloca in the entry block for better code-gen.
+	// We will emit the alloca at the start of the block, so that it doesn't go after any terminator instructions already created which have to be at the end of the block.
+	llvm::IRBuilder<> entry_block_builder(&params.currently_building_func->getEntryBlock(), params.currently_building_func->getEntryBlock().getFirstInsertionPt());
+
+	//=======================================Begin specialisation ====================================================
+
+	// TODO: check args to update as well to make sure it is bound to correct update etc..
+	// Also check first arg of update is bound to first arg to specialised_f.
+	if(specialised_f && specialised_f->body->nodeType() == ASTNode::FunctionExpressionType && specialised_f->body.downcast<FunctionExpression>()->function_name == "update")
+	{
+		llvm::Value* running_state_alloca = entry_block_builder.CreateAlloca(
+			state_type->LLVMType(*params.context), // State
+			llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1, true)), // num elems
+			"Running state"
+		);
+
+		// Copy initial state to running state alloca
+		if(state_type->passByValue())
+		{
+			params.builder->CreateStore(initial_state_ptr_or_value, running_state_alloca);
+		}
+		else
+		{
+			if(state_type->getType() == Type::ArrayTypeType)
+			{
+				llvm::Value* size = llvm::ConstantInt::get(*params.context, llvm::APInt(32, sizeof(int) * state_type.downcast<ArrayType>()->num_elems, true)); // TEMP HACK
+				params.builder->CreateMemCpy(running_state_alloca, initial_state_ptr_or_value, size, 4);
+			}
+			else
+			{
+				params.builder->CreateStore(params.builder->CreateLoad(initial_state_ptr_or_value), running_state_alloca);
+			}
+		}
+
+		// Make the new basic block for the loop header, inserting after current block.
+		llvm::Function* TheFunction = params.builder->GetInsertBlock()->getParent();
+		llvm::BasicBlock* PreheaderBB = params.builder->GetInsertBlock();
+		llvm::BasicBlock* LoopBB = llvm::BasicBlock::Create(*params.context, "loop", TheFunction);
+  
+		// Insert an explicit fall through from the current block to the LoopBB.
+		params.builder->CreateBr(LoopBB);
+
+		// Start insertion in LoopBB.
+		params.builder->SetInsertPoint(LoopBB);
+
+
+		// Create loop index (i) variable phi node
+		llvm::PHINode* loop_index_var = params.builder->CreatePHI(llvm::Type::getInt32Ty(*params.context), 2, "loop_index_var");
+		llvm::Value* initial_loop_index_value = llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0)); // Initial induction loop index value: Zero
+		loop_index_var->addIncoming(initial_loop_index_value, PreheaderBB);
+
+
+		//=========================== Emit the body of the loop. =========================
+
+		// fold(function<State, T, State> f, array<T> array, State initial_state) State
+
+		//TEMP: assuming array elements (T) are pass by value.
+		assert(array_type->elem_type->passByValue());
+		vector<llvm::Value*> indices(2);
+		indices[0] = llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0)); // get the zero-th array
+		indices[1] = loop_index_var; // get the indexed element in the array
+
+		llvm::Value* array_elem_ptr = params.builder->CreateInBoundsGEP(array_arg, indices, "array elem ptr");
+		llvm::Value* array_elem = params.builder->CreateLoad(array_elem_ptr, "array elem");
+
+		// Set up params.argument_values to override the existing values.
+		params.argument_values.resize(2);
+		params.argument_values[0] = running_state_alloca; // current state
+		params.argument_values[1] = array_elem; // array element
+
+
+		// Instead of calling function 'f', just emit f's body code, without the update.
+		// so update(current_state, index, new_value)
+		// becomes
+		// running_state[index] = new_value
+		FunctionExpressionRef update_func_expr = specialised_f->body.downcast<FunctionExpression>();
+		ASTNodeRef index_expr = update_func_expr->argument_expressions[1];
+		ASTNodeRef new_value_expr = update_func_expr->argument_expressions[2];
+
+		llvm::Value* index_llvm_val = index_expr->emitLLVMCode(params);
+		llvm::Value* new_value_llvm_val = new_value_expr->emitLLVMCode(params); // TEMP: assuming pass by value
+
+		// Store the new value to running_state_alloca at the correct index
+		indices[1] = index_llvm_val;
+		llvm::Value* target_elem_ptr = params.builder->CreateInBoundsGEP(running_state_alloca, indices, "target elem ptr");
+
+		params.builder->CreateStore(new_value_llvm_val, target_elem_ptr);
+
+
+		params.argument_values.resize(0); // Reset
+
+
+		// Create increment of loop index
+		llvm::Value* step_val = llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1));
+		llvm::Value* next_var = params.builder->CreateAdd(loop_index_var, step_val, "next_var");
+
+		// Compute the end condition.
+		llvm::Value* end_value = llvm::ConstantInt::get(*params.context, llvm::APInt(32, array_type->num_elems));
+  
+		llvm::Value* end_cond = params.builder->CreateICmpNE(
+			end_value, 
+			next_var,
+			"loopcond"
+		);
+  
+		// Create the "after loop" block and insert it.
+		llvm::BasicBlock* LoopEndBB = params.builder->GetInsertBlock();
+		llvm::BasicBlock* AfterBB = llvm::BasicBlock::Create(*params.context, "afterloop", TheFunction);
+  
+		// Insert the conditional branch into the end of LoopEndBB.
+		params.builder->CreateCondBr(end_cond, LoopBB, AfterBB);
+  
+		// Any new code will be inserted in AfterBB.
+		params.builder->SetInsertPoint(AfterBB);
+  
+		// Add a new entry to the PHI node for the backedge.
+		loop_index_var->addIncoming(next_var, LoopEndBB);
+	
+		
+		if(state_type->passByValue())
+		{
+			// The running state needs to be loaded from running_state_alloca and returned directly.
+			return params.builder->CreateLoad(running_state_alloca);
+		}
+		else
+		{
+			// Finally load and store the running state value to the SRET return ptr.
+			if(state_type->getType() == Type::ArrayTypeType)
+			{
+				llvm::Value* size = llvm::ConstantInt::get(*params.context, llvm::APInt(32, sizeof(int) * state_type.downcast<ArrayType>()->num_elems, true)); // TEMP HACK
+				params.builder->CreateMemCpy(return_ptr, running_state_alloca, size, 4);
+				return return_ptr;
+			}
+			else
+			{
+				params.builder->CreateStore(params.builder->CreateLoad(running_state_alloca), return_ptr);
+				return return_ptr;
+			}
+		}
+	}
+	//======================================= End specialisation ====================================================
+
+
+	// Allocate space on stack for the running state, if the state type is not pass-by-value.
+	llvm::Value* new_state_alloca = NULL;
+	llvm::Value* running_state_alloca = NULL;
+	//if(!state_type->passByValue())
+	{
+		new_state_alloca = entry_block_builder.CreateAlloca(
+			state_type->LLVMType(*params.context), // State
+			llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1, true)), // num elems
+			"New running state"
+		);
+
+		running_state_alloca = entry_block_builder.CreateAlloca(
+			state_type->LLVMType(*params.context), // State
+			llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1, true)), // num elems
+			"Running state"
+		);
+
+		if(state_type->passByValue())
+		{
+			params.builder->CreateStore(initial_state_ptr_or_value, new_state_alloca); // running_state_alloca);
+		}
+		else
+		{
+			// Load and store initial state in new state // running state
+			if(state_type->getType() == Type::ArrayTypeType)
+			{
+				llvm::Value* size = llvm::ConstantInt::get(*params.context, llvm::APInt(32, sizeof(int) * state_type.downcast<ArrayType>()->num_elems, true)); // TEMP HACK
+				//params.builder->CreateMemCpy(running_state_alloca, initial_state_ptr_or_value, size, 4);
+				params.builder->CreateMemCpy(new_state_alloca, initial_state_ptr_or_value, size, 4);
+			}
+			else
+			{
+				llvm::Value* initial_state = params.builder->CreateLoad(initial_state_ptr_or_value);
+				params.builder->CreateStore(initial_state, new_state_alloca); // running_state_alloca);
+			}
+		}
+	}
+	
+
+	// Make the new basic block for the loop header, inserting after current
+	// block.
+	llvm::Function* TheFunction = params.builder->GetInsertBlock()->getParent();
+	llvm::BasicBlock* PreheaderBB = params.builder->GetInsertBlock();
+	llvm::BasicBlock* LoopBB = llvm::BasicBlock::Create(*params.context, "loop", TheFunction);
+  
+	// Insert an explicit fall through from the current block to the LoopBB.
+	params.builder->CreateBr(LoopBB);
+
+	// Start insertion in LoopBB.
+	params.builder->SetInsertPoint(LoopBB);
+
+	// Create running state value variable phi node
+	/*llvm::PHINode* running_state_value = NULL;
+	if(state_type->passByValue())
+	{
+		running_state_value = params.builder->CreatePHI(state_type->LLVMType(*params.context), 2, "running_state_value");
+		running_state_value->addIncoming(initial_state_ptr_or_value, PreheaderBB);
+	}*/
+  
+	
+
+	// Create loop index (i) variable phi node
+	llvm::PHINode* loop_index_var = params.builder->CreatePHI(llvm::Type::getInt32Ty(*params.context), 2, "loop_index_var");
+	llvm::Value* initial_loop_index_value = llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0)); // Initial induction loop index value: Zero
+	loop_index_var->addIncoming(initial_loop_index_value, PreheaderBB);
+
+
+	//=========================== Emit the body of the loop. =========================
+	// For now, the state at the beginning and end of the loop will be in new_state_alloca.
+
+	// fold(function<State, T, State> f, array<T> array, State initial_state) State
+
+	//TEMP: assuming array elements (T) are pass by value.
+	assert(array_type->elem_type->passByValue());
+	vector<llvm::Value*> indices(2);
+	indices[0] = llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0)); // get the zero-th array
+	indices[1] = loop_index_var; // get the indexed element in the array
+
+	llvm::Value* array_elem_ptr = params.builder->CreateInBoundsGEP(array_arg, indices, "array elem ptr");
+	llvm::Value* array_elem = params.builder->CreateLoad(array_elem_ptr, "array elem");
+
+	// Copy the state from new_state_alloca to running_state_alloca
+	if(state_type->getType() == Type::ArrayTypeType)
+	{
+		llvm::Value* size = llvm::ConstantInt::get(*params.context, llvm::APInt(32, sizeof(int) * state_type.downcast<ArrayType>()->num_elems, true)); // TEMP HACK
+		params.builder->CreateMemCpy(running_state_alloca, new_state_alloca, size, 4);
+	}
+	else
+	{
+		llvm::Value* state = params.builder->CreateLoad(new_state_alloca); // Load the state from new_state_alloca
+		params.builder->CreateStore(state, running_state_alloca); // Store the state in running_state_alloca
+	}
+
+
+	if(state_type->passByValue())
+	{
+		// Load running state
+		llvm::Value* running_state_value = params.builder->CreateLoad(running_state_alloca);
+
+		// Call function on element
+		llvm::Value* next_running_state_value = params.builder->CreateCall2(function, running_state_value, array_elem);
+
+		// Store new value in running_state_alloca
+		params.builder->CreateStore(next_running_state_value, new_state_alloca); // running_state_alloca);
+	}
+	else
+	{
+		// Call function on element
+		params.builder->CreateCall3(function, 
+			new_state_alloca, // SRET return value arg
+			running_state_alloca, // current state
+			array_elem // array element
+		);
+
+		// Copy the state from new_state_alloca to running_state_alloca
+		//if(state_type->getType() == Type::ArrayTypeType)
+		//{
+		//	llvm::Value* size = llvm::ConstantInt::get(*params.context, llvm::APInt(32, sizeof(int) * state_type.downcast<ArrayType>()->num_elems, true)); // TEMP HACK
+		//	params.builder->CreateMemCpy(running_state_alloca, new_state_alloca, size, 4);
+		//}
+		//else
+		//{
+		//	llvm::Value* state = params.builder->CreateLoad(new_state_alloca); // Load the state from new_state_alloca
+		//	params.builder->CreateStore(state, running_state_alloca); // Store the state in running_state_alloca
+		//}
+	}
+
+	// Create increment of loop index
+	llvm::Value* step_val = llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1));
+	llvm::Value* next_var = params.builder->CreateAdd(loop_index_var, step_val, "next_var");
+
+	// Compute the end condition.
+	llvm::Value* end_value = llvm::ConstantInt::get(*params.context, llvm::APInt(32, array_type->num_elems));
+  
+	llvm::Value* end_cond = params.builder->CreateICmpNE(
+		end_value, 
+		next_var,
+		"loopcond"
+	);
+
+	//=========================== End loop body =========================
+  
+	// Create the "after loop" block and insert it.
+	llvm::BasicBlock* LoopEndBB = params.builder->GetInsertBlock();
+	llvm::BasicBlock* AfterBB = llvm::BasicBlock::Create(*params.context, "afterloop", TheFunction);
+  
+	// Insert the conditional branch into the end of LoopEndBB.
+	params.builder->CreateCondBr(end_cond, LoopBB, AfterBB);
+  
+	// Any new code will be inserted in AfterBB.
+	params.builder->SetInsertPoint(AfterBB);
+  
+	// Add a new entry to the PHI node for the backedge.
+	loop_index_var->addIncoming(next_var, LoopEndBB);
+
+
+	// Finally load and store the running state value to the SRET return ptr.
+	if(state_type->passByValue())
+	{
+		llvm::Value* running_state = params.builder->CreateLoad(new_state_alloca);// running_state_alloca);
+		return running_state;
+	}
+	else
+	{
+		// Copy from new_state_alloca to return_ptr
+		if(state_type->getType() == Type::ArrayTypeType)
+		{
+			llvm::Value* size = llvm::ConstantInt::get(*params.context, llvm::APInt(32, sizeof(int) * state_type.downcast<ArrayType>()->num_elems, true)); // TEMP HACK
+			params.builder->CreateMemCpy(return_ptr, new_state_alloca/*running_state_alloca*/, size, 4);
+			return return_ptr;
+		}
+		else
+		{
+			llvm::Value* running_state = params.builder->CreateLoad(new_state_alloca/*running_state_alloca*/);
+			params.builder->CreateStore(running_state, return_ptr);
+			return return_ptr;
+		}
+	}
 }
 
 
@@ -1346,7 +1788,11 @@ llvm::Value* DotProductBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) con
 		vector<llvm::Value*> args;
 		args.push_back(a);
 		args.push_back(b);
+#if TARGET_LLVM_VERSION <= 34
 		args.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 255))); // SSE DPPS control bits
+#else
+		args.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(8, 255))); // SSE DPPS control bits
+#endif
 
 		llvm::Function* dot_func = llvm::Intrinsic::getDeclaration(params.module, llvm::Intrinsic::x86_sse41_dpps);
 

@@ -61,6 +61,81 @@ void LanguageTests::run()
 //	ProgramBuilder::test();
 	Timer timer;
 
+
+	// ===================================================================
+	// Test update()
+	// update(CollectionType c, int index, T newval) CollectionType
+	// ===================================================================
+
+	//testMainIntegerArg("def main(int x) int :  elem(update([0, 0]a, 0, x), 0)", 10, 10);
+
+	// ===================================================================
+	// Test fold built-in function
+	// fold(function<State, T, State> f, array<T> array, State initial_state) State
+	// ===================================================================
+
+	testMainIntegerArg("															\n\
+		def f(int current_state, int elem) int :									\n\
+			current_state + elem													\n\
+		def main(int x) int :  fold(f, [0, 1, 2, 3, 4, 5]a, x)", 10, 25);
+		
+
+	// Test fold built-in function with update
+	testMainIntegerArg("															\n\
+		def f(array<int, 16> current_state, int elem) array<int, 16> :				\n\
+			let																		\n\
+				old_count = elem(current_state, elem)								\n\
+				new_count = old_count + 1											\n\
+			in																		\n\
+				update(current_state, elem, new_count)								\n\
+		def main(int x) int :  elem(fold(f, [0, 0, 1, 2]a, [0]a16), 1)", 10, 1,
+		true // allow_unsafe_operations
+	);
+
+
+	// If first arg to fold() is bound to global def (f), and bound function f has update() as 'last' function call,
+	// and fist arg to update() is first arg to f, then can transform to just setting element on running state.
+
+	// Test fold built-in function with update
+	{
+		const int len = 256;
+		js::Vector<int, 32> vals(len, 0);
+		js::Vector<int, 32> b(len, 0);
+		js::Vector<int, 32> target_results(len, 0);
+		target_results[0] = len;
+
+		testIntArray("																\n\
+		def f(array<int, 256> counts, int x) array<int, 256> :			\n\
+				update(counts, x, elem(counts, x) + 1)			\n\
+		def main(array<int, 256> vals, array<int, 256> initial_counts) array<int, 256>:  fold(f, vals, initial_counts)",
+			&vals[0], &b[0], &target_results[0], vals.size(),
+			true // allow_unsafe_operations
+		);
+	}
+
+	
+	// Test fold built-in function with update
+	{
+		const int len = 256;
+		js::Vector<int, 32> vals(len, 0);
+		js::Vector<int, 32> b(len, 0);
+		js::Vector<int, 32> target_results(len, 0);
+		target_results[0] = len;
+
+		testIntArray("																\n\
+		def f(array<int, 256> current_state, int elem) array<int, 256> :			\n\
+			let																		\n\
+				old_count = elem(current_state, elem)								\n\
+				new_count = old_count + 1											\n\
+			in																		\n\
+				update(current_state, elem, new_count)								\n\
+		def main(array<int, 256> vals, array<int, 256> b) array<int, 256>:  fold(f, vals, b)",
+			&vals[0], &b[0], &target_results[0], vals.size(),
+			true // allow_unsafe_operations
+		);
+	}
+
+
 	// ===================================================================
 	// Test iterate built-in function
 	// ===================================================================

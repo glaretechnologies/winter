@@ -499,7 +499,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 		{
 			// There is a problem with LLVM 3.3 and earlier with the pow intrinsic getting turned into exp2f() when the first argument is 2.
 			// So for now just use our own pow() external function.
-#if USE_LLVM_3_4
+#if TARGET_LLVM_VERSION >= 34
 			if(sig.name == "pow")
 			{
 				vector<FunctionDefinition::FunctionArg> args(2);
@@ -773,7 +773,71 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 		this->sig_to_function_map.insert(std::make_pair(sig, def));
 		return def;
 	}
+	if(sig.name == "fold" && sig.param_types.size() == 3 && sig.param_types[0]->getType() == Type::FunctionType && sig.param_types[1]->getType() == Type::ArrayTypeType)
+	{
+		const Reference<Function> func_type = sig.param_types[0].downcast<Function>();
+		const Reference<ArrayType> array_type = sig.param_types[1].downcast<ArrayType>();
+		const TypeRef state_type = sig.param_types[2];
+			
+		// TODO: typecheck elems and function arg and return types
 
+		vector<FunctionDefinition::FunctionArg> args(3);
+		args[0].type = func_type;
+		args[0].name = "f";
+		args[1].type = array_type;
+		args[1].name = "array";
+		args[2].type = state_type;
+		args[2].name = "initial_state";
+
+		FunctionDefinitionRef def = new FunctionDefinition(
+			SrcLocation::invalidLocation(),
+			"fold",
+			args,
+			ASTNodeRef(NULL), // body expr
+			state_type, // return type
+			new ArrayFoldBuiltInFunc(
+				func_type, // func type
+				array_type,
+				state_type
+			)
+		);
+
+		this->sig_to_function_map.insert(std::make_pair(sig, def));
+		return def;
+	}
+
+	// def update(CollectionType c, int index, T newval) CollectionType
+	// TODO: other types
+	if(sig.name == "update" && sig.param_types.size() == 3 && sig.param_types[0]->getType() == Type::ArrayTypeType && sig.param_types[1]->getType() == Type::IntType)
+	{
+		const TypeRef collection_type = sig.param_types[0];
+		const Reference<Int> index_type = sig.param_types[1].downcast<Int>();
+		const TypeRef value_type = sig.param_types[2];
+			
+		// TODO: typecheck elems and function arg and return types
+
+		vector<FunctionDefinition::FunctionArg> args(3);
+		args[0].type = collection_type;
+		args[0].name = "c";
+		args[1].type = index_type;
+		args[1].name = "index";
+		args[2].type = value_type;
+		args[2].name = "newval";
+
+		FunctionDefinitionRef def = new FunctionDefinition(
+			SrcLocation::invalidLocation(),
+			"update",
+			args,
+			ASTNodeRef(NULL), // body expr
+			collection_type, // return type
+			new UpdateElementBuiltInFunc(
+				collection_type
+			)
+		);
+
+		this->sig_to_function_map.insert(std::make_pair(sig, def));
+		return def;
+	}
 
 	// Match against vector element access functions of name 'eN' where N is an integer.
 	if(sig.name.size() > 1 && sig.name[0] == 'e')
@@ -987,7 +1051,7 @@ Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDef
 		if(generic_func->sig.name == "fold")
 		{
 			assert(type_mappings.size() == 1);
-			built_in_impl = new ArrayFoldBuiltInFunc(type_mappings[0]);
+			//built_in_impl = new ArrayFoldBuiltInFunc(type_mappings[0]);
 		}
 		else if(generic_func->sig.name == "if")
 		{

@@ -27,8 +27,6 @@ Generated at 2011-04-30 18:53:38 +0100
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
-#include "llvm/Analysis/Verifier.h"
-#include "llvm/ExecutionEngine/JIT.h"
 #include "llvm/ExecutionEngine/Interpreter.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
 #include "llvm/Support/raw_ostream.h"
@@ -613,7 +611,7 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 			}
 		}
 		// Set second arg now for elem(tuple, i)
-		if(this->target_function && this->target_function->sig.name == "elem" && target_function->sig.param_types[0]->getType() == Type::TupleTypeType)
+		else if(this->target_function && this->target_function->sig.name == "elem" && target_function->sig.param_types[0]->getType() == Type::TupleTypeType)
 		{
 			assert(this->argument_expressions.size() == 2);
 			if(!this->argument_expressions[1]->isConstant())
@@ -653,6 +651,33 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 			// Set proper return type for function definition.
 			this->target_function->declared_return_type = tuple_elem_func->tuple_type->component_types[index];
 			
+		}
+		else if(this->target_function && this->target_function->sig.name == "fold")
+		{
+			// TEMP: specialise fold for the passed in function now.
+			if(this->binding_type == BoundToGlobalDef)
+			{
+				assert(this->target_function->built_in_func_impl.nonNull());
+				assert(dynamic_cast<ArrayFoldBuiltInFunc*>(this->target_function->built_in_func_impl.getPointer()));
+				ArrayFoldBuiltInFunc* fold_func = static_cast<ArrayFoldBuiltInFunc*>(this->target_function->built_in_func_impl.getPointer());
+
+				// Eval first arg (to get function 'f')
+				try
+				{
+					VMState vmstate;
+					vmstate.func_args_start.push_back(0);
+					ValueRef res = this->argument_expressions[0]->exec(vmstate);
+					assert(dynamic_cast<FunctionValue*>(res.getPointer()));
+
+					FunctionValue* res_f = static_cast<FunctionValue*>(res.getPointer());
+
+					fold_func->specialiseForFunctionArg(res_f->func_def);
+				}
+				catch(BaseException& e)
+				{
+					throw BaseException("Failed to eval second arg of elem(tuple, i): " + e.what());
+				}
+			}
 		}
 	}
 	else if(payload.operation == TraversalPayload::CheckInDomain)
