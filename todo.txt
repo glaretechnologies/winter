@@ -1,3 +1,13 @@
+TODO: use CreateCall2() instead of CreateCall etc..  (only do once we know that void* hidden args won't be required to be appended?)
+
+TODO: fold specialisation requires that each fold built-in be unique.
+
+TODO: Fix stuff up for new variable bit width integer type - proofs etc..
+
+TODO: add tests for update()
+
+TODO: type checking for fold(), iterate() args etc..
+
 
 TODO: integer divides by zero crash: testMainIntegerArg("def main(int x) int : 10 / x ", 0, 10);
 

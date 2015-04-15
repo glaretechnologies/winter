@@ -1021,6 +1021,59 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 
 		throw BaseException("Failed to prove truncateToInt() argument is in-bounds." + errorContext(*this));*/
 	}
+	else if(this->target_function && this->target_function->sig.name == "update" && this->argument_expressions.size() == 3)
+	{
+		// def update(CollectionType c, int index, T newval) CollectionType
+
+		// NOTE: a lot of this code copied from elem() above.  Combine?
+		if(this->argument_expressions[0]->type()->getType() == Type::ArrayTypeType &&
+			this->argument_expressions[1]->type()->getType() == Type::IntType)
+		{
+			// update(array, index, newval)
+			const Reference<ArrayType> array_type = this->argument_expressions[0]->type().downcast<ArrayType>();
+
+			// If the index is constant, into a fixed length array, we can prove whether the index is in-bounds
+			if(this->argument_expressions[1]->isConstant())
+			{
+				// Evaluate the index expression
+				VMState vmstate;
+				vmstate.func_args_start.push_back(0);
+
+				ValueRef retval = this->argument_expressions[1]->exec(vmstate);
+
+				assert(dynamic_cast<IntValue*>(retval.getPointer()));
+
+				const int index_val = static_cast<IntValue*>(retval.getPointer())->value;
+
+				if(index_val >= 0 && index_val < array_type->num_elems)
+				{
+					// Array index is in-bounds!
+					return;
+				}
+				else
+				{
+					throw BaseException("Constant index with value " + toString(index_val) + " was out of bounds of array type " + array_type->toString());
+				}
+			}
+			else
+			{
+				// Else index is not known at compile time.
+				
+				const IntervalSetInt i_bounds = ProofUtils::getIntegerRange(payload, stack, 
+					this->argument_expressions[1] // integer value
+				);
+
+				// Now check our bounds against the array
+				if(i_bounds.lower() >= 0 && i_bounds.upper() < array_type->num_elems)
+				{
+					// Array index is proven to be in-bounds.
+					return;
+				}
+			}
+		}
+
+		throw BaseException("Failed to prove update() index argument is in-bounds." + errorContext(*this));
+	}
 }
 
 

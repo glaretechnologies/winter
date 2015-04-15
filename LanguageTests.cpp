@@ -67,7 +67,21 @@ void LanguageTests::run()
 	// update(CollectionType c, int index, T newval) CollectionType
 	// ===================================================================
 
-	//testMainIntegerArg("def main(int x) int :  elem(update([0, 0]a, 0, x), 0)", 10, 10);
+	testMainIntegerArg("def main(int x) int :  elem(update([0]a, 0, x), 0)", 10, 10);
+
+	testMainIntegerArg("def main(int x) int :  elem(update([0, 0]a, 0, x), 0)", 10, 10);
+	testMainIntegerArg("def main(int x) int :  elem(update([0, 0]a, 0, x), 1)", 10, 0);
+	testMainIntegerArg("def main(int x) int :  elem(update([0, 0]a, 1, x), 0)", 10, 0);
+	testMainIntegerArg("def main(int x) int :  elem(update([0, 0]a, 1, x), 1)", 10, 10);
+
+	// Test update arg out of bounds
+	testMainIntegerArgInvalidProgram("def main(int x) int :  elem(update([]a, 0, x), 0)");
+	testMainIntegerArgInvalidProgram("def main(int x) int :  elem(update([0]a, -1, x), 0)");
+	testMainIntegerArgInvalidProgram("def main(int x) int :  elem(update([0]a, 1, x), 0)");
+
+	// Test failure to prove valid, since index arg cannot be proven in bounds:
+	testMainIntegerArgInvalidProgram("def main(int x) int :  elem(update([0]a, x, x), 0)");
+
 
 	// ===================================================================
 	// Test fold built-in function
