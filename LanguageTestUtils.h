@@ -23,11 +23,14 @@ extern "C"
 #include "Value.h"
 #include "VirtualMachine.h"
 #include "../indigo/StandardPrintOutput.h"
+#include "../utils/Exception.h"
+#include "../utils/Vector.h"
 
 // OpenCL:
+#if USE_OPENCL
 #include "../../indigo/trunk/opencl/OpenCL.h"
 #include "../../indigo/trunk/opencl/OpenCLBuffer.h"
-
+#endif
 
 namespace Winter
 {
@@ -298,6 +301,7 @@ static void testMainFloatArg(const std::string& src, float argument, float targe
 		const bool TEST_OPENCL = false;
 		if(TEST_OPENCL)
 		{
+#if USE_OPENCL
 			OpenCL* opencl = getGlobalOpenCL();
 
 			cl_context context;
@@ -399,6 +403,7 @@ static void testMainFloatArg(const std::string& src, float argument, float targe
 				assert(0);
 				exit(1);
 			}
+#endif // #if USE_OPENCL
 		}
 	}
 	catch(Winter::BaseException& e)
@@ -546,6 +551,7 @@ static void testMainIntegerArg(const std::string& src, int x, int target_return_
 		const bool TEST_OPENCL = false;
 		if(TEST_OPENCL)
 		{
+#if USE_OPENCL
 			OpenCL* opencl = getGlobalOpenCL();
 
 			cl_context context;
@@ -654,7 +660,8 @@ static void testMainIntegerArg(const std::string& src, int x, int target_return_
 				assert(0);
 				exit(1);
 			}
-			}
+#endif // #if USE_OPENCL
+		}
 	}
 	catch(Winter::BaseException& e)
 	{
