@@ -1012,7 +1012,7 @@ void VirtualMachine::compileToNativeAssembly(llvm::Module* mod, const std::strin
 	if(errcode)
 		throw Winter::BaseException("Error when opening file to print assembly to: " + errcode.message());
 #elif TARGET_LLVM_VERSION == 34
-	llvm::raw_fd_ostream raw_out(filename.c_str(), err, 0);
+	llvm::raw_fd_ostream raw_out(filename.c_str(), err, llvm::sys::fs::F_None);
 #else
 	llvm::raw_fd_ostream raw_out(filename.c_str(), err, 0);
 #endif
