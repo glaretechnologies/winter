@@ -486,6 +486,7 @@ static bool testFuzzProgram(const std::string& src)
 		const bool TEST_OPENCL = false;
 		if(TEST_OPENCL)
 		{
+#if USE_OPENCL
 			OpenCL* opencl = getGlobalOpenCL();
 
 			cl_context context;
@@ -587,6 +588,7 @@ static bool testFuzzProgram(const std::string& src)
 				assert(0);
 				exit(1);
 			}
+#endif // #if USE_OPENCL
 		}
 	}
 	catch(Winter::BaseException& )
