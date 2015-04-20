@@ -2,6 +2,46 @@ Copyright 2009- Nicholas Chapman
 
 
 
+
+
+
+Parsing precedence:
+
+parseLetBlock
+parseExpression
+parseArraySubscriptExpression
+parseBinaryLogicalExpression
+parseComparisonExpression
+parseAddSubExpression
+parseMulDivExpression
+parseUnaryExpression
+parseParenExpression
+parseBasicExpression
+parseFieldExpression	parseLiteral	parseMapLiteralExpression	parseArrayOrVectorLiteralOrArraySubscriptExpression
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 Detecting function arguments that aren't referenced
 ===================================================
 Do a pass over function body.
@@ -614,7 +654,7 @@ double					64 bit float										8.0
 string					Unicode string (utf-8?)								"bleh"
 tuple<T0, T1, .. TN>	Ordered pair of types T0, T1, .. , TN	(struct?)	[8, "hello"]t
 ntuple<T, n>			Where n is an integer literal.						[1, 2, 3, 4]t
-map<T0, T1>				Map from T0 to T1									{8, "bleh"}
+map<T0, T1>				Map from T0 to T1									{8 : "bleh", 10 : "hello"}
 list<T>					Variable length list of 0 or more T's (std::vector)	[1, 2, 3, 4]
 flist<T, n>				List of known length: n								[1, 2, 3, 4]f
 array<T>				Variable length list of 0 or more T's (std::vector)	[1, 2, 3, 4]

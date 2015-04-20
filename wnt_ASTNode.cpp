@@ -111,6 +111,7 @@ bool shouldFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
 {
 	return	e.nonNull() &&
 			e->isConstant() && 
+			e->type().nonNull() && 
 			(	(e->type()->getType() == Type::FloatType &&		
 				(e->nodeType() != ASTNode::FloatLiteralType)) ||
 				(e->type()->getType() == Type::BoolType &&		
@@ -264,7 +265,7 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::v
 					// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
 					// This is needed now because we need to know the type of op_X, which is only available once bound.
 					TraversalPayload new_payload(TraversalPayload::BindVariables);
-					new_payload.top_lvl_frame = payload.top_lvl_frame;
+					//new_payload.top_lvl_frame = payload.top_lvl_frame;
 					new_payload.linker = payload.linker;
 					new_payload.func_def_stack = payload.func_def_stack;
 					e->traverse(new_payload, stack);
@@ -286,7 +287,7 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::v
 					// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
 					// This is needed now because we need to know the type of op_X, which is only available once bound.
 					TraversalPayload new_payload(TraversalPayload::BindVariables);
-					new_payload.top_lvl_frame = payload.top_lvl_frame;
+					//new_payload.top_lvl_frame = payload.top_lvl_frame;
 					new_payload.linker = payload.linker;
 					new_payload.func_def_stack = payload.func_def_stack;
 					e->traverse(new_payload, stack);
@@ -307,7 +308,7 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::v
 				// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
 				// This is needed now because we need to know the type of op_X, which is only available once bound.
 				TraversalPayload new_payload(TraversalPayload::BindVariables);
-				new_payload.top_lvl_frame = payload.top_lvl_frame;
+				//new_payload.top_lvl_frame = payload.top_lvl_frame;
 				new_payload.linker = payload.linker;
 				new_payload.func_def_stack = payload.func_def_stack;
 				e->traverse(new_payload, stack);
@@ -328,7 +329,7 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::v
 					// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
 					// This is needed now because we need to know the type of op_X, which is only available once bound.
 					TraversalPayload new_payload(TraversalPayload::BindVariables);
-					new_payload.top_lvl_frame = payload.top_lvl_frame;
+					//new_payload.top_lvl_frame = payload.top_lvl_frame;
 					new_payload.linker = payload.linker;
 					new_payload.func_def_stack = payload.func_def_stack;
 					e->traverse(new_payload, stack);
@@ -349,7 +350,7 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::v
 				// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
 				// This is needed now because we need to know the type of op_X, which is only available once bound.
 				TraversalPayload new_payload(TraversalPayload::BindVariables);
-				new_payload.top_lvl_frame = payload.top_lvl_frame;
+				//new_payload.top_lvl_frame = payload.top_lvl_frame;
 				new_payload.linker = payload.linker;
 				new_payload.func_def_stack = payload.func_def_stack;
 				e->traverse(new_payload, stack);
@@ -369,7 +370,7 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::v
 				// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
 				// This is needed now because we need to know the type of op_X, which is only available once bound.
 				TraversalPayload new_payload(TraversalPayload::BindVariables);
-				new_payload.top_lvl_frame = payload.top_lvl_frame;
+				//new_payload.top_lvl_frame = payload.top_lvl_frame;
 				new_payload.linker = payload.linker;
 				new_payload.func_def_stack = payload.func_def_stack;
 				e->traverse(new_payload, stack);
@@ -679,7 +680,8 @@ Variable::Variable(const std::string& name_, const SrcLocation& loc)
 	name(name_),
 	bound_index(-1),
 	bound_function(NULL),
-	bound_let_block(NULL)
+	bound_let_block(NULL),
+	bound_named_constant(NULL)
 	//use_captured_var(false),
 	//captured_var_index(0)
 {
@@ -806,24 +808,70 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 //	BufferRoot* root = static_cast<BufferRoot*>(stack[0]);
 //	vector<FunctionDefinitionRef
 //	for(size_t i=0; i<stack[0]->get
-	Frame::NameToFuncMapType::iterator res = payload.top_lvl_frame->name_to_functions_map.find(this->name);
-	if(res != payload.top_lvl_frame->name_to_functions_map.end())
+
+//	Frame::NameToFuncMapType::iterator res = payload.top_lvl_frame->name_to_functions_map.find(this->name);
+//	if(res != payload.top_lvl_frame->name_to_functions_map.end())
+	//Frame::NameToFuncMapType::iterator res = payload.linker->findMatchingFunctionByName(this->name);
+	vector<FunctionDefinitionRef> matching_functions;
+	payload.linker->getFuncsWithMatchingName(this->name, matching_functions);
+
+	if(!matching_functions.empty())
 	{
-		vector<FunctionDefinitionRef>& matching_functions = res->second;
+		//vector<FunctionDefinitionRef>& matching_functions = res->second;
+		
 
 		assert(matching_functions.size() > 0);
 
 		if(matching_functions.size() > 1)
-			throw BaseException("Ambiguous binding for variable '" + this->name + "': multiple functions with name." + 
-				errorContext(*this, payload));
+			throw BaseException("Ambiguous binding for variable '" + this->name + "': multiple functions with name." + errorContext(*this, payload));
+
+		if(contains(payload.func_def_stack, matching_functions[0].getPointer()))
+			throw BaseException("Variable refer to current function definition." + errorContext(*this, payload));
 
 		this->vartype = BoundToGlobalDefVariable;
 		this->bound_function = matching_functions[0].getPointer();
 		return;
 	}
 
+	// Try and bind to a named constant.
+	//Frame::NamedConstantMap::iterator name_res = payload.top_lvl_frame->named_constant_map.find(this->name);
+	//if(name_res != payload.top_lvl_frame->named_constant_map.end())
+	Frame::NamedConstantMap::iterator name_res = payload.linker->named_constant_map.find(this->name);
+	if(name_res != payload.linker->named_constant_map.end())
+	{
+		if(payload.current_named_constant)
+		{
+			const int current_named_constant_src_pos = payload.current_named_constant->srcLocation().char_index;
+			const int target_named_constant_src_pos = name_res->second->srcLocation().char_index;
 
-	throw BaseException("Variable::bindVariables(): No such function, function argument or let definition '" + this->name + "'." + 
+			// Only bind to a named constant defined earlier in the file.
+			// NOTE: kind of an abuse of src location here.
+			if(target_named_constant_src_pos < current_named_constant_src_pos)
+			{
+				this->vartype = BoundToNamedConstant;
+				this->bound_named_constant = name_res->second.getPointer();
+				return;
+			}
+		}
+		else
+		{
+			this->vartype = BoundToNamedConstant;
+			this->bound_named_constant = name_res->second.getPointer();
+			return;
+		}
+
+		// Don't try to bind to the named constant we are in the value expression for.
+		//if(payload.named_constant_stack.empty() || (payload.named_constant_stack[0] != name_res->second.getPointer()))
+		/*if(payload.current_named_constant != name_res->second.getPointer())
+		{
+			this->vartype = BoundToNamedConstant;
+			this->bound_named_constant = name_res->second.getPointer();
+			return;
+		}*/
+	}
+
+
+	throw BaseException("No such function, function argument, named constant or let definition '" + this->name + "'." + 
 		errorContext(*this, payload));
 }
 
@@ -832,6 +880,11 @@ void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
 	if(payload.operation == TraversalPayload::BindVariables)
 		this->bindVariables(payload, stack);
+	else if(payload.operation == TraversalPayload::TypeCheck)
+	{
+		if(this->vartype == UnboundVariable)
+			BaseException("No such function, function argument, named constant or let definition '" + this->name + "'." + errorContext(*this, payload));
+	}
 }
 
 
@@ -854,6 +907,10 @@ ValueRef Variable::exec(VMState& vmstate)
 	{
 		StructureValueRef captured_vars(new StructureValue(vector<ValueRef>()));
 		return ValueRef(new FunctionValue(this->bound_function, captured_vars));
+	}
+	else if(this->vartype == BoundToNamedConstant)
+	{
+		return bound_named_constant->exec(vmstate);
 	}
 	else if(this->vartype == CapturedVariable)
 	{
@@ -880,6 +937,8 @@ TypeRef Variable::type() const
 		return this->bound_function->args[this->bound_index].type;
 	else if(this->vartype == BoundToGlobalDefVariable)
 		return this->bound_function->type();
+	else if(this->vartype == BoundToNamedConstant)
+		return this->bound_named_constant->type();
 	else if(this->vartype == CapturedVariable)
 	{
 		if(this->bound_function != NULL)
@@ -905,6 +964,8 @@ inline static const std::string varType(Variable::VariableType t)
 		return "Arg";
 	else if(t == Variable::BoundToGlobalDefVariable)
 		return "BoundToGlobalDef";
+	else if(t == Variable::BoundToNamedConstant)
+		return "BoundToNamedConstant";
 	else if(t == Variable::CapturedVariable)
 		return "Captured";
 	else
@@ -930,16 +991,7 @@ std::string Variable::sourceString() const
 
 std::string Variable::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
-	if(vartype == LetVariable)
-	{
-		assert(params.let_block_expressions.find(this->bound_let_block) != params.let_block_expressions.end());
-
-		return params.let_block_expressions[this->bound_let_block][this->bound_index];
-	}
-	else
-	{
-		return this->name;
-	}
+	return this->name;
 }
 
 
@@ -1016,6 +1068,10 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 	{
 		return this->bound_function->emitLLVMCode(params, ret_space_ptr);
 	}
+	else if(vartype == BoundToNamedConstant)
+	{
+		return this->bound_named_constant->emitLLVMCode(params, ret_space_ptr);
+	}
 	else if(vartype == CapturedVariable)
 	{
 		// Get pointer to captured variables. structure.
@@ -1067,6 +1123,7 @@ Reference<ASTNode> Variable::clone()
 	v->vartype = vartype;
 	v->bound_function = bound_function;
 	v->bound_let_block = bound_let_block;
+	v->bound_named_constant = bound_named_constant;
 	v->bound_index = bound_index;
 	v->let_frame_offset = let_frame_offset;
 	v->uncaptured_bound_index = uncaptured_bound_index;
@@ -1085,6 +1142,10 @@ bool Variable::isConstant() const
 		return false;
 	case ArgumentVariable:
 		return false;
+	case BoundToNamedConstant:
+		{
+			return bound_named_constant->isConstant();
+		}
 	case LetVariable:
 		{
 			return this->bound_let_block->lets[this->bound_index]->isConstant();
@@ -1380,6 +1441,10 @@ ArrayLiteral::ArrayLiteral(const std::vector<ASTNodeRef>& elems, const SrcLocati
 
 TypeRef ArrayLiteral::type() const
 {
+	// if Array literal contains a yet-unbound function, then the type is not known yet and will be NULL.
+	const TypeRef e0_type = elements[0]->type();
+	if(e0_type.isNull()) return NULL;
+
 	if(has_int_suffix)
 		return new ArrayType(elements[0]->type(), this->int_suffix);
 	else
@@ -1707,10 +1772,14 @@ VectorLiteral::VectorLiteral(const std::vector<ASTNodeRef>& elems, const SrcLoca
 
 TypeRef VectorLiteral::type() const
 {
+	TypeRef elem_type = elements[0]->type();
+	if(elem_type.isNull())
+		return NULL;
+
 	if(has_int_suffix)
-		return new VectorType(elements[0]->type(), this->int_suffix);
+		return new VectorType(elem_type, this->int_suffix);
 	else
-		return new VectorType(elements[0]->type(), (int)elements.size());
+		return new VectorType(elem_type, (int)elements.size());
 }
 
 
@@ -1841,7 +1910,7 @@ void VectorLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	{
 		// Check all the element expression types match the computed element type.
 		const TypeRef elem_type = this->elements[0]->type();
-		for(unsigned int i=0; i<this->elements.size(); ++i)
+		for(unsigned int i=1; i<this->elements.size(); ++i)
 			if(*elem_type != *this->elements[i]->type())
 				throw BaseException("Vector element " + ::toString(i) + " did not have required type " + elem_type->toString() + "." + errorContext(*this, payload));
 	}
@@ -2606,7 +2675,8 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 	}
 	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
-		if(this->type()->getType() == Type::GenericTypeType || this->type()->getType() == Type::IntType || this->type()->getType() == Type::FloatType)
+		const TypeRef& this_type = this->type();
+		if(this_type->getType() == Type::GenericTypeType || this_type->getType() == Type::IntType || this_type->getType() == Type::FloatType)
 		{
 			if(*a->type() != *b->type())
 				throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
@@ -3983,6 +4053,30 @@ void LetASTNode::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 	{
 		convertOverloadedOperators(expr, payload, stack);
 	}
+	else if(payload.operation == TraversalPayload::TypeCheck)
+	{
+		if(declared_type.nonNull())
+		{
+			// Check that the return type of the body expression is equal to the declared return type
+			// of this function.
+			if(*expr->type() != *this->declared_type)
+				throw BaseException("Type error for let '" + this->variable_name + "': Computed return type '" + this->expr->type()->toString() + 
+					"' is not equal to the declared return type '" + this->declared_type->toString() + "'." + errorContext(*this));
+		}
+	}
+	else if(payload.operation == TraversalPayload::TypeCoercion)
+	{
+		// Do int -> float coercion
+		if(expr->nodeType() == ASTNode::IntLiteralType && declared_type.nonNull() && declared_type->getType() == Type::FloatType)
+		{
+			IntLiteral* body_lit = static_cast<IntLiteral*>(expr.getPointer());
+			if(isIntExactlyRepresentableAsFloat(body_lit->value))
+			{
+				expr = new FloatLiteral((float)body_lit->value, body_lit->srcLocation());
+				payload.tree_changed = true;
+			}
+		}
+	}
 
 	stack.pop_back();
 }
@@ -4010,7 +4104,7 @@ void LetASTNode::emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* va
 
 Reference<ASTNode> LetASTNode::clone()
 {
-	LetASTNode* e = new LetASTNode(this->variable_name, this->srcLocation());
+	LetASTNode* e = new LetASTNode(this->variable_name, this->declared_type, this->srcLocation());
 	e->expr = this->expr->clone();
 	return ASTNodeRef(e);
 }
@@ -4356,19 +4450,56 @@ std::string LetBlock::sourceString() const
 }
 
 
+/*
+let
+	x = 1
+	y = 2
+in
+	x + y
+
+=>
+
+
+int let_result_xx;
+{
+	int x = 1;
+	int y = 2;
+	
+	let_result_xx = x + y;
+}
+*/
 std::string LetBlock::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
-	// Compute and store expressions for the let variable names
-	params.let_block_expressions.insert(std::make_pair(this, std::vector<std::string>()));
+	const std::string result_var_name = "let_result_" + toString(params.uid++);
+
+	std::string s = this->type()->OpenCLCType() + " " + result_var_name + ";\n";
+	s += "{\n";
 
 	for(size_t i=0; i<lets.size(); ++i)
 	{
-		std::string let_expression = this->lets[i]->emitOpenCLC(params);
+		// Emit code for let variable
+		params.blocks.push_back("");
+		const std::string let_expression = this->lets[i]->emitOpenCLC(params);
+		StringUtils::appendTabbed(s, params.blocks.back(), 1);
+		params.blocks.pop_back();
 
-		params.let_block_expressions[this].push_back(let_expression);
+		s += "\t" + this->lets[i]->type()->OpenCLCType() + " " + this->lets[i]->variable_name + " = " + let_expression + ";\n";
 	}
 
-	return this->expr->emitOpenCLC(params);
+	// Emit code for let value expression
+	params.blocks.push_back("");
+	const std::string let_value_expr = expr->emitOpenCLC(params);
+	StringUtils::appendTabbed(s, params.blocks.back(), 1);
+	params.blocks.pop_back();
+
+	s += "\t" + result_var_name + " = " + let_value_expr + ";\n";
+
+	s += "}\n";
+
+	params.blocks.back() += s;
+
+	return result_var_name;
+	//return this->expr->emitOpenCLC(params);
 }
 
 
@@ -4559,6 +4690,96 @@ Reference<ASTNode> ArraySubscript::clone()
 bool ArraySubscript::isConstant() const
 {
 	return subscript_expr->isConstant();
+}
+
+
+//----------------------------------------------------------------------------------------
+
+
+ValueRef NamedConstant::exec(VMState& vmstate)
+{
+	return this->value_expr->exec(vmstate);
+}
+
+
+void NamedConstant::print(int depth, std::ostream& s) const
+{
+	printMargin(depth, s);
+	s << "Named constant.  name='" << name << "'\n";
+	printMargin(depth, s);
+	this->value_expr->print(depth + 1, s);
+}
+
+
+std::string NamedConstant::sourceString() const
+{
+	assert(0);
+	return "";
+}
+
+
+std::string NamedConstant::emitOpenCLC(EmitOpenCLCodeParams& params) const
+{
+	return name + " = " + value_expr->emitOpenCLC(params);
+}
+
+
+void NamedConstant::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
+{
+	if(payload.operation == TraversalPayload::ConstantFolding)
+	{
+		checkFoldExpression(value_expr, payload);
+	}
+
+	//payload.named_constant_stack.push_back(this);
+	payload.current_named_constant = this;
+	stack.push_back(this);
+
+	value_expr->traverse(payload, stack);
+
+	if(payload.operation == TraversalPayload::InlineFunctionCalls)
+	{
+		checkInlineExpression(value_expr, payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	{
+		checkSubstituteVariable(value_expr, payload);
+	}
+	// Convert overloaded operators before we pop this node off the stack.
+	// This node needs to be on the node stack if an operator overloading substitution is made,
+	// as the new op_X function will need to have a bind variables pass run on it.
+	else if(payload.operation == TraversalPayload::BindVariables)
+	{
+		convertOverloadedOperators(value_expr, payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::TypeCheck)
+	{
+		// Check that value_expr is constant now.  NOTE: not sure this is the best place/phase to do it.
+		if(!value_expr->isConstant())
+			throw BaseException("Named constant value was not constant. " + errorContext(*this, payload));
+	}
+
+	stack.pop_back();
+	//payload.named_constant_stack.pop_back();
+	payload.current_named_constant = NULL;
+}
+
+
+llvm::Value* NamedConstant::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
+{
+	return value_expr->emitLLVMCode(params, ret_space_ptr);
+}
+
+
+Reference<ASTNode> NamedConstant::clone()
+{
+	return new NamedConstant(name, value_expr->clone(), this->srcLocation());
+}
+
+
+bool NamedConstant::isConstant() const
+{
+	return value_expr->isConstant();
 }
 
 

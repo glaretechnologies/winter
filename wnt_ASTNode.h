@@ -109,7 +109,7 @@ public:
 	};
 
 	TraversalPayload(Operation e) : 
-		operation(e), tree_changed(false) {}
+		operation(e), tree_changed(false), current_named_constant(NULL) {}
 
 	Linker* linker;
 
@@ -119,13 +119,16 @@ public:
 
 	bool tree_changed;
 
-	FrameRef top_lvl_frame;
+	//FrameRef top_lvl_frame;
 
 	//bool capture_variables; // If true, variables and function expressions will capture variable and add to captured_vars
 	//vector<CapturedVar> captured_vars; // For when parsing anon functions
 
 	//vector<LetBlock*> let_block_stack;
 	std::vector<FunctionDefinition*> func_def_stack;
+
+	//std::vector<NamedConstant*> named_constant_stack;
+	NamedConstant* current_named_constant;
 
 	bool all_variables_bound; // Are all variables in a given function body bound?  Used in BindVariables pass.
 
@@ -200,9 +203,9 @@ class EmitOpenCLCodeParams
 public:
 	std::string file_scope_code;
 
-	//std::vector<LetBlock*> let_block_stack;
+	std::vector<std::string> blocks;
 
-	std::map<const LetBlock*, std::vector<std::string> > let_block_expressions;
+	int uid;
 };
 
 
@@ -258,7 +261,8 @@ public:
 		AnonFunctionType,
 		LetBlockType,
 		ArraySubscriptType,
-		IfExpressionType
+		IfExpressionType,
+		NamedConstantType
 	};
 
 	ASTNode(ASTNodeType node_type_, const SrcLocation& loc_) : node_type(node_type_), location(loc_) {}
@@ -328,6 +332,7 @@ ASTNodeRef foldExpression(ASTNodeRef& e, TraversalPayload& payload);
 bool expressionsHaveSameValue(const ASTNodeRef& a, const ASTNodeRef& b);
 class FunctionDefinition;
 class LetBlock;
+class NamedConstant;
 
 
 class BufferRoot : public ASTNode
@@ -336,6 +341,8 @@ public:
 	BufferRoot(const SrcLocation& loc) : ASTNode(BufferRootType, loc) 
 	{}
 	std::vector<Reference<FunctionDefinition> > func_defs;
+
+	std::vector<Reference<NamedConstant> > named_constants;
 
 	virtual ValueRef exec(VMState& vmstate){ return ValueRef(); }
 	virtual TypeRef type() const { throw BaseException("root has no type."); }
@@ -363,6 +370,7 @@ public:
 		LetVariable,
 		ArgumentVariable,
 		BoundToGlobalDefVariable,
+		BoundToNamedConstant,
 		CapturedVariable
 	};
 
@@ -387,6 +395,7 @@ public:
 
 	FunctionDefinition* bound_function; // Function for which the variable is an argument of,
 	LetBlock* bound_let_block;
+	NamedConstant* bound_named_constant;
 
 	int bound_index; // index in parent function definition argument list.
 	//int argument_offset; // Currently, a variable must be an argument to the enclosing function
@@ -734,8 +743,8 @@ public:
 class LetASTNode : public ASTNode
 {
 public:
-	LetASTNode(const std::string& var_name, const SrcLocation& loc) : 
-	  ASTNode(LetType, loc), variable_name(var_name) {}
+	LetASTNode(const std::string& var_name, const TypeRef& declared_type_, const SrcLocation& loc) : 
+	  ASTNode(LetType, loc), variable_name(var_name), declared_type(declared_type_) {}
 
 	virtual ValueRef exec(VMState& vmstate);
 	virtual TypeRef type() const { return expr->type(); }
@@ -752,6 +761,7 @@ public:
 
 	std::string variable_name;
 	ASTNodeRef expr;
+	TypeRef declared_type;
 };
 
 
@@ -829,6 +839,31 @@ public:
 
 	ASTNodeRef subscript_expr;
 };
+
+
+class NamedConstant : public ASTNode
+{
+public:
+	NamedConstant(const std::string& name_, const ASTNodeRef& value_expr_, const SrcLocation& loc) : 
+	  ASTNode(NamedConstantType, loc), name(name_), value_expr(value_expr_) 
+	{
+	}
+
+	virtual ValueRef exec(VMState& vmstate);
+	virtual TypeRef type() const { return value_expr->type(); }
+	virtual void print(int depth, std::ostream& s) const;
+	virtual std::string sourceString() const;
+	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
+	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
+	virtual Reference<ASTNode> clone();
+	virtual bool isConstant() const;
+
+	std::string name;
+	ASTNodeRef value_expr;
+};
+
+typedef Reference<NamedConstant> NamedConstantRef;
 
 
 /*class AnonFunction : public ASTNode

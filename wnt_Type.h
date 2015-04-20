@@ -285,7 +285,7 @@ public:
 class ArrayType : public Type
 {
 public:
-	ArrayType(const TypeRef& elem_type_, size_t num_elems_) : Type(ArrayTypeType), elem_type(elem_type_), num_elems(num_elems_) {}
+	ArrayType(const TypeRef& elem_type_, size_t num_elems_) : Type(ArrayTypeType), elem_type(elem_type_), num_elems(num_elems_) { assert(elem_type_.nonNull()); }
 	virtual const std::string toString() const;
 	virtual bool lessThan(const Type& b) const
 	{

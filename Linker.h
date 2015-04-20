@@ -41,7 +41,12 @@ public:
 
 	const std::string buildOpenCLCode();
 
-	std::vector<FunctionDefinitionRef> concrete_funcs;
+	//std::vector<FunctionDefinitionRef> concrete_funcs;
+	std::vector<FunctionDefinitionRef> func_defs;
+
+	typedef std::map<std::string, Reference<NamedConstant> > NamedConstantMap;
+	NamedConstantMap named_constant_map;
+
 private:
 	void addFunction(const FunctionDefinitionRef& f);
 	FunctionDefinitionRef makeConcreteFunction(Reference<FunctionDefinition> generic_func, 

@@ -1,0 +1,1932 @@
+
+def main(float x) float :  main(x)  
+
+def main(float x) float :  1  def f(int x) int : f(0)  
+
+def main(float x) float :  x [bleh
+
+def main(int x) int : 10 + (if x < 10 then 1 else 2)
+
+def main(int x) int : if x < 10 then 1 else 2
+
+def main(int x) int : if x < 10 then (if x < 5 then 1 else 2) else (if x < 15 then 3 else 4)
+
+TEN = 10			def main(int x) int : TEN + x
+
+TEN = 5 * 2			def main(int x) int : TEN + x
+
+	FIVE = 5		TEN = FIVE * 2			 def main(int x) int : TEN + x
+
+	def five() int : 5		TEN = five() * 2			def main(int x) int : TEN + x
+
+	TEN = x			def main(int x) int : TEN + x
+
+	TEN = main			def main(int x) int : TEN + x
+					   
+	TEN = main()		def main(int x) int : TEN + x
+
+	TEN = TEN			def main(int x) int : TEN + x
+
+
+	def f(int x) tuple<int> : if x < 0 [1]t else [3]t			 def main(int x) int : f(x)[0]
+
+	def f(int x) tuple<int> : if x < 0 [1]t else [3]t			
+					   def main(int x) int : f(x)[0]
+
+	def f(int x) tuple<int, int> : if x < 0 [1, 2]t else [3, 4]t			
+					   def main(int x) int : f(x)[0]
+
+	def main(int x) int : [x]a[0]
+
+	def main(int x) int : [x, x + 1, x + 2]a[1]
+
+	def main(int x) int : [x, x + 1, x + 2]a[1 + 1]
+
+	
+
+	def main(int x) int :  [x, x + 1, x + 2]a[-1])
+
+	def main(int x) int :  [x, x + 1, x + 2]a[3])
+	
+
+	def main(int x) int :  elem(update([0]a, 0, x), 0)
+
+	def main(int x) int :  elem(update([0, 0]a, 0, x), 0)
+
+	def main(int x) int :  elem(update([0, 0]a, 0, x), 1)
+
+	def main(int x) int :  elem(update([0, 0]a, 1, x), 0)
+
+	def main(int x) int :  elem(update([0, 0]a, 1, x), 1)
+
+	def main(int x) int :  elem(update([]a, 0, x), 0)
+
+	def main(int x) int :  elem(update([0]a, -1, x), 0)
+
+	def main(int x) int :  elem(update([0]a, 1, x), 0)
+
+	def main(int x) int :  elem(update([0]a, x, x), 0)
+
+
+		def f(int current_state, int elem) int :									
+			current_state + elem						
+										
+		def main(int x) int :  fold(f, [0, 1, 2, 3, 4, 5]a, x)
+		
+		def f(array<int, 16> current_state, int elem) array<int, 16> :				
+			let																		
+				old_count = elem(current_state, elem)								
+				new_count = old_count + 1											
+			in																		
+				update(current_state, elem, new_count)		
+										
+		def main(int x) int :  elem(fold(f, [0, 0, 1, 2]a, [0]a16), 1)
+
+
+		def f(array<int, 256> counts, int x) array<int, 256> :			
+				update(counts, x, elem(counts, x) + 1)			
+
+		def main(array<int, 256> vals, array<int, 256> initial_counts) array<int, 256>:  fold(f, vals, initial_counts)
+			&vals[0], &b[0], &target_results[0], vals.size(),
+			true 
+
+		def f(array<int, 256> current_state, int elem) array<int, 256> :			
+			let																		
+				old_count = elem(current_state, elem)								
+				new_count = old_count + 1											
+			in																		
+				update(current_state, elem, new_count)								
+
+		def main(array<int, 256> vals, array<int, 256> b) array<int, 256>:  fold(f, vals, b)
+														
+		def f(int current_state, int iteration) tuple<int, bool> :					
+			if iteration >= 100														
+				[current_state, false]t # break										
+			else																	
+				[current_state + 1, true]t											
+		def main(int x) int :  iterate(f, 0)
+
+	struct State { int bound, int i }							
+		def f(State current_state, int iteration) tuple<State, bool> :				
+			if iteration >= current_state.bound 									
+				[State(current_state.bound, current_state.i), false]t # break		
+			else																	
+				[State(current_state.bound, current_state.i + 1), true]t			
+		def main(int x) int :  iterate(f, State(x, 0)).i
+
+	struct State { float i }					
+		def f(State current_state, int iteration) tuple<State, bool> :	
+			if iteration >= 100									
+				[State(current_state.i), false]t # break		
+			else												
+				[State(current_state.i + 1.0), true]t			
+		def main(float x) float :  iterate(f, State(0.0)).i
+
+	def main(float x) float :  elem([x]t, 0)
+
+	def main(float x) float :  elem([x + 1.0, x + 2.0]t, 1)
+
+	
+	def f(float x) tuple<float> : [x]t   
+		def main(float x) float :  elem(f(x), 0)
+
+	def f(float x) tuple<float, float> : [x, x]t   
+		def main(float x) float :  elem(f(x), 0)
+
+	def f(float x) tuple<float, float> : [x, x + 1.0]t   
+		def main(float x) float :  elem(f(x), 1)
+
+	
+	def f(tuple<float, float> t) float : elem(t, 1)   
+		def main(float x) float :  f([x + 1.0, x + 2.0]t)
+
+	
+	def f(tuple<float, float> t) tuple<float, float> : t   
+		def main(float x) float :  elem(f([x + 1.0, x + 2.0]t), 1)
+
+	
+	def f(float x) tuple<float, int> : [x, 2]t   
+		def main(float x) float :  elem(f(x), 0)
+
+	def f(float x) tuple<float, int, bool> : [x, 2, true]t   
+		def main(float x) float :  elem(f(x), 0)
+
+	
+	def f(float x) tuple<tuple<float, float>, tuple<float, float>> : [[x, x + 1.0]t, [x + 2.0, x + 3.0]t]t   
+		def main(float x) float :  elem(elem(f(x), 1), 0)
+
+	
+	struct S { float a, int b }		
+		def f(float x) tuple<S, float> : [S(x + 2.0, 1), x]t   
+		def main(float x) float :  elem(f(x), 0).a
+
+	
+	struct S { tuple<float, float> a, int b }		
+		def f(float x) S : S([x + 2.0, x]t, 1)   
+		def main(float x) float :  elem(f(x).a, 0)
+
+
+	
+	def f(float x) tuple<> : []t   
+		def main(float x) float :  elem(f(x), 0)
+
+	
+	def f(float x) tuple<float, float> : [x, x]t   
+		def main(float x) float :  elem(f(x), -1)
+	def f(float x) tuple<float, float> : [x, x]t   
+		def main(float x) float :  elem(f(x), 2)
+
+	
+	def f(float x) tuple<float, float> : [x, x]t   
+		def main(float x) float :  elem(f(x), truncateToInt(x))
+
+	def main(float x) float :  elem([x, x, x, x]v, 0)
+
+
+	
+	def main(float x) float : sqrt(4)
+
+	def main(float x) float : cos(4)
+
+	def main(float x) float : pow(2, 3)
+
+	def main(float x) float : pow(x, 3)
+
+	def main(float x) float : pow(2, x)
+
+	
+	def f(float x) float : x*x                   def main(float x) float : f(3)
+
+	def f(float x) float : x*x                   def main(float x) float : f(x + 1)
+
+	def f(float x) float : x*x                   def main(float x) float : f(1 + x)
+
+	def f(float x) float : x*x                   def main(float x) float : f(2 * x)
+
+	def f(float x) float : x*x                   def main(float x) float : f(x * 2)
+
+	def f(float x) float : x*x                   def main(float x) float : f(1 / x)
+
+	def f(float x) float : x + 2.0               def main(float x) float : f(1)
+
+	def f(float x, float y) float : x + y        def main(float x) float : f(1, x)
+
+	def f(float x, float y) float : x + y        def main(float x) float : f(x, 1)
+
+	def main(float x) float : sqrt(2 + x)
+
+	
+	def main(float x) float : if(true, 3, 4)
+
+	def main(float x) float : if(x < 10.0, 3, 4)
+	
+	def main(float x) float : 3
+
+	def main(float x) float : 3
+
+	def main(float x) float : x + 1
+
+
+	def main(float x) float : 1 + x
+
+	def main(float x) float : 2 * (x + 1)
+
+	def main(float x) float : 2 * (1 + x)
+
+	def main(float x) float : (1 + x) + (2 + x) * 3
+	
+	def main(float x) float : if(x < 1.0, 3.0, true)
+
+	def main(float x) float : if(x < 1.0, true, 3.0)
+
+	def main(float x) float : if(3.0, 2.0, 3.0)
+
+	
+	def main(float x) float : if(x < 1.0)
+
+	def main(float x) float : if(x < 1.0, 2.0)
+
+	def main(float x) float : if(x < 1.0, 2.0, 3.0, 4.0)
+
+
+	
+	def main(float x) float : sqrt(x) + sqrt(x + 1.0) + sqrt(x + 2.0) + sqrt(x + 3.0)
+
+struct Float4Struct { vector<float, 4> v } 
+			def main(Float4Struct a, Float4Struct b) Float4Struct : 
+				Float4Struct(a.v + [2.0]v4)
+struct Float4Struct { vector<float, 4> v } 
+			def main(Float4Struct a, Float4Struct b) Float4Struct : 
+				Float4Struct(a.v + [elem(b.v, 0)]v4)
+
+	
+	def main(float x) float :  elem(    [2.0]v8    , 5)
+def expensiveA(float x) float : cos(x * 2.0)			
+		def main(float x) float: expensiveA(x)
+
+
+		def expensiveA(float x) float : cos(x * 2.0)			
+		def main(float x) float: x + expensiveA(x)
+
+		def expensiveA(float x) float : cos(x * 0.456 + cos(x))			
+		def expensiveB(float x) float : sin(x * 0.345 + sin(x))			
+		def main(float x) float: if(x < 0.5, expensiveA(x + 0.145), expensiveB(x + 0.2435))
+
+
+	def g(float x) float : 8.f             def main(float x) float :  pow(g(x), 2.0)
+
+	def main(float x) float :  let y = (1.0 + 1.0) in pow(y, 3.0)
+
+	def g(float x) float :  pow(2 + x, -(1.0 / 8.0))         def main(float x) float : g(0.5)
+	
+	def g(float x, float y) float : pow(x, y)         def main(float x) float : g(2.0, 3.0)
+
+	def g(float x) float : 1 / x         def main(float x) float : g(2)
+
+	def g(float x) float : 1 / x         def main(float x) float : g(x)
+	
+	def g(float x) float : 10 + x         def main(float x) float : g(1)
+	
+	def main(float x) float : 1 + x
+
+	def g(float x) float : x*x         def main(float x) float : g(1 + x)
+	
+	def main(float x) float : sin(x) + sin(x + 0.02) * sin(x + 0.03)
+	
+	def main(float x) float : elem(-[1.0, 2.0, 3.0, 4.0]v, 2)
+	
+	def main(int x) int : elem(-[1, 2, 3, 4]v, 2)
+
+	def main(float x) float : elem(-[x + 1.0, x + 2.0, x + 3.0, x + 4.0]v, 2)
+	def main(int x) int : elem(-[x + 1, x + 2, x + 3, x + 4]v, 2)
+
+struct Float4Struct { vector<float, 4> v } 
+			def main(Float4Struct a, Float4Struct b) Float4Struct : 
+				Float4Struct(-v(a))
+
+
+	def main(float x) float : elem(  elem([1.0, 2.0, 3.0, 4.0]a, [2, 3]v)   , 0)
+
+	
+	def main(float x) float : elem(   shuffle([1.0, 2.0, 3.0, 4.0]v, [2, 3]v)   , 1)
+
+	def main(float x) float : elem(   shuffle([x + 1.0, x + 2.0, x + 3.0, x + 4.0]v, [2, 3]v)   , 1)
+
+	
+	def main(float x) float : elem(   shuffle([1.0, 2.0, 3.0, 4.0]v, [2, 3.0]v)   , 1)
+
+	
+	def main(int x) int : elem(   shuffle([1.0, 2.0, 3.0, 4.0]v, [2, x]v)   , 1)
+
+	
+		struct teststruct { int y }										
+		def f() teststruct : teststruct(1)						
+		def g() teststruct : teststruct(2)						
+		def main(int x) int : y( if x < 5 then f() else g() ) 
+
+
+	
+		struct teststruct { int y }										
+		def f(teststruct s) teststruct : teststruct(1 + y(s))						
+		def g(teststruct s) teststruct : teststruct(2 + y(s))						
+		def main(int x) int : y( if x < 5 then f(teststruct(1)) else g(teststruct(2)) ) 
+
+
+
+		struct teststruct { int y }										
+		def f(teststruct a, teststruct b, bool condition) teststruct : a      
+		def main(int x) int : y( f(teststruct(1), teststruct(2), x < 5) ) 
+
+
+		struct teststruct { int y }										
+		def f(teststruct a, teststruct b, bool condition) teststruct : teststruct(1)      
+		def main(int x) int : y( f(teststruct(1), teststruct(2), x < 5) ) 
+
+
+		struct teststruct { int y }										
+		def f(teststruct a, teststruct b, bool condition) teststruct : if(condition, a, b)      
+		def main(int x) int : y( f(teststruct(1), teststruct(2), x < 5) ) 
+
+
+	
+		struct teststruct { int y }										
+		def f(teststruct a, teststruct b, bool condition) teststruct :      
+			let																
+				x = if(condition, a, b)										
+			in																
+				x															
+		def main(int x) int : y( f(teststruct(1), teststruct(2), x < 5) ) 
+
+
+	
+	
+		"struct teststruct { int y }										
+		def f(teststruct a, teststruct b, bool condition) teststruct :      
+			let																
+				x = teststruct( y(if(condition, a, b))	)									
+			in																
+				x															
+		def main(int x) int : y( f(teststruct(1), teststruct(2), x < 5) ) 
+
+
+
+	
+		struct teststruct { int y }										
+		def g(teststruct a, teststruct b, bool condition) teststruct : if(condition, a, b)      
+		def f(teststruct a, teststruct b, bool condition) teststruct : if(condition, g(a, b, condition), g(a, b, condition))      
+		def main(int x) int : y( f(teststruct(1), teststruct(2), x < 5) ) 
+
+
+	
+	def main(float x) float : toFloat(if x >= -2147483648.0 && x < 2147483647.0 then truncateToInt(x) else 0)
+
+
+	def main(float x) float : toFloat(truncateToInt(3.1))
+
+def main(int i) int : if i > 1 then 2 else 0
+
+
+	def div(int x, int y) int : if(y != 0 && x != -2147483648, x / y, 0)	
+					   def main(int i) int : div(i, i)
+
+	def main(int i) int : if i != 0 && i != -1 then i / i else 0
+
+
+	
+	def f(int x) int : x*x	      def main(float x) float : 14 / (f(2) - 4)
+
+	def f(int x) int : x*x	      def main(float x) float : 14 / (f(2) + 2)
+
+	
+	def f(int x) int : x*x	      def main(float x) float : 14 / (f(2) + 3)
+
+	def main(int i) int : if i > -10000 then i / -1 else 0
+
+
+	def main(int i) int : if i >= 1 then -2147483648 / i else 0
+
+
+def main(int i) int : i / -1
+	
+
+	
+	
+		main(int i) int : i / 4
+
+
+def main(int i) int : i / 0
+
+
+
+	
+	def main(int i) int : if i != 0 then 8 / i else 0
+
+def main(int i) int : if i >= 0 && i < 2 then elem(elem([[1, 2]a, [3, 4]a]a, i), i) else 0
+
+def main(int i) int : if i >= 0 && i < 10 then elem([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]a, i) else 0
+	
+
+def main(int i) int : if i >= 0 && i < 10 then elem([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]v, i) else 0
+
+def main(int i) int :						
+			let										
+				a = [1, 2, 3, 4]a					
+			in										
+				elem(a, 1)							
+
+
+def main(int i) int :						
+			let										
+				a = [1, 2, 3, 4]a					
+			in										
+				elem(a, -1)		
+
+def main(int i) int :						
+			let										
+				a = [1, 2, 3, 4]a					
+			in										
+				if inBounds(a, i)					
+					elem(a, i)						
+				else								
+					0								
+	
+		def f(array<int, 4> a, int i) int :		
+			if inBounds(a, i)						
+				elem(a, i)							
+			else									
+				0									
+		def main(int i) int :						
+			f([1, 2, 3, 4]a, i)
+
+	
+	
+		main(int i) int :						
+			let										
+				a = [1, 2, 3, 4]a					
+			in										
+				if inBounds(a, i)					
+					elem(a, i)						
+				else								
+					0								
+
+
+	
+	
+		f(array<int, 4> a, int i) int :		
+			if inBounds(a, i)						
+				elem(a, i)							
+			else									
+				0									
+		def main(int i) int :						
+			f([1, 2, 3, 4]a, i)
+
+
+
+	
+	
+	
+	
+	
+		main(int i) int :						
+			let										
+				a = [1, 2, 3, 4]v					
+			in										
+				elem(a, 1)							
+
+
+	
+	testMainIntegerArgInvalidProgram(
+		main(int i) int :						
+			let										
+				a = [1, 2, 3, 4]v					
+			in										
+				elem(a, -1)		
+
+
+	
+		main(int i) int :						
+			let										
+				a = [1, 2, 3, 4]v					
+			in										
+				if inBounds(a, i)					
+					elem(a, i)						
+				else								
+					0								
+
+		
+	
+	
+		main(int i) int :						
+			let										
+				a = [1, 2, 3, 4]v					
+			in										
+				if inBounds(a, i)					
+					elem(a, i)						
+				else								
+					0								
+
+
+	
+		main(int i) int :						
+			match x = elem([1, 2, 3, 4]a, i)		
+				int: x								
+				error: 0							
+
+
+	
+	
+		main(int i) int :						
+			match x = elem([1, 2, 3, 4]a, i)		
+				int: x								
+				error: 0							
+
+
+	
+	
+	def main(int x) int : if x < 5 then 10 else 5 
+	def main(int x) int : if x < 5 then 10 else 5 
+
+	def main(int x) int : if (x < 5) then 10 else 5 
+	def main(int x) int : if (x * 2) < 5 then 10 else 5 
+
+	
+	def main(int x) int : if x < 5 10 else 5 
+	def main(int x) int : if x < 5 10 else 5 
+	def main(int x) int : if (x < 5) 10 else 5 
+	def main(int x) int : if (x * 2) < 5 10 else 5 
+
+	
+	def main(int x) int : if x < 5 then if x < 2 then 1 else 2 else 5 
+	def main(int x) int : if x < 5 then if x < 2 then 1 else 2 else 5 
+	def main(int x) int : if x < 5 then if x < 2 then 1 else 2 else 5 
+	def main(int x) int : if (x < 5) then if x < 2 then 1 else 2 else 5 
+	def main(int x) int : if x < 5 then if (x < 2) then 1 else 2 else 5 
+
+	
+	def main(int x) int : if x < 5 if x < 2 1 else 2 else 5 
+	def main(int x) int : if x < 5 if x < 2 1 else 2 else 5 
+	def main(int x) int : if x < 5 if x < 2 1 else 2 else 5 
+
+	def main(int x) int :			
+								if x < 5				
+									if x < 3			
+										1				
+									else				
+										2				
+								else					
+									if x < 7			
+										6				
+									else				
+										7				
+		
+
+	
+	def main(int x) int : if x < 5 then (if x < 2 then 1 else 2) else 5 
+	def main(int x) int : if x < 5 then (if x < 2 then 1 else 2) else 5 
+	def main(int x) int : if x < 5 then (if x < 2 then 1 else 2) else 5 
+
+
+	
+	
+	
+	
+
+		"struct teststruct { string str }										
+		def f() teststruct : teststruct(\"hello world\")						
+		def main(int x) int : stringLength(str(f())) 
+		2, 11
+
+	
+	
+		"struct teststruct { string str }										
+		def main(int x) int : stringLength(teststruct(\"hello world\").str) 
+		2, 11
+
+	
+
+	
+	
+	
+
+	
+	
+		f() string :"hello world\"	
+		def g() string : f()				
+		def main(int x) int : stringLength(g())
+
+	
+
+	
+	
+		main(int x) int : stringLength(concatStrings(\"hello\
+
+
+	
+	
+		main(int x) int :				
+			let								
+				s ="hello world\"			
+				s2 = s						
+			in								
+				stringLength(s) + stringLength(s2)
+
+
+	
+	
+		main(int x) int :				
+			let								
+				s ="hello world\"			
+				s2 ="hallo thar\"			
+			in								
+				stringLength(s) + stringLength(s2)
+
+
+	
+	
+		f() string :"hello world\"	
+		def main(int x) int : stringLength(f())
+
+
+	
+	
+		f() string :"hello world\"	
+		def main(int x) int :				
+			let								
+				s = f()						
+			in								
+				stringLength(s)
+
+
+	
+	
+		main(int x) int :				
+			let								
+				s ="hello world\"			
+			in								
+				stringLength(s)
+
+
+	
+	
+		main(int x) int :				
+				stringLength(\"hello world\")
+
+
+	
+	
+		main(int x) int :				
+			let								
+				s ="hello world\"			
+				s2 = s						
+			in								
+				stringLength(s2)
+
+
+	
+	
+		main(int x) int :				
+			let								
+				c = 'a'						
+			in								
+				10
+
+
+
+	
+	
+		main(float x) float: elem(   2.0 * [1.0, 2.0, 3, 4]v, 1)
+
+
+	
+	
+		main(float x) float: elem(   2.0 * [1.0, 2.0, 3.0, 4.0]v, 1)
+
+
+	
+	
+		main(float x) float: elem(   [1.0, 2.0, 3.0, 4.0]v * 2.0, 1)
+
+
+	
+	
+		main(int x) int: elem(   2 * [1, 2, 3, 4]v, 1)
+
+
+	
+	
+		main(int x) int: elem(   [1, 2, 3, 4]v * 2, 1)
+
+
+
+	
+	
+		main(float x) float: elem(   x * [x, 2.0, 3.0, 4.0]v, 1)
+
+
+	
+	
+		main(float x) float: elem(   [1.0, 2.0, 3.0, 4.0]v * x, 1)
+
+
+	
+	
+		main(int x) int: elem(   x * [1, 2, 3, 4]v, 1)
+
+
+	
+	
+		main(int x) int: elem(   [1, 2, 3, 4]v * x, 1)
+
+	
+	
+		main(int i) int :								
+			let												
+				a = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]v		
+				b = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1 ]v		
+			in												
+				elem(a + b, i)
+
+	
+		main(int i) int :								
+			let												
+				a = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]v		
+				b = [1.0, 1.6, 1.0, 1.0, 1.3, 1.6, 1.8, 1.6]v		
+				c = [1.7, 2.8, 3.0, 4.7, 5.5, 6.7, 7.0, 8.4]v		
+			in												
+				truncateToInt(elem(a + if(i < 1, b, c), i))
+
+
+	
+		main(int i) int :								
+			let												
+				a = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]v		
+				b = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 ]v		
+				c = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]v		
+			in												
+				truncateToInt(elem(a + if(i < 1, b, c), i))
+
+
+	
+
+	
+		main(int i) int : if i >= 0 && i < 10 then elem([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]v, i) else 0
+
+
+
+	
+		main(float x) float: elem( if(x < 0.5, [1.0, 2.0]a, [3.0, 4.0]a), 0)
+
+	
+	
+struct Float4Struct { vector<float, 4> v }			
+			struct Float4StructPair { Float4Struct a, Float4Struct b }			
+			def main(Float4StructPair pair1, Float4StructPair pair2) float :			
+				if(e0(pair1.a.v) < 0.5, dot(pair1.a.v, pair2.b.v), dot(pair1.b.v, pair2.a.v))
+
+
+	
+struct Float4Struct { vector<float, 4> v }			
+			struct Float4StructPair { Float4Struct a, Float4Struct b }			
+			def main(Float4StructPair pair1, Float4StructPair pair2) float :			
+				dot(pair1.a.v, pair2.b.v)
+
+
+	
+		
+		expensiveA(float x) float : cos(x * 0.456 + cos(x))			
+		def expensiveB(float x) float : sin(x * 0.345 + sin(x))			
+		def main(float x) float: if(x < 0.5, expensiveA(x + 0.145), expensiveB(x + 0.2435))
+
+
+
+	
+		op_add(array<float, 2> a, array<float, 2> b) array<float, 2> : [elem(a, 0) + elem(b, 0), elem(a, 1) + elem(b, 1)]a		
+		def main(float x) float: elem([1.0, 2.0]a  + [3.0, 4.0]a, 1)
+
+
+	
+	
+		op_mul(array<float, 2> a, float x) array<float, 2> : [elem(a, 0) * x, elem(a, 1) * x]a		
+		def main(float x) float: elem([1.0, 2.0]a * 2.0, 1)
+
+
+	
+	
+	
+		main(int i) int : if i >= 0 && i < 2 then elem(elem([[1, 2]a, [3, 4]a]a, i), i) else 0
+
+
+	
+	
+		struct Pair { int a, int b }		
+		def main(int i) int : if i >= 0 && i < 2 then b(elem([Pair(1, 2), Pair(3, 4)]a, i)) else 0 
+
+
+
+	
+		main(int i) int : if i >= 0 && i < 5 then elem([1, 2, 3, 4, 5]a, i) else 0
+
+		
+	
+	
+		main(int i) int : if i >= 0 && i < 20 then elem([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]a, i) else 0
+
+
+
+			main(int i) int : if i >= 0 && i < 5 then elem([1, 2, 3, 4, 5]a, i) else 0
+
+		main(int i) int : if i >= 0 && i < 4 then elem([1, 2, 3, 4]a, i) else 0
+
+
+			main(int i) int : elem([1, 2, 3, 4]a, i)
+
+
+		
+			main(int i) int : elem([1, 2, 3, 4]a, i)
+
+
+		
+		
+			main(float x) float : elem([1.0, 2.0, 3.0, 4.0]a, 4)
+
+
+		
+			main(float x) float : elem([1.0, 2.0, 3.0, 4.0]a, -1)
+
+
+		main(array<float, 4> a, array<float, 4> b) array<float, 4> : a
+
+			square(float x) float : x*x			
+			def main(array<float, 4> a, array<float, 4> b) array<float, 4> : map(square, a)
+
+
+		
+			square(float x) float : x*x			
+			def main(array<float, 256> a, array<float, 256> b) array<float, 256> : map(square, a)
+
+
+		main(array<float, 4> a, array<float, 4> b) array<float, 4> : [elem(a,0) + elem(b,0), elem(a,1) + elem(b,1), elem(a,2) + elem(b,2), elem(a,3) + elem(b,3)]a
+
+
+			struct Float4Struct { vector<float, 4> v } 
+			def main(Float4Struct a, Float4Struct b) Float4Struct : 
+				a
+
+struct Pair { float a, float b }		
+		def main(float x) float : b(elem([Pair(1.0, 2.0), Pair(3.0, 4.0)]a, 1)) 
+
+	
+	
+	def main(float x) float : elem([1.0, 2, 3.0, 4.0]a, 1) + x
+	def main(float x) float : elem([1, 2.0, 3.0, 4.0]a, 1) + x
+
+	
+	def main(float x) float : elem([1.0, 2.0, 3.0, 4.0]a, 1) + x
+
+	
+	def main(float x) float : elem([1.0]a, 0) + x
+
+	def main(float x) float : elem([x, x, x, x]a, 1) + x
+	def main(float x) float : elem([x, x+1.0, x+2.0, x+3.0]a, 2)
+
+	
+	
+	def main(int x) int : elem([1, 2, 3, 4]a, 1) + x
+
+	
+
+
+	
+	
+		main(float x) float :				
+			let									
+				a = [1.0, 2.0, 3.0, 4.0]a		
+			in									
+				elem(a, 0)
+
+
+	
+	
+		f(array<float, 4> a) float : elem(a, 1)		
+		def main(float x) float :						
+			f([1.0, 2.0, 3.0, 4.0]a) +  x
+
+
+
+	
+	def main(float x) float : abs(x)
+	def main(float x) float : abs(x)
+
+
+		
+			struct Float4Struct { vector<float, 4> v } 
+			def abs(Float4Struct f) : Float4Struct(abs(f.v))		
+			def main(Float4Struct a, Float4Struct b) Float4Struct : 
+				abs(a)
+			a, a, target_result
+
+
+	
+	
+	
+
+	
+struct Float4Struct { vector<float, 4> v } 
+			def sqrt(Float4Struct f) : Float4Struct(sqrt(f.v))		
+			def main(Float4Struct a, Float4Struct b) Float4Struct : 
+				let													
+					vec_int = truncateToInt(a.v)					
+				in													
+					Float4Struct(toFloat(vec_int))
+			a, a, target_result
+
+	def main(float x) float : sqrt(x)
+
+struct Float4Struct { vector<float, 4> v } 
+			def sqrt(Float4Struct f) : Float4Struct(sqrt(f.v))		
+			def main(Float4Struct a, Float4Struct b) Float4Struct : 
+				sqrt(a)
+
+
+	
+	def main(float x) float : pow(2.4, x)
+	def main(float x) float : pow(2.0, x)
+
+	struct Float4Struct { vector<float, 4> v } 
+			def pow(Float4Struct a, Float4Struct b) : Float4Struct(pow(a.v, b.v))		
+			def main(Float4Struct a, Float4Struct b) Float4Struct : 
+				pow(a, b)
+	
+
+	
+	def main(float x) float : sin(x)
+
+	
+struct Float4Struct { vector<float, 4> v } 
+			def sin(Float4Struct f) : Float4Struct(sin(f.v))		
+			def main(Float4Struct a, Float4Struct b) Float4Struct : 
+				sin(a)
+
+	
+	def main(float x) float : exp(x)
+
+	
+struct Float4Struct { vector<float, 4> v } 
+			def exp(Float4Struct f) : Float4Struct(exp(f.v))		
+			def main(Float4Struct a, Float4Struct b) Float4Struct : 
+				exp(a)
+
+
+	
+	def main(float x) float : log(x)
+
+	
+struct Float4Struct { vector<float, 4> v } 
+			def log(Float4Struct f) : Float4Struct(log(f.v))		
+			def main(Float4Struct a, Float4Struct b) Float4Struct : 
+				log(a)
+
+	
+	def main(float x) float : cos(x)
+
+	
+
+struct Float4Struct { vector<float, 4> v } 
+			def cos(Float4Struct f) : Float4Struct(cos(f.v))		
+			def main(Float4Struct a, Float4Struct b) Float4Struct : 
+				cos(a)
+
+	
+	def main(float x) float : floor(x)
+	def main(float x) float : floor(x)
+
+
+		
+struct Float4Struct { vector<float, 4> v } 
+			def floor(Float4Struct f) : Float4Struct(floor(f.v))		
+			def main(Float4Struct a, Float4Struct b) Float4Struct : 
+				floor(a)
+
+
+	def main(float x) float : ceil(x)
+	def main(float x) float : ceil(x)
+
+
+			struct Float4Struct { vector<float, 4> v } 
+			def ceil(Float4Struct f) : Float4Struct(ceil(f.v))		
+			def main(Float4Struct a, Float4Struct b) Float4Struct : 
+				ceil(a)
+
+
+	
+										
+		def main(float x) float :		
+			let							
+				z = y					
+				y = x					
+			in							
+				z				
+
+
+	
+										
+		def main(float x) float :		
+			let							
+				z = y					
+				y = z					
+			in							
+				z					
+
+
+	
+										
+		def main(float y) float :		
+			let							
+				x = x					
+			in							
+				x			
+
+
+	
+										
+		def main(float y) float :		
+			let							
+				x = 1.0 + x				
+			in							
+				x	
+
+
+	
+							
+		def f(float x) float : x		
+		def main(float y) float :		
+			let							
+				f1 = f(1.0) + 1.0				
+				f = f(1.0) + 1.0				
+			in							
+				f						
+		1.0f,
+		2.0f
+
+
+
+	
+	
+	def f() float : 
+				  let	
+					z = 2.0 
+					y = z 
+				  in 
+					y 
+				  def main() float : f()
+
+		
+			struct Float4Struct { vector<float, 4> v } 
+			def min(Float4Struct a, Float4Struct b) Float4Struct : Float4Struct(min(a.v, b.v)) 
+			def main(Float4Struct a, Float4Struct b) Float4Struct : 
+				min(a, b)
+			a, b, target_result
+
+
+	
+struct Float8Struct { vector<float, 8> v } 
+			def min(Float8Struct a, Float8Struct b) Float8Struct : Float8Struct(min(a.v, b.v)) 
+			def main(Float8Struct a, Float8Struct b) Float8Struct : 
+				min(a, b)
+	
+	
+	struct vec4 { vector<float, 4> v }					
+				   struct vec16 { vector<float, 16> v }					
+				   struct large_struct { vec4 a, vec16 b }				
+				   def main(float x) float : large_struct(vec4([x, x, x, x]v), vec16([x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x]v)).a.v.e0
+
+
+
+	
+	
+		def main(float x) float :
+					 let v = [x, x, x, x]v in\
+					 dot(v, v)
+
+
+	
+								
+		def main(float x) float :		
+			let							
+				x = 2.0					
+			in							
+				x						
+
+							
+		struct vec3 { float x, float y, float z }		
+		def vec3(float v) vec3 : vec3(v, v, v)			
+		def eval(vec3 pos) vec3 :						
+			let											
+				x = sin(x(pos) * 1000.0)				
+			in											
+				vec3(0.1)								
+		def main(float t) float: x(eval(vec3(t, t, t)))
+
+				
+		struct vec3 { float x, float y, float z }	
+		def vec3(float v) vec3 : vec3(v, v, v)		
+		def op_add(vec3 a, vec3 b) vec3 : vec3(a.x+b.x, a.y+b.y, a.z+b.z)	
+		def eval(vec3 pos) vec3 :					
+			let											
+				scale = 20.0							
+			in											
+				vec3(scale) + vec3(0.2)					
+		def main(float x) float: x(eval(vec3(x, x, x)))
+
+
+	
+									
+		struct vec3 { float x, float y, float z }	
+		def vec3(float v) vec3 : vec3(v, v, v)		
+		def op_mul(vec3 a, float b) vec3 : vec3(a.x*b, a.y*b, a.z*b)	
+		def eval(vec3 pos) vec3 :					
+			let											
+				actualpos = vec3(pos.x, pos.y, pos.z + 10.0)				
+			in											
+				actualpos * 10000.0						
+		def main(float x) float: x(eval(vec3(x, x, x)))
+
+
+	
+	
+	
+	
+	
+	def main(float x) float : if(x < 1.0 + 2.0, 5.0, 6.0)
+
+
+
+
+	
+def main() float :                          
+				  let blerg = 3.0 in                     
+				  let f =\() : blerg  in                    
+				  f()
+
+	
+
+	def main(float x) float : sin(x)
+
+
+	
+	 def main() float : if(true && true, 1.0, 2.0)
+	 def main() float : if(true && false, 1.0, 2.0)
+	 def main() float : if(true || false, 1.0, 2.0)
+	 def main() float : if(false || false, 1.0, 2.0)
+
+
+	
+	
+	
+
+	
+	struct s { float x, float y } 
+				  def op_add(s a, s b) : s(a.x + b.x, a.y + b.y) 
+				  def main() float : x(s(1, 2) + s(3, 4))
+
+	
+	struct s { float x, float y } 
+				  def op_mul(s a, s b) : s(a.x * b.x, a.y * b.y) 
+				  def main() float : x(s(2, 3) * s(3, 4))
+
+	
+	struct s { float x, float y } 
+				  def op_sub(s a, s b) : s(a.x - b.x, a.y - b.y) 
+				  def main() float : x(s(2, 3) - s(3, 4))
+
+	
+	struct s { float x, float y } 
+				  def op_div(s a, s b) : s(a.x / b.x, a.y / b.y) 
+				  def main() float : x(s(2, 3) / s(3, 4))
+
+	
+	struct s { float x, float y } 
+				  def op_unary_minus(s a) : s(-a.x, -a.y) 
+				  def main() float : x(-s(2, 3))
+
+	struct S { float x, float y }					
+				  struct T { float z, float w }					
+				  def op_add(S a, T b) S : S(a.x + b.z, a.y + b.w)	
+				  def main() float : x(S(1, 2) + T(3, 4))
+
+	
+	struct S { float x, float y }					
+				  struct T { float z, float w }					
+				  def op_add(S a, T b) T : T(a.x + b.z, a.y + b.w)	
+				  def main() float : z(S(1, 2) + T(3, 4))
+
+	
+	
+	
+	struct s { float x, float y }						
+				  def op_add(s a, s b) : s(a.x + b.x, a.y + b.y)		
+				  def f<T>(T a, T b) : a + b							
+				  def main() float : x(f(s(1, 2), s(3, 4)))
+
+	
+
+	def f(float x) float : x*x         def main() float : f(10)
+	def f(float x, float y) float : 1.0f   
+				  def f(float x, int y) float : 2.0f   
+				  def main() float : f(1.0, 2)
+
+	
+	def main() float : 3.0 + 4
+
+	def main() float : 3 + 4.0
+
+	def main() float : 3.0 - 4
+
+	def main() float : 3 - 4.0
+
+	def main() float : 3.0 * 4
+
+	def main() float : 3 * 4.0
+
+	def main() float : 12.0 / 4
+
+	def main() float : 12 / 4.0
+	
+	
+	
+	def f(float x) float : x*x      def main(float x) float : f(x) + 3
+
+	def f(float x) float : x*x      def main(float x) float : 3 + f(x)
+
+	
+	def f(float x) float : x*x      def main(float x) float : f(x) - 3
+
+	def f(float x) float : x*x      def main(float x) float : 3 - f(x)
+
+	
+	def f(float x) float : x*x      def main(float x) float : f(x) * 3
+
+	def f(float x) float : x*x      def main(float x) float : 3 * f(x)
+
+	
+	def f(float x) float : x*x      def main(float x) float : f(x) / 3
+
+
+	def f(float x) float : x*x      def main(float x) float : 14 / (f(2) + 3)
+
+	def f(int x) int : x*x	      def main(float x) float : 14 / (f(2) + 3)
+
+	def f<T>(T x) T : x*x           def main(float x) float : 14 / (f(2) + 3)
+
+	def f(float x) float : x*x      def main(float x) float : f(x) * 2 + 1
+	
+	def main(float x) float : ( x + x) * (-0.4)
+
+	def main(float x) float : (x + x) - 1.5
+	
+	
+	
+	def f(float x) float : x*x      def main(float x) float : f(x) / 3
+
+
+	def f(float x) float : x*x      def main(float x) float : f(x) * (1.0 / 3.0)
+
+	def f(float x) float : x*x      def main(float x) float : f(x) * (1 / 3.0)
+
+	def f(float x) float : x*x      def main(float x) float : f(x) * (1.0 / 3)
+
+	
+	def f(float x) float : x*x      def main(float x) float : 1.0 / 3.0
+
+
+
+	
+	def main() float : 3
+
+	def main() float : 1.0 + (2 + 3)
+	
+	def main() float : 1.0 + 2 + 3
+	
+	
+	
+
+	def main() float : (1.0 + 2.0) + (3 + 4)
+
+	def main() float : (1.0 + 2) + (3 + 4)
+
+
+	
+	
+	main() int : if(1 <= 2, 10, 20)
+
+	main() int : if(1 <= 1, 10, 20)
+
+	main() int : if(3 <= 1, 10, 20)
+
+	
+	main() int : if(1 >= 2, 10, 20)
+
+	main() int : if(1 >= 1, 10, 20)
+
+	main() int : if(3 >= 1, 10, 20)
+
+	
+	main() int : if(1 < 2, 10, 20)
+
+	main() int : if(3 < 1, 10, 20)
+
+	
+	main() int : if(1 > 2, 10, 20)
+
+	main() int : if(3 > 1, 10, 20)
+
+	
+	main() int : if(1 == 1, 10, 20)
+
+	main() int : if(1 == 2, 10, 20)
+
+	
+	main() int : if(1 != 1, 10, 20)
+
+	main() int : if(1 != 2, 10, 20)
+
+
+	
+	
+	def main() float : if(1.0 <= 2.0, 10.0, 20.0)
+
+	def main() float : if(1.0 <= 1.0, 10.0, 20.0)
+
+	def main() float : if(3.0 <= 1.0, 10.0, 20.0)
+
+	
+	def main() float : if(1.0 >= 2.0, 10.0, 20.0)
+
+	def main() float : if(1.0 >= 1.0, 10.0, 20.0)
+
+	def main() float : if(3.0 >= 1.0, 10.0, 20.0)
+
+	
+	def main() float : if(1.0 < 2.0, 10.0, 20.0)
+
+	def main() float : if(3.0 < 1.0, 10.0, 20.0)
+
+	
+	def main() float : if(1.0 > 2.0, 10.0, 20.0)
+
+	def main() float : if(3.0 > 1.0, 10.0, 20.0)
+
+	
+	def main() float : if(1.0 == 1.0, 10.0, 20.0)
+
+	def main() float : if(1.0 == 2.0, 10.0, 20.0)
+
+	
+	def main() float : if(1.0 != 1.0, 10.0, 20.0)
+
+	def main() float : if(1.0 != 2.0, 10.0, 20.0)
+
+
+	
+	
+	
+	
+
+	
+	def main() float : if(1.0 <= 2, 10.0, 20.0)
+	def main() float : if(1 <= 2.0, 10.0, 20.0)
+
+	
+	def main() float : if(3 <= 1.0, 10.0, 20.0)
+	def main() float : if(3.0 <= 1, 10.0, 20.0)
+
+	
+	def main(float x) float : if(x <= 2, 10.0, 20.0)
+	def main(float x) float : if(x <= 2, 10.0, 20.0)
+
+	def main(float x) float : if(2 <= x, 10.0, 20.0)
+	def main(float x) float : if(2 <= x, 10.0, 20.0)
+
+
+
+
+	
+	main() int : if(true, 2, 3)
+	main() int : if(false, 2, 3)
+
+	
+	struct s { int a, int b }   
+		def main() int : a(if(true, s(1, 2), s(3, 4)))
+
+	struct s { int a, int b }   
+		def main() int : a(if(false, s(1, 2), s(3, 4)))
+
+
+	
+	
+		main() float : e0(if(true, [1.0, 2.0, 3.0, 4.0]v, [10.0, 20.0, 30.0, 40.0]v))
+
+	
+		main() float : e0(if(false, [1.0, 2.0, 3.0, 4.0]v, [10.0, 20.0, 30.0, 40.0]v))
+
+
+
+	def main() float : testExternalFunc(3.0)
+	def main(float x) float : testExternalFunc(x)
+
+
+	
+	
+	def main() float : 1.0
+
+	
+	def main() float : 1.0 + 2.0
+
+	
+	main() int : 1 + 2
+
+	
+	main() int : 1 + 2 + 3
+	main() int : 1 + 2 + 3 + 4
+
+	
+	main() int : 1 - 2 - 3 - 4
+
+	
+	
+
+
+	main() int : 2 - 3 + 4
+
+
+	
+	def main() float : 3.0 * 2.0
+
+
+
+
+	
+	main() int : 2 * 3
+
+	
+	main() int : 2 * 3 * 4 * 5
+
+	
+	
+	
+	
+	main() int : 12 / 4 / 3
+
+
+	
+	def main() float : 3.0 - 2.0
+
+	
+	main() int : 2 - 3
+
+	
+	main() int : 2 + 3 * 4
+	main() int : 2 * 3 + 4
+
+	
+	main() int : (2 + 3) * 4
+	main() int : 2 * (3 + 4)
+
+
+	
+	main() int : -(1 + 2)
+
+	
+	def main() float : -(1.0 + 2.0)
+
+	
+	f(int x) int : -x        def main() int : f(3)
+
+
+
+
+	
+	def f(float x) float : x        def main() float : f(3.0)
+
+	
+	def f(float x, float y) float : x        def main() float : f(3.0, 4.0)
+	def f(float x, float y) float : y        def main() float : f(3.0, 4.0)
+
+	
+	def f(float x) : x        def main() float : f(3.0)
+
+	
+	def f(float x) : g(x)    def g(float x) : x    def main() float : f(3.0)
+	def f(float x) : x    def g(float x) : f(x)    def main() float : g(3.0)
+
+	
+	def f<T>(T x) T : x        def main() float : f(2.0)
+
+	
+	def f<T>(T x) : x        def main() float : f(2.0)
+
+
+	
+	def overloadedFunc(int x) float : 4.0
+				  def overloadedFunc(float x) float : 5.0
+				  def main() float: overloadedFunc(1)
+
+	
+	def overloadedFunc(int x) float : 4.0
+				  def overloadedFunc(float x) float : 5.0
+				  def main() float: overloadedFunc(1.0)
+
+	
+	def overloadedFunc(int x) float : 4.0
+				  def overloadedFunc(float x) float : 5.0
+				  def f<T>(T x) float: overloadedFunc(x)\
+				  def main() float : f(1)
+
+	
+	def overloadedFunc(int x) float : 4.0
+				  def overloadedFunc(float x) float : 5.0
+				  def f<T>(T x) float: overloadedFunc(x)
+				  def main() float : f(1.0)
+
+	
+	def f(float x) float :
+				  let z = 2.0
+				  in
+				  z
+				  def main() float : f(0.0)
+
+	
+	def f(float x) float :
+				  let	
+					z = 2.0
+					y = 3.0
+				  in
+					y + z
+				  def main() float : f(0.0)
+
+	
+		def f(float x) float :
+					let	
+						z = 2.0
+					in
+						let		
+							y = 10.0 
+						in				
+							y + z			
+				  def main() float : f(0.0)
+
+	
+		def f(float a) float :
+				  let	
+					x = 1.0 
+					y = 2.0
+				  in
+					let		
+						z = 10.0 
+						w = 20.0  	
+					in				
+						x + y + z + w			
+				  def main() float : f(0.0)
+
+	
+	def f() float :
+				  let	
+					z = 2.0
+					y = z
+				  in
+					y
+				  def main() float : f()
+
+
+	
+	def f(float x) float :		
+				  let								
+					float z = 2.0					
+				  in								
+					x + z							
+				  def main(float x) float : f(x)
+
+	
+	def f(float x) float :		
+				  let								
+					float y = 2.0					
+					float z = 3.0					
+				  in								
+					x + y + z							
+				  def main(float x) float : f(x)
+
+	
+	def f(float x) float :		
+				  let								
+					float z = 2						
+				  in								
+					x + z							
+				  def main(float x) float : f(x)
+
+
+	
+	def f(float x) float :		
+				  let								
+					bool z = 2						
+				  in								
+					x + z							
+				  def main(float x) float : f(x)
+
+	def f(float x) float :		
+				  let								
+					int z = true					
+				  in								
+					x + z							
+				  def main(float x) float : f(x)
+
+	def f(float x) float :		
+				  let								
+					bool y = true					
+					int z = y						
+				  in								
+					x + z							
+				  def main(float x) float : f(x)
+
+	
+	/*def f() float :
+				  let	
+					z = y
+					y = 2.0
+				  in
+					y
+				  def main() float : f()
+
+	
+		def makeFunc(float x) function<float> :() : x      
+					def main() float :                          
+					let f = makeFunc(2.0) in                    
+					f()
+
+
+
+	
+	def makeLambda() :(float x) : x*x    
+					def main() float :           
+					let f = makeLambda()  in   
+				  f(2.0)
+
+	
+
+	def g(function<float, float> f, float x) : f(x)       
+					def main() float :           
+					g(\\(float x) : x*x*x, 2.0f)
+
+
+	
+	
+		def makeFunc(float x) function<float> :\() : x      
+					def main() float :                          
+					let f = makeFunc(2.0) in                    
+					f()
+
+
+	
+		def makeFunc(float x, float y) function<float> :\() : x + y     
+					def main() float :                          
+					let f = makeFunc(2.0, 3.0) in                    
+					f()
+	
+	
+		def makeFunc(float x) function<float, float> :\(float y) : x + y     
+					def main() float :                          
+					let f = makeFunc(2.0) in                    
+					f(3.0)
+
+
+	
+	
+	NOTE: Disabled, because these tests leak due to call to allocateRefCountedStructure().
+		def main() float :                          
+					let x = 3.0 in                         
+					let z = 4.0 in                         
+					let f =\() : x  in                    
+					f()
+
+		def main() float :                          
+					let x = 3.0 in                         
+					let z = 4.0 in                         
+					let f =\() : z  in                    
+					f()
+
+
+
+
+	
+	def f(float x) float :
+				  let z = 2.0 + 3.0 in
+				  z
+				  def main() float : f(0.0)
+
+	
+		def g(float x) float : x + 1.0
+					def f(float x) float :
+					let z = g(1.0) in
+					z
+					def main() float : f(0.0)
+
+	
+		def f(float x) float :
+					let z = x + 1.0 in
+					z
+					def main() float : f(2.0)
+
+
+	
+		def f(float x) float :
+				  let z = x + 1.0 in
+				  z + z
+				  def main() float : f(2.0)
+
+
+
+		
+			struct Float4Struct { vector<float, 4> v } 
+			def sqrt(Float4Struct f) : Float4Struct(sqrt(f.v))		
+			def main(Float4Struct a, Float4Struct b) Float4Struct : 
+				let													
+					a = Float4Struct([1.0, 2.0, 3.0, 4.0]v)			
+				in													
+					sqrt(a)
+
+
+	
+	struct Complex { float re, float im }
+				  def main() float : re(Complex(2.0, 3.0))
+	
+	struct Complex { float re, float im }
+ 				  def main() float : im(Complex(2.0, 3.0))
+
+	
+	struct Complex { float re, float im }
+				  struct ComplexPair { Complex a, Complex b }
+				  def main() float : im(a(ComplexPair(Complex(2.0, 3.0), Complex(4.0, 5.0))))
+
+
+	
+	struct Complex { float re, float im } 
+ 				  def main() float : 
+					let z = Complex(2.0, 3.0) in 
+					z.im
+
+	
+	struct Complex { float re, float im } 
+ 				  def main() float : 
+					Complex(2.0, 3.0).im
+
+	
+	struct Complex { float re, float im } 
+				  def f() Complex : Complex(1.0, 2.0) 
+ 				  def main() float : 
+					f().im
+
+
+	
+	struct Complex { float re, float im } 
+				  struct ComplexPair { Complex a, Complex b } 
+				  def main() float : ComplexPair(Complex(2.0, 3.0), Complex(4.0, 5.0)).a.im
+
+
+
+	
+		def main() float :
+					let x = [1.0, 2.0, 3.0, 4.0]v in\
+					e0(x)
+		def main() float :
+					let x = [1.0, 2.0, 3.0, 4.0]v in
+					e1(x)
+
+	
+		def f() vector<float, 4> : [1.0, 2.0, 3.0, 4.0]v
+					def main() float : e2(f())
+
+	
+		def main() float :
+					let x = [1.0, 2.0, 3.0, 4.0]v
+					y = [10.0, 20.0, 30.0, 40.0]v in
+					e1(x + y)
+
+	
+		def main() float :
+					let x = [1.0, 2.0, 3.0, 4.0]v
+					y = [10.0, 20.0, 30.0, 40.0]v in
+					e1(x - y)
+
+	
+		def main() float :
+				  let x = [1.0, 2.0, 3.0, 4.0]v in
+			  e1(x * 10.0)
+
+	
+		def main() float :
+				  let x = [1.0, 2.0, 3.0, 4.0]v
+				  y = [10.0, 20.0, 30.0, 40.0]v in
+				e1(x * y)
+
+	
+	"	def main() int :
+				  let x = [1, 2, 3, 4]v
+				  y = [10, 20, 30, 40]v in
+				e1(x * y)
+
+	
+		def mul(vector<float, 4> v, float x) vector<float, 4> : v * [x, x, x, x]v 
+					def main() float :
+						let x = [1.0, 2.0, 3.0, 4.0]v
+						y = 10.0 in
+						mul(x, y).e1
+
+		def mul(vector<float, 4> v, float x) vector<float, 4> : v * [x, x, x, x]v 
+				  def main(float x) float :
+				  let v = [1.0, 2.0, 3.0, 4.0]v in
+				  e1(mul(v, x))
+
+	
+		def main(float x) float :
+					 let v = [x, x, x, x]v in
+					 dot(v, v)
+
+		def main(float x) float :
+					 let v = [x, x, x, x, x, x, x, x]v in
+					 dot(v, v)
+
+
+	
+		def main() float :
+					 let a = [1.0, 2.0, 3.0, 4.0]v
+					 b = [11.0, 12.0, 13.0, 14.0]v in
+					 e2(min(a, b))
+		def main() float :
+				  let a = [1.0, 2.0, 3.0, 4.0]v
+				  b = [11.0, 12.0, 13.0, 14.0]v in
+				  e2(min(b, a))
+
+	
+		def main() float :
+				  let a = [1.0, 2.0, 3.0, 4.0]v
+				  b = [11.0, 12.0, 13.0, 14.0]v in
+				  e2(max(a, b))
+		def main() float :
+				  let a = [1.0, 2.0, 3.0, 4.0]v
+				  b = [11.0, 12.0, 13.0, 14.0]v in
+				  e2(max(b, a))
+				  
+
+		def clamp(vector<float, 4> x, vector<float, 4> lowerbound, vector<float, 4> upperbound) vector<float, 4> : max(lowerbound, min(upperbound, x))  
+					def make_v4f(float x) vector<float, 4> : [x, x, x, x]v  
+					def main() float :
+					let a = [1.0, 2.0, 3.0, 4.0]v in
+					e2(clamp(a, make_v4f(2.0), make_v4f(2.5)))
+
+		struct PolarisationVec { vector<float, 8> e } 
+																	
+					def clamp(vector<float, 4> x, vector<float, 4> lowerbound, vector<float, 4> upperbound) vector<float, 4> : max(lowerbound, min(upperbound, x))  
+																																					
+					def clamp(PolarisationVec x, float lowerbound, float upperbound) PolarisationVec : 
+						let lo = [e0(e(x)), e1(e(x)), e2(e(x)), e3(e(x))]v   
+						hi = [e4(e(x)), e5(e(x)), e6(e(x)), e7(e(x))]v   
+						clamped_lo = clamp(lo, make_v4f(lowerbound), make_v4f(upperbound))   
+						clamped_hi = clamp(hi, make_v4f(lowerbound), make_v4f(upperbound))  in 
+						PolarisationVec([e0(clamped_lo), e1(clamped_lo), e2(clamped_lo), e3(clamped_lo), e0(clamped_hi), e1(clamped_hi), e2(clamped_hi), e3(clamped_hi)]v)   
+																																												
+				  def make_v4f(float x) vector<float, 4> : [x, x, x, x]v  
+																		
+				  def main() float :
+					let a = PolarisationVec([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]v) in
+					e5(e(clamp(a, 2.0, 2.5)))
+
+	
+	
+	
+	
+struct Matrix { vector<float, 4> r0, vector<float, 4> r1, vector<float, 4> r2, vector<float, 4> r3 } 
+						def mul(Matrix m, vector<float, 4> v) vector<float, 4> : [dot(r0(m), v), dot(r1(m), v), dot(r2(m), v), dot(r3(m), v)]v  
+						def main(float x) float :
+						let m = Matrix([x, x, x, x]v, [x, x, x, x]v, [x, x, x, x]v, [x, x, x, x]v)
+					 let v = [1.0, 2.0, 3.0, 4.0]v
+					 e0(mul(m, v))
+
+
+struct TestStruct { float a, float b, float c, float d }
+			def main() TestStruct : TestStruct(1.0, 2.0, 3.0, 4.0)
+
+struct TestStruct { float a, float b, float c, float d }
+			def main() TestStruct : TestStruct(1.0, 2.0, 3.0, 4.0)
+		
+
+struct TestStruct { float a, float b, float c, float d }
+			struct TestStructIn { float x, float y }
+			def main(TestStructIn in_s) TestStruct : TestStruct(x(in_s), y(in_s), 3.0, 4.0)
+		
+
+							struct StructWithVec { vector<float, 4> a, vector<float, 4> b, float data2 } 
+							def main(StructWithVec in_s) StructWithVec : 
+								StructWithVec(  
+								a(in_s) + b(in_s), #[e0(a(in_s)) + e0(b(in_s)), e1(a(in_s)) + e1(b(in_s)), e2(a(in_s)) + e2(b(in_s)), e3(a(in_s)) + e3(b(in_s))]v, 
+								a(in_s), 
+								data2(in_s))
+

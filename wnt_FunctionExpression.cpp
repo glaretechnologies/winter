@@ -153,6 +153,10 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 {
 	if(VERBOSE_EXEC) std::cout << indent(vmstate) << "FunctionExpression, target_name=" << this->function_name << "\n";
 
+	if(vmstate.func_args_start.size() > 1000)
+		throw BaseException("Function call level too deep, aborting.");
+
+
 	if(this->binding_type == Unbound)
 		throw BaseException("Function is not bound.");
 	
@@ -267,6 +271,19 @@ bool FunctionExpression::doesFunctionTypeMatch(const TypeRef& type)
 }*/
 
 
+static bool isTargetDefinedBeforeAllInStack(const std::vector<FunctionDefinition*>& func_def_stack, const FunctionDefinition* target_function)
+{
+	if(!target_function->srcLocation().isValid()) // If target is a built-in function etc.. then there are no ordering problems.
+		return true;
+
+	for(size_t i=0; i<func_def_stack.size(); ++i)
+		if(target_function->function_order_num >= func_def_stack[i]->function_order_num)
+			return false;
+
+	return true;
+}
+
+
 void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
 	// Return if we have already bound this function in an earlier pass.
@@ -344,6 +361,7 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 					else
 					{
 						if(let_block->lets[i]->variable_name == this->function_name && 
+							let_block->lets[i]->type().nonNull() && // Let var might be an unbound function -> no type
 							doesFunctionTypeMatch(let_block->lets[i]->type()))
 						{
 							this->bound_index = i;
@@ -401,7 +419,7 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 
 			// Try and resolve to internal function.
 			this->target_function = linker.findMatchingFunction(sig).getPointer();
-			if(this->target_function)
+			if(this->target_function && isTargetDefinedBeforeAllInStack(payload.func_def_stack, target_function)) // Disallow recursion for now: Check the linked function is not the current function.
 			{
 				this->binding_type = BoundToGlobalDef;
 			}
@@ -426,7 +444,7 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 				const FunctionSignature coerced_sig(this->function_name, coerced_argtypes);
 
 				this->target_function = linker.findMatchingFunction(coerced_sig).getPointer();
-				if(this->target_function)
+				if(this->target_function && isTargetDefinedBeforeAllInStack(payload.func_def_stack, target_function)) // Disallow recursion for now: Check the linked function is not the current function.
 				{
 					this->binding_type = BoundToGlobalDef;
 
@@ -571,7 +589,7 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 		// because the binding depends on argument type due to function overloading, so we have to wait
 		// until we know the concrete type.
 
-		if(!payload.func_def_stack.back()->isGenericFunction())
+		if(payload.func_def_stack.empty() || !payload.func_def_stack.back()->isGenericFunction())
 			linkFunctions(*payload.linker, payload, stack);
 
 		// Set shuffle mask now
@@ -690,12 +708,24 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 		if(this->binding_type == Unbound)
 		{
 			vector<TypeRef> argtypes;
+			//bool has_null_argtype = false;
 			for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
+			{
 				argtypes.push_back(this->argument_expressions[i]->type());
+				//if(argtypes.back().isNull())
+				//	has_null_argtype = true;
+			}
 
-			const FunctionSignature sig(this->function_name, argtypes);
+			/*if(has_null_argtype)
+			{
+				throw BaseException("Failed to find function '" + this->function_name + "'." + errorContext(*this));
+			}
+			else*/
+			{
+				const FunctionSignature sig(this->function_name, argtypes);
 		
-			throw BaseException("Failed to find function '" + sig.toString() + "'." + errorContext(*this));
+				throw BaseException("Failed to find function '" + sig.toString() + "'." + errorContext(*this));
+			}
 		}
 		else if(this->binding_type == BoundToGlobalDef)
 		{
@@ -1399,6 +1429,8 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		target_llvm_func = params.builder->CreateLoad(func_ptr_ptr, "func_ptr");
 		}*/
 
+		throw BaseException("Support for first class functions as let variables disabled.");//TEMP
+
 		target_llvm_func = LLVMTypeUtils::createFieldLoad(
 			closure_pointer,
 			1, // field index
@@ -1443,6 +1475,8 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		target_llvm_func = params.builder->CreateLoad(field_ptr, "func_ptr");
 		}*/
 		//closure_pointer->dump();
+
+		throw BaseException("Support for first class functions passed as arguments disabled.");//TEMP
 
 		target_llvm_func = LLVMTypeUtils::createFieldLoad(
 			closure_pointer,

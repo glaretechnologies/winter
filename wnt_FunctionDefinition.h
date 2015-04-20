@@ -136,6 +136,8 @@ public:
 	bool is_anon_func;
 
 	int num_uses; // Conservative, >= than the actual num uses.
+
+	int function_order_num;
 private:
 	FunctionDefinition* alloc_func; // NOTE: make this just a ptr?
 };

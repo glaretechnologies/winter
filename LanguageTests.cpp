@@ -7,7 +7,12 @@
 
 #include "LanguageTestUtils.h"
 #include <utils/Timer.h>
-//#include "ProgramBuilder.h"
+#include <utils/MTwister.h>
+#include <utils/Task.h>
+#include <utils/TaskManager.h>
+#include <utils/MemMappedFile.h>
+#include <utils/FileUtils.h>
+#include <unordered_set>
 
 
 namespace Winter
@@ -56,12 +61,169 @@ void LanguageTests::doLLVMInit()
 }
 
 
+static const bool DO_OPENCL_TESTS = false;
+
+
 void LanguageTests::run()
 {
-//	ProgramBuilder::test();
 	Timer timer;
 
+	//fuzzTests();
 
+	// ===================================================================
+	// Miscellaneous programs that caused crashes or other errors during fuzz testing
+	// ===================================================================
+
+	testFuzzProgram("def main(float x)  : if(x < 10.0, 3, 4)");
+
+	testFuzzProgram("def main(float x) float : let v = [x, x, x, x, x, x, x, x]v in dot(v, v)");
+
+	testMainFloatArgInvalidProgram("def g(function<float, float> f, float x) : f(x)");
+
+	testMainFloatArgInvalidProgram("def overload(float x) float : 5.0 				  def overloadedFunc(float x) float : 5.0 	 def f<T>(T x) float: overloadedFunc       def main() float : f(1)");
+
+	testMainFloatArgInvalidProgram("def expensiveA(float x) float : cos(x * 2.0)			 def expensiveA(float x) float : cos(x * 2.0)			 		def main(float x) float: e xpensiveA(x) 		def expensiveA(float x) float : cos(x * 2.0)			 		def main(float x) float: x + expensiveA(x) 		def expensiveA(float x) float : cos(x * 0.456 + cos(x))			 		def expensiveB(float x) float : sin(x * 0.345 + sin(x)).			 		def main(float x) float: if(x < 0.5, expensiveA(x + 0.145), expensiveB(x + 0.2435)) 	def g(float x) float : 8.f             def main(float x) float :  pow(g(x), 2.0) 	def main(float x) float :  let y = (1.0 + 1.0) in pow(y, 3.0) 	def g(float x) float :  pow(2 + x, -(1.0 / 8.0))         def main(float x) float : g(0.5)");
+
+	// Disallow definition of same function (with same signature) twice.
+	testMainFloatArgInvalidProgram("def f(float x) : x   def f(float x) : x     def main(float x) float : f(2.0)");
+
+	testMainFloatArgInvalidProgram("def f<T>(T x) : x ()        def main() float : f(2.0)");
+
+	testMainFloatArgInvalidProgram("struct s { float x, float y }						\n\
+				  def f<T>(T a, T b) : a + b							\n\
+				  def main() float : x(f(s(1, 2), s(3, 4)))");
+
+	//testMainFloatArgInvalidProgram("struct s { float x, float y }	def op_fadd(s a, s b) : s(a.x + b.x, a.y + b.y)		 def f<T>(T a, T b) : a + b		 def main() float : x(f(s(1, 2), s(3, 4)))");
+
+//	testMainFloatArgInvalidProgram("struct s { float x, float y }						 	struct s { float x, float y }						 				  def op_fadd(s a, s b) : s(a.x + b.x, a.y + b.y)		 				  def f<T>(T a, T b) : a + b							 				  def main() float : x(f(s(1, 2), s(3, 4)))");
+
+	testMainFloatArgInvalidProgram("struct s { float x, float y }  	struct s { float x, float y }  				  def op_mul(s a, s b) : s(a.x * b.x, a().y * b.y)  				  def main() float : x(s(2, 3) * s(3, 4))");
+	testMainFloatArgInvalidProgram("struct s { float x, float y }   def fop_add(s a, s b) : s(a.x + b.x, a.y + b.y)	 ");
+
+	testMainFloatArgInvalidProgram("#e71 def main(float x) float : x");
+	testMainFloatArgInvalidProgram("     n=\\():\"\"     ");
+	//testMainFloatArgInvalidProgram("E=\\():4.    def main(float x) float : x");
+
+	// struct s { float x, float y }  	struct s { float x, float y }  				  def op_mul(s a, s b) : s(a.x * b.x, a().y * b.y)  				  def main() float : x(s(2, 3) * s(3, 4))
+
+	testMainFloatArgInvalidProgram("struct s { float x, float y }   def fop_add(s a, s b) : s(a.x + b.x, a.y + b.y)	 ");
+	
+	testMainFloatArgInvalidProgram(" def f<T>(T a, T b) : a + b	def main() float : x(f(s(1, 2), s(3, 4)))");
+
+	testMainFloatArgInvalidProgram("def main(float x) float : elem(  elem([1.0, 2.0, 3.0, 4.0]a, [2, 3.]v)   , 0)");
+
+	testMainFloatArgInvalidProgram("struct Float4Struct { vector<float, 4> v }  			def sin(Float4Struct f) : Float4Struct(sin < (f.v))		");
+
+	testMainFloatArgInvalidProgram("def f<T>(T x) T : x  ( )   def main() float : f(2.0)");
+
+	testMainFloatArgInvalidProgram("def main() float : let f = makeFunc(2.0, 3.0) in f()");
+
+	testMainFloatArgInvalidProgram("\t\t\t\t\tdef main() float :                            0 \t\t\t\t\tdef main() float :                           \t\t\t\t\tlet f = makeFunc(2.0, 3.0) in                     \t\t\t\t\tf()");
+
+	testMainFloatArgInvalidProgram("\t\t\t\t  def main() float : x(s(2, 3) / s(3, 4)) \t\t\t\t  def main() float : x(s(2, 3) / s(3, 4))");
+
+	testMainFloatArgInvalidProgram("def main(float x) float : b(elem([Pair(1.0, 2.0), Pair(3.0, 4.0)]a, 1))  ");
+	
+	testMainFloatArgInvalidProgram("def main(float x) float : b(elem([Pair(1.0, 2.0), Pair(3.0, 4.0)]a, 1))  		def main(float x) float : b(elem([Pair(1.0, 2.0), Pair(3.0, 4.0)]a, 1)) ");
+
+	testMainFloatArgInvalidProgram("\t\t\tin\t\t\t\t\t\t\t\t\t\t \t\t\tin\t\t\t\t\t\t\t\t\t\t \t\t\t\telem(a, -1)\t\t\t\t\t\t\t\" \t ");
+	
+
+	// ===================================================================
+	// Test that recursion is disallowed.
+	// ===================================================================
+	testMainFloatArgInvalidProgram("def main(float x) float :  main(x)  ");
+	testMainFloatArgInvalidProgram("def main(float x) float :  1  def f(int x) int : f(0)  ");
+
+	// Mutual recursion
+	testMainFloatArgInvalidProgram("def g(float x) float : f(x)      def f(float x) float : g(x)              def main(float x) float : f(x)");
+	
+	
+	// ===================================================================
+	// Test that some programs with invalid syntax fail to compile.
+	// ===================================================================
+	testMainFloatArgInvalidProgram("def main(float x) float :  x [bleh");
+
+
+	testMainIntegerArg("def main(int x) int : 10 + (if x < 10 then 1 else 2)", 5, 11);
+
+	testMainIntegerArg("def main(int x) int : if x < 10 then 1 else 2", 5, 1);
+
+	testMainIntegerArg("def main(int x) int : if x < 10 then (if x < 5 then 1 else 2) else (if x < 15 then 3 else 4)", 5, 2);
+
+
+
+	// ===================================================================
+	// Test named constants
+	// ===================================================================
+	testMainIntegerArg("TEN = 10			\n\
+					   def main(int x) int : TEN + x", 3, 13);
+
+	// Test an expression
+	testMainIntegerArg("TEN = 5 * 2			\n\
+					   def main(int x) int : TEN + x", 3, 13);
+
+	// Test an expression involving another constant
+	testMainIntegerArg("FIVE = 5		TEN = FIVE * 2			\n\
+					   def main(int x) int : TEN + x", 3, 13);
+
+	// Test an expression involving a function call
+	testMainIntegerArg("def five() int : 5		TEN = five() * 2			\n\
+					   def main(int x) int : TEN + x", 3, 13);
+
+
+	// test invalidity of two named constants with same name.
+	testMainFloatArgInvalidProgram("z = 1     z = 2               def main(float x) float : x");
+
+
+	// Test named constants that aren't constant
+	testMainIntegerArgInvalidProgram("TEN = x			\n\
+					   def main(int x) int : TEN + x");
+
+	testMainIntegerArgInvalidProgram("TEN = main			\n\
+					   def main(int x) int : TEN + x");
+					   
+	testMainIntegerArgInvalidProgram("TEN = main()			\n\
+					   def main(int x) int : TEN + x");
+
+	// self-reference
+	testMainIntegerArgInvalidProgram("TEN = TEN			\n\
+					   def main(int x) int : TEN + x");
+
+	// Test invalidity of mutual references between named contants.
+	testMainFloatArgInvalidProgram("z = y	y = z      def main(float x) float : x");
+
+
+	// NOTE: if 'then' token is removed, we get a parse error below.
+	if(!DO_OPENCL_TESTS)
+	{
+
+	testMainIntegerArg("def f(int x) tuple<int> : if x < 0 [1]t else [3]t			\n\
+					   def main(int x) int : f(x)[0]", 10, 3);
+	// ===================================================================
+	// Test array subscript (indexing) operator []
+	// ===================================================================
+
+	// NOTE: if 'then' token is removed, we get a parse error below.
+
+	testMainIntegerArg("def f(int x) tuple<int> : if x < 0 [1]t else [3]t			\n\
+					   def main(int x) int : f(x)[0]", 10, 3);
+
+	testMainIntegerArg("def f(int x) tuple<int, int> : if x < 0 [1, 2]t else [3, 4]t			\n\
+					   def main(int x) int : f(x)[0]", 10, 3);
+	} // end if DO_OPENCL_TESTS
+
+	if(!DO_OPENCL_TESTS)
+	{
+
+	testMainIntegerArg("def main(int x) int : [x]a[0]", 10, 10);
+	testMainIntegerArg("def main(int x) int : [x, x + 1, x + 2]a[1]", 10, 11);
+	testMainIntegerArg("def main(int x) int : [x, x + 1, x + 2]a[1 + 1]", 10, 12);
+
+	// Test index out of bounds
+	testMainIntegerArgInvalidProgram("def main(int x) int :  [x, x + 1, x + 2]a[-1])");
+	testMainIntegerArgInvalidProgram("def main(int x) int :  [x, x + 1, x + 2]a[3])");
+	
 	// ===================================================================
 	// Test update()
 	// update(CollectionType c, int index, T newval) CollectionType
@@ -241,7 +403,7 @@ void LanguageTests::run()
 		def main(float x) float :  elem(f(x), truncateToInt(x))");
 
 
-
+	} // end if DO_OPENCL_TESTS
 
 
 	testMainFloatArg("def main(float x) float :  elem([x, x, x, x]v, 0)", 1.0f, 1.0f);
@@ -1536,6 +1698,10 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 	// Try dot product
 	testMainFloatArg("	def main(float x) float : \
 					 let v = [x, x, x, x]v in\
+					 dot(v, v)", 4.0f, 64.0f);
+
+	testMainFloatArg("	def main(float x) float : \
+					 let v = [x, x, x, x]v in\
 					 dot(v, v)", 2.0f, 16.0f);
 
 
@@ -1680,7 +1846,11 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 				  def f<T>(T a, T b) : a + b							\n\
 				  def main() float : x(f(s(1, 2), s(3, 4)))", 4.0f);
 
+	// Test when op_add is not present
 
+	testMainFloatArgInvalidProgram("struct s { float x, float y }						\n\
+				  def f<T>(T a, T b) : a + b							\n\
+				  def main() float : x(f(s(1, 2), s(3, 4)))");
 
 
 
@@ -1956,8 +2126,8 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 	testMainFloat("def f(float x) : x        def main() float : f(3.0)", 3.0);
 
 	// Test two call levels of inferred return type (f, g)
-	testMainFloat("def f(float x) : g(x)    def g(float x) : x    def main() float : f(3.0)", 3.0);
-	testMainFloat("def f(float x) : x    def g(float x) : f(x)    def main() float : g(3.0)", 3.0);
+	testMainFloat("def g(float x) : x    def f(float x) : g(x)       def main() float : f(3.0)", 3.0);
+	testMainFloat("def f(float x) : x    def g(float x) : f(x)       def main() float : g(3.0)", 3.0);
 
 	// Test generic function
 	testMainFloat("def f<T>(T x) T : x        def main() float : f(2.0)", 2.0);
@@ -2036,6 +2206,56 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 				  in \
 					y \
 				  def main() float : f()", 2.0);
+
+
+	// Test optional types on let blocks
+	testMainFloatArg("def f(float x) float :		\n\
+				  let								\n\
+					float z = 2.0					\n\
+				  in								\n\
+					x + z							\n\
+				  def main(float x) float : f(x)", 2.0f, 4.0f);
+
+	// Test optional types on let blocks
+	testMainFloatArg("def f(float x) float :		\n\
+				  let								\n\
+					float y = 2.0					\n\
+					float z = 3.0					\n\
+				  in								\n\
+					x + y + z							\n\
+				  def main(float x) float : f(x)", 2.0f, 7.0f);
+
+	// Test int->float type coercion with optional types on let blocks
+	testMainFloatArg("def f(float x) float :		\n\
+				  let								\n\
+					float z = 2						\n\
+				  in								\n\
+					x + z							\n\
+				  def main(float x) float : f(x)", 2.0f, 4.0f);
+
+
+	// Test type mismatches between declared type and actual time.
+	testMainFloatArgInvalidProgram("def f(float x) float :		\n\
+				  let								\n\
+					bool z = 2						\n\
+				  in								\n\
+					x + z							\n\
+				  def main(float x) float : f(x)");
+
+	testMainFloatArgInvalidProgram("def f(float x) float :		\n\
+				  let								\n\
+					int z = true					\n\
+				  in								\n\
+					x + z							\n\
+				  def main(float x) float : f(x)");
+
+	testMainFloatArgInvalidProgram("def f(float x) float :		\n\
+				  let								\n\
+					bool y = true					\n\
+					int z = y						\n\
+				  in								\n\
+					x + z							\n\
+				  def main(float x) float : f(x)");
 
 	// Test two let clauses where one refers to the other (reverse order)
 	/*testMainFloat("def f() float : \
@@ -2311,11 +2531,14 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 					 let v = [x, x, x, x]v in\
 					 dot(v, v)", 2.0f, 16.0f);
 
-	/* OpenCl dot not supported for > 4 elems in vecttor
-	testMainFloatArg("	def main(float x) float : \
-					 let v = [x, x, x, x, x, x, x, x]v in\
-					 dot(v, v)", 2.0f, 32.0f);
-					 */
+	// OpenCl dot not supported for > 4 elems in vecttor
+	if(!DO_OPENCL_TESTS)
+	{
+		testMainFloatArg("	def main(float x) float : \
+						 let v = [x, x, x, x, x, x, x, x]v in\
+						 dot(v, v)", 4.0f, 128.0f);
+	}
+					 
 
 	// Test vector min
 	testMainFloat("	def main() float : \
@@ -2346,6 +2569,8 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 
 	testMainFloat("	struct PolarisationVec { vector<float, 8> e } \n\
 																	\n\
+								def make_v4f(float x) vector<float, 4> : [x, x, x, x]v  \n\
+																		\n\
 					def clamp(vector<float, 4> x, vector<float, 4> lowerbound, vector<float, 4> upperbound) vector<float, 4> : max(lowerbound, min(upperbound, x))  \n\
 																																					\n\
 					def clamp(PolarisationVec x, float lowerbound, float upperbound) PolarisationVec : \n\
@@ -2355,8 +2580,6 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 						clamped_hi = clamp(hi, make_v4f(lowerbound), make_v4f(upperbound))  in \n\
 						PolarisationVec([e0(clamped_lo), e1(clamped_lo), e2(clamped_lo), e3(clamped_lo), e0(clamped_hi), e1(clamped_hi), e2(clamped_hi), e3(clamped_hi)]v)   \n\
 																																												\n\
-				  def make_v4f(float x) vector<float, 4> : [x, x, x, x]v  \n\
-																		\n\
 				  def main() float : \
 					let a = PolarisationVec([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]v) in \
 					e5(e(clamp(a, 2.0, 2.5)))", 2.5);
@@ -2481,6 +2704,264 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 	}
 
 	std::cout << "===================All LanguageTests passed.  Elapsed: " << timer.elapsedString() << " =============================" << std::endl;
+}
+
+
+
+// Fuzz testing choice
+struct Choice
+{
+	enum Action
+	{
+		Action_Break,
+		Action_Insert,
+		Action_InsertRandomChar,
+		Action_Copy,
+		Action_Remove
+	};
+
+	Choice() {}
+	Choice(Action action_, float probability_) : action(action_), probability(probability_) {}
+	Choice(Action action_, std::string left_, float probability_) : action(action_), probability(probability_), left(left_) {}
+	Choice(Action action_, std::string left_, std::string right_, float probability_) : action(action_), probability(probability_), left(left_), right(right_) {}
+
+	Action action;
+	float probability;
+	std::string left;
+	std::string right;
+};
+
+
+class FuzzTask : public Indigo::Task
+{
+public:
+	void run(size_t thread_index)
+	{
+		Timer timer;
+		Timer print_timer;
+		MTwister rng(rng_seed);
+
+		std::ofstream outfile("D:/fuzz_output/fuzz_thread_" + toString(thread_index) + ".txt"); // TEMP HACK HARD CODED PATH
+		
+		// We want to N to be quite large, but not so large that the tested_programs set uses up all our RAM.
+		const int N = 5000000;
+		for(int i=0; i<N; ++i)
+		{
+			//std::string s = "def main(float x) float : ";
+			// Pick a random input line to get started
+			std::string start_string;
+			while(start_string.empty())
+			{
+				// Pick a line to start at
+				size_t linenum = myMin(fuzzer_input->size()-1, (size_t)(fuzzer_input->size() * rng.unitRandom()));
+				
+				start_string = (*fuzzer_input)[linenum]; // Get line
+
+				// While there are more lines below that aren't just whitespace, then the program continues, so append.
+				for(; linenum<fuzzer_input->size() && (::stripWhitespace((*fuzzer_input)[linenum]) != ""); ++linenum)
+					start_string += " " + (*fuzzer_input)[linenum];
+			}
+
+			start_string = ::stripHeadAndTailWhitespace(start_string);
+
+			std::string s = start_string;
+
+			// Insert tokens
+			while(1)
+			{
+				const float r = rng.unitRandom();
+
+				float probability_sum = 0;
+				for(size_t z=0; z<choices.size(); ++z)
+				{
+					probability_sum += choices[z].probability;
+					if(r < probability_sum)
+					{
+						if(choices[z].action == Choice::Action_Break) // If this is the 'stop-appending tokens' token:
+							goto done;
+						else if(choices[z].action == Choice::Action_Insert)
+						{
+							// Insert choices[z].left randomly in the existing string
+							const size_t startpos = 0; // start_string.size();
+
+							const size_t insert_pos = myMin((size_t)(startpos + rng.unitRandom() * (s.size()-startpos)), s.size() - 1);
+							s.insert(insert_pos, choices[z].left); 
+
+							// Insert choice right
+							if(!choices[z].right.empty() && rng.unitRandom() < 0.8f)
+							{
+								const size_t right_insert_pos = myMin((size_t)(startpos + rng.unitRandom() * (s.size()-startpos)), s.size() - 1);
+								s.insert(right_insert_pos, choices[z].right); 
+							}
+						}
+						else if(choices[z].action == Choice::Action_InsertRandomChar)
+						{
+							const size_t insert_pos = myMin((size_t)(rng.unitRandom() * s.size()), s.size() - 1);
+							s.insert(insert_pos, 1, (char)(rng.unitRandom() * 128)); 
+						}
+						else if(choices[z].action == Choice::Action_Remove)
+						{
+							// Remove random chunk of string
+							if(!s.empty())
+							{
+								const size_t pos = myMin((size_t)(rng.unitRandom() * s.size()), s.size() - 1);
+					
+								const size_t chunk_len = 1 + (size_t)(20.f * rng.unitRandom() * rng.unitRandom());
+
+								s.erase(pos, chunk_len);
+							}
+						}
+						else if(choices[z].action == Choice::Action_Copy)
+						{
+							// Copy random chunk of text and insert somewhere else in string.
+							if(!s.empty())
+							{
+								const size_t src_pos = myMin((size_t)(rng.unitRandom() * s.size()), s.size() - 1);
+								const size_t chunk_len = 1 + (size_t)(20.f * rng.unitRandom() * rng.unitRandom());
+								const std::string chunk = s.substr(src_pos, chunk_len);
+
+								const size_t insert_pos = myMin((size_t)(rng.unitRandom() * s.size()), s.size());
+								s.insert(insert_pos, chunk); 
+							}
+						}
+
+
+						break;
+					}
+				}
+			}
+done:
+			//std::cout << "\n------------------------------------------------------\n" << s << 
+			//	"\n------------------------------------------------------\n" << std::endl;
+
+			bool already_tested;
+			size_t num_tested;
+			{
+				Lock lock(*tested_programs_mutex);
+				num_tested = tested_programs->size();
+				already_tested = tested_programs->find(s) != tested_programs->end();
+
+				if(!already_tested)
+					tested_programs->insert(s);
+			}
+
+			if(!already_tested)
+			{
+				// Write program source to disk, so if testFuzzProgram crashes we will have a record of the program.
+				outfile << s << std::endl;
+
+				testFuzzProgram(s);
+			}
+			
+
+			if(print_timer.elapsed() > 2.0)
+			{
+				const double tests_per_sec = i / timer.elapsed();
+				std::cout << (std::string("Iterations: ") + toString(i) + ", Num tested: " + toString(num_tested) + ", Test speed: " + doubleToStringNDecimalPlaces(tests_per_sec, 1) + " tests/s\n");
+				print_timer.reset();
+			}
+		}
+	}
+
+	int rng_seed;
+	std::vector<Choice> choices;
+	Mutex* tested_programs_mutex;
+	std::unordered_set<std::string>* tested_programs;
+	std::vector<std::string>* fuzzer_input;
+};
+
+
+void LanguageTests::fuzzTests()
+{
+	try
+	{
+		std::vector<Choice> choices;
+		choices.push_back(Choice(Choice::Action_InsertRandomChar, 5.f));
+		choices.push_back(Choice(Choice::Action_Remove, 5.f));
+		choices.push_back(Choice(Choice::Action_Copy, 5.f));
+		choices.push_back(Choice(Choice::Action_Break, 20.f)); // Break loop choice.  Should be reasonably high probability so we don't make too many random changes each test.
+
+		choices.push_back(Choice(Choice::Action_Insert, " 1.0 ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " 0 ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " 1 ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " x ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, "(", ")", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " if ", " else ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " then ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " + ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " * ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " < ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " true ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " < ", " > ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " [ ", " ]t ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " [ ", " ] ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " { ", " } ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " struct ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, ",", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, ".", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " let ", " in ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " = ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " def ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " f ", " def f(int x) int : ", 1.0f));
+
+		choices.push_back(Choice(Choice::Action_Insert, " int ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " int64 ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " string ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " char ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " opaque ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " float ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " bool ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " map ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " array ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " function ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " vector ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " tuple ", 1.0f));
+
+
+		// Normalise probabilities.
+		float sum = 0;
+		for(size_t i=0; i<choices.size(); ++i)
+			sum += choices[i].probability;
+		for(size_t i=0; i<choices.size(); ++i)
+			choices[i].probability /= sum;
+
+		std::vector<std::string> fuzzer_input;
+		std::string filecontent;
+		FileUtils::readEntireFileTextMode("N:/winter/trunk/fuzzer_input.txt", filecontent); // TEMP HACK hardcoded path
+		fuzzer_input = ::split(filecontent, '\n');
+
+
+		// Each stage has different random number seeds, and after each stage tested_programs will be cleared, otherwise it gets too large and uses up too much RAM.
+		int rng_seed = 10;
+		for(int stage=0; stage<1000000; ++stage)
+		{
+			std::cout << "=========================== Stage " << stage << "===========================================" << std::endl;
+
+			Mutex tested_programs_mutex;
+			std::unordered_set<std::string> tested_programs;
+
+			const int NUM_THREADS = 1;
+			Indigo::TaskManager manager(NUM_THREADS);
+			for(int i=0; i<NUM_THREADS; ++i)
+			{
+				Reference<FuzzTask> t = new FuzzTask();
+				t->rng_seed = rng_seed;
+				t->choices = choices;
+				t->tested_programs_mutex = &tested_programs_mutex;
+				t->tested_programs = &tested_programs;
+				t->fuzzer_input = &fuzzer_input;
+				manager.addTask(t);
+
+				rng_seed++;
+			}
+		}
+	}
+	catch(FileUtils::FileUtilsExcep& e)
+	{
+		std::cerr << "Test failed: " << e.what() << std::endl;
+		assert(0);
+		exit(1);
+	}
 }
 
 

@@ -171,7 +171,39 @@ std::string IfExpression::sourceString() const
 
 std::string IfExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
-	return "(" + condition->emitOpenCLC(params) + " ? " + then_expr->emitOpenCLC(params) + " : " + else_expr->emitOpenCLC(params) + ")";
+	//return "(" + condition->emitOpenCLC(params) + " ? " + then_expr->emitOpenCLC(params) + " : " + else_expr->emitOpenCLC(params) + ")";
+	const std::string result_var_name = "if_res_" + toString(params.uid++);
+
+	//const std::string tabs((int)params.blocks.size(), '\t');
+	
+	std::string s;
+	s += this->type()->OpenCLCType() + " " + result_var_name + ";\n";
+
+	s += "if(" + condition->emitOpenCLC(params) + ") {\n";
+
+	// Emit 'then' code
+	params.blocks.push_back("");
+	const std::string then_code = then_expr->emitOpenCLC(params);
+	StringUtils::appendTabbed(s, params.blocks.back(), 1); // (int)params.blocks.size());
+	params.blocks.pop_back();
+
+	s += "\t" + result_var_name + " = " + then_code + ";\n";
+
+	s += "} else {\n";
+
+	// Emit 'else' code
+	params.blocks.push_back("");
+	const std::string else_code = else_expr->emitOpenCLC(params);
+	StringUtils::appendTabbed(s, params.blocks.back(), 1); // (int)params.blocks.size());
+	params.blocks.pop_back();
+
+	s += "\t" + result_var_name + " = " + else_code + ";\n";
+
+	s += "}\n";
+
+	params.blocks.back() += s;
+
+	return result_var_name;
 }
 
 

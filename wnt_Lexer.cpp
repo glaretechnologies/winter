@@ -42,7 +42,7 @@ void Lexer::parseStringLiteral(const SourceBufferRef& buffer, Parser& parser, st
 	while(1)
 	{
 		if(parser.eof())
-			throw LexerExcep("End of input while parsing string literal." + errorPosition(buffer, parser.currentPos()));
+			throw LexerExcep("End of input while parsing string literal." + errorPosition(buffer, parser.currentPos() - 1));
 
 		if(parser.current() == '"')
 		{
@@ -378,7 +378,7 @@ void Lexer::process(const SourceBufferRef& src, std::vector<Reference<TokenBase>
 
 const std::string Lexer::errorPosition(const SourceBufferRef& buffer, unsigned int pos)
 {
-	return Diagnostics::positionString(*buffer, pos);
+	return Diagnostics::positionString(*buffer, myMin(pos, (unsigned int)buffer->source.size() - 1));
 }
 
 

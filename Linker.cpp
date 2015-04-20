@@ -48,8 +48,13 @@ void Linker::addFunctions(const vector<FunctionDefinitionRef>& func_defs)
 
 void Linker::addFunction(const FunctionDefinitionRef& def)
 {
+	if(this->sig_to_function_map.find(def->sig) != this->sig_to_function_map.end())
+		throw BaseException("Function " + def->sig.toString() + " already defined: " + errorContext(def.getPointer()) + "\nalready defined here: " + 
+		errorContext(this->sig_to_function_map[def->sig].getPointer()));
+
 	this->name_to_functions_map[def->sig.name].push_back(def);
 	this->sig_to_function_map.insert(std::make_pair(def->sig, def));
+	func_defs.push_back(def);
 }
 
 
@@ -109,12 +114,12 @@ void Linker::buildLLVMCode(llvm::Module* module, const llvm::DataLayout/*TargetD
 	}
 
 	// Build concrete funcs
-	for(unsigned int i=0; i<concrete_funcs.size(); ++i)
+	/*for(unsigned int i=0; i<concrete_funcs.size(); ++i)
 	{
 		assert(!concrete_funcs[i]->isGenericFunction());
 
 		concrete_funcs[i]->buildLLVMFunction(module, cpu_info, hidden_voidptr_arg, target_data, common_functions);
-	}
+	}*/
 
 	// Build 'unique' functions (like shuffle())
 	for(unsigned int i=0; i<unique_functions.size(); ++i)
@@ -129,6 +134,7 @@ const std::string Linker::buildOpenCLCode()
 	std::string s;
 
 	EmitOpenCLCodeParams params;
+	params.uid = 0;
 
 	for(Linker::SigToFuncMapType::iterator it = sig_to_function_map.begin(); it != sig_to_function_map.end(); ++it)
 	{
@@ -141,12 +147,12 @@ const std::string Linker::buildOpenCLCode()
 	}
 
 	// Build concrete funcs
-	for(unsigned int i=0; i<concrete_funcs.size(); ++i)
+	/*for(unsigned int i=0; i<concrete_funcs.size(); ++i)
 	{
 		assert(!concrete_funcs[i]->isGenericFunction());
 
 		s += concrete_funcs[i]->emitOpenCLC(params) + "\n";
-	}
+	}*/
 
 	// Build 'unique' functions (like shuffle())
 	//for(unsigned int i=0; i<unique_functions.size(); ++i)
@@ -346,6 +352,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 				args[1].type = sig.param_types[1];
 
 				TypeRef ret_type = sig.param_types[0].downcast<ArrayType>()->elem_type;
+				assert(ret_type.nonNull());
 
 				FunctionDefinitionRef def = new FunctionDefinition(
 					SrcLocation::invalidLocation(),
@@ -949,12 +956,19 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 					{
 						if(f.isGenericFunction())
 						{
-							concrete_funcs.push_back(makeConcreteFunction(
+							FunctionDefinitionRef new_concrete_func = makeConcreteFunction(
+								funcs[z],
+								type_mapping
+							);
+
+							addFunction(new_concrete_func);
+							return new_concrete_func;
+							/*concrete_funcs.push_back(makeConcreteFunction(
 								funcs[z],
 								type_mapping
 							));
 
-							return concrete_funcs.back();
+							return concrete_funcs.back();*/
 						}
 						else
 							return funcs[z];
@@ -1088,6 +1102,7 @@ Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDef
 		concrete_declared_ret_type, // return type
 		built_in_impl // built in func impl
 	));
+	def->function_order_num = generic_func->function_order_num;
 
 	if(body.nonNull())
 	{
@@ -1096,6 +1111,7 @@ Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDef
 			TraversalPayload payload(TraversalPayload::BindVariables);
 			payload.func_def_stack.push_back(def.getPointer());
 			payload.linker = this;
+			//payload.top_lvl_frame = 
 			
 			std::vector<ASTNode*> stack;
 			def->traverse(

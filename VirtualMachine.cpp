@@ -274,18 +274,18 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 	{
 		hidden_voidptr_arg = true;
 
+		this->external_functions = args.external_functions;
+
+		// Load source buffers
+		loadSource(args, args.source_buffers, args.preconstructed_func_defs);
+
+
 		this->llvm_context = new llvm::LLVMContext();
-	
 		this->llvm_module = new llvm::Module("WinterModule", *this->llvm_context);
 
-		llvm::InitializeNativeTarget();
-		llvm::InitializeNativeTargetAsmPrinter();
-
 		//llvm::TargetOptions to;
-
 		//const char* argv[] = { "dummyprogname", "-vectorizer-min-trip-count=4"};
 		//llvm::cl::ParseCommandLineOptions(2, argv, "my tool");
-
 		//const char* argv[] = { "dummyprogname", "-debug"};
 		//llvm::cl::ParseCommandLineOptions(2, argv, "my tool");
 
@@ -332,27 +332,14 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 		this->llvm_exec_engine->DisableLazyCompilation();
 		//this->llvm_exec_engine->DisableSymbolSearching(); // Symbol searching is required for sin, pow intrinsics etc..
 
-		this->external_functions = args.external_functions;
 
+		/*
 		ExternalFunctionRef alloc_ref(new ExternalFunction());
 		alloc_ref->interpreted_func = NULL;
 		alloc_ref->return_type = TypeRef(new OpaqueType());
 		alloc_ref->sig = FunctionSignature("allocateRefCountedStructure", std::vector<TypeRef>(1, TypeRef(new Int())));
 		alloc_ref->func = (void*)(allocateRefCountedStructure);
 		this->external_functions.push_back(alloc_ref);
-
-
-		// There is a problem with LLVM 3.3 and earlier with the pow intrinsic getting turned into exp2f().
-		// So for now just use our own pow() external function.
-#if TARGET_LLVM_VERSION < 34
-		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
-			(void*)(float(*)(float, float))std::pow,
-			powInterpreted,
-			FunctionSignature("pow", vector<TypeRef>(2, new Float())),
-			new Float()
-		)));
-#endif
-
 
 		// Add allocateString
 		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
@@ -390,13 +377,21 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			FunctionSignature("concatStrings", vector<TypeRef>(2, new String())),
 			new String() // return type
 		)));
+		*/
+
+		// There is a problem with LLVM 3.3 and earlier with the pow intrinsic getting turned into exp2f().
+		// So for now just use our own pow() external function.
+#if TARGET_LLVM_VERSION < 34
+		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
+			(void*)(float(*)(float, float))std::pow,
+			powInterpreted,
+			FunctionSignature("pow", vector<TypeRef>(2, new Float())),
+			new Float()
+		)));
+#endif
 
 		for(unsigned int i=0; i<this->external_functions.size(); ++i)
 			addExternalFunction(this->external_functions[i], *this->llvm_context, *this->llvm_module);
-
-
-		// Load source buffers
-		loadSource(args, args.source_buffers, args.preconstructed_func_defs);
 
 		this->build(args);
 	}
@@ -429,6 +424,9 @@ void VirtualMachine::init()
 #if TARGET_LLVM_VERSION < 36
 	llvm::llvm_start_multithreaded();
 #endif
+
+	llvm::InitializeNativeTarget();
+	llvm::InitializeNativeTargetAsmPrinter();
 }
 
 
@@ -488,7 +486,9 @@ static void optimiseFunctions(llvm::FunctionPassManager& fpm, llvm::Module* modu
 void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vector<SourceBufferRef>& source_buffers, const std::vector<FunctionDefinitionRef>& preconstructed_func_defs)
 {
 	vector<FunctionDefinitionRef> func_defs;
+	vector<NamedConstantRef> named_constants;
 	std::map<std::string, TypeRef> named_types;
+	int function_order_num = 0;
 
 	LangParser parser;
 	for(size_t i=0; i<source_buffers.size(); ++i)
@@ -497,7 +497,7 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		Lexer::process(source_buffers[i], tokens);
 
 		vector<FunctionDefinitionRef> buffer_func_defs;
-		parser.parseBuffer(tokens, source_buffers[i], buffer_func_defs, named_types, named_types_ordered);
+		Reference<BufferRoot> buffer_root = parser.parseBuffer(tokens, source_buffers[i], buffer_func_defs, named_types, named_types_ordered);
 
 		// Add named_types 
 
@@ -505,16 +505,46 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		for(size_t z=0; z<args.function_rewriters.size(); ++z)
 			args.function_rewriters[z]->rewrite(buffer_func_defs, source_buffers[i]);
 
-		func_defs.insert(func_defs.end(), buffer_func_defs.begin(), buffer_func_defs.end());
+		// Assign function numbers to establish an ordering
+		for(size_t z=0; z<buffer_func_defs.size(); ++z)
+			buffer_func_defs[z]->function_order_num = function_order_num++;
+
+		// TODO: use buffer_root instead.
+		//func_defs.insert(func_defs.end(), buffer_func_defs.begin(), buffer_func_defs.end());
+		append(func_defs, buffer_func_defs);
+
+
+
+		append(named_constants, buffer_root->named_constants);
 	}
 
 	func_defs.insert(func_defs.end(), preconstructed_func_defs.begin(), preconstructed_func_defs.end());
 
 
-	// Copy func devs to top level frame
-	FrameRef top_lvl_frame(new Frame());
+	// Copy func defs to top level frame
+	/*FrameRef top_lvl_frame(new Frame());
 	for(size_t i=0; i<func_defs.size(); ++i)
 		top_lvl_frame->name_to_functions_map[func_defs[i]->sig.name].push_back(func_defs[i]);
+
+	for(size_t i=0; i<named_constants.size(); ++i)
+	{
+		if(top_lvl_frame->named_constant_map.find(named_constants[i]->name) != top_lvl_frame->named_constant_map.end())
+			throw BaseException("Named constant with name '" + named_constants[i]->name + "' already defined." + errorContext(named_constants[i].getPointer()) + 
+			"\nalready defined here: " + errorContext(top_lvl_frame->named_constant_map[named_constants[i]->name].getPointer()));
+
+		top_lvl_frame->named_constant_map[named_constants[i]->name] = named_constants[i];
+	}
+
+	*/
+
+	for(size_t i=0; i<named_constants.size(); ++i)
+	{
+		if(linker.named_constant_map.find(named_constants[i]->name) != linker.named_constant_map.end())
+			throw BaseException("Named constant with name '" + named_constants[i]->name + "' already defined." + errorContext(named_constants[i].getPointer()) + 
+			"\nalready defined here: " + errorContext(linker.named_constant_map[named_constants[i]->name].getPointer()));
+
+		linker.named_constant_map[named_constants[i]->name] = named_constants[i];
+	}
 
 
 	//BufferRoot* root = dynamic_cast<BufferRoot*>(rootref.getPointer());
@@ -544,15 +574,26 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 	{
 		std::vector<ASTNode*> stack;
 		TraversalPayload payload(TraversalPayload::BindVariables);
-		payload.top_lvl_frame = top_lvl_frame;
+		//payload.top_lvl_frame = top_lvl_frame;
 		payload.linker = &linker;
-		for(size_t i=0; i<func_defs.size(); ++i)
-			if(!func_defs[i]->is_anon_func)
-				func_defs[i]->traverse(payload, stack);
+		for(size_t i=0; i<linker.func_defs.size(); ++i)
+			if(!linker.func_defs[i]->is_anon_func)
+				linker.func_defs[i]->traverse(payload, stack);
+		
+		for(size_t i=0; i<named_constants.size(); ++i)
+			named_constants[i]->traverse(payload, stack);
+
 		//root->traverse(payload, stack);
 		assert(stack.size() == 0);
 	}
 
+	
+	/*if(!linker.concrete_funcs.empty())
+	{
+		append(func_defs, linker.concrete_funcs);
+		linker.concrete_funcs.resize(0);
+	}*/
+	
 
 
 
@@ -571,12 +612,16 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		TraversalPayload payload(TraversalPayload::OperatorOverloadConversion);
 		
 		// Add linker info, so we can bind new functions such as op_add immediately.
-		payload.top_lvl_frame = top_lvl_frame;
+		//payload.top_lvl_frame = top_lvl_frame;
 		payload.linker = &linker;
 
-		for(size_t i=0; i<func_defs.size(); ++i)
-			if(!func_defs[i]->is_anon_func)
-				func_defs[i]->traverse(payload, stack);
+		for(size_t i=0; i<linker.func_defs.size(); ++i)
+			if(!linker.func_defs[i]->is_anon_func)
+				linker.func_defs[i]->traverse(payload, stack);
+
+		for(size_t i=0; i<named_constants.size(); ++i)
+			named_constants[i]->traverse(payload, stack);
+
 		//root->traverse(payload, stack);
 		assert(stack.size() == 0);
 
@@ -598,11 +643,15 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 	{
 		std::vector<ASTNode*> stack;
 		TraversalPayload payload(TraversalPayload::BindVariables);
-		payload.top_lvl_frame = top_lvl_frame;
+		//payload.top_lvl_frame = top_lvl_frame;
 		payload.linker = &linker;
-		for(size_t i=0; i<func_defs.size(); ++i)
-			if(!func_defs[i]->is_anon_func)
-				func_defs[i]->traverse(payload, stack);
+		for(size_t i=0; i<linker.func_defs.size(); ++i)
+			if(!linker.func_defs[i]->is_anon_func)
+				linker.func_defs[i]->traverse(payload, stack);
+
+		for(size_t i=0; i<named_constants.size(); ++i)
+			named_constants[i]->traverse(payload, stack);
+
 		//root->traverse(payload, stack);
 		assert(stack.size() == 0);
 	}
@@ -620,9 +669,13 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		{
 			std::vector<ASTNode*> stack;
 			TraversalPayload payload(TraversalPayload::ConstantFolding);
-			for(size_t i=0; i<func_defs.size(); ++i)
-				if(!func_defs[i]->is_anon_func)
-					func_defs[i]->traverse(payload, stack);
+			for(size_t i=0; i<linker.func_defs.size(); ++i)
+				if(!linker.func_defs[i]->is_anon_func)
+					linker.func_defs[i]->traverse(payload, stack);
+
+			for(size_t i=0; i<named_constants.size(); ++i)
+				named_constants[i]->traverse(payload, stack);
+
 			//root->traverse(payload, stack);
 			assert(stack.size() == 0);
 
@@ -645,9 +698,13 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		{
 			std::vector<ASTNode*> stack;
 			TraversalPayload payload(TraversalPayload::TypeCoercion);
-			for(size_t i=0; i<func_defs.size(); ++i)
-				if(!func_defs[i]->is_anon_func)
-					func_defs[i]->traverse(payload, stack);
+			for(size_t i=0; i<linker.func_defs.size(); ++i)
+				if(!linker.func_defs[i]->is_anon_func)
+					linker.func_defs[i]->traverse(payload, stack);
+
+			for(size_t i=0; i<named_constants.size(); ++i)
+				named_constants[i]->traverse(payload, stack);
+
 			//root->traverse(payload, stack);
 			assert(stack.size() == 0);
 
@@ -658,11 +715,15 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		{
 			std::vector<ASTNode*> stack;
 			TraversalPayload payload(TraversalPayload::BindVariables);
-			payload.top_lvl_frame = top_lvl_frame;
+			//payload.top_lvl_frame = top_lvl_frame;
 			payload.linker = &linker;
-			for(size_t i=0; i<func_defs.size(); ++i)
-				if(!func_defs[i]->is_anon_func)
-					func_defs[i]->traverse(payload, stack);
+			for(size_t i=0; i<linker.func_defs.size(); ++i)
+				if(!linker.func_defs[i]->is_anon_func)
+					linker.func_defs[i]->traverse(payload, stack);
+
+			for(size_t i=0; i<named_constants.size(); ++i)
+				named_constants[i]->traverse(payload, stack);
+
 			//root->traverse(payload, stack);
 			assert(stack.size() == 0);
 		}
@@ -717,32 +778,44 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 			break;
 	}*/
 
-	// Do in-domain checking (e.g. check elem() calls are in-bounds etc..)
-	if(!args.allow_unsafe_operations)
-	{
-		std::vector<ASTNode*> stack;
-		TraversalPayload payload(TraversalPayload::CheckInDomain);
-		for(size_t i=0; i<func_defs.size(); ++i)
-			if(!func_defs[i]->is_anon_func)
-				func_defs[i]->traverse(payload, stack);
-		assert(stack.size() == 0);
-	}
+	
 
 	// TypeCheck
 	{
 		std::vector<ASTNode*> stack;
 		TraversalPayload payload(TraversalPayload::TypeCheck);
-		for(size_t i=0; i<func_defs.size(); ++i)
-			if(!func_defs[i]->is_anon_func)
+
+		for(size_t i=0; i<named_constants.size(); ++i)
+			named_constants[i]->traverse(payload, stack);
+
+		for(size_t i=0; i<linker.func_defs.size(); ++i)
+			if(!linker.func_defs[i]->is_anon_func)
 			{
-				func_defs[i]->traverse(payload, stack);
+				linker.func_defs[i]->traverse(payload, stack);
 				assert(stack.size() == 0);
 			}
+
 		
 		//root->traverse(payload, stack);
 		assert(stack.size() == 0);
 	}
 
+	// Do in-domain checking (e.g. check elem() calls are in-bounds etc..)
+	// Do this after type-checking, so type-checking can check that all types are non-null (e.g. all funcs are bound).
+	// This is because domain checking needs to use the types.
+	if(!args.allow_unsafe_operations)
+	{
+		std::vector<ASTNode*> stack;
+		TraversalPayload payload(TraversalPayload::CheckInDomain);
+		for(size_t i=0; i<linker.func_defs.size(); ++i)
+			if(!linker.func_defs[i]->is_anon_func)
+				linker.func_defs[i]->traverse(payload, stack);
+
+		for(size_t i=0; i<named_constants.size(); ++i)
+			named_constants[i]->traverse(payload, stack);
+
+		assert(stack.size() == 0);
+	}
 }
 
 
@@ -750,8 +823,9 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 {
 	this->llvm_module->setDataLayout(this->llvm_exec_engine->getDataLayout()->getStringRepresentation());
 
+	
 	CommonFunctions common_functions;
-	{
+	/*TEMP{
 		const FunctionSignature allocateStringSig("allocateString", vector<TypeRef>(1, new OpaqueType()));
 		common_functions.allocateStringFunc = findMatchingFunction(allocateStringSig).getPointer();
 		assert(common_functions.allocateStringFunc);
@@ -764,7 +838,7 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 	}
 
 	RefCounting::emitRefCountingFunctions(this->llvm_module, this->llvm_exec_engine->getDataLayout(), common_functions);
-
+	*/
 
 	linker.buildLLVMCode(
 		this->llvm_module,
@@ -799,6 +873,13 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 			*this->llvm_module
 			// TODO: pass std out
 		);
+
+		if(ver_errors)
+		{
+			std::cout << "Module verification errors." << std::endl;
+			this->llvm_module->dump();
+			throw BaseException("Module verification errors.");
+		}
 #else
 		string error_str;
 		const bool ver_errors = llvm::verifyModule(
@@ -809,9 +890,7 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 		if(ver_errors)
 		{
 			std::cout << "Module verification errors: " << error_str << std::endl;
-
 			this->llvm_module->dump();
-
 			throw BaseException("Module verification errors: " + error_str);
 		}
 #endif
@@ -902,6 +981,12 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 			*this->llvm_module
 			// TODO: pass std out
 		);
+		if(ver_errors)
+		{
+			std::cout << "Module verification errors." << std::endl;
+			this->llvm_module->dump();
+			throw BaseException("Module verification errors.");
+		}
 #else
 		string error_str;
 		const bool ver_errors = llvm::verifyModule(
@@ -912,9 +997,7 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 		if(ver_errors)
 		{
 			std::cout << "Module verification errors: " << error_str << std::endl;
-
 			this->llvm_module->dump();
-
 			throw BaseException("Module verification errors: " + error_str);
 		}
 #endif

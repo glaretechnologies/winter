@@ -1057,13 +1057,23 @@ ValueRef ArraySubscriptBuiltInFunc::invoke(VMState& vmstate)
 		else
 			throw BaseException("Array index out of bounds"); // return this->array_type->elem_type->getInvalidValue();
 	}
-	else
+	else // else index vector
 	{
 		const VectorValue* index_vec = static_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
 
 		vector<ValueRef> res(index_vec->e.size());
+
 		for(size_t i=0; i<index_vec->e.size(); ++i)
-			res[i] = arr->e[index_vec->e[i].downcast<IntValue>()->value]; // TODO: bounds check
+		{
+			ValueRef index_val = index_vec->e[i];
+			if(!dynamic_cast<IntValue*>(index_val.getPointer()))
+				throw BaseException("Index did not have int type");
+			int64 index = static_cast<IntValue*>(index_val.getPointer())->value;
+			if(index < 0 || index >= arr->e.size())
+				throw BaseException("Index out of bounds");
+
+			res[i] = arr->e[index];
+		}
 
 		return new ArrayValue(res);
 	}
@@ -1769,7 +1779,7 @@ ValueRef DotProductBuiltInFunc::invoke(VMState& vmstate)
 
 	for(unsigned int i=0; i<vector_type->num; ++i)
 	{
-		res->value += static_cast<const FloatValue*>(a->e[i].getPointer())->value + static_cast<const FloatValue*>(b->e[i].getPointer())->value;
+		res->value += static_cast<const FloatValue*>(a->e[i].getPointer())->value * static_cast<const FloatValue*>(b->e[i].getPointer())->value;
 	}
 
 	return ValueRef(res);

@@ -46,6 +46,8 @@ public:
 	std::map<std::string, TypeRef>& named_types;
 	std::vector<FunctionDefinitionRef>& func_defs;
 	//bool else_token_present;
+
+	std::vector<std::string> generic_type_params; // Used when parsing types.
 };
 
 
@@ -61,7 +63,7 @@ public:
 
 	~LangParser();
 
-	Reference<ASTNode> parseBuffer(const std::vector<Reference<TokenBase> >& tokens, 
+	Reference<BufferRoot> parseBuffer(const std::vector<Reference<TokenBase> >& tokens, 
 		const SourceBufferRef& source_buffer,
 		std::vector<FunctionDefinitionRef>& func_defs_out, 
 		std::map<std::string, TypeRef>& named_types,
@@ -72,51 +74,54 @@ public:
 private:
 	const std::string errorPosition(const SourceBuffer& buffer, unsigned int pos);
 	const std::string errorPosition(const ParseInfo& parseinfo);
-	const std::string errorPositionPrevToken(const ParseInfo& parseinfo);
+	const std::string errorPositionPrevToken(ParseInfo& parseinfo);
 
-	const std::string parseIdentifier(const std::string& id_type, const ParseInfo& parseinfo);
-	ASTNodeRef parseLiteral(const ParseInfo& parseinfo);
-	Reference<IntLiteral> parseIntLiteral(const ParseInfo& parseinfo);
+	const std::string parseIdentifier(const std::string& id_type, ParseInfo& parseinfo);
+	void parseAndCheckIdentifier(const std::string& target_id, ParseInfo& parseinfo);
+	ASTNodeRef parseLiteral(ParseInfo& parseinfo);
+	Reference<IntLiteral> parseIntLiteral(ParseInfo& parseinfo);
 
-	FunctionDefinitionRef parseFunctionDefinition(const ParseInfo& parseinfo);
-	FunctionDefinitionRef parseFunctionDefinitionGivenName(const std::string& func_name, const ParseInfo& parseinfo);
+	FunctionDefinitionRef parseFunctionDefinition(ParseInfo& parseinfo);
+	FunctionDefinitionRef parseFunctionDefinitionGivenName(const std::string& func_name, ParseInfo& parseinfo);
 	//Reference<ASTNode> parseFunctionDeclaration(const std::vector<Reference<TokenBase> >& tokens, const char* text_buffer, unsigned int& i);
+	NamedConstantRef parseNamedConstant(ParseInfo& parseinfo);
 
-	Reference<ASTNode> parseFunctionExpression(const ParseInfo& parseinfo);
+	Reference<ASTNode> parseFunctionExpression(ParseInfo& parseinfo);
 
-	Reference<ASTNode> parseLetBlock(const ParseInfo& parseinfo);
-	Reference<ASTNode> parseExpression(const ParseInfo& parseinfo);
-	ASTNodeRef parseBasicExpression(const ParseInfo& parseinfo);
+	Reference<ASTNode> parseLetBlock(ParseInfo& parseinfo);
+	Reference<ASTNode> parseExpression(ParseInfo& parseinfo);
+	ASTNodeRef parseBasicExpression(ParseInfo& parseinfo);
 
 	//void parseToken(const std::vector<Reference<TokenBase> >& tokens, const char* text_buffer, unsigned int token_type, const std::string& type_name, unsigned int& i);
-	void parseToken(unsigned int token_type, const ParseInfo& parseinfo);
-	bool isTokenCurrent(unsigned int token_type, const ParseInfo& parseinfo);
+	void parseToken(unsigned int token_type, ParseInfo& parseinfo);
+	bool isTokenCurrent(unsigned int token_type, ParseInfo& parseinfo);
 
-	ASTNodeRef parseFieldExpression(const ParseInfo& parseinfo);
-	ASTNodeRef parseVariableExpression(const ParseInfo& parseinfo);
-	ASTNodeRef parseIfExpression(const ParseInfo& parseinfo);
+	ASTNodeRef parseFieldExpression(ParseInfo& parseinfo);
+	ASTNodeRef parseVariableExpression(ParseInfo& parseinfo);
+	ASTNodeRef parseIfExpression(ParseInfo& parseinfo);
 
-	TypeRef parseType(const ParseInfo& parseinfo, const std::vector<std::string>& generic_type_params);
-	TypeRef parseSumType(const ParseInfo& parseinfo, const std::vector<std::string>& generic_type_params);
-	TypeRef parseElementaryType(const ParseInfo& parseinfo, const std::vector<std::string>& generic_type_params);
-	TypeRef parseMapType(const ParseInfo& parseinfo, const std::vector<std::string>& generic_type_params);
-	TypeRef parseArrayType(const ParseInfo& parseinfo, const std::vector<std::string>& generic_type_params);
-	TypeRef parseFunctionType(const ParseInfo& p, const std::vector<std::string>& generic_type_params);
-	Reference<StructureType> parseStructType(const ParseInfo& p, const std::vector<std::string>& generic_type_params);
-	TypeRef parseVectorType(const ParseInfo& p, const std::vector<std::string>& generic_type_params);
-	TypeRef parseTupleType(const ParseInfo& p, const std::vector<std::string>& generic_type_params);
+	TypeRef parseType(ParseInfo& parseinfo);
+	TypeRef parseSumType(ParseInfo& parseinfo);
+	TypeRef parseElementaryType(ParseInfo& parseinfo);
+	TypeRef parseMapType(ParseInfo& parseinfo);
+	TypeRef parseArrayType(ParseInfo& parseinfo);
+	TypeRef parseFunctionType(ParseInfo& parseinfo);
+	Reference<StructureType> parseStructType(ParseInfo& parseinfo);
+	TypeRef parseVectorType(ParseInfo& parseinfo);
+	TypeRef parseTupleType(ParseInfo& parseinfo);
 
-	ASTNodeRef parseComparisonExpression(const ParseInfo& parseinfo);
-	ASTNodeRef parseUnaryExpression(const ParseInfo& parseinfo);
-	ASTNodeRef parseAddSubExpression(const ParseInfo& parseinfo);
-	ASTNodeRef parseMulDivExpression(const ParseInfo& parseinfo);
-	ASTNodeRef parseBinaryLogicalExpression(const ParseInfo& parseinfo);
-	ASTNodeRef parseParenExpression(const ParseInfo& parseinfo);
-	ASTNodeRef parseMapLiteralExpression(const ParseInfo& parseinfo);
-	ASTNodeRef parseArrayOrVectorLiteralOrArraySubscriptExpression(const ParseInfo& parseinfo);
-	Reference<LetASTNode> parseLet(const ParseInfo& parseinfo);
-	FunctionDefinitionRef parseAnonFunction(const ParseInfo& parseinfo);
-	void parseParameterList(const ParseInfo& parseinfo, const std::vector<std::string>& generic_type_params, std::vector<FunctionDefinition::FunctionArg>& args_out);
+	ASTNodeRef parseComparisonExpression(ParseInfo& parseinfo);
+	ASTNodeRef parseUnaryExpression(ParseInfo& parseinfo);
+	ASTNodeRef parseAddSubExpression(ParseInfo& parseinfo);
+	ASTNodeRef parseMulDivExpression(ParseInfo& parseinfo);
+	ASTNodeRef parseBinaryLogicalExpression(ParseInfo& parseinfo);
+	ASTNodeRef parseParenExpression(ParseInfo& parseinfo);
+	ASTNodeRef parseMapLiteralExpression(ParseInfo& parseinfo);
+	ASTNodeRef parseArrayOrVectorLiteralOrArraySubscriptExpression(ParseInfo& parseinfo);
+	ASTNodeRef parseArraySubscriptExpression(ParseInfo& parseinfo);
+	Reference<LetASTNode> parseLet(ParseInfo& parseinfo);
+	FunctionDefinitionRef parseAnonFunction(ParseInfo& parseinfo);
+	void parseParameterList(ParseInfo& parseinfo, std::vector<FunctionDefinition::FunctionArg>& args_out);
 
 	bool isKeyword(const std::string& name);
 private:

@@ -64,7 +64,8 @@ FunctionDefinition::FunctionDefinition(const SrcLocation& src_loc, const std::st
 	closure_type(NULL),
 	alloc_func(NULL),
 	is_anon_func(false),
-	num_uses(0)
+	num_uses(0),
+	function_order_num(0)
 {
 	sig.name = name;
 	for(unsigned int i=0; i<args_.size(); ++i)
@@ -91,8 +92,8 @@ TypeRef FunctionDefinition::returnType() const
 	if(this->declared_return_type.nonNull())
 		return this->declared_return_type;
 
-	assert(this->body.nonNull());
-	assert(this->body->type().nonNull());
+	//assert(this->body.nonNull());
+	//assert(this->body->type().nonNull());
 	return this->body->type();
 	//return this->body.nonNull() ? this->body->type() : TypeRef(NULL);
 }
@@ -107,8 +108,10 @@ TypeRef FunctionDefinition::type() const
 	//vector<TypeRef> captured_var_types;
 	//for(size_t i=0; i<this->captured_vars.size(); ++i)
 	//	captured_var_types.push_back(this->captured_vars[i].type());
+	const TypeRef return_type = this->returnType();
+	if(return_type.isNull()) return NULL;
 
-	return TypeRef(new Function(arg_types, this->returnType(), /*captured_var_types, */this->use_captured_vars));
+	return TypeRef(new Function(arg_types, return_type, /*captured_var_types, */this->use_captured_vars));
 }
 
 
@@ -300,7 +303,7 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 	//		payload.capture_variables = true; // Tell varables in function expression tree to capture
 	//}
 
-	if(payload.operation == TraversalPayload::BindVariables)
+	/*TEMP if(payload.operation == TraversalPayload::BindVariables)
 	{
 		// We want to bind to allocateRefCountedStructure()
 		const FunctionSignature sig("allocateRefCountedStructure", std::vector<TypeRef>(1, TypeRef(new Int())));
@@ -316,7 +319,7 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 		// Zero all arg ref counts.
 		for(size_t i=0; i<args.size(); ++i)
 			args[i].ref_count = 0;
-	}
+	}*/
 
 
 
@@ -355,6 +358,10 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 			{
 				if(this->declared_return_type.nonNull())
 				{
+					const TypeRef body_type = this->body->type();
+					if(body_type.isNull()) // Will happen if body is a function expression bound to a newly concrete function that has not been type-checked yet.
+						throw BaseException("Type error for function '" + this->sig.toString() + "': Computed return type [Unknown] is not equal to the declared return type '" + this->declared_return_type->toString() + "'." + errorContext(*this));
+
 					// Check that the return type of the body expression is equal to the declared return type
 					// of this function.
 					if(*this->body->type() != *this->declared_return_type)
@@ -498,10 +505,20 @@ std::string FunctionDefinition::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 	params.file_scope_code += opencl_sig + ";\n";
 
+	// Emit function definition
+	std::string s = opencl_sig + "\n{\n";
+	
+	// Emit body expression
+	params.blocks.push_back("");
+	const std::string body_expr = body->emitOpenCLC(params);
+	StringUtils::appendTabbed(s, params.blocks.back(), (int)params.blocks.size());
+	params.blocks.pop_back();
+	
+	s += "\treturn " + body_expr + ";\n";
 
-	std::string s = opencl_sig + "\n{\n\treturn ";
+	s += "}\n";
 
-	return s + body->emitOpenCLC(params) + ";\n}";
+	return s;
 }
 
 
