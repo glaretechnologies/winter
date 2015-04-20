@@ -202,7 +202,7 @@ static FunctionDefinitionRef makeBuiltInFuncDef(const std::string& name, const T
 }
 
 
-Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignature& sig)
+Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignature& sig, const SrcLocation& call_src_location)
 {
 	/*
 	if sig.name matches eN
@@ -457,13 +457,14 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 				args[1].type = sig.param_types[1];
 
 				FunctionDefinitionRef def = new FunctionDefinition(
-					SrcLocation::invalidLocation(),
+					call_src_location,
 					"elem", // name
 					args, // args
 					NULL, // body expr
 					NULL, // sig.param_types[0].downcast<TupleType>()->component_types, // return type
 					new GetTupleElementBuiltInFunc(sig.param_types[0].downcast<TupleType>(), std::numeric_limits<unsigned int>::max()) // built in impl.
 				);
+				def->function_order_num = -1; // Consider Before everything else
 
 				// NOTE: because shuffle is unusual in that it has the shuffle mask 'baked into it', we need a unique ShuffleBuiltInFunc impl each time.
 				// So don't add to function map, so that it isn't reused.
@@ -546,13 +547,14 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 					args[1].type = sig.param_types[1];
 
 					FunctionDefinitionRef def = new FunctionDefinition(
-						SrcLocation::invalidLocation(),
+						call_src_location,
 						"shuffle_" + toString(unique_functions.size()) + "_", // name
 						args, // args
 						NULL, // body expr
 						new VectorType(sig.param_types[0].downcast<VectorType>()->elem_type, sig.param_types[1].downcast<VectorType>()->num), // return type
 						new ShuffleBuiltInFunc(sig.param_types[0].downcast<VectorType>(), sig.param_types[1].downcast<VectorType>()) // built in impl.
 					);
+					def->function_order_num = -1; // Consider Before everything else
 
 					// NOTE: because shuffle is unusual in that it has the shuffle mask 'baked into it', we need a unique ShuffleBuiltInFunc impl each time.
 					// So don't add to function map, so that it isn't reused.
@@ -564,12 +566,13 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 
 
 
-			if(
-				(static_cast<const VectorType*>(sig.param_types[0].getPointer())->elem_type->getType() == Type::FloatType && // vector of floats
-				static_cast<const VectorType*>(sig.param_types[1].getPointer())->elem_type->getType() == Type::FloatType) || // and vector of floats
-				(static_cast<const VectorType*>(sig.param_types[0].getPointer())->elem_type->getType() == Type::IntType && // vector of ints
-				static_cast<const VectorType*>(sig.param_types[1].getPointer())->elem_type->getType() == Type::IntType)) // and vector of ints
+			if((
+				(static_cast<const VectorType*>(sig.param_types[0].getPointer())->elem_type->getType() == Type::FloatType) || // if vector of floats
+				(static_cast<const VectorType*>(sig.param_types[0].getPointer())->elem_type->getType() == Type::IntType)  // or vector of ints
+				) && (*sig.param_types[0] == *sig.param_types[1])) // and argument types are the same
 			{
+				assert(*sig.param_types[0] == *sig.param_types[1]);
+
 				if(sig.name == "min")
 				{
 					vector<FunctionDefinition::FunctionArg> args(2);
@@ -613,9 +616,8 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 			}
 
 
-			if(
-				static_cast<const VectorType*>(sig.param_types[0].getPointer())->elem_type->getType() == Type::FloatType && // vector of floats
-				static_cast<const VectorType*>(sig.param_types[1].getPointer())->elem_type->getType() == Type::FloatType) // and vector of floats
+			if(static_cast<const VectorType*>(sig.param_types[0].getPointer())->elem_type->getType() == Type::FloatType && // vector of floats
+				(*sig.param_types[0] == *sig.param_types[1])) // and argument types are the same
 			{
 				if(sig.name == "pow")
 				{
@@ -658,93 +660,6 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 					return def;
 				}
 			} // End if (vector of floats, vector of floats)
-		} // End if (vector, vector) params
-
-
-		if(
-			(sig.param_types[0]->getType() == Type::VectorTypeType && static_cast<const VectorType*>(sig.param_types[0].getPointer())->elem_type->getType() == Type::FloatType) && // vector of floats
-			(sig.param_types[1]->getType() == Type::VectorTypeType && static_cast<const VectorType*>(sig.param_types[1].getPointer())->elem_type->getType() == Type::FloatType)) // and vector of floats
-		{
-			if(sig.name == "pow")
-			{
-				vector<FunctionDefinition::FunctionArg> args(2);
-				args[0].name = "x";
-				args[0].type = sig.param_types[0];
-				args[1].name = "y";
-				args[1].type = sig.param_types[1];
-
-				FunctionDefinitionRef def = new FunctionDefinition(
-					SrcLocation::invalidLocation(),
-					"pow", // name
-					args, // args
-					NULL, // body expr
-					sig.param_types[0], // return type
-					new PowBuiltInFunc(sig.param_types[0]) // built in impl.
-				);
-
-				this->sig_to_function_map.insert(std::make_pair(sig, def));
-				return def;
-			}
-			else if(sig.name == "min")
-			{
-				vector<FunctionDefinition::FunctionArg> args(2);
-				args[0].name = "x";
-				args[0].type = sig.param_types[0];
-				args[1].name = "y";
-				args[1].type = sig.param_types[1];
-
-				FunctionDefinitionRef def = new FunctionDefinition(
-					SrcLocation::invalidLocation(),
-					"min", // name
-					args, // args
-					NULL, // body expr
-					sig.param_types[0], // return type
-					new VectorMinBuiltInFunc(sig.param_types[0].downcast<VectorType>()) // built in impl.
-				);
-
-				this->sig_to_function_map.insert(std::make_pair(sig, def));
-				return def;
-			}
-			else if(sig.name == "max")
-			{
-				vector<FunctionDefinition::FunctionArg> args(2);
-				args[0].name = "x";
-				args[0].type = sig.param_types[0];
-				args[1].name = "y";
-				args[1].type = sig.param_types[1];
-
-				FunctionDefinitionRef def = new FunctionDefinition(
-					SrcLocation::invalidLocation(),
-					"max", // name
-					args, // args
-					NULL, // body expr
-					sig.param_types[0], // return type
-					new VectorMaxBuiltInFunc(sig.param_types[0].downcast<VectorType>()) // built in impl.
-				);
-
-				this->sig_to_function_map.insert(std::make_pair(sig, def));
-				return def;
-			}
-			else if(sig.name == "dot")
-			{
-				vector<FunctionDefinition::FunctionArg> args(2);
-				args[0].name = "x";
-				args[0].type = sig.param_types[0];
-				args[1].name = "y";
-				args[1].type = sig.param_types[1];
-
-				FunctionDefinitionRef def = new FunctionDefinition(
-					SrcLocation::invalidLocation(),
-					"dot", // name
-					args, // args
-					NULL, // body expr
-					new Float(), // return type
-					new DotProductBuiltInFunc(sig.param_types[0].downcast<VectorType>()) // built in impl.
-				);
-
-				this->sig_to_function_map.insert(std::make_pair(sig, def));
-				return def;
-			}
 		} // End if (vector, vector) params
 	} // End if two params
 	else if(sig.param_types.size() == 3)

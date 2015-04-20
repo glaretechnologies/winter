@@ -418,7 +418,7 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 			const FunctionSignature sig(this->function_name, argtypes);
 
 			// Try and resolve to internal function.
-			this->target_function = linker.findMatchingFunction(sig).getPointer();
+			this->target_function = linker.findMatchingFunction(sig, this->srcLocation()).getPointer();
 			if(this->target_function && isTargetDefinedBeforeAllInStack(payload.func_def_stack, target_function)) // Disallow recursion for now: Check the linked function is not the current function.
 			{
 				this->binding_type = BoundToGlobalDef;
@@ -443,7 +443,7 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 				// Try again with our coerced arguments
 				const FunctionSignature coerced_sig(this->function_name, coerced_argtypes);
 
-				this->target_function = linker.findMatchingFunction(coerced_sig).getPointer();
+				this->target_function = linker.findMatchingFunction(coerced_sig, this->srcLocation()).getPointer();
 				if(this->target_function && isTargetDefinedBeforeAllInStack(payload.func_def_stack, target_function)) // Disallow recursion for now: Check the linked function is not the current function.
 				{
 					this->binding_type = BoundToGlobalDef;
@@ -616,7 +616,8 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 					if(!(dynamic_cast<IntValue*>(res_v->e[i].getPointer())))
 						throw BaseException("Element in shuffle mask was not an integer.");
 
-					mask[i] = static_cast<IntValue*>(res_v->e[i].getPointer())->value;
+					const int index = static_cast<IntValue*>(res_v->e[i].getPointer())->value;
+					mask[i] = index;
 				}
 
 				assert(this->target_function->built_in_func_impl.nonNull());

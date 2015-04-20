@@ -942,7 +942,7 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 			std::vector<std::string> export_list_strings;
 			for(unsigned int i=0; i<args.entry_point_sigs.size(); ++i)
 			{
-				FunctionDefinitionRef func = linker.findMatchingFunction(args.entry_point_sigs[i]);
+				FunctionDefinitionRef func = linker.findMatchingFunction(args.entry_point_sigs[i], SrcLocation::invalidLocation());
 
 				if(func.nonNull())
 					export_list_strings.push_back(func->built_llvm_function->getName()); // NOTE: is LLVM func built yet?
@@ -1060,13 +1060,13 @@ int truncateToInt_float_(float x) { return (int)x; } \n\
 Reference<FunctionDefinition> VirtualMachine::findMatchingFunction(
 	const FunctionSignature& sig)
 {
-	return linker.findMatchingFunction(sig);
+	return linker.findMatchingFunction(sig, SrcLocation::invalidLocation());
 }
 
 
 void* VirtualMachine::getJittedFunction(const FunctionSignature& sig)
 {
-	FunctionDefinitionRef func = linker.findMatchingFunction(sig);
+	FunctionDefinitionRef func = linker.findMatchingFunction(sig, SrcLocation::invalidLocation());
 
 	if(func.isNull())
 		throw Winter::BaseException("Failed to find function " + sig.toString());

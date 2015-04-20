@@ -2104,6 +2104,10 @@ llvm::Value* ShuffleBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	{
 		std::vector<llvm::Constant*> elems(shuffle_mask.size());
 		for(size_t i=0; i<shuffle_mask.size(); ++i)
+		{
+			if(shuffle_mask[i] < 0 || shuffle_mask[i] >= vector_type->num)
+				throw BaseException("Shuffle mask index " + toString(shuffle_mask[i]) + " out of bounds: " + errorContext(params.currently_building_func_def));
+
 			elems[i] = llvm::ConstantInt::get(
 				*params.context, 
 				llvm::APInt(
@@ -2112,6 +2116,7 @@ llvm::Value* ShuffleBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 					true // signed
 				)
 			);
+		}
 
 		mask = llvm::ConstantVector::get(elems);
 	}

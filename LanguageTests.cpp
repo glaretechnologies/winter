@@ -74,6 +74,10 @@ void LanguageTests::run()
 	// Miscellaneous programs that caused crashes or other errors during fuzz testing
 	// ===================================================================
 
+	// max() with vector args with different width
+ 	testMainFloatArgInvalidProgram("def clamp(vector<float, 46> x, vector<float, 4> lowerbound, vector<float, 4> upperbound) vector<float, 4> : max(lowerbound, min(upperbound, x))    def main(float x) float : x");
+
+
 	// Test invalidity of repeated struct definition
 	testMainFloatArgInvalidProgram("struct Complex { float re, float im }  struct Complex { float rm }   def main(float x) float : x");
 	testMainFloatArgInvalidProgram("struct Complex { float re, float im }  struct Complex { float re, float im }   def main(float x) float : x");
@@ -593,6 +597,10 @@ void LanguageTests::run()
 	testMainFloatArg("def main(float x) float : elem(   shuffle([1.0, 2.0, 3.0, 4.0]v, [2, 3]v)   , 1)", 0.1f, 4.0f);
 
 	testMainFloatArg("def main(float x) float : elem(   shuffle([x + 1.0, x + 2.0, x + 3.0, x + 4.0]v, [2, 3]v)   , 1)", 0.1f, 4.1f);
+
+	// Test shuffle mask index out of bounds.
+	testMainFloatArgInvalidProgram("def main(float x) float : elem(   shuffle([x + 1.0, x + 2.0, x + 3.0, x + 4.0]v, [2, 33]v)   , 1)     def main(float x) float : x");
+ 
 
 	// Test a shuffle where the mask is invalid - a float
 	testMainFloatArgInvalidProgram("def main(float x) float : elem(   shuffle([1.0, 2.0, 3.0, 4.0]v, [2, 3.0]v)   , 1)");
