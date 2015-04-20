@@ -442,7 +442,7 @@ static bool testFuzzProgram(const std::string& src)
 		VirtualMachine vm(vm_args);
 
 		// Remove non-printable chars so console doesn't make bell sounds while printing.
-		std::cout << ("\nCompiled OK:\n" + StringUtils::removeNonPrintableChars(src) + "\n");
+		//std::cout << ("\nCompiled OK:\n" + StringUtils::removeNonPrintableChars(src) + "\n");
 
 		// Get main function
 		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
@@ -591,8 +591,14 @@ static bool testFuzzProgram(const std::string& src)
 #endif // #if USE_OPENCL
 		}
 	}
-	catch(Winter::BaseException& )
+	catch(Winter::BaseException& e)
 	{
+		if(e.what() == "Module verification errors.")
+		{
+			std::cerr << "Module verification errors while compiling " << src << std::endl;
+			assert(0);
+			exit(1);
+		}
 		// Compile failure when fuzzing is alright.
 		//std::cerr << e.what() << std::endl;
 		return false;

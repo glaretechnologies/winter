@@ -95,7 +95,10 @@ Reference<BufferRoot> LangParser::parseBuffer(const std::vector<Reference<TokenB
 			else if(tokens[i]->isIdentifier() && tokens[i]->getIdentifierValue() == "struct")
 			{
 				Reference<StructureType> t = parseStructType(parseinfo);
-				// TODO: check to see if it has already been defined.
+				
+				if(named_types.find(t->name) != named_types.end())
+					throw BaseException("struct with name '" + t->name + "' already defined: " + errorPosition(*source_buffer, i));
+
 				named_types[t->name] = t;
 				named_types_ordered_out.push_back(t);
 
@@ -768,16 +771,16 @@ TypeRef LangParser::parseElementaryType(ParseInfo& p)
 		return TypeRef(new Int());
 	else if(t == "int64")
 		return TypeRef(new Int(64));
-	else if(t == "string")
-		return TypeRef(new String());
+	//else if(t == "string")
+	//	return TypeRef(new String());
 	else if(t == "char")
 		return TypeRef(new CharType());
 	else if(t == "opaque" || t == "voidptr")
 		return TypeRef(new OpaqueType());
 	else if(t == "bool")
 		return TypeRef(new Bool());
-	else if(t == "error")
-		return new ErrorType();
+	//else if(t == "error")
+	//	return new ErrorType();
 	else if(t == "map")
 		return parseMapType(p);
 	else if(t == "array")

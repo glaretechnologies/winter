@@ -68,11 +68,18 @@ void LanguageTests::run()
 {
 	Timer timer;
 
-	//fuzzTests();
+	// fuzzTests();
 
 	// ===================================================================
 	// Miscellaneous programs that caused crashes or other errors during fuzz testing
 	// ===================================================================
+
+	// Test invalidity of repeated struct definition
+	testMainFloatArgInvalidProgram("struct Complex { float re, float im }  struct Complex { float rm }   def main(float x) float : x");
+	testMainFloatArgInvalidProgram("struct Complex { float re, float im }  struct Complex { float re, float im }   def main(float x) float : x");
+	testMainFloatArgInvalidProgram("struct Complex { float re, float im }  struct Complex { float rm }    def f() Complex : Complex(1.0, 2.0)    def main() float :   f().im");
+
+	testFuzzProgram("struct PolarisationVec { vector<float, 8> e }  		struct PolarisationVec {  string ve }");
 
 	testFuzzProgram("def main(float x)  : if(x < 10.0, 3, 4)");
 
@@ -2932,7 +2939,7 @@ void LanguageTests::fuzzTests()
 
 
 		// Each stage has different random number seeds, and after each stage tested_programs will be cleared, otherwise it gets too large and uses up too much RAM.
-		int rng_seed = 10;
+		int rng_seed = 30;
 		for(int stage=0; stage<1000000; ++stage)
 		{
 			std::cout << "=========================== Stage " << stage << "===========================================" << std::endl;
@@ -2940,7 +2947,7 @@ void LanguageTests::fuzzTests()
 			Mutex tested_programs_mutex;
 			std::unordered_set<std::string> tested_programs;
 
-			const int NUM_THREADS = 1;
+			const int NUM_THREADS = 4;
 			Indigo::TaskManager manager(NUM_THREADS);
 			for(int i=0; i<NUM_THREADS; ++i)
 			{
