@@ -120,6 +120,8 @@ void Lexer::parseNumericLiteral(const SourceBufferRef& buffer, Parser& parser, s
 
 		int num_bits = 32;
 		// Parse suffix if present
+
+		const unsigned int suffix_pos = parser.currentPos(); // Suffix position (if present)
 		if(parser.currentIsChar('i'))
 		{
 			parser.advance();
@@ -131,6 +133,9 @@ void Lexer::parseNumericLiteral(const SourceBufferRef& buffer, Parser& parser, s
 				throw LexerExcep("Failed to parse integer suffix after 'i':.  (Next chars '" + next_token + "')" + errorPosition(buffer, pos));
 			}
 		}
+
+		if(!(num_bits == 32 || num_bits == 64))
+			throw LexerExcep("Integer must have 32 or 64 bits." + errorPosition(buffer, suffix_pos));
 
 		tokens_out.push_back(Reference<TokenBase>(new IntLiteralToken(x, num_bits, char_index)));
 	}

@@ -68,7 +68,8 @@ void LanguageTests::run()
 {
 	Timer timer;
 
-
+	testMainIntegerArgInvalidProgram("def main(int i) int : if i >= 0 && i < 1i0 then elem([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]v, i) else 0");
+	
 
 	// Test circular definitions between named constants and function definitions
 	testMainIntegerArgInvalidProgram("TEN = main			def main(int x) : TEN + x");

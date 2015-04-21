@@ -705,7 +705,7 @@ const std::string errorContext(const ASTNode& n, TraversalPayload& payload)
 }
 
 
-static bool isTargetDefinedBeforeAllInStack(const std::vector<FunctionDefinition*>& func_def_stack, int target_function_order_num)
+bool isTargetDefinedBeforeAllInStack(const std::vector<FunctionDefinition*>& func_def_stack, int target_function_order_num)
 {
 	if(target_function_order_num == -1) // If target is a built-in function etc.. then there are no ordering problems.
 		return true;
