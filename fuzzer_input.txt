@@ -173,6 +173,7 @@ TEN = 5 * 2			def main(int x) int : TEN + x
 	
 	def f(float x) tuple<float, float> : [x, x]t   
 		def main(float x) float :  elem(f(x), -1)
+
 	def f(float x) tuple<float, float> : [x, x]t   
 		def main(float x) float :  elem(f(x), 2)
 
@@ -255,12 +256,14 @@ TEN = 5 * 2			def main(int x) int : TEN + x
 struct Float4Struct { vector<float, 4> v } 
 			def main(Float4Struct a, Float4Struct b) Float4Struct : 
 				Float4Struct(a.v + [2.0]v4)
+
 struct Float4Struct { vector<float, 4> v } 
 			def main(Float4Struct a, Float4Struct b) Float4Struct : 
 				Float4Struct(a.v + [elem(b.v, 0)]v4)
 
 	
 	def main(float x) float :  elem(    [2.0]v8    , 5)
+
 def expensiveA(float x) float : cos(x * 2.0)			
 		def main(float x) float: expensiveA(x)
 

@@ -51,11 +51,12 @@ public:
 	};
 
 	
-	FunctionDefinition(const SrcLocation& src_loc, const std::string& name, const std::vector<FunctionArg>& args, 
+	FunctionDefinition(const SrcLocation& src_loc, int order_num, const std::string& name, const std::vector<FunctionArg>& args, 
 		//const vector<Reference<LetASTNode> >& lets,
 		const ASTNodeRef& body, 
 		const TypeRef& declared_rettype, // May be null, if return type is to be inferred.
-		const BuiltInFunctionImplRef& impl);
+		const BuiltInFunctionImplRef& impl
+	);
 	
 	~FunctionDefinition();
 
@@ -137,7 +138,7 @@ public:
 
 	int num_uses; // Conservative, >= than the actual num uses.
 
-	int function_order_num;
+	int order_num; // Used for establishing an ordering between function definitions and named constants, to avoid circular references.
 private:
 	FunctionDefinition* alloc_func; // NOTE: make this just a ptr?
 };

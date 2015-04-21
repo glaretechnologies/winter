@@ -149,6 +149,7 @@ void doImplicitIntToFloatTypeCoercionForFloatReturn(Reference<ASTNode>& expr, Tr
 const std::string errorContext(const ASTNode* n);
 const std::string errorContext(const ASTNode& n);
 const std::string errorContext(const ASTNode& n, TraversalPayload& payload);
+bool isTargetDefinedBeforeAllInStack(const std::vector<FunctionDefinition*>& func_def_stack, int target_function_order_num);
 
 
 class CleanUpInfo
@@ -607,7 +608,7 @@ public:
 	AdditionExpression(const SrcLocation& loc) : ASTNode(AdditionExpressionType, loc) {}
 
 	virtual ValueRef exec(VMState& vmstate);
-	virtual TypeRef type() const { return a->type(); }
+	virtual TypeRef type() const;
 	virtual void print(int depth, std::ostream& s) const;
 	virtual std::string sourceString() const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
@@ -629,7 +630,7 @@ public:
 	SubtractionExpression(const SrcLocation& loc) : ASTNode(SubtractionExpressionType, loc) {}
 
 	virtual ValueRef exec(VMState& vmstate);
-	virtual TypeRef type() const { return a->type(); }
+	virtual TypeRef type() const;
 	virtual void print(int depth, std::ostream& s) const;
 	virtual std::string sourceString() const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
@@ -673,7 +674,7 @@ public:
 	DivExpression(const SrcLocation& loc) : ASTNode(DivExpressionType, loc), proven_defined(false) {}
 
 	virtual ValueRef exec(VMState& vmstate);
-	virtual TypeRef type() const { return a->type(); }
+	virtual TypeRef type() const;
 	virtual void print(int depth, std::ostream& s) const;
 	virtual std::string sourceString() const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
@@ -844,8 +845,8 @@ public:
 class NamedConstant : public ASTNode
 {
 public:
-	NamedConstant(const std::string& name_, const ASTNodeRef& value_expr_, const SrcLocation& loc) : 
-	  ASTNode(NamedConstantType, loc), name(name_), value_expr(value_expr_) 
+	NamedConstant(const std::string& name_, const ASTNodeRef& value_expr_, const SrcLocation& loc, int order_num_) : 
+	  ASTNode(NamedConstantType, loc), name(name_), value_expr(value_expr_), order_num(order_num_)
 	{
 	}
 
@@ -861,6 +862,7 @@ public:
 
 	std::string name;
 	ASTNodeRef value_expr;
+	int order_num;
 };
 
 typedef Reference<NamedConstant> NamedConstantRef;

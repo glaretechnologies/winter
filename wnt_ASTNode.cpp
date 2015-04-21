@@ -136,21 +136,21 @@ ASTNodeRef foldExpression(ASTNodeRef& e, TraversalPayload& payload)
 	//delete vmstate.argument_stack[0];
 	vmstate.func_args_start.pop_back();
 
-	if(e->type()->getType() == Type::FloatType)
+	if(dynamic_cast<FloatValue*>(retval.getPointer())) //e->type()->getType() == Type::FloatType)
 	{
 		assert(dynamic_cast<FloatValue*>(retval.getPointer()));
 		FloatValue* val = static_cast<FloatValue*>(retval.getPointer());
 
 		return ASTNodeRef(new FloatLiteral(val->value, e->srcLocation()));
 	}
-	else if(e->type()->getType() == Type::IntType)
+	else if(dynamic_cast<IntValue*>(retval.getPointer())) // e->type()->getType() == Type::IntType)
 	{
 		assert(dynamic_cast<IntValue*>(retval.getPointer()));
 		IntValue* val = static_cast<IntValue*>(retval.getPointer());
 
 		return ASTNodeRef(new IntLiteral(val->value, static_cast<const Int*>(e->type().getPointer())->numBits(), e->srcLocation()));
 	}
-	else if(e->type()->getType() == Type::BoolType)
+	else if(dynamic_cast<BoolValue*>(retval.getPointer())) // e->type()->getType() == Type::BoolType)
 	{
 		assert(dynamic_cast<BoolValue*>(retval.getPointer()));
 		BoolValue* val = static_cast<BoolValue*>(retval.getPointer());
@@ -159,8 +159,9 @@ ASTNodeRef foldExpression(ASTNodeRef& e, TraversalPayload& payload)
 	}
 	else
 	{
-		assert(0);
-		return ASTNodeRef(NULL);
+		throw BaseException("invalid type");
+		//assert(0);
+		//return ASTNodeRef(NULL);
 	}
 }
 
@@ -399,6 +400,7 @@ static void doImplicitIntToFloatTypeCoercion(ASTNodeRef& a, ASTNodeRef& b, Trave
 
 	// TODO: Handle bitness
 
+	// 3.0 > 4		=>		3.0 > 4.0
 	if(a_type.nonNull() && a_type->getType() == Type::FloatType && b->nodeType() == ASTNode::IntLiteralType)
 	{
 		IntLiteral* b_lit = static_cast<IntLiteral*>(b.getPointer());
@@ -420,6 +422,35 @@ static void doImplicitIntToFloatTypeCoercion(ASTNodeRef& a, ASTNodeRef& b, Trave
 		}
 	}
 }
+
+
+static bool canDoImplicitIntToFloatTypeCoercion(const ASTNodeRef& a, const ASTNodeRef& b)
+{
+	// Type may be null if 'a' is a variable node that has not been bound yet.
+	const TypeRef a_type = a->type(); 
+	const TypeRef b_type = b->type();
+
+	// TODO: Handle bitness
+
+	// 3.0 > 4		=>		3.0 > 4.0
+	if(a_type.nonNull() && a_type->getType() == Type::FloatType && b->nodeType() == ASTNode::IntLiteralType)
+	{
+		IntLiteral* b_lit = static_cast<IntLiteral*>(b.getPointer());
+		if(isIntExactlyRepresentableAsFloat(b_lit->value))
+			return true;
+	}
+
+	// 3 > 4.0      =>        3.0 > 4.0
+	if(b_type.nonNull() && b_type->getType() == Type::FloatType && a->nodeType() == ASTNode::IntLiteralType)
+	{
+		IntLiteral* a_lit = static_cast<IntLiteral*>(a.getPointer());
+		if(isIntExactlyRepresentableAsFloat(a_lit->value))
+			return true;
+	}
+
+	return false;
+}
+
 
 
 void doImplicitIntToFloatTypeCoercionForFloatReturn(ASTNodeRef& expr, TraversalPayload& payload)
@@ -674,6 +705,19 @@ const std::string errorContext(const ASTNode& n, TraversalPayload& payload)
 }
 
 
+static bool isTargetDefinedBeforeAllInStack(const std::vector<FunctionDefinition*>& func_def_stack, int target_function_order_num)
+{
+	if(target_function_order_num == -1) // If target is a built-in function etc.. then there are no ordering problems.
+		return true;
+
+	for(size_t i=0; i<func_def_stack.size(); ++i)
+		if(target_function_order_num >= func_def_stack[i]->order_num)
+			return false;
+
+	return true;
+}
+
+
 Variable::Variable(const std::string& name_, const SrcLocation& loc)
 :	ASTNode(VariableASTNodeType, loc),
 	vartype(UnboundVariable),
@@ -818,19 +862,28 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 	if(!matching_functions.empty())
 	{
 		//vector<FunctionDefinitionRef>& matching_functions = res->second;
-		
+
+	
 
 		assert(matching_functions.size() > 0);
 
 		if(matching_functions.size() > 1)
 			throw BaseException("Ambiguous binding for variable '" + this->name + "': multiple functions with name." + errorContext(*this, payload));
 
-		if(contains(payload.func_def_stack, matching_functions[0].getPointer()))
-			throw BaseException("Variable refer to current function definition." + errorContext(*this, payload));
+		//if(contains(payload.func_def_stack, matching_functions[0].getPointer()))
+		//	throw BaseException("Variable refer to current function definition." + errorContext(*this, payload));
 
-		this->vartype = BoundToGlobalDefVariable;
-		this->bound_function = matching_functions[0].getPointer();
-		return;
+
+		FunctionDefinition* target_func_def = matching_functions[0].getPointer();
+
+		// Only bind to a named constant defined earlier, and only bind to a named constant earlier than all functions we are defining.
+		if((!payload.current_named_constant || target_func_def->order_num < payload.current_named_constant->order_num) &&
+			isTargetDefinedBeforeAllInStack(payload.func_def_stack, target_func_def->order_num))
+		{
+			this->vartype = BoundToGlobalDefVariable;
+			this->bound_function = target_func_def;
+			return;
+		}
 	}
 
 	// Try and bind to a named constant.
@@ -839,7 +892,22 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 	Frame::NamedConstantMap::iterator name_res = payload.linker->named_constant_map.find(this->name);
 	if(name_res != payload.linker->named_constant_map.end())
 	{
-		if(payload.current_named_constant)
+		//if(payload.current_named_constant)
+		//{
+			const NamedConstant* target_named_constant = name_res->second.getPointer();
+
+			// Only bind to a named constant defined earlier, and only bind to a named constant earlier than all functions we are defining.
+			if((!payload.current_named_constant || target_named_constant->order_num < payload.current_named_constant->order_num) &&
+				isTargetDefinedBeforeAllInStack(payload.func_def_stack, target_named_constant->order_num))
+			{
+				this->vartype = BoundToNamedConstant;
+				this->bound_named_constant = name_res->second.getPointer();
+				return;
+			}
+		//}
+
+
+		/*if(payload.current_named_constant)
 		{
 			const int current_named_constant_src_pos = payload.current_named_constant->srcLocation().char_index;
 			const int target_named_constant_src_pos = name_res->second->srcLocation().char_index;
@@ -858,7 +926,7 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 			this->vartype = BoundToNamedConstant;
 			this->bound_named_constant = name_res->second.getPointer();
 			return;
-		}
+		}*/
 
 		// Don't try to bind to the named constant we are in the value expression for.
 		//if(payload.named_constant_stack.empty() || (payload.named_constant_stack[0] != name_res->second.getPointer()))
@@ -1779,7 +1847,17 @@ TypeRef VectorLiteral::type() const
 	if(has_int_suffix)
 		return new VectorType(elem_type, this->int_suffix);
 	else
+	{
+		if(elem_type->getType() == Type::IntType)
+		{
+			// Consider type coercion - do we have any floats literals in this vector?
+			for(size_t i=0; i<elements.size(); ++i)
+				if(elements[i]->nodeType() == ASTNode::FloatLiteralType)
+					return elements[i]->type(); // Float type
+		}
+
 		return new VectorType(elem_type, (int)elements.size());
+	}
 }
 
 
@@ -1867,7 +1945,7 @@ void VectorLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	{
 		// Convert e.g. [1.0, 2.0, 3]v to [1.0, 2.0, 3.0]v
 
-		// Do we have any floats in this vector?
+		// Do we have any float literals in this vector?
 		bool have_float = false;
 		for(size_t i=0; i<elements.size(); ++i)
 			have_float = have_float || (elements[i]->nodeType() == ASTNode::FloatLiteralType);
@@ -2029,7 +2107,11 @@ TypeRef TupleLiteral::type() const
 {
 	vector<TypeRef> component_types(elements.size());
 	for(size_t i=0; i<component_types.size(); ++i)
+	{
 		component_types[i] = elements[i]->type();
+		if(component_types[i].isNull())
+			return NULL;
+	}
 
 	return new TupleType(component_types);
 }
@@ -2095,29 +2177,6 @@ void TupleLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 	{
 		for(size_t i=0; i<elements.size(); ++i)
 			convertOverloadedOperators(elements[i], payload, stack);
-	}
-	else if(payload.operation == TraversalPayload::TypeCoercion)
-	{
-		// Convert e.g. [1.0, 2.0, 3]t to [1.0, 2.0, 3.0]t
-
-		// Do we have any floats in this vector?
-		bool have_float = false;
-		for(size_t i=0; i<elements.size(); ++i)
-			have_float = have_float || (elements[i]->nodeType() == ASTNode::FloatLiteralType);
-
-		if(have_float)
-		{
-			for(size_t i=0; i<elements.size(); ++i)
-				if(elements[i]->nodeType() == ASTNode::IntLiteralType)
-				{
-					const IntLiteral* int_lit = static_cast<const IntLiteral*>(elements[i].getPointer());
-					if(isIntExactlyRepresentableAsFloat(int_lit->value))
-					{
-						elements[i] = ASTNodeRef(new FloatLiteral((float)int_lit->value, int_lit->srcLocation()));
-						payload.tree_changed = true;
-					}
-				}
-		}
 	}
 
 
@@ -2459,6 +2518,7 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 			if(b->type()->getType() == Type::VectorTypeType) // float * vector
 			{
 				VectorValue* bval_vec = static_cast<VectorValue*>(bval.getPointer());
+
 				vector<ValueRef> elem_values(bval_vec->e.size());
 				for(unsigned int i=0; i<elem_values.size(); ++i)
 					elem_values[i] = ValueRef(new FloatValue(op(
@@ -2482,6 +2542,7 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 			if(b->type()->getType() == Type::VectorTypeType) // int * vector
 			{
 				VectorValue* bval_vec = static_cast<VectorValue*>(bval.getPointer());
+
 				vector<ValueRef> elem_values(bval_vec->e.size());
 				for(unsigned int i=0; i<elem_values.size(); ++i)
 					elem_values[i] = ValueRef(new IntValue(op(
@@ -2514,6 +2575,9 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 				{
 					if(b->type()->getType() == Type::VectorTypeType) // Vector * vector
 					{
+						if(b->type().downcast<VectorType>()->num != vectype->num)
+							throw BaseException("Invalid types to binary op.");
+
 						VectorValue* bval_vec = static_cast<VectorValue*>(bval.getPointer());
 						for(unsigned int i=0; i<elem_values.size(); ++i)
 							elem_values[i] = ValueRef(new FloatValue(op(
@@ -2541,6 +2605,10 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 					if(b->type()->getType() == Type::VectorTypeType) // Vector * vector
 					{
 						VectorValue* bval_vec = static_cast<VectorValue*>(bval.getPointer());
+
+						if(b->type().downcast<VectorType>()->num != vectype->num)
+							throw BaseException("Invalid types to binary op.");
+
 						for(unsigned int i=0; i<elem_values.size(); ++i)
 							elem_values[i] = ValueRef(new IntValue(op(
 								static_cast<IntValue*>(aval_vec->e[i].getPointer())->value,
@@ -2615,6 +2683,13 @@ void AdditionExpression::bindVariables(const std::vector<ASTNode*>& stack)
 }*/
 
 
+TypeRef AdditionExpression::type() const
+{
+	if(canDoImplicitIntToFloatTypeCoercion(a, b))
+		return new Float();
+	else
+		return a->type();
+}
 
 
 void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
@@ -2811,6 +2886,15 @@ void SubtractionExpression::bindVariables(const std::vector<ASTNode*>& stack)
 }*/
 
 
+TypeRef SubtractionExpression::type() const
+{
+	if(canDoImplicitIntToFloatTypeCoercion(a, b))
+		return new Float();
+	else
+		return a->type();
+}
+
+
 void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
 	if(payload.operation == TraversalPayload::ConstantFolding)
@@ -2957,7 +3041,10 @@ TypeRef MulExpression::type() const
 	else if(b_type.nonNull() && b_type->getType() == Type::VectorTypeType)
 		return b->type();
 
-	return a->type();
+	if(canDoImplicitIntToFloatTypeCoercion(a, b))
+		return new Float();
+	else
+		return a->type();
 }
 
 
@@ -3271,6 +3358,33 @@ ValueRef DivExpression::exec(VMState& vmstate)
 		assert(!"divexpression type invalid!");
 	}
 	return retval;
+}
+
+
+TypeRef DivExpression::type() const
+{
+	// See if we can do type coercion
+
+	// Type may be null if 'a' is a variable node that has not been bound yet.
+	const TypeRef a_type = a->type(); 
+	const TypeRef b_type = b->type();
+
+	if(a_type.nonNull() && a_type->getType() == Type::FloatType && b->nodeType() == ASTNode::IntLiteralType)
+	{
+		IntLiteral* b_lit = static_cast<IntLiteral*>(b.getPointer());
+		if(isIntExactlyRepresentableAsFloat(b_lit->value) && (b_lit->value != 0))
+			return new Float();
+	}
+
+	// 3 / 4.0 => 3.0 / 4.0
+	if(b_type.nonNull() && b_type->getType() == Type::FloatType && a->nodeType() == ASTNode::IntLiteralType)
+	{
+		IntLiteral* a_lit = static_cast<IntLiteral*>(a.getPointer());
+		if(isIntExactlyRepresentableAsFloat(a_lit->value))
+			return new Float();
+	}
+
+	return a->type();
 }
 
 
@@ -4198,7 +4312,7 @@ ValueRef ComparisonExpression::exec(VMState& vmstate)
 		retval = ValueRef(compare<BoolValue>(this->token->getType(), aval.getPointer(), bval.getPointer()));
 		break;
 	default:
-		assert(!"ComparisonExpression type invalid!");
+		throw BaseException("ComparisonExpression type invalid!");
 	}
 
 	return retval;
@@ -4773,7 +4887,7 @@ llvm::Value* NamedConstant::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 
 Reference<ASTNode> NamedConstant::clone()
 {
-	return new NamedConstant(name, value_expr->clone(), this->srcLocation());
+	return new NamedConstant(name, value_expr->clone(), srcLocation(), order_num);
 }
 
 

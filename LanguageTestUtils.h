@@ -1615,7 +1615,7 @@ static void testFloatArray(const std::string& src, const float* a, const float* 
 		// Get main function
 		const FunctionSignature mainsig(
 			"main", 
-			std::vector<TypeRef>(2, new ArrayType(new Float(), 4)) // 2 float arrays of 4 elems each
+			std::vector<TypeRef>(2, new ArrayType(new Float(), len)) // 2 float arrays of 4 elems each
 		);
 
 		vm_args.entry_point_sigs.push_back(mainsig);

@@ -48,11 +48,13 @@ namespace Winter
 static const bool VERBOSE_EXEC = false;
 
 
-FunctionDefinition::FunctionDefinition(const SrcLocation& src_loc, const std::string& name, const std::vector<FunctionArg>& args_, 
+FunctionDefinition::FunctionDefinition(const SrcLocation& src_loc, int order_num_, const std::string& name, const std::vector<FunctionArg>& args_, 
 									   //const vector<Reference<LetASTNode> >& lets_,
 									   const ASTNodeRef& body_, const TypeRef& declared_rettype, 
-									   const BuiltInFunctionImplRef& impl)
+									   const BuiltInFunctionImplRef& impl
+									   )
 :	ASTNode(FunctionDefinitionType, src_loc),
+	order_num(order_num_),
 	args(args_),
 	//lets(lets_),
 	body(body_),
@@ -64,8 +66,7 @@ FunctionDefinition::FunctionDefinition(const SrcLocation& src_loc, const std::st
 	closure_type(NULL),
 	alloc_func(NULL),
 	is_anon_func(false),
-	num_uses(0),
-	function_order_num(0)
+	num_uses(0)
 {
 	sig.name = name;
 	for(unsigned int i=0; i<args_.size(); ++i)
@@ -1138,6 +1139,7 @@ Reference<ASTNode> FunctionDefinition::clone()
 {
 	FunctionDefinitionRef f = new FunctionDefinition(
 		this->srcLocation(),
+		this->order_num,
 		this->sig.name,
 		this->args,
 		this->body.nonNull() ? this->body->clone() : NULL,

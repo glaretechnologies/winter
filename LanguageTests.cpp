@@ -68,7 +68,42 @@ void LanguageTests::run()
 {
 	Timer timer;
 
-	// fuzzTests();
+
+
+	// Test circular definitions between named constants and function definitions
+	testMainIntegerArgInvalidProgram("TEN = main			def main(int x) : TEN + x");
+	
+	testMainFloatArgInvalidProgram("struct S { tuple<float, float> a, int b }		 		def f(float x) S : S([x + 2.0, x(f(x), 0).a]t, 1)    		def main(float x) float :  elem(f(x).a, 0)");
+	
+	testMainFloatArgInvalidProgram("def f(float x) float :	let	float z = 2.0 in x + z       def main(int x) int :  iterate(f, 0)");
+//	testMainFloatArgInvalidProgram("def f(float x) float :	let	float z = 2.0 in x + z       def main(int x) int :  iterate(f, 0)	  def main(float x) float : f(x)");
+	
+	
+	testMainFloatArgInvalidProgram("def main(float x) float : elem(   shuffle([1.0, 20, 4.0]v, [2, 3]v)   , 1)");
+
+	testMainIntegerArgInvalidProgram("def main(int i) int : if i >= 0 && i < 10 then elem([1, 2, 3, 4, 5, 6, 7, 8., 9, 10]t, i) else 0");
+	testMainIntegerArgInvalidProgram("def main(int i) int : if i >= 0 && i < 10 then elem([1, 2, 3, 4, 5, 6, 7, 8., 9, 10]a, i) else 0");
+
+	// Test type coercion in vector literal changing elem() type
+	testMainFloatArgInvalidProgram("def main(int i) int : if i >= 0 && i < 10 then elem([1, 2, 3, 4, 5, 6, 7, 8., 9, 10]v, i) else 0");
+
+	testMainFloatArgInvalidProgram("def mul(vector<float, 4> v, float x) vector<float, 4> : v * [x, x,]v  					def main() float : 	let x = [1.0, 2.0, 3.0, 4.0]v 		y = 10.0 in   mul(x, y).e1");
+	
+		
+
+	testMainFloatArgInvalidProgram("def main() float : 					let x = [1.0, 2.0, 3.0, 4.0]v 					y = [10.0, 20.0, 30.0, 40.0]v  <1.0 in 					e1(x + y)");
+
+	testMainFloatArgInvalidProgram("def f(array<int, 4> a, int i) int : if inBounds(a, i) elem(a, i) else 0       def main(int i) int : f([1, 2, 3]a, i)");
+
+
+	// This function has special static global variabl-creating mem-leaking powers.
+	testMainFloatArg(
+		"def expensiveA(float x) float : cos(x * 0.456 + cos(x))			\n\
+		def expensiveB(float x) float : sin(x * 0.345 + sin(x))			\n\
+		def main(float x) float: if(x < 0.5, expensiveA(x + 0.145), expensiveB(x + 0.2435))",
+		0.2f, cos((0.2f + 0.145f) * 0.456f + cos((0.2f + 0.145f))));	
+
+
 
 	// ===================================================================
 	// Miscellaneous programs that caused crashes or other errors during fuzz testing
@@ -473,6 +508,29 @@ void LanguageTests::run()
 	testMainFloatArgInvalidProgram("def main(float x) float : if(x < 1.0)");
 	testMainFloatArgInvalidProgram("def main(float x) float : if(x < 1.0, 2.0)");
 	testMainFloatArgInvalidProgram("def main(float x) float : if(x < 1.0, 2.0, 3.0, 4.0)");
+
+
+	// Test int->float type coercion for addition operands changing return type of tuple elem()
+	testMainFloatArg("def main(float x) float :  elem([0  + 2.0]t, 0)", 1.0f, 2.0f);
+	testMainFloatArg("def main(float x) float :  elem([x + 1.0, x, 0  + 2.0]t, 1)", 1.0f, 1.0f);
+	testMainFloatArg("def main(float x) float :  elem([x + 1.0, x, 0  - 2.0]t, 1)", 1.0f, 1.0f);
+	testMainFloatArg("def main(float x) float :  elem([x + 1.0, x, 0  * 2.0]t, 1)", 1.0f, 1.0f);
+	testMainFloatArg("def main(float x) float :  elem([x + 1.0, x, 0  / 2.0]t, 1)", 1.0f, 1.0f);
+
+	// Test function binding based on int->float type coercion
+	testMainFloatArg("def f(int i) float : 10.0     def f(float x) float : 20.0     def main(float x) float : f(1 + 2.0)", 1.0f, 20.0f); // 1 op 2.0 should be coerced to float
+	testMainFloatArg("def f(int i) float : 10.0     def f(float x) float : 20.0     def main(float x) float : f(1 - 2.0)", 1.0f, 20.0f); // 1 op 2.0 should be coerced to float
+	testMainFloatArg("def f(int i) float : 10.0     def f(float x) float : 20.0     def main(float x) float : f(1 * 2.0)", 1.0f, 20.0f); // 1 op 2.0 should be coerced to float
+	testMainFloatArg("def f(int i) float : 10.0     def f(float x) float : 20.0     def main(float x) float : f(1 / 2.0)", 1.0f, 20.0f); // 1 op 2.0 should be coerced to float
+	testMainFloatArg("def f(int i) float : 10.0     def f(float x) float : 20.0     def main(float x) float : f(1.0 + 2)", 1.0f, 20.0f); // 1.0 op 2 should be coerced to float
+	testMainFloatArg("def f(int i) float : 10.0     def f(float x) float : 20.0     def main(float x) float : f(1.0 - 2)", 1.0f, 20.0f); // 1.0 op 2 should be coerced to float
+	testMainFloatArg("def f(int i) float : 10.0     def f(float x) float : 20.0     def main(float x) float : f(1.0 * 2)", 1.0f, 20.0f); // 1.0 op 2 should be coerced to float
+	testMainFloatArg("def f(int i) float : 10.0     def f(float x) float : 20.0     def main(float x) float : f(1.0 / 2)", 1.0f, 20.0f); // 1.0 op 2 should be coerced to float
+
+	testMainFloatArg("def f(int i) float : 10.0     def f(float x) float : 20.0     def main(float x) float : f(1 + x)", 1.0f, 20.0f); // 1 op x should be coerced to float
+
+
+
 
 
 	// Test if LLVM combined multiple sqrts into a sqrtps instruction (doesn't do this as of LLVM 3.4)
@@ -2718,6 +2776,9 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 							in, target_result);
 	}
 
+
+	// fuzzTests();
+
 	std::cout << "===================All LanguageTests passed.  Elapsed: " << timer.elapsedString() << " =============================" << std::endl;
 }
 
@@ -2732,6 +2793,7 @@ struct Choice
 		Action_Insert,
 		Action_InsertRandomChar,
 		Action_Copy,
+		Action_CopyFromOtherProgram,
 		Action_Remove
 	};
 
@@ -2745,6 +2807,34 @@ struct Choice
 	std::string left;
 	std::string right;
 };
+
+
+static std::string readRandomProgramFromFuzzerInput(const std::vector<std::string>* fuzzer_input, MTwister& rng)
+{
+	// Pick a random input line to get started
+	std::string start_string;
+	while(start_string.empty())
+	{
+		// Pick a line to start at
+		size_t linenum = myMin(fuzzer_input->size()-1, (size_t)(fuzzer_input->size() * rng.unitRandom()));
+
+		// If we are in whitespace, pick another line.
+		if(::isAllWhitespace((*fuzzer_input)[linenum]))
+			continue;
+
+		// Go up until we are below a whitespace line
+		while(linenum >= 1 && !::isAllWhitespace((*fuzzer_input)[linenum - 1]))
+			linenum--;
+				
+		start_string = (*fuzzer_input)[linenum]; // Get line
+
+		linenum++;
+		// While there are more lines below that aren't just whitespace, then the program continues, so append.
+		for(; linenum<fuzzer_input->size() && !::isAllWhitespace((*fuzzer_input)[linenum]); ++linenum)
+			start_string += " " + (*fuzzer_input)[linenum];
+	}
+	return start_string;
+}
 
 
 class FuzzTask : public Indigo::Task
@@ -2762,22 +2852,8 @@ public:
 		const int N = 5000000;
 		for(int i=0; i<N; ++i)
 		{
-			//std::string s = "def main(float x) float : ";
-			// Pick a random input line to get started
-			std::string start_string;
-			while(start_string.empty())
-			{
-				// Pick a line to start at
-				size_t linenum = myMin(fuzzer_input->size()-1, (size_t)(fuzzer_input->size() * rng.unitRandom()));
-				
-				start_string = (*fuzzer_input)[linenum]; // Get line
-
-				// While there are more lines below that aren't just whitespace, then the program continues, so append.
-				for(; linenum<fuzzer_input->size() && (::stripWhitespace((*fuzzer_input)[linenum]) != ""); ++linenum)
-					start_string += " " + (*fuzzer_input)[linenum];
-			}
-
-			start_string = ::stripHeadAndTailWhitespace(start_string);
+			// Pick a random program to get started
+			const std::string start_string = readRandomProgramFromFuzzerInput(fuzzer_input, rng);
 
 			std::string s = start_string;
 
@@ -2839,6 +2915,18 @@ public:
 								s.insert(insert_pos, chunk); 
 							}
 						}
+						else if(choices[z].action == Choice::Action_CopyFromOtherProgram)
+						{
+							// Copy random chunk of text from some other program and insert somewhere in string.
+							const std::string src_string = readRandomProgramFromFuzzerInput(fuzzer_input, rng);
+
+							const size_t src_pos = myMin((size_t)(rng.unitRandom() * src_string.size()), src_string.size() - 1);
+							const size_t chunk_len = 1 + (size_t)(src_string.size() * 2 * rng.unitRandom() * rng.unitRandom());
+							const std::string chunk = src_string.substr(src_pos, chunk_len);
+
+							const size_t insert_pos = myMin((size_t)(rng.unitRandom() * s.size()), s.size());
+							s.insert(insert_pos, chunk); 
+						}
 
 
 						break;
@@ -2891,11 +2979,12 @@ void LanguageTests::fuzzTests()
 	try
 	{
 		std::vector<Choice> choices;
+		choices.push_back(Choice(Choice::Action_Break, 20.f)); // Break loop choice.  Should be reasonably high probability so we don't make too many random changes each test.
 		choices.push_back(Choice(Choice::Action_InsertRandomChar, 5.f));
 		choices.push_back(Choice(Choice::Action_Remove, 5.f));
 		choices.push_back(Choice(Choice::Action_Copy, 5.f));
-		choices.push_back(Choice(Choice::Action_Break, 20.f)); // Break loop choice.  Should be reasonably high probability so we don't make too many random changes each test.
-
+		choices.push_back(Choice(Choice::Action_CopyFromOtherProgram, 5));
+		
 		choices.push_back(Choice(Choice::Action_Insert, " 1.0 ", 1.0f));
 		choices.push_back(Choice(Choice::Action_Insert, " 0 ", 1.0f));
 		choices.push_back(Choice(Choice::Action_Insert, " 1 ", 1.0f));
@@ -2931,7 +3020,7 @@ void LanguageTests::fuzzTests()
 		choices.push_back(Choice(Choice::Action_Insert, " function ", 1.0f));
 		choices.push_back(Choice(Choice::Action_Insert, " vector ", 1.0f));
 		choices.push_back(Choice(Choice::Action_Insert, " tuple ", 1.0f));
-
+		
 
 		// Normalise probabilities.
 		float sum = 0;
@@ -2947,7 +3036,7 @@ void LanguageTests::fuzzTests()
 
 
 		// Each stage has different random number seeds, and after each stage tested_programs will be cleared, otherwise it gets too large and uses up too much RAM.
-		int rng_seed = 30;
+		int rng_seed = 50;
 		for(int stage=0; stage<1000000; ++stage)
 		{
 			std::cout << "=========================== Stage " << stage << "===========================================" << std::endl;
@@ -2955,7 +3044,7 @@ void LanguageTests::fuzzTests()
 			Mutex tested_programs_mutex;
 			std::unordered_set<std::string> tested_programs;
 
-			const int NUM_THREADS = 4;
+			const int NUM_THREADS = 1;
 			Indigo::TaskManager manager(NUM_THREADS);
 			for(int i=0; i<NUM_THREADS; ++i)
 			{

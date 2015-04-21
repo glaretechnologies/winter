@@ -277,7 +277,7 @@ static bool isTargetDefinedBeforeAllInStack(const std::vector<FunctionDefinition
 		return true;
 
 	for(size_t i=0; i<func_def_stack.size(); ++i)
-		if(target_function->function_order_num >= func_def_stack[i]->function_order_num)
+		if(target_function->order_num >= func_def_stack[i]->order_num)
 			return false;
 
 	return true;
@@ -1558,6 +1558,10 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		// Set hidden voidptr argument
 		//if(target_takes_voidptr_arg) // params.hidden_voidptr_arg)
 		//	args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));
+
+		/*target_llvm_func->dump();
+		for(size_t z=0; z<args.size(); ++z)
+			args[z]->dump();*/
 
 		llvm::CallInst* call_inst = params.builder->CreateCall(target_llvm_func, args);
 

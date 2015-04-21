@@ -432,9 +432,7 @@ void VirtualMachine::init()
 
 void VirtualMachine::shutdown() // Calls llvm_shutdown()
 {
-#if TARGET_LLVM_VERSION < 36
-	llvm::llvm_shutdown(); // This calls llvm::llvm_stop_multithreaded() as well.
-#endif
+	llvm::llvm_shutdown(); // This calls llvm::llvm_stop_multithreaded() as well (on <= LLVM 3.4 at least).
 }
 
 
@@ -497,7 +495,7 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		Lexer::process(source_buffers[i], tokens);
 
 		vector<FunctionDefinitionRef> buffer_func_defs;
-		Reference<BufferRoot> buffer_root = parser.parseBuffer(tokens, source_buffers[i], buffer_func_defs, named_types, named_types_ordered);
+		Reference<BufferRoot> buffer_root = parser.parseBuffer(tokens, source_buffers[i], buffer_func_defs, named_types, named_types_ordered, function_order_num);
 
 		// Add named_types 
 
@@ -506,8 +504,12 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 			args.function_rewriters[z]->rewrite(buffer_func_defs, source_buffers[i]);
 
 		// Assign function numbers to establish an ordering
-		for(size_t z=0; z<buffer_func_defs.size(); ++z)
-			buffer_func_defs[z]->function_order_num = function_order_num++;
+		//for(size_t z=0; z<buffer_func_defs.size(); ++z)
+		//	buffer_func_defs[z]->function_order_num = function_order_num++;
+
+		// Assign function numbers to establish an ordering
+		//for(size_t z=0; z<buffer_func_defs.size(); ++z)
+		//	buffer_func_defs[z]->function_order_num = function_order_num++;
 
 		// TODO: use buffer_root instead.
 		//func_defs.insert(func_defs.end(), buffer_func_defs.begin(), buffer_func_defs.end());

@@ -70,6 +70,7 @@ void Linker::addExternalFunctions(vector<ExternalFunctionRef>& funcs)
 
 		Reference<FunctionDefinition> def(new FunctionDefinition(
 			SrcLocation::invalidLocation(),
+			-1, // order number
 			f->sig.name,
 			args,
 			ASTNodeRef(NULL), // body
@@ -191,6 +192,7 @@ static FunctionDefinitionRef makeBuiltInFuncDef(const std::string& name, const T
 
 	FunctionDefinitionRef def = new FunctionDefinition(
 		SrcLocation::invalidLocation(),
+		-1, // order number
 		name, // name
 		args, // args
 		NULL, // body expr
@@ -327,6 +329,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 
 			FunctionDefinitionRef def = new FunctionDefinition(
 				SrcLocation::invalidLocation(),
+				-1, // order number
 				"map",
 				args,
 				ASTNodeRef(NULL), // body expr
@@ -356,6 +359,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 
 				FunctionDefinitionRef def = new FunctionDefinition(
 					SrcLocation::invalidLocation(),
+					-1, // order number
 					"elem", // name
 					args, // args
 					NULL, // body expr
@@ -383,6 +387,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 
 				FunctionDefinitionRef def = new FunctionDefinition(
 					SrcLocation::invalidLocation(),
+					-1, // order number
 					"inBounds", // name
 					args, // args
 					NULL, // body expr
@@ -410,6 +415,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 
 				FunctionDefinitionRef def = new FunctionDefinition(
 					SrcLocation::invalidLocation(),
+					-1, // order number
 					"inBounds", // name
 					args, // args
 					NULL, // body expr
@@ -434,6 +440,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 
 				FunctionDefinitionRef def = new FunctionDefinition(
 					SrcLocation::invalidLocation(),
+					-1, // order number
 					"elem", // name
 					args, // args
 					NULL, // body expr
@@ -458,13 +465,13 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 
 				FunctionDefinitionRef def = new FunctionDefinition(
 					call_src_location,
+					-1, // order number - Consider Before everything else
 					"elem", // name
 					args, // args
 					NULL, // body expr
 					NULL, // sig.param_types[0].downcast<TupleType>()->component_types, // return type
 					new GetTupleElementBuiltInFunc(sig.param_types[0].downcast<TupleType>(), std::numeric_limits<unsigned int>::max()) // built in impl.
 				);
-				def->function_order_num = -1; // Consider Before everything else
 
 				// NOTE: because shuffle is unusual in that it has the shuffle mask 'baked into it', we need a unique ShuffleBuiltInFunc impl each time.
 				// So don't add to function map, so that it isn't reused.
@@ -491,6 +498,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 
 				FunctionDefinitionRef def = new FunctionDefinition(
 					SrcLocation::invalidLocation(),
+					-1, // order number
 					"elem", // name
 					args, // args
 					NULL, // body expr
@@ -518,6 +526,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 
 				FunctionDefinitionRef def = new FunctionDefinition(
 					SrcLocation::invalidLocation(),
+					-1, // order number
 					"pow", // name
 					args, // args
 					NULL, // body expr
@@ -548,13 +557,13 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 
 					FunctionDefinitionRef def = new FunctionDefinition(
 						call_src_location,
+						-1, // order number
 						"shuffle_" + toString(unique_functions.size()) + "_", // name
 						args, // args
 						NULL, // body expr
 						new VectorType(sig.param_types[0].downcast<VectorType>()->elem_type, sig.param_types[1].downcast<VectorType>()->num), // return type
 						new ShuffleBuiltInFunc(sig.param_types[0].downcast<VectorType>(), sig.param_types[1].downcast<VectorType>()) // built in impl.
 					);
-					def->function_order_num = -1; // Consider Before everything else
 
 					// NOTE: because shuffle is unusual in that it has the shuffle mask 'baked into it', we need a unique ShuffleBuiltInFunc impl each time.
 					// So don't add to function map, so that it isn't reused.
@@ -583,6 +592,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 
 					FunctionDefinitionRef def = new FunctionDefinition(
 						SrcLocation::invalidLocation(),
+						-1, // order number
 						"min", // name
 						args, // args
 						NULL, // body expr
@@ -603,6 +613,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 
 					FunctionDefinitionRef def = new FunctionDefinition(
 						SrcLocation::invalidLocation(),
+						-1, // order number
 						"max", // name
 						args, // args
 						NULL, // body expr
@@ -629,6 +640,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 
 					FunctionDefinitionRef def = new FunctionDefinition(
 						SrcLocation::invalidLocation(),
+						-1, // order number
 						"pow", // name
 						args, // args
 						NULL, // body expr
@@ -649,6 +661,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 
 					FunctionDefinitionRef def = new FunctionDefinition(
 						SrcLocation::invalidLocation(),
+						-1, // order number
 						"dot", // name
 						args, // args
 						NULL, // body expr
@@ -673,6 +686,26 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 		const TypeRef state_type = sig.param_types[1];
 			
 		// TODO: typecheck elems and function arg and return types
+		// iterate(function<State, int, tuple<State, bool>> f, State initial_state) State
+		if(func_type->arg_types.size() != 2)
+			throw BaseException("function argument to iterate must have 2 args.");
+		if(*func_type->arg_types[0] != *state_type)
+			throw BaseException("First argument type to function argument to iterate must be same as initial_state type.");
+
+		if(func_type->arg_types[1]->getType() != Type::IntType)
+			throw BaseException("second argument type to function argument to iterate must be int.");
+
+		if(func_type->return_type->getType() != Type::TupleTypeType)
+			throw BaseException("function argument to iterate must return tuple<State, bool>");
+
+		if(func_type->return_type.downcast<TupleType>()->component_types.size() != 2)
+			throw BaseException("function argument to iterate must return tuple<State, bool>");
+
+		if(*func_type->return_type.downcast<TupleType>()->component_types[0] != *state_type)
+			throw BaseException("function argument to iterate must return tuple<State, bool>");
+
+		if(func_type->return_type.downcast<TupleType>()->component_types[1]->getType() != Type::BoolType)
+			throw BaseException("function argument to iterate must return tuple<State, bool>");
 
 		vector<FunctionDefinition::FunctionArg> args(2);
 		args[0].type = func_type;
@@ -682,6 +715,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 
 		FunctionDefinitionRef def = new FunctionDefinition(
 			SrcLocation::invalidLocation(),
+			-1, // order number
 			"iterate",
 			args,
 			ASTNodeRef(NULL), // body expr
@@ -713,6 +747,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 
 		FunctionDefinitionRef def = new FunctionDefinition(
 			SrcLocation::invalidLocation(),
+			-1, // order number
 			"fold",
 			args,
 			ASTNodeRef(NULL), // body expr
@@ -748,6 +783,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 
 		FunctionDefinitionRef def = new FunctionDefinition(
 			SrcLocation::invalidLocation(),
+			-1, // order number
 			"update",
 			args,
 			ASTNodeRef(NULL), // body expr
@@ -799,6 +835,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 
 				FunctionDefinitionRef new_func_def(new FunctionDefinition(
 					SrcLocation::invalidLocation(),
+					-1, // order number
 					sig.name, // name
 					args,
 					//vector<Reference<LetASTNode> >(), // lets
@@ -1011,13 +1048,13 @@ Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDef
 
 	Reference<FunctionDefinition> def(new FunctionDefinition(
 		generic_func->srcLocation(), // Use the generic function's location in src for the location
+		generic_func->order_num,
 		generic_func->sig.name, // name
 		args, // args
 		body,
 		concrete_declared_ret_type, // return type
 		built_in_impl // built in func impl
 	));
-	def->function_order_num = generic_func->function_order_num;
 
 	if(body.nonNull())
 	{

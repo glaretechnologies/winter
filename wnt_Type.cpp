@@ -394,6 +394,9 @@ bool ArrayType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) co
 	// So b is an Array as well.
 	const ArrayType* b_ = static_cast<const ArrayType*>(&b);
 
+	if(this->num_elems != b_->num_elems)
+		return false;
+
 	return this->elem_type->matchTypes(*b_->elem_type, type_mapping);
 }
 

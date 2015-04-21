@@ -36,8 +36,8 @@ class ParseInfo
 {
 public:
 	ParseInfo(unsigned int& i_, const std::vector<Reference<TokenBase> >& t, std::map<std::string, TypeRef>& named_types_,
-		std::vector<FunctionDefinitionRef>& func_defs_) 
-		: i(i_), tokens(t), named_types(named_types_), func_defs(func_defs_)/*, else_token_present(false)*/ {}
+		std::vector<FunctionDefinitionRef>& func_defs_, int order_num_) 
+		: i(i_), tokens(t), named_types(named_types_), func_defs(func_defs_), order_num(order_num_)/*, else_token_present(false)*/ {}
 	const std::vector<Reference<TokenBase> >& tokens;
 	//const char* text_buffer;
 	//const std::string* text_buffer;
@@ -46,6 +46,7 @@ public:
 	std::map<std::string, TypeRef>& named_types;
 	std::vector<FunctionDefinitionRef>& func_defs;
 	//bool else_token_present;
+	int order_num;
 
 	std::vector<std::string> generic_type_params; // Used when parsing types.
 };
@@ -67,7 +68,8 @@ public:
 		const SourceBufferRef& source_buffer,
 		std::vector<FunctionDefinitionRef>& func_defs_out, 
 		std::map<std::string, TypeRef>& named_types,
-		std::vector<TypeRef>& named_types_ordered_out);
+		std::vector<TypeRef>& named_types_ordered_out,
+		int& function_order_num);
 
 	static void test();
 

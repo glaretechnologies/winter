@@ -521,7 +521,7 @@ ValueRef ArrayMapBuiltInFunc::invoke(VMState& vmstate)
 	assert(f);
 	assert(from);
 
-	ArrayValue* retval = new ArrayValue();
+	ArrayValueRef retval = new ArrayValue();
 	retval->e.resize(from->e.size());
 
 	for(unsigned int i=0; i<from->e.size(); ++i)
@@ -536,7 +536,7 @@ ValueRef ArrayMapBuiltInFunc::invoke(VMState& vmstate)
 		vmstate.func_args_start.pop_back();
 	}
 
-	return ValueRef(retval);
+	return retval;
 }
 
 
@@ -1775,7 +1775,7 @@ ValueRef DotProductBuiltInFunc::invoke(VMState& vmstate)
 	const VectorValue* b = dynamic_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
 	assert(a && b);
 
-	FloatValue* res = new FloatValue(0.0f);
+	FloatValueRef res = new FloatValue(0.0f);
 
 	for(unsigned int i=0; i<vector_type->num; ++i)
 	{
@@ -1904,7 +1904,7 @@ ValueRef VectorMinBuiltInFunc::invoke(VMState& vmstate)
 		{
 			const float x = static_cast<const FloatValue*>(a->e[i].getPointer())->value;
 			const float y = static_cast<const FloatValue*>(b->e[i].getPointer())->value;
-			res_values[i] = ValueRef(new FloatValue(x < y ? x : y));
+			res_values[i] = new FloatValue(x < y ? x : y);
 		}
 	}
 	else if(this->vector_type->elem_type->getType() == Type::IntType)
@@ -1913,7 +1913,7 @@ ValueRef VectorMinBuiltInFunc::invoke(VMState& vmstate)
 		{
 			const int64 x = static_cast<const IntValue*>(a->e[i].getPointer())->value;
 			const int64 y = static_cast<const IntValue*>(b->e[i].getPointer())->value;
-			res_values[i] = ValueRef(new IntValue(x > y ? x : y));
+			res_values[i] = new IntValue(x > y ? x : y);
 		}
 	}
 	else
@@ -1921,7 +1921,7 @@ ValueRef VectorMinBuiltInFunc::invoke(VMState& vmstate)
 		assert(0);
 	}
 
-	return ValueRef(new VectorValue(res_values));
+	return new VectorValue(res_values);
 }
 
 
@@ -2009,7 +2009,7 @@ ValueRef VectorMaxBuiltInFunc::invoke(VMState& vmstate)
 		{
 			const float x = static_cast<const FloatValue*>(a->e[i].getPointer())->value;
 			const float y = static_cast<const FloatValue*>(b->e[i].getPointer())->value;
-			res_values[i] = ValueRef(new FloatValue(x > y ? x : y));
+			res_values[i] = new FloatValue(x > y ? x : y);
 		}
 	}
 	else if(this->vector_type->elem_type->getType() == Type::IntType)
@@ -2018,7 +2018,7 @@ ValueRef VectorMaxBuiltInFunc::invoke(VMState& vmstate)
 		{
 			const int64 x = static_cast<const IntValue*>(a->e[i].getPointer())->value;
 			const int64 y = static_cast<const IntValue*>(b->e[i].getPointer())->value;
-			res_values[i] = ValueRef(new IntValue(x > y ? x : y));
+			res_values[i] = new IntValue(x > y ? x : y);
 		}
 	}
 	else
@@ -2027,7 +2027,7 @@ ValueRef VectorMaxBuiltInFunc::invoke(VMState& vmstate)
 	}
 
 
-	return ValueRef(new VectorValue(res_values));
+	return new VectorValue(res_values);
 }
 
 
@@ -2069,10 +2069,14 @@ ValueRef ShuffleBuiltInFunc::invoke(VMState& vmstate)
 
 	for(unsigned int i=0; i<index_vec->e.size(); ++i)
 	{
-		res_values[i] = a->e[ index_vec->e[i].downcast<IntValue>()->value ];
+		const int64 index_val = index_vec->e[i].downcast<IntValue>()->value;
+		if(index_val < 0 || index_val >= a->e.size())
+			throw BaseException("invalid index");
+
+		res_values[i] = a->e[index_val];
 	}
 
-	return ValueRef(new VectorValue(res_values));
+	return new VectorValue(res_values);
 }
 
 

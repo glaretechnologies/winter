@@ -53,6 +53,7 @@ public:
 	virtual llvm::Constant* getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const;
 	float value;
 };
+typedef Reference<FloatValue> FloatValueRef;
 
 
 class BoolValue : public Value
@@ -144,6 +145,7 @@ public:
 
 	std::vector<ValueRef> e;
 };
+typedef Reference<ArrayValue> ArrayValueRef;
 
 
 class VectorValue : public Value

@@ -64,7 +64,8 @@ static const SrcLocation prevTokenLoc(ParseInfo& p)
 Reference<BufferRoot> LangParser::parseBuffer(const std::vector<Reference<TokenBase> >& tokens, 
 										   const SourceBufferRef& source_buffer,
 										   vector<FunctionDefinitionRef>& func_defs_out, std::map<std::string, TypeRef>& named_types,
-											std::vector<TypeRef>& named_types_ordered_out)
+											std::vector<TypeRef>& named_types_ordered_out,
+											int& order_num)
 {
 	try
 	{
@@ -74,7 +75,7 @@ Reference<BufferRoot> LangParser::parseBuffer(const std::vector<Reference<TokenB
 
 		unsigned int i = 0;
 
-		ParseInfo parseinfo(i, tokens, named_types, func_defs_out);
+		ParseInfo parseinfo(i, tokens, named_types, func_defs_out, order_num);
 		parseinfo.text_buffer = source_buffer.getPointer();
 
 		// NEW: go through buffer and see if there is a 'else' token
@@ -91,6 +92,7 @@ Reference<BufferRoot> LangParser::parseBuffer(const std::vector<Reference<TokenB
 			{
 				root->func_defs.push_back(parseFunctionDefinition(parseinfo));
 				parseinfo.generic_type_params.resize(0);
+				parseinfo.order_num++;
 			}
 			else if(tokens[i]->isIdentifier() && tokens[i]->getIdentifierValue() == "struct")
 			{
@@ -112,6 +114,7 @@ Reference<BufferRoot> LangParser::parseBuffer(const std::vector<Reference<TokenB
 
 				FunctionDefinitionRef cons = new FunctionDefinition(
 					SrcLocation::invalidLocation(),
+					parseinfo.order_num, // order number
 					t->name, // name
 					args, // arguments
 					ASTNodeRef(NULL), // body expr
@@ -120,6 +123,7 @@ Reference<BufferRoot> LangParser::parseBuffer(const std::vector<Reference<TokenB
 				);
 				root->func_defs.push_back(cons);
 				func_defs_out.push_back(cons);
+				
 
 				// Make field access functions
 				vector<FunctionDefinition::FunctionArg> getfield_args(1);
@@ -130,6 +134,7 @@ Reference<BufferRoot> LangParser::parseBuffer(const std::vector<Reference<TokenB
 				{
 					FunctionDefinitionRef def(new FunctionDefinition(
 						SrcLocation::invalidLocation(),
+						parseinfo.order_num, // order number
 						t->component_names[i], // name
 						getfield_args, // args
 						ASTNodeRef(NULL), // body expr
@@ -140,15 +145,21 @@ Reference<BufferRoot> LangParser::parseBuffer(const std::vector<Reference<TokenB
 					root->func_defs.push_back(def);
 					func_defs_out.push_back(def);
 				}
+
+				parseinfo.order_num++;
 			}
 			else if(tokens[i]->isIdentifier())
 			{
 				// Parse named constant, e.g. "DOZEN = 12"
 				root->named_constants.push_back(parseNamedConstant(parseinfo));
+				parseinfo.order_num++;
 			}
 			else
 				throw LangParserExcep("Expected 'def'." + errorPosition(*source_buffer, tokens[i]->char_index));
 		}
+
+		// Update order_num
+		order_num = parseinfo.order_num;
 
 		return root;
 	}
@@ -235,10 +246,10 @@ ASTNodeRef LangParser::parseFieldExpression(ParseInfo& p)
 
 		const std::string field_name = parseIdentifier("field name", p);
 
-		FunctionExpression* func_expr(new FunctionExpression(src_loc));
+		FunctionExpressionRef func_expr = new FunctionExpression(src_loc);
 		func_expr->function_name = field_name;
 		func_expr->argument_expressions.push_back(var_expression);
-		var_expression = ASTNodeRef(func_expr);
+		var_expression = func_expr;
 	}
 
 /*
@@ -377,8 +388,7 @@ ASTNodeRef LangParser::parseVariableExpression(ParseInfo& p)
 	if(isKeyword(name))
 		throw LangParserExcep("Cannot call a variable '" + name + "' - is a keyword.  " +  errorPositionPrevToken(p));
 
-	Variable* var = new Variable(name, loc);
-	return ASTNodeRef(var);
+	return new Variable(name, loc);
 }
 
 
@@ -467,6 +477,7 @@ FunctionDefinitionRef LangParser::parseFunctionDefinitionGivenName(const std::st
 
 		Reference<FunctionDefinition> def = new FunctionDefinition(
 			loc,
+			p.order_num,
 			func_name,
 			args,
 			//lets,
@@ -494,7 +505,7 @@ NamedConstantRef LangParser::parseNamedConstant(ParseInfo& p)
 
 	const ASTNodeRef value_expr = parseExpression(p);
 
-	return new NamedConstant(name, value_expr, src_loc);
+	return new NamedConstant(name, value_expr, src_loc, p.order_num);
 }
 
 
@@ -512,7 +523,7 @@ Reference<ASTNode> LangParser::parseFunctionExpression(ParseInfo& p)
 
 	std::vector<Reference<ASTNode> > arg_expressions;
 
-	FunctionExpression* expr = new FunctionExpression(src_loc);
+	FunctionExpressionRef expr = new FunctionExpression(src_loc);
 
 	if(p.tokens[p.i]->getType() != CLOSE_PARENTHESIS_TOKEN)
 	{
@@ -530,7 +541,7 @@ Reference<ASTNode> LangParser::parseFunctionExpression(ParseInfo& p)
 
 	expr->argument_expressions = arg_expressions;
 	expr->function_name = func_name;
-	return ASTNodeRef(expr);
+	return expr;
 }
 
 
@@ -971,21 +982,21 @@ a + b + c = (a + b) + c
 		{
 			parseToken(PLUS_TOKEN, p);
 
-			AdditionExpression* addexpr = new AdditionExpression(loc);
+			Reference<AdditionExpression> addexpr = new AdditionExpression(loc);
 			addexpr->a = left;
 			addexpr->b = parseMulDivExpression(p);
 			
-			left = ASTNodeRef(addexpr);
+			left = addexpr;
 		}
 		else if(isTokenCurrent(MINUS_TOKEN, p))
 		{
 			parseToken(MINUS_TOKEN, p);
 
-			SubtractionExpression* e = new SubtractionExpression(loc);
+			Reference<SubtractionExpression> e = new SubtractionExpression(loc);
 			e->a = left;
 			e->b = parseMulDivExpression(p);
 			
-			left = ASTNodeRef(e);
+			left = e;
 		}
 		else
 		{
@@ -1006,19 +1017,19 @@ ASTNodeRef LangParser::parseMulDivExpression(ParseInfo& p)
 		{
 			parseToken(ASTERISK_TOKEN, p);
 
-			MulExpression* expr = new MulExpression(loc);
+			Reference<MulExpression> expr = new MulExpression(loc);
 			expr->a = left;
 			expr->b = parseUnaryExpression(p);
-			left = ASTNodeRef(expr);
+			left = expr;
 		}
 		else if(isTokenCurrent(FORWARDS_SLASH_TOKEN, p))
 		{
 			parseToken(FORWARDS_SLASH_TOKEN, p);
 
-			DivExpression* expr = new DivExpression(loc);
+			Reference<DivExpression> expr = new DivExpression(loc);
 			expr->a = left;
 			expr->b = parseUnaryExpression(p);
-			left = ASTNodeRef(expr);
+			left = expr;
 		}
 		else
 			return left;
@@ -1037,23 +1048,23 @@ ASTNodeRef LangParser::parseBinaryLogicalExpression(ParseInfo& p)
 		{
 			parseToken(AND_TOKEN, p);
 
-			left = ASTNodeRef(new BinaryBooleanExpr(
+			left = new BinaryBooleanExpr(
 				BinaryBooleanExpr::AND,
 				left,
 				parseComparisonExpression(p),
 				loc
-			));
+			);
 		}
 		else if(isTokenCurrent(OR_TOKEN, p))
 		{
 			parseToken(OR_TOKEN, p);
 
-			left = ASTNodeRef(new BinaryBooleanExpr(
+			left = new BinaryBooleanExpr(
 				BinaryBooleanExpr::OR,
 				left,
 				parseComparisonExpression(p),
 				loc
-			));
+			);
 		}
 		else
 			return left;
@@ -1076,13 +1087,13 @@ ASTNodeRef LangParser::parseComparisonExpression(ParseInfo& p)
 
 			Reference<TokenBase> token_ref = makeTokenObject(token, p.tokens[p.i - 1]->char_index);
 
-			ComparisonExpression* expr = new ComparisonExpression(
+			Reference<ComparisonExpression> expr = new ComparisonExpression(
 				token_ref,
 				left, 
 				parseAddSubExpression(p),
 				loc
 			);
-			return ASTNodeRef(expr);
+			return expr;
 		}
 	}
 
@@ -1098,10 +1109,10 @@ ASTNodeRef LangParser::parseUnaryExpression(ParseInfo& p)
 
 		parseToken(MINUS_TOKEN, p);
 
-		UnaryMinusExpression* unary_expr = new UnaryMinusExpression(loc);
+		Reference<UnaryMinusExpression> unary_expr = new UnaryMinusExpression(loc);
 		unary_expr->expr = parseUnaryExpression(p);
 
-		return ASTNodeRef(unary_expr);
+		return unary_expr;
 	}
 	else
 	{
@@ -1135,7 +1146,7 @@ ASTNodeRef LangParser::parseMapLiteralExpression(ParseInfo& p)
 
 	parseToken(OPEN_BRACE_TOKEN, p);
 
-	MapLiteral* m = new MapLiteral(loc);
+	Reference<MapLiteral> m = new MapLiteral(loc);
 
 	while(1)
 	{
@@ -1160,7 +1171,7 @@ ASTNodeRef LangParser::parseMapLiteralExpression(ParseInfo& p)
 
 	parseToken(CLOSE_BRACE_TOKEN, p);
 
-	return ASTNodeRef(m);
+	return m;
 }
 
 
@@ -1317,7 +1328,7 @@ Reference<LetASTNode> LangParser::parseLet(ParseInfo& p)
 
 	parseToken(EQUALS_TOKEN, p);
 
-	Reference<LetASTNode> letnode = Reference<LetASTNode>(new LetASTNode(var_name, declared_type, loc));
+	Reference<LetASTNode> letnode = new LetASTNode(var_name, declared_type, loc);
 
 	ASTNodeRef expr = parseExpression(p);
 
