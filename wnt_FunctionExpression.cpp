@@ -271,7 +271,7 @@ bool FunctionExpression::doesFunctionTypeMatch(const TypeRef& type)
 }*/
 
 
-static bool isTargetDefinedBeforeAllInStack(const std::vector<FunctionDefinition*>& func_def_stack, const FunctionDefinition* target_function)
+/*static bool isTargetDefinedBeforeAllInStack(const std::vector<FunctionDefinition*>& func_def_stack, const FunctionDefinition* target_function)
 {
 	if(!target_function->srcLocation().isValid()) // If target is a built-in function etc.. then there are no ordering problems.
 		return true;
@@ -281,7 +281,7 @@ static bool isTargetDefinedBeforeAllInStack(const std::vector<FunctionDefinition
 			return false;
 
 	return true;
-}
+}*/
 
 
 void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload, std::vector<ASTNode*>& stack)
@@ -418,8 +418,8 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 			const FunctionSignature sig(this->function_name, argtypes);
 
 			// Try and resolve to internal function.
-			this->target_function = linker.findMatchingFunction(sig, this->srcLocation()).getPointer();
-			if(this->target_function && isTargetDefinedBeforeAllInStack(payload.func_def_stack, target_function)) // Disallow recursion for now: Check the linked function is not the current function.
+			this->target_function = linker.findMatchingFunction(sig, this->srcLocation(), &payload.func_def_stack).getPointer();
+			if(this->target_function/* && isTargetDefinedBeforeAllInStack(payload.func_def_stack, target_function)*/) // Disallow recursion for now: Check the linked function is not the current function.
 			{
 				this->binding_type = BoundToGlobalDef;
 			}
@@ -443,8 +443,8 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 				// Try again with our coerced arguments
 				const FunctionSignature coerced_sig(this->function_name, coerced_argtypes);
 
-				this->target_function = linker.findMatchingFunction(coerced_sig, this->srcLocation()).getPointer();
-				if(this->target_function && isTargetDefinedBeforeAllInStack(payload.func_def_stack, target_function)) // Disallow recursion for now: Check the linked function is not the current function.
+				this->target_function = linker.findMatchingFunction(coerced_sig, this->srcLocation(), &payload.func_def_stack).getPointer();
+				if(this->target_function/* && isTargetDefinedBeforeAllInStack(payload.func_def_stack, target_function)*/) // Disallow recursion for now: Check the linked function is not the current function.
 				{
 					this->binding_type = BoundToGlobalDef;
 

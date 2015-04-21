@@ -30,8 +30,8 @@ public:
 	class FunctionArg
 	{
 	public:
-		FunctionArg() : referenced(true) {}
-		FunctionArg(TypeRef type_, const std::string& n) : type(type_), name(n), referenced(true) {}
+		FunctionArg()/* : referenced(true)*/ {}
+		FunctionArg(TypeRef type_, const std::string& n) : type(type_), name(n)/*, referenced(true)*/ {}
 		/*enum TypeKind
 		{
 			GENERIC_TYPE,
@@ -43,11 +43,11 @@ public:
 		//int generic_type_param_index;
 		std::string name;
 
-		bool isReferenced() const { return referenced; }
+		//bool isReferenced() const { return referenced; }
 
-		bool referenced; // Is this argument bound to by a variable in the function body?  Will be conservatively set to true if unknown.
+		//bool referenced; // Is this argument bound to by a variable in the function body?  Will be conservatively set to true if unknown.
 
-		int ref_count;
+		//int ref_count;
 	};
 
 	

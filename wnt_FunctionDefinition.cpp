@@ -409,13 +409,13 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 		if all variables are bound:
 		any argument that is not referenced is not used.
 		*/
-		if(payload.all_variables_bound)
+		/*if(payload.all_variables_bound)
 		{
 			for(size_t i=0; i<args.size(); ++i)
 			{
 				args[i].referenced = args[i].ref_count > 0;
 			}
-		}
+		}*/
 
 	}
 

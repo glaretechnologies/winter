@@ -68,8 +68,27 @@ void LanguageTests::run()
 {
 	Timer timer;
 
-	testMainIntegerArgInvalidProgram("def main(int i) int : if i >= 0 && i < 1i0 then elem([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]v, i) else 0");
+	// Test that we can't put a structure in a vector
+	testMainFloatArgInvalidProgram("struct teststruct { float y } \n\
+        def main(float x) float : elem([teststruct(x)]v, 0).y");
+
+	testMainFloatArgInvalidProgram("struct teststruct { int y } \n\
+								   def f(teststruct a, teststruct b, bool condition) teststruct : let x = if(condition, a, b) in let v = [x, x, x, x, x, x, x, x]v in x \n\
+        def main(int x) int : y( f(teststruct(1), teststruct(2), x < 5) )");
+
+	testMainFloatArgInvalidProgram("struct s { float x, float yd }  	def op_sub(s a, s b) : s(a.x - b.x, a.y - b.y)  	def main() float : x( true  < s(2, 3) - s(3, 4))");
+
+	testMainFloatArgInvalidProgram("def f(float x) float : x*x def main(int x) int :  elem(fold(f, [0, 0, 1, 2]a, [0]a16), 1)    def main(float x) float : f(x) - 3");
+
+
+	testMainIntegerArgInvalidProgram("struct Float4Struct { vector<float, 4> v }  			def main(Float4Struct a, Float4Struct b) Float4Struct :  				Float4Struct(a.v + [eleFm(b.v, 0)]v4)");
+
+
+	testMainIntegerArgInvalidProgram("def main(int i) int : if i >= 0 && i < 10 then elem([1, 2, 3, 4, 5 + 1.0, 6, 7, 8, 9, 10]v, i) else 0");
+		
+	testMainIntegerArgInvalidProgram("def main(int x) int :  elem(update([0]a, 0, [  x ]t ), 0)");
 	
+	testMainIntegerArgInvalidProgram("def main(int i) int : if i >= 0 && i < 1i0 then elem([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]v, i) else 0");
 
 	// Test circular definitions between named constants and function definitions
 	testMainIntegerArgInvalidProgram("TEN = main			def main(int x) : TEN + x");
@@ -647,6 +666,8 @@ void LanguageTests::run()
 	}
 
 
+	// Vector divide (not supported currently)
+	testMainIntegerArgInvalidProgram("def main() float : 					let x = [1.0, 2.0, 3.0, 4.0]v 					y = [10.0, 20.0, 30.0, 40.0]v in 					e1(x/ - y)");
 
 
 	// Gather load:
@@ -1126,6 +1147,19 @@ void LanguageTests::run()
 		"def main(float x) float: elem(   2.0 * [1.0, 2.0, 3, 4]v, 1)",
 		1.0f, 4.0f);
 
+	testMainFloatArg("def main(float x) float : elem(  [1, 2.0]v   , 0)", 1.0f, 1.0f);
+	testMainFloatArg("def main(float x) float : elem(  [1.0, 2]v   , 0)", 1.0f, 1.0f);
+
+	testMainFloatArg("def main(float x) float : elem(  [1, x]v   , 0)", 1.0f, 1.0f);
+	testMainFloatArg("def main(float x) float : elem(  [x, 2]v   , 0)", 1.0f, 1.0f);
+
+	testMainFloatArg("def main(float x) float : elem(  [1, x, 3.0]v   , 0)", 1.0f, 1.0f);
+	testMainFloatArg("def main(float x) float : elem(  [x, 2, 3.0]v   , 0)", 1.0f, 1.0f);
+
+	// Test incoercible integers
+	testMainFloatArgInvalidProgram("def main(float x) float : elem(  [100000001, 2.0]v   , 0)");
+	testMainFloatArgInvalidProgram("def main(float x) float : elem(  [2.0, 100000001]v   , 0)");
+
 	// float * Vector<float> multiplication
 	testMainFloatArg(
 		"def main(float x) float: elem(   2.0 * [1.0, 2.0, 3.0, 4.0]v, 1)",
@@ -1356,6 +1390,19 @@ TEMP OPENCL
 		testFloatArray(
 			"def square(float x) float : x*x			\n\
 			def main(array<float, 4> a, array<float, 4> b) array<float, 4> : map(square, a)",
+			a, b, target_results, 4);
+	}
+
+	// Test map from one element type to another
+	{
+		const float a[] = {1.0f, 2.0f, 3.0f, 4.0f};
+		const float b[] = {10.0f, 20.0f, 30.0f, 40.0f};
+		float target_results[] = {1.0f, 2.0f, 3.0f, 4.0f};
+
+		testFloatArray(
+			"def squareToInt(float x) int : truncateToInt(x*x + 0.000001)			\n\
+			def sqrtToFloat(int i) float : sqrt(toFloat(i))							\n\
+			def main(array<float, 4> a, array<float, 4> b) array<float, 4> : map(sqrtToFloat, map(squareToInt, a))",
 			a, b, target_results, 4);
 	}
 
@@ -2226,6 +2273,12 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 				  def f<T>(T x) float: overloadedFunc(x)\
 				  def main() float : f(1)", 4.0f);
 
+
+	// Test invalidity of recursive call in generic function.
+	testMainFloatArgInvalidProgram("def f<T>(T x) f(x)   def main(float x) float : f(x)");
+	testMainFloatArgInvalidProgram("def f<T>(T x) T : x*x / (f(2) + 3)   def main(float x) float : 1/ (f(2) + 3)");
+
+
 	// Call f with float param
 	testMainFloat("def overloadedFunc(int x) float : 4.0 \
 				  def overloadedFunc(float x) float : 5.0 \
@@ -3037,7 +3090,7 @@ void LanguageTests::fuzzTests()
 
 
 		// Each stage has different random number seeds, and after each stage tested_programs will be cleared, otherwise it gets too large and uses up too much RAM.
-		int rng_seed = 50;
+		int rng_seed = 110;
 		for(int stage=0; stage<1000000; ++stage)
 		{
 			std::cout << "=========================== Stage " << stage << "===========================================" << std::endl;
@@ -3045,7 +3098,7 @@ void LanguageTests::fuzzTests()
 			Mutex tested_programs_mutex;
 			std::unordered_set<std::string> tested_programs;
 
-			const int NUM_THREADS = 1;
+			const int NUM_THREADS = 4;
 			Indigo::TaskManager manager(NUM_THREADS);
 			for(int i=0; i<NUM_THREADS; ++i)
 			{

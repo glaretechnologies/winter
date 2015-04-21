@@ -138,6 +138,9 @@ ASTNodeRef foldExpression(ASTNodeRef& e, TraversalPayload& payload)
 
 	if(dynamic_cast<FloatValue*>(retval.getPointer())) //e->type()->getType() == Type::FloatType)
 	{
+		if(e->type()->getType() != Type::FloatType)
+			throw BaseException("invalid type");
+
 		assert(dynamic_cast<FloatValue*>(retval.getPointer()));
 		FloatValue* val = static_cast<FloatValue*>(retval.getPointer());
 
@@ -145,6 +148,9 @@ ASTNodeRef foldExpression(ASTNodeRef& e, TraversalPayload& payload)
 	}
 	else if(dynamic_cast<IntValue*>(retval.getPointer())) // e->type()->getType() == Type::IntType)
 	{
+		if(e->type()->getType() != Type::IntType)
+			throw BaseException("invalid type");
+
 		assert(dynamic_cast<IntValue*>(retval.getPointer()));
 		IntValue* val = static_cast<IntValue*>(retval.getPointer());
 
@@ -152,6 +158,9 @@ ASTNodeRef foldExpression(ASTNodeRef& e, TraversalPayload& payload)
 	}
 	else if(dynamic_cast<BoolValue*>(retval.getPointer())) // e->type()->getType() == Type::BoolType)
 	{
+		if(e->type()->getType() != Type::BoolType)
+			throw BaseException("invalid type");
+
 		assert(dynamic_cast<BoolValue*>(retval.getPointer()));
 		BoolValue* val = static_cast<BoolValue*>(retval.getPointer());
 
@@ -471,6 +480,12 @@ void doImplicitIntToFloatTypeCoercionForFloatReturn(ASTNodeRef& expr, TraversalP
 }
 
 
+static bool isIntLiteralAndExactlyRepresentableAsFloat(const ASTNodeRef& node)
+{
+	return node->nodeType() == ASTNode::IntLiteralType && isIntExactlyRepresentableAsFloat(node.downcastToPtr<IntLiteral>()->value);
+}
+
+
 template <class T> 
 T cast(ValueRef& v)
 {
@@ -772,7 +787,7 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 						this->bound_function = def;
 					}
 
-					def->args[i].ref_count++;
+					//def->args[i].ref_count++;
 
 					return;
 				}
@@ -1850,10 +1865,19 @@ TypeRef VectorLiteral::type() const
 	{
 		if(elem_type->getType() == Type::IntType)
 		{
-			// Consider type coercion - do we have any floats literals in this vector?
+			// Consider type coercion.
+			// A vector of elements that contains one or more float-typed elements will be considered to be a float-typed vector.
+			// Either all integer elements will be succesfully constant-folded and coerced to a float literal, or type checking will fail.
 			for(size_t i=0; i<elements.size(); ++i)
-				if(elements[i]->nodeType() == ASTNode::FloatLiteralType)
-					return elements[i]->type(); // Float type
+			{
+				const TypeRef& cur_elem_type = elements[i]->type();
+
+				if(cur_elem_type.isNull())
+					return NULL;
+
+				if(cur_elem_type->getType() == Type::FloatType)
+					return new VectorType(new Float(), (int)elements.size()); // float vector type
+			}
 		}
 
 		return new VectorType(elem_type, (int)elements.size());
@@ -1944,11 +1968,13 @@ void VectorLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	else if(payload.operation == TraversalPayload::TypeCoercion)
 	{
 		// Convert e.g. [1.0, 2.0, 3]v to [1.0, 2.0, 3.0]v
+		// A vector of elements that contains one or more float-typed elements will be considered to be a float-typed vector.
+		// Either all integer elements will be succesfully constant-folded and coerced to a float literal, or type checking will fail.
 
 		// Do we have any float literals in this vector?
 		bool have_float = false;
 		for(size_t i=0; i<elements.size(); ++i)
-			have_float = have_float || (elements[i]->nodeType() == ASTNode::FloatLiteralType);
+			have_float = have_float || (elements[i]->type().nonNull() && elements[i]->type()->getType() == Type::FloatType);
 
 		if(have_float)
 		{
@@ -1987,10 +2013,19 @@ void VectorLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
 		// Check all the element expression types match the computed element type.
-		const TypeRef elem_type = this->elements[0]->type();
-		for(unsigned int i=1; i<this->elements.size(); ++i)
+		const TypeRef this_type = this->type();
+		if(this_type.isNull() || this_type->getType() != Type::VectorTypeType)
+			throw BaseException("Vector type error." + errorContext(*this, payload));
+
+		const Type* elem_type = this_type.downcastToPtr<VectorType>()->elem_type.getPointer();
+
+		for(size_t i=0; i<this->elements.size(); ++i)
 			if(*elem_type != *this->elements[i]->type())
-				throw BaseException("Vector element " + ::toString(i) + " did not have required type " + elem_type->toString() + "." + errorContext(*this, payload));
+				throw BaseException("Vector element did not have required type " + elem_type->toString() + "." + errorContext(*this->elements[i], payload));
+
+		if(!(elem_type->getType() == Type::IntType || elem_type->getType() == Type::FloatType))
+			throw BaseException("Vector types can only contain float or int elements." + errorContext(*this, payload));
+
 	}
 }
 
@@ -3355,7 +3390,7 @@ ValueRef DivExpression::exec(VMState& vmstate)
 	}
 	else
 	{
-		assert(!"divexpression type invalid!");
+		throw BaseException("invalid types for div op.");
 	}
 	return retval;
 }
@@ -3455,12 +3490,12 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 			if(*a->type() != *b->type())
 				throw BaseException("Binary operator '/' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
 		}
-		else if(a->type()->getType() == Type::VectorTypeType && b->type()->getType() == Type::VectorTypeType)
+		/*else if(a->type()->getType() == Type::VectorTypeType && b->type()->getType() == Type::VectorTypeType)
 		{
 			// this is alright.
 			// NOTE: need to do more checking tho.
 			// Need to check number of elements is same in both vectors, and field types are the same.
-		}
+		}*/
 		else
 		{
 			throw BaseException("Binary operator '/' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
@@ -4426,14 +4461,19 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 	}
 	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
-		if(a->type()->getType() == Type::GenericTypeType || a->type()->getType() == Type::IntType || a->type()->getType() == Type::FloatType || a->type()->getType() == Type::BoolType)
+		const TypeRef a_type = a->type();
+		const TypeRef b_type = b->type();
+		if(a_type.isNull() || b_type.isNull())
+			throw BaseException("Unknown type");
+
+		if(a_type->getType() == Type::GenericTypeType || a_type->getType() == Type::IntType || a_type->getType() == Type::FloatType || a_type->getType() == Type::BoolType)
 		{
-			if(a->type()->getType() != b->type()->getType())
-				throw BaseException("Comparison operand types must be the same.  Left operand type: " + a->type()->toString() + ", right operand type: " + b->type()->toString() + "." + errorContext(*this, payload));
+			if(a_type->getType() != b_type->getType())
+				throw BaseException("Comparison operand types must be the same.  Left operand type: " + a_type->toString() + ", right operand type: " + b_type->toString() + "." + errorContext(*this, payload));
 		}
 		else
 		{
-			throw BaseException("Child type '" + this->type()->toString() + "' does not define Comparison operators. (First child type: " + a->type()->toString() + ")." + errorContext(*this, payload));
+			throw BaseException("Child type '" + this->type()->toString() + "' does not define Comparison operators. (First child type: " + a_type->toString() + ")." + errorContext(*this, payload));
 		}
 	}
 

@@ -122,6 +122,10 @@ public:
 	ArrayMapBuiltInFunc(const Reference<ArrayType>& from_type_, const Reference<Function>& func_type_) : from_type(from_type_), func_type(func_type_) {}
 	virtual ~ArrayMapBuiltInFunc(){}
 
+	/*
+	map(function<T, R>, array<T, N>) array<R, N>
+
+	*/
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:

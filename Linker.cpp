@@ -204,7 +204,7 @@ static FunctionDefinitionRef makeBuiltInFuncDef(const std::string& name, const T
 }
 
 
-Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignature& sig, const SrcLocation& call_src_location)
+Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignature& sig, const SrcLocation& call_src_location, const std::vector<FunctionDefinition*>* func_def_stack)
 {
 	/*
 	if sig.name matches eN
@@ -227,7 +227,8 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 	// If the function matching this signature is in the map, return it
 	SigToFuncMapType::iterator sig_lookup_res = sig_to_function_map.find(sig);
 	if(sig_lookup_res != sig_to_function_map.end())
-		return sig_lookup_res->second;
+		if(!func_def_stack || isTargetDefinedBeforeAllInStack(*func_def_stack, sig_lookup_res->second->order_num))
+			return sig_lookup_res->second;
 
 	// Handle float->float, or vector<float, N> -> vector<float, N> functions
 	if(sig.param_types.size() == 1)
@@ -309,18 +310,18 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 		if(sig.param_types[0]->getType() == Type::FunctionType && sig.param_types[1]->getType() == Type::ArrayTypeType)
 		{
 			const Reference<ArrayType> array_type = sig.param_types[1].downcast<ArrayType>();
-			const TypeRef elem_type = array_type->elem_type;
+			const TypeRef array_elem_type = array_type->elem_type;
 
 			const Reference<Function> func_type = sig.param_types[0].downcast<Function>();
+			const TypeRef R = func_type->return_type;
 			
-			// TODO: typecheck elems and function arg and return types
+			// map(function<T, R>, array<T, N>) array<R, N>
+			if(func_type->arg_types.size() != 1)
+				throw BaseException("Function argument to map must take one argument.");
 
-			// Function from elemType -> elemType
-			//TypeRef func_type = new Function(
-			//	vector<TypeRef>(1, elem_type), // arg types
-			//	elem_type, // return type
-			//	false // use captured vars.  TEMP
-			//);
+			if(*func_type->arg_types[0] != *array_elem_type)
+				throw BaseException("Function argument to map must take same argument type as array element.");
+
 			vector<FunctionDefinition::FunctionArg> args(2);
 			args[0].type = func_type;
 			args[0].name = "f";
@@ -333,7 +334,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 				"map",
 				args,
 				ASTNodeRef(NULL), // body expr
-				array_type, // return type
+				new ArrayType(R, array_type->num_elems), // return type
 				new ArrayMapBuiltInFunc(
 					array_type, // from array type
 					func_type // func type
@@ -685,7 +686,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 		const Reference<Function> func_type = sig.param_types[0].downcast<Function>();
 		const TypeRef state_type = sig.param_types[1];
 			
-		// TODO: typecheck elems and function arg and return types
+		// typecheck elems and function arg
 		// iterate(function<State, int, tuple<State, bool>> f, State initial_state) State
 		if(func_type->arg_types.size() != 2)
 			throw BaseException("function argument to iterate must have 2 args.");
@@ -735,7 +736,19 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 		const Reference<ArrayType> array_type = sig.param_types[1].downcast<ArrayType>();
 		const TypeRef state_type = sig.param_types[2];
 			
-		// TODO: typecheck elems and function arg and return types
+		// fold(function<State, T, State> f, array<T> array, State initial_state) State
+
+		if(func_type->arg_types.size() != 2)
+			throw BaseException("function argument to fold must have 2 args.");
+
+		if(*func_type->arg_types[0] != *state_type)
+			throw BaseException("First argument type to function argument to fold must be same as initial_state type.");
+
+		if(*func_type->arg_types[1] != *array_type->elem_type)
+			throw BaseException("Second argument type to function argument to fold must be same as array element type.");
+
+		if(*func_type->return_type != *state_type)
+			throw BaseException("Function argument to fold return type must be same as initial_state type.");
 
 		vector<FunctionDefinition::FunctionArg> args(3);
 		args[0].type = func_type;
@@ -771,7 +784,15 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 		const Reference<Int> index_type = sig.param_types[1].downcast<Int>();
 		const TypeRef value_type = sig.param_types[2];
 			
-		// TODO: typecheck elems and function arg and return types
+		// NOTE: only supported for arrays currently
+		if(collection_type->getType() == Type::ArrayTypeType)
+		{
+			const ArrayType* array_type = collection_type.downcastToPtr<ArrayType>();
+			if(*array_type->elem_type != *value_type)
+				throw BaseException("Invalid argument types for update."); // TODO: add error context
+		}
+		else
+			throw BaseException("Invalid first argument to update."); // TODO: add error context
 
 		vector<FunctionDefinition::FunctionArg> args(3);
 		args[0].type = collection_type;
@@ -860,45 +881,25 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 		}
 	}
 
-	NameToFuncMapType::iterator res = this->name_to_functions_map.find(sig.name);
+	// Try and find a suitable generic function
+	NameToFuncMapType::iterator res = this->name_to_functions_map.find(sig.name); // Get all functions with given name
 	if(res != this->name_to_functions_map.end())
 	{
-		vector<FunctionDefinitionRef> funcs = res->second;
+		const vector<FunctionDefinitionRef>& funcs = res->second;
 		for(size_t z=0; z<funcs.size(); ++z)
 		{
-			FunctionDefinition& f = *funcs[z];
-			//bool match = true;
-			if(f.sig.name == sig.name)
+			const FunctionDefinition& f = *funcs[z];
+			assert(f.sig.name == sig.name);
+
+			if(!func_def_stack || isTargetDefinedBeforeAllInStack(*func_def_stack, f.order_num))
 			{
-				if(f.sig.param_types.size() == sig.param_types.size())
+				if(f.isGenericFunction() && f.sig.param_types.size() == sig.param_types.size())
 				{
 					bool match = true;
-					//std::map<int, TypeRef> types; // generic types
 					vector<TypeRef> type_mapping;
 
 					for(unsigned int i=0; match && (i<f.sig.param_types.size()); ++i)
 					{
-						/*if(f.sig.param_types[i]->getType() == Type::GenericTypeType)
-						{
-							GenericType* gt = dynamic_cast<GenericType*>(f.sig.param_types[i].getPointer());
-							assert(gt);
-							if(gt->genericTypeParamIndex() < (int)types.size() && types[gt->genericTypeParamIndex()].nonNull())
-							{
-								if(*types[gt->genericTypeParamIndex()] != *sig.param_types[i])
-									match = false;
-							}
-							else
-							{
-								if(gt->genericTypeParamIndex() >= (int)types.size())
-									types.resize(gt->genericTypeParamIndex() + 1);
-								types[gt->genericTypeParamIndex()] = sig.param_types[i];
-							}
-						}
-						else // else concrete type
-						{
-							if(*f.sig.param_types[i] != *sig.param_types[i])
-								match = false;
-						}*/
 						const bool arg_match = f.sig.param_types[i]->matchTypes(*sig.param_types[i], type_mapping);
 						if(!arg_match)
 							match = false;
@@ -906,40 +907,16 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 
 					if(match)
 					{
-						if(f.isGenericFunction())
-						{
-							FunctionDefinitionRef new_concrete_func = makeConcreteFunction(
-								funcs[z],
-								type_mapping
-							);
-
-							addFunction(new_concrete_func);
-							return new_concrete_func;
-							/*concrete_funcs.push_back(makeConcreteFunction(
-								funcs[z],
-								type_mapping
-							));
-
-							return concrete_funcs.back();*/
-						}
-						else
-							return funcs[z];
+						FunctionDefinitionRef new_concrete_func = makeConcreteFunction(funcs[z], type_mapping);
+						addFunction(new_concrete_func);
+						return new_concrete_func;
 					}
 				}
 			}
 		}
 	}
 
-//	throw BaseException("Could not find " + sig.toString());
 	return FunctionDefinitionRef();
-/*
-
-	Linker::FuncMapType::iterator res = this->functions.find(sig);
-	if(res == this->functions.end())
-		throw BaseException("Could not find " + sig.toString());
-	else
-		return (*res).second;
-		*/
 }
 
 

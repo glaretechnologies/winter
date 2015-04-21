@@ -32,7 +32,9 @@ public:
 	//void linkFunctions(BufferRoot& root);
 
 	//ExternalFunctionRef findMatchingExternalFunction(const FunctionSignature& sig);
-	FunctionDefinitionRef findMatchingFunction(const FunctionSignature& sig, const SrcLocation& call_src_location); // Returns null ref if not found
+
+	// If func_def_stack is present, makes sure found function is defined before all functions in func_def_stack.
+	FunctionDefinitionRef findMatchingFunction(const FunctionSignature& sig, const SrcLocation& call_src_location, const std::vector<FunctionDefinition*>* func_def_stack = NULL); // Returns null ref if not found
 	FunctionDefinitionRef findMatchingFunctionByName(const std::string& name); // NOTE: rather unsafe
 
 	void getFuncsWithMatchingName(const std::string& name, std::vector<FunctionDefinitionRef>& funcs_out);

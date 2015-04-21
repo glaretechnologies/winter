@@ -130,7 +130,7 @@ public:
 	//std::vector<NamedConstant*> named_constant_stack;
 	NamedConstant* current_named_constant;
 
-	bool all_variables_bound; // Are all variables in a given function body bound?  Used in BindVariables pass.
+	//bool all_variables_bound; // Are all variables in a given function body bound?  Used in BindVariables pass.
 
 	std::vector<Reference<ASTNode> > variable_substitutes; // Used in SubstituteVariables pass
 
