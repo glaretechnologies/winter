@@ -10,6 +10,7 @@ Generated at 2011-04-30 18:53:38 +0100
 #include "wnt_ASTNode.h"
 #include "wnt_SourceBuffer.h"
 #include "wnt_RefCounting.h"
+#include "wnt_VectorLiteral.h"
 #include "VMState.h"
 #include "Value.h"
 #include "Linker.h"
