@@ -72,7 +72,7 @@ static ValueRef testExternalFuncInterpreted(const std::vector<ValueRef>& arg_val
 	const FloatValue* float_val = static_cast<const FloatValue*>(arg_values[0].getPointer());
 	//const VoidPtrValue* voidptr_val = static_cast<const VoidPtrValue*>(arg_values[1].getPointer());
 
-	return ValueRef(new FloatValue(testExternalFunc(float_val->value/*, (TestEnv*)voidptr_val->value*/)));
+	return new FloatValue(testExternalFunc(float_val->value/*, (TestEnv*)voidptr_val->value*/));
 }
 
 
@@ -158,7 +158,7 @@ static void testMainFloat(const std::string& src, float target_return_val)
 
 		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
-		//vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(&test_env)));
+		//vmstate.argument_stack.push_back(new VoidPtrValue(&test_env));
 
 		ValueRef retval = maindef->invoke(vmstate);
 
@@ -273,8 +273,8 @@ static void testMainFloatArg(const std::string& src, float argument, float targe
 
 		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
-		vmstate.argument_stack.push_back(ValueRef(new FloatValue(argument)));
-		//vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(&test_env)));
+		vmstate.argument_stack.push_back(new FloatValue(argument));
+		//vmstate.argument_stack.push_back(new VoidPtrValue(&test_env));
 
 		ValueRef retval = maindef->invoke(vmstate);
 
@@ -460,8 +460,8 @@ static bool testFuzzProgram(const std::string& src)
 
 		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
-		vmstate.argument_stack.push_back(ValueRef(new FloatValue(argument)));
-		//vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(&test_env)));
+		vmstate.argument_stack.push_back(new FloatValue(argument));
+		//vmstate.argument_stack.push_back(new VoidPtrValue(&test_env));
 
 		ValueRef retval = maindef->invoke(vmstate);
 
@@ -650,7 +650,7 @@ static void testMainInteger(const std::string& src, int target_return_val)
 
 		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
-		//vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(&test_env)));
+		//vmstate.argument_stack.push_back(new VoidPtrValue(&test_env));
 
 		ValueRef retval = maindef->invoke(vmstate);
 
@@ -719,8 +719,8 @@ static void testMainIntegerArg(const std::string& src, int x, int target_return_
 
 		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
-		vmstate.argument_stack.push_back(ValueRef(new IntValue(x)));
-		//vmstate.argument_stack.push_back(ValueRef(new VoidPtrValue(&test_env)));
+		vmstate.argument_stack.push_back(new IntValue(x));
+		//vmstate.argument_stack.push_back(new VoidPtrValue(&test_env));
 
 		ValueRef retval = maindef->invoke(vmstate);
 

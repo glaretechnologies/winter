@@ -113,7 +113,7 @@ Value* StructureValue::clone() const
 	vector<ValueRef> field_clones(this->fields.size());
 
 	for(unsigned int i=0; i<this->fields.size(); ++i)
-		field_clones[i] = ValueRef(this->fields[i]->clone());
+		field_clones[i] = this->fields[i]->clone();
 
 	return new StructureValue(field_clones);
 }
@@ -159,7 +159,7 @@ Value* ArrayValue::clone() const
 	ret->e.resize(this->e.size());
 
 	for(unsigned int i=0; i<this->e.size(); ++i)
-		ret->e[i] = ValueRef(this->e[i]->clone());
+		ret->e[i] = this->e[i]->clone();
 
 	return ret;
 }
@@ -210,7 +210,7 @@ Value* VectorValue::clone() const
 	ret->e.resize(this->e.size());
 
 	for(unsigned int i=0; i<this->e.size(); ++i)
-		ret->e[i] = ValueRef(this->e[i]->clone());
+		ret->e[i] = this->e[i]->clone();
 
 	return ret;
 }
@@ -256,7 +256,7 @@ Value* TupleValue::clone() const
 	ret->e.resize(this->e.size());
 
 	for(unsigned int i=0; i<this->e.size(); ++i)
-		ret->e[i] = ValueRef(this->e[i]->clone());
+		ret->e[i] = this->e[i]->clone();
 
 	return ret;
 }

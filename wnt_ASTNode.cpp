@@ -957,7 +957,7 @@ ValueRef Variable::exec(VMState& vmstate)
 	else if(this->vartype == BoundToGlobalDefVariable)
 	{
 		StructureValueRef captured_vars(new StructureValue(vector<ValueRef>()));
-		return ValueRef(new FunctionValue(this->bound_function, captured_vars));
+		return new FunctionValue(this->bound_function, captured_vars);
 	}
 	else if(this->vartype == BoundToNamedConstant)
 	{
@@ -975,7 +975,7 @@ ValueRef Variable::exec(VMState& vmstate)
 	else
 	{
 		assert(!"invalid vartype.");
-		return ValueRef(NULL);
+		return NULL;
 	}
 }
 
@@ -1209,7 +1209,7 @@ bool Variable::isConstant() const
 
 ValueRef FloatLiteral::exec(VMState& vmstate)
 {
-	return ValueRef(new FloatValue(value));
+	return new FloatValue(value);
 }
 
 
@@ -1262,7 +1262,7 @@ Reference<ASTNode> FloatLiteral::clone()
 
 ValueRef IntLiteral::exec(VMState& vmstate)
 {
-	return ValueRef(new IntValue(value));
+	return new IntValue(value);
 }
 
 
@@ -1313,7 +1313,7 @@ Reference<ASTNode> IntLiteral::clone()
 
 ValueRef BoolLiteral::exec(VMState& vmstate)
 {
-	return ValueRef(new BoolValue(value));
+	return new BoolValue(value);
 }
 
 
@@ -1614,7 +1614,7 @@ CharLiteral::CharLiteral(const std::string& v, const SrcLocation& loc)
 
 ValueRef CharLiteral::exec(VMState& vmstate)
 {
-	return ValueRef(new CharValue(value));
+	return new CharValue(value);
 }
 
 
@@ -2971,17 +2971,17 @@ ValueRef BinaryBooleanExpr::exec(VMState& vmstate)
 
 	if(t == OR)
 	{
-		return ValueRef(new BoolValue(
+		return new BoolValue(
 			checkedCast<BoolValue>(aval)->value || 
 			checkedCast<BoolValue>(bval)->value
-		));
+		);
 	}
 	else if(t == AND)
 	{
-		return ValueRef(new BoolValue(
+		return new BoolValue(
 			checkedCast<BoolValue>(aval)->value &&
 			checkedCast<BoolValue>(bval)->value
-		));
+		);
 	}
 	else
 	{
@@ -3481,13 +3481,13 @@ ValueRef ComparisonExpression::exec(VMState& vmstate)
 	switch(a->type()->getType())
 	{
 	case Type::FloatType:
-		retval = ValueRef(compare<FloatValue>(this->token->getType(), aval.getPointer(), bval.getPointer()));
+		retval = compare<FloatValue>(this->token->getType(), aval.getPointer(), bval.getPointer());
 		break;
 	case Type::IntType:
-		retval = ValueRef(compare<IntValue>(this->token->getType(), aval.getPointer(), bval.getPointer()));
+		retval = compare<IntValue>(this->token->getType(), aval.getPointer(), bval.getPointer());
 		break;
 	case Type::BoolType:
-		retval = ValueRef(compare<BoolValue>(this->token->getType(), aval.getPointer(), bval.getPointer()));
+		retval = compare<BoolValue>(this->token->getType(), aval.getPointer(), bval.getPointer());
 		break;
 	default:
 		throw BaseException("ComparisonExpression type invalid!");

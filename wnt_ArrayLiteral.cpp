@@ -233,7 +233,7 @@ llvm::Value* ArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 
 			VMState vm_state; // hidden_voidptr_arg
 			vm_state.func_args_start.push_back(0);
-			vm_state.argument_stack.push_back(ValueRef(new VoidPtrValue(NULL)));
+			vm_state.argument_stack.push_back(new VoidPtrValue(NULL));
 			ValueRef value = this->elements[0]->exec(vm_state);
 			llvm::Constant* llvm_val = value->getConstantLLVMValue(params, this->type().downcast<ArrayType>()->elem_type);
 
@@ -248,7 +248,7 @@ llvm::Value* ArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 			{
 				VMState vm_state; // hidden_voidptr_arg
 				vm_state.func_args_start.push_back(0);
-				vm_state.argument_stack.push_back(ValueRef(new VoidPtrValue(NULL)));
+				vm_state.argument_stack.push_back(new VoidPtrValue(NULL));
 				ValueRef value = this->elements[i]->exec(vm_state);
 				array_llvm_values[i] = value->getConstantLLVMValue(params, this->type().downcast<ArrayType>()->elem_type);
 			}

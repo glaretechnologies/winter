@@ -193,7 +193,7 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 	if(use_target_func->use_captured_vars)
 	{
 		assert(function_value);
-		vmstate.argument_stack.push_back(ValueRef(function_value->captured_vars.getPointer()));
+		vmstate.argument_stack.push_back(function_value->captured_vars.getPointer());
 	}
 
 

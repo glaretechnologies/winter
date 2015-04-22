@@ -149,7 +149,7 @@ ValueRef Constructor::invoke(VMState& vmstate)
 	for(unsigned int i=0; i<this->struct_type->component_types.size(); ++i)
 		field_values[i] = vmstate.argument_stack[func_args_start + i];
 
-	return ValueRef(new StructureValue(field_values));
+	return new StructureValue(field_values);
 }
 
 
@@ -1782,7 +1782,7 @@ ValueRef DotProductBuiltInFunc::invoke(VMState& vmstate)
 		res->value += static_cast<const FloatValue*>(a->e[i].getPointer())->value * static_cast<const FloatValue*>(b->e[i].getPointer())->value;
 	}
 
-	return ValueRef(res);
+	return res;
 }
 
 
@@ -2148,7 +2148,7 @@ ValueRef PowBuiltInFunc::invoke(VMState& vmstate)
 	const FloatValue* a = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 0].getPointer());
 	const FloatValue* b = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
 
-	return ValueRef(new FloatValue(std::pow(a->value, b->value)));
+	return new FloatValue(std::pow(a->value, b->value));
 }
 
 
@@ -2202,7 +2202,7 @@ ValueRef SqrtBuiltInFunc::invoke(VMState& vmstate)
 	if(type->getType() == Type::FloatType)
 	{
 		const FloatValue* a = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
-		return ValueRef(new FloatValue(std::sqrt(a->value)));
+		return new FloatValue(std::sqrt(a->value));
 	}
 	else
 	{
@@ -2216,7 +2216,7 @@ ValueRef SqrtBuiltInFunc::invoke(VMState& vmstate)
 		for(unsigned int i=0; i<vector_type->num; ++i)
 		{
 			const float x = static_cast<const FloatValue*>(a->e[i].getPointer())->value;
-			res_values[i] = ValueRef(new FloatValue(std::sqrt(x)));
+			res_values[i] = new FloatValue(std::sqrt(x));
 		}
 
 		return new VectorValue(res_values);
@@ -2243,7 +2243,7 @@ ValueRef ExpBuiltInFunc::invoke(VMState& vmstate)
 {
 	const FloatValue* a = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 
-	return ValueRef(new FloatValue(std::exp(a->value)));
+	return new FloatValue(std::exp(a->value));
 }
 
 
@@ -2265,7 +2265,7 @@ ValueRef LogBuiltInFunc::invoke(VMState& vmstate)
 {
 	const FloatValue* a = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 
-	return ValueRef(new FloatValue(std::log(a->value)));
+	return new FloatValue(std::log(a->value));
 }
 
 
@@ -2287,7 +2287,7 @@ ValueRef SinBuiltInFunc::invoke(VMState& vmstate)
 {
 	const FloatValue* a = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 
-	return ValueRef(new FloatValue(std::sin(a->value)));
+	return new FloatValue(std::sin(a->value));
 }
 
 
@@ -2309,7 +2309,7 @@ ValueRef CosBuiltInFunc::invoke(VMState& vmstate)
 {
 	const FloatValue* a = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 
-	return ValueRef(new FloatValue(std::cos(a->value)));
+	return new FloatValue(std::cos(a->value));
 }
 
 
@@ -2331,7 +2331,7 @@ ValueRef AbsBuiltInFunc::invoke(VMState& vmstate)
 {
 	const FloatValue* a = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 
-	return ValueRef(new FloatValue(std::fabs(a->value)));
+	return new FloatValue(std::fabs(a->value));
 }
 
 
@@ -2354,7 +2354,7 @@ ValueRef FloorBuiltInFunc::invoke(VMState& vmstate)
 	if(type->getType() == Type::FloatType)
 	{
 		const FloatValue* a = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
-		return ValueRef(new FloatValue(std::floor(a->value)));
+		return new FloatValue(std::floor(a->value));
 	}
 	else
 	{
@@ -2368,7 +2368,7 @@ ValueRef FloorBuiltInFunc::invoke(VMState& vmstate)
 		for(unsigned int i=0; i<vector_type->num; ++i)
 		{
 			const float x = static_cast<const FloatValue*>(a->e[i].getPointer())->value;
-			res_values[i] = ValueRef(new FloatValue(std::floor(x)));
+			res_values[i] = new FloatValue(std::floor(x));
 		}
 
 		return new VectorValue(res_values);
@@ -2395,7 +2395,7 @@ ValueRef CeilBuiltInFunc::invoke(VMState& vmstate)
 	if(type->getType() == Type::FloatType)
 	{
 		const FloatValue* a = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
-		return ValueRef(new FloatValue(std::ceil(a->value)));
+		return new FloatValue(std::ceil(a->value));
 	}
 	else
 	{
@@ -2409,7 +2409,7 @@ ValueRef CeilBuiltInFunc::invoke(VMState& vmstate)
 		for(unsigned int i=0; i<vector_type->num; ++i)
 		{
 			const float x = static_cast<const FloatValue*>(a->e[i].getPointer())->value;
-			res_values[i] = ValueRef(new FloatValue(std::ceil(x)));
+			res_values[i] = new FloatValue(std::ceil(x));
 		}
 
 		return new VectorValue(res_values);
@@ -2449,7 +2449,7 @@ ValueRef TruncateToIntBuiltInFunc::invoke(VMState& vmstate)
 {
 	const FloatValue* a = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 
-	return ValueRef(new IntValue((int)a->value));
+	return new IntValue((int)a->value);
 }
 
 
@@ -2494,7 +2494,7 @@ ValueRef ToFloatBuiltInFunc::invoke(VMState& vmstate)
 {
 	const IntValue* a = static_cast<const IntValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 
-	return ValueRef(new FloatValue((float)a->value));
+	return new FloatValue((float)a->value);
 }
 
 

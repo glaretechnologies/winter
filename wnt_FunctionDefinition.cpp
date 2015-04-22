@@ -148,7 +148,7 @@ ValueRef FunctionDefinition::exec(VMState& vmstate)
 	// Put captured values into the variable struct.
 	Reference<StructureValue> var_struct(new StructureValue(vals));
 
-	return ValueRef(new FunctionValue(this, var_struct));
+	return new FunctionValue(this, var_struct);
 }
 
 
