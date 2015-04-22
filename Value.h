@@ -3,6 +3,7 @@
 
 
 #include "wnt_Type.h"
+#include "BaseException.h"
 #include <utils/RefCounted.h>
 #include <string>
 #include <vector>
