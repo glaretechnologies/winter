@@ -65,7 +65,7 @@ public:
 	virtual llvm::Value* getConstantLLVMValue(EmitLLVMCodeParams& params) const;
 	virtual Reference<ASTNode> clone();
 	virtual bool isConstant() const;
-	FunctionDefinition* runtimeBind(VMState& vmstate, FunctionValue*& function_value_out);
+	FunctionDefinition* runtimeBind(VMState& vmstate, const FunctionValue*& function_value_out);
 	virtual bool provenDefined() const;
 
 	///////

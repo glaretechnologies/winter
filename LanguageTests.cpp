@@ -68,6 +68,18 @@ void LanguageTests::run()
 {
 	Timer timer;
 
+	// int64 - int mixing
+	testMainIntegerArgInvalidProgram("def main(int64 x) int :	x + 1");
+	testMainIntegerArgInvalidProgram("def main(int64 x) int :	x - 1");
+	testMainIntegerArgInvalidProgram("def main(int64 x) int :	x * 1");
+	testMainIntegerArgInvalidProgram("def main(int64 x) int :	x / 1");
+	testMainIntegerArgInvalidProgram("def main(int64 x) int :	if x < 5 1 else 2");
+
+	testMainFloatArgInvalidProgram("	def f(float x) float if(x < 1.0) : 				  let	 					z = 2.0 					y = 3.0 				  in 					y + z 				  def main() float : f(0.0)");
+	testMainFloatArgInvalidProgram("def main() float : 					 let a = [1.0, 2.0, 3.0, 4.0]v 					 b = [11.0, 12.0, 13.0, 14 else .0]v in 					 e2(min(a, b)) 		de if f main() float : 				  let a = [1.0, 2.0, 3.0, 4.0]v 				  b = [11.0, 12.0, 13.0, 14.0]v in 				  e2(min(b, a))");
+	testMainFloatArgInvalidProgram("		main(int i) int :								 			let												 				a = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]v		 				b = string  [1.0, 1.6, 1.0, 1.0, 1.3, 1.6, 1.8, 1.6]v		 				c = [1.7, 2.8, 3.0, 4 true .7, 5.5, 6.7, 7.0, 8.4] int64 v		 			in												 				truncateToInt(elem(a + if(i < 1, b, c), i))");
+	testMainFloatArgInvalidProgram("		def main() float : 					let x = [1.0, 2.0, 3.0, 4.0]v 					y = [10.0, 20.0, 30.0, 40.0]v* sin(x + 0.03) in 					e1(x + y)");
+
 	// Test that we can't put a structure in a vector
 	testMainFloatArgInvalidProgram("struct teststruct { float y } \n\
         def main(float x) float : elem([teststruct(x)]v, 0).y");
@@ -80,6 +92,25 @@ void LanguageTests::run()
 
 	testMainFloatArgInvalidProgram("def f(float x) float : x*x def main(int x) int :  elem(fold(f, [0, 0, 1, 2]a, [0]a16), 1)    def main(float x) float : f(x) - 3");
 
+	
+	// A vector of elements that contains one or more float-typed elements will be considered to be a float-typed vector.
+	// Either all integer elements will be succesfully constant-folded and coerced to a float literal, or type checking will fail.
+
+	// OLD: A vector of elements, where each element is either an integer literal, or has float type, and there is at least one element with float tyoe, 
+	// and each integer literal can be converted to a float literal, will be converted to a vector of floats
+
+	// Test incoercible integers
+	testMainFloatArgInvalidProgram("def main(float x) float : elem(  [100000001, 2.0]v   , 0)");
+	testMainFloatArgInvalidProgram("def main(float x) float : elem(  [2.0, 100000001]v   , 0)");
+
+	testMainFloatArg("def main(float x) float : elem(  [1, 2.0]v   , 0)", 1.0f, 1.0f);
+	testMainFloatArg("def main(float x) float : elem(  [1.0, 2]v   , 0)", 1.0f, 1.0f);
+
+	testMainFloatArg("def main(float x) float : elem(  [1, x]v   , 0)", 1.0f, 1.0f);
+	testMainFloatArg("def main(float x) float : elem(  [x, 2]v   , 0)", 1.0f, 1.0f);
+
+	testMainFloatArg("def main(float x) float : elem(  [1, x, 3.0]v   , 0)", 1.0f, 1.0f);
+	testMainFloatArg("def main(float x) float : elem(  [x, 2, 3.0]v   , 0)", 1.0f, 1.0f);
 
 	testMainIntegerArgInvalidProgram("struct Float4Struct { vector<float, 4> v }  			def main(Float4Struct a, Float4Struct b) Float4Struct :  				Float4Struct(a.v + [eleFm(b.v, 0)]v4)");
 
@@ -1146,19 +1177,6 @@ void LanguageTests::run()
 	testMainFloatArg(
 		"def main(float x) float: elem(   2.0 * [1.0, 2.0, 3, 4]v, 1)",
 		1.0f, 4.0f);
-
-	testMainFloatArg("def main(float x) float : elem(  [1, 2.0]v   , 0)", 1.0f, 1.0f);
-	testMainFloatArg("def main(float x) float : elem(  [1.0, 2]v   , 0)", 1.0f, 1.0f);
-
-	testMainFloatArg("def main(float x) float : elem(  [1, x]v   , 0)", 1.0f, 1.0f);
-	testMainFloatArg("def main(float x) float : elem(  [x, 2]v   , 0)", 1.0f, 1.0f);
-
-	testMainFloatArg("def main(float x) float : elem(  [1, x, 3.0]v   , 0)", 1.0f, 1.0f);
-	testMainFloatArg("def main(float x) float : elem(  [x, 2, 3.0]v   , 0)", 1.0f, 1.0f);
-
-	// Test incoercible integers
-	testMainFloatArgInvalidProgram("def main(float x) float : elem(  [100000001, 2.0]v   , 0)");
-	testMainFloatArgInvalidProgram("def main(float x) float : elem(  [2.0, 100000001]v   , 0)");
 
 	// float * Vector<float> multiplication
 	testMainFloatArg(
@@ -3090,7 +3108,7 @@ void LanguageTests::fuzzTests()
 
 
 		// Each stage has different random number seeds, and after each stage tested_programs will be cleared, otherwise it gets too large and uses up too much RAM.
-		int rng_seed = 110;
+		int rng_seed = 120;
 		for(int stage=0; stage<1000000; ++stage)
 		{
 			std::cout << "=========================== Stage " << stage << "===========================================" << std::endl;

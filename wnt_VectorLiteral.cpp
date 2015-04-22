@@ -233,7 +233,6 @@ void VectorLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 
 		if(!(elem_type->getType() == Type::IntType || elem_type->getType() == Type::FloatType))
 			throw BaseException("Vector types can only contain float or int elements." + errorContext(*this, payload));
-
 	}
 }
 

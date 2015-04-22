@@ -188,4 +188,17 @@ public:
 };
 
 
+// Downcast from a value object, to a value object subclass.
+// Check the type is correct with dynamic_cast.  If it's not, throw an exception.
+template <class T> 
+const T* checkedCast(const ValueRef& v)
+{
+	const T* result = dynamic_cast<const T*>(v.getPointer());
+	if(result)
+		return result;
+	else
+		throw BaseException("Type error.");
+}
+
+
 }

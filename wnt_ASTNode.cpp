@@ -109,9 +109,10 @@ static bool expressionIsWellTyped(ASTNodeRef& e, TraversalPayload& payload_)
 
 bool shouldFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
 {
-	return	e.nonNull() &&
-			e->isConstant() && 
-			e->type().nonNull() && 
+	if(e.nonNull() && e->isConstant())
+	{
+		const TypeRef e_type = e->type();
+		return e->type().nonNull() && 
 			(	(e->type()->getType() == Type::FloatType &&		
 				(e->nodeType() != ASTNode::FloatLiteralType)) ||
 				(e->type()->getType() == Type::BoolType &&		
@@ -119,21 +120,22 @@ bool shouldFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
 				(e->type()->getType() == Type::IntType &&
 				(e->nodeType() != ASTNode::IntLiteralType))
 			) &&
-			expressionIsWellTyped(e, payload);// &&
-			//e->provenDefined();
+			expressionIsWellTyped(e, payload);
+	}
+	else
+		return false;
 }
 	
 
 // Replace an expression with a constant (literal AST node)
 ASTNodeRef foldExpression(ASTNodeRef& e, TraversalPayload& payload)
 {
+	// Compute value of expression
 	VMState vmstate;
 	vmstate.func_args_start.push_back(0);
 
 	ValueRef retval = e->exec(vmstate);
 
-	//assert(vmstate.argument_stack.size() == 1);
-	//delete vmstate.argument_stack[0];
 	vmstate.func_args_start.pop_back();
 
 	if(dynamic_cast<FloatValue*>(retval.getPointer())) //e->type()->getType() == Type::FloatType)
@@ -141,36 +143,25 @@ ASTNodeRef foldExpression(ASTNodeRef& e, TraversalPayload& payload)
 		if(e->type()->getType() != Type::FloatType)
 			throw BaseException("invalid type");
 
-		assert(dynamic_cast<FloatValue*>(retval.getPointer()));
-		FloatValue* val = static_cast<FloatValue*>(retval.getPointer());
-
-		return ASTNodeRef(new FloatLiteral(val->value, e->srcLocation()));
+		return new FloatLiteral(retval.downcastToPtr<FloatValue>()->value, e->srcLocation());
 	}
 	else if(dynamic_cast<IntValue*>(retval.getPointer())) // e->type()->getType() == Type::IntType)
 	{
 		if(e->type()->getType() != Type::IntType)
 			throw BaseException("invalid type");
 
-		assert(dynamic_cast<IntValue*>(retval.getPointer()));
-		IntValue* val = static_cast<IntValue*>(retval.getPointer());
-
-		return ASTNodeRef(new IntLiteral(val->value, static_cast<const Int*>(e->type().getPointer())->numBits(), e->srcLocation()));
+		return ASTNodeRef(new IntLiteral(retval.downcastToPtr<IntValue>()->value, e->type().downcastToPtr<Int>()->numBits(), e->srcLocation()));
 	}
 	else if(dynamic_cast<BoolValue*>(retval.getPointer())) // e->type()->getType() == Type::BoolType)
 	{
 		if(e->type()->getType() != Type::BoolType)
 			throw BaseException("invalid type");
 
-		assert(dynamic_cast<BoolValue*>(retval.getPointer()));
-		BoolValue* val = static_cast<BoolValue*>(retval.getPointer());
-
-		return ASTNodeRef(new BoolLiteral(val->value, e->srcLocation()));
+		return ASTNodeRef(new BoolLiteral(retval.downcastToPtr<BoolValue>()->value, e->srcLocation()));
 	}
 	else
 	{
 		throw BaseException("invalid type");
-		//assert(0);
-		//return ASTNodeRef(NULL);
 	}
 }
 
@@ -191,6 +182,7 @@ void checkFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
 		}
 	}
 }
+
 
 /*
 If node 'e' is a function expression, inline the target function by replacing e with the target function body.
@@ -266,16 +258,14 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::v
 		if(expr->a->type().nonNull() && expr->b->type().nonNull())
 			if(	expr->a->type()->getType() == Type::StructureTypeType || expr->a->type()->getType() == Type::ArrayTypeType ||
 				expr->b->type()->getType() == Type::StructureTypeType || expr->b->type()->getType() == Type::ArrayTypeType)
-				//if(expr->a->type()->getType() == Type::StructureTypeType)
 				{
 					// Replace expr with an op_add function call.
-					e = ASTNodeRef(new FunctionExpression(expr->srcLocation(), "op_add", expr->a, expr->b));
+					e = new FunctionExpression(expr->srcLocation(), "op_add", expr->a, expr->b);
 					payload.tree_changed = true;
 
 					// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
 					// This is needed now because we need to know the type of op_X, which is only available once bound.
 					TraversalPayload new_payload(TraversalPayload::BindVariables);
-					//new_payload.top_lvl_frame = payload.top_lvl_frame;
 					new_payload.linker = payload.linker;
 					new_payload.func_def_stack = payload.func_def_stack;
 					e->traverse(new_payload, stack);
@@ -288,16 +278,14 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::v
 		if(expr->a->type().nonNull() && expr->b->type().nonNull())
 			if(	expr->a->type()->getType() == Type::StructureTypeType || expr->a->type()->getType() == Type::ArrayTypeType ||
 				expr->b->type()->getType() == Type::StructureTypeType || expr->b->type()->getType() == Type::ArrayTypeType)
-				//if(expr->a->type()->getType() == Type::StructureTypeType)
 				{
 					// Replace expr with an op_sub function call.
-					e = ASTNodeRef(new FunctionExpression(expr->srcLocation(), "op_sub", expr->a, expr->b));
+					e = new FunctionExpression(expr->srcLocation(), "op_sub", expr->a, expr->b);
 					payload.tree_changed = true;
 
 					// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
 					// This is needed now because we need to know the type of op_X, which is only available once bound.
 					TraversalPayload new_payload(TraversalPayload::BindVariables);
-					//new_payload.top_lvl_frame = payload.top_lvl_frame;
 					new_payload.linker = payload.linker;
 					new_payload.func_def_stack = payload.func_def_stack;
 					e->traverse(new_payload, stack);
@@ -312,13 +300,12 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::v
 				expr->b->type()->getType() == Type::StructureTypeType || expr->b->type()->getType() == Type::ArrayTypeType)
 			{
 				// Replace expr with an op_mul function call.
-				e = ASTNodeRef(new FunctionExpression(expr->srcLocation(), "op_mul", expr->a, expr->b));
+				e = new FunctionExpression(expr->srcLocation(), "op_mul", expr->a, expr->b);
 				payload.tree_changed = true;
 
 				// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
 				// This is needed now because we need to know the type of op_X, which is only available once bound.
 				TraversalPayload new_payload(TraversalPayload::BindVariables);
-				//new_payload.top_lvl_frame = payload.top_lvl_frame;
 				new_payload.linker = payload.linker;
 				new_payload.func_def_stack = payload.func_def_stack;
 				e->traverse(new_payload, stack);
@@ -333,13 +320,12 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::v
 				expr->b->type()->getType() == Type::StructureTypeType || expr->b->type()->getType() == Type::ArrayTypeType)
 				{
 					// Replace expr with an op_div function call.
-					e = ASTNodeRef(new FunctionExpression(expr->srcLocation(), "op_div", expr->a, expr->b));
+					e = new FunctionExpression(expr->srcLocation(), "op_div", expr->a, expr->b);
 					payload.tree_changed = true;
 
 					// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
 					// This is needed now because we need to know the type of op_X, which is only available once bound.
 					TraversalPayload new_payload(TraversalPayload::BindVariables);
-					//new_payload.top_lvl_frame = payload.top_lvl_frame;
 					new_payload.linker = payload.linker;
 					new_payload.func_def_stack = payload.func_def_stack;
 					e->traverse(new_payload, stack);
@@ -354,13 +340,12 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::v
 				expr->b->type()->getType() == Type::StructureTypeType)
 			{
 				// Replace expr with a function call.
-				e = ASTNodeRef(new FunctionExpression(expr->srcLocation(), expr->getOverloadedFuncName(), expr->a, expr->b));
+				e = new FunctionExpression(expr->srcLocation(), expr->getOverloadedFuncName(), expr->a, expr->b);
 				payload.tree_changed = true;
 
 				// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
 				// This is needed now because we need to know the type of op_X, which is only available once bound.
 				TraversalPayload new_payload(TraversalPayload::BindVariables);
-				//new_payload.top_lvl_frame = payload.top_lvl_frame;
 				new_payload.linker = payload.linker;
 				new_payload.func_def_stack = payload.func_def_stack;
 				e->traverse(new_payload, stack);
@@ -374,13 +359,12 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::v
 			if(expr->expr->type()->getType() == Type::StructureTypeType)
 			{
 				// Replace expr with a function call to op_unary_minus
-				e = ASTNodeRef(new FunctionExpression(expr->srcLocation(), "op_unary_minus", expr->expr));
+				e = new FunctionExpression(expr->srcLocation(), "op_unary_minus", expr->expr);
 				payload.tree_changed = true;
 
 				// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
 				// This is needed now because we need to know the type of op_X, which is only available once bound.
 				TraversalPayload new_payload(TraversalPayload::BindVariables);
-				//new_payload.top_lvl_frame = payload.top_lvl_frame;
 				new_payload.linker = payload.linker;
 				new_payload.func_def_stack = payload.func_def_stack;
 				e->traverse(new_payload, stack);
@@ -407,15 +391,15 @@ static void doImplicitIntToFloatTypeCoercion(ASTNodeRef& a, ASTNodeRef& b, Trave
 	const TypeRef a_type = a->type(); 
 	const TypeRef b_type = b->type();
 
-	// TODO: Handle bitness
+	// TODO: Handle integer bitness
 
 	// 3.0 > 4		=>		3.0 > 4.0
 	if(a_type.nonNull() && a_type->getType() == Type::FloatType && b->nodeType() == ASTNode::IntLiteralType)
 	{
-		IntLiteral* b_lit = static_cast<IntLiteral*>(b.getPointer());
+		const IntLiteral* b_lit = b.downcastToPtr<IntLiteral>();
 		if(isIntExactlyRepresentableAsFloat(b_lit->value))
 		{
-			b = ASTNodeRef(new FloatLiteral((float)b_lit->value, b->srcLocation()));
+			b = new FloatLiteral((float)b_lit->value, b->srcLocation());
 			payload.tree_changed = true;
 		}
 	}
@@ -423,10 +407,10 @@ static void doImplicitIntToFloatTypeCoercion(ASTNodeRef& a, ASTNodeRef& b, Trave
 	// 3 > 4.0      =>        3.0 > 4.0
 	if(b_type.nonNull() && b_type->getType() == Type::FloatType && a->nodeType() == ASTNode::IntLiteralType)
 	{
-		IntLiteral* a_lit = static_cast<IntLiteral*>(a.getPointer());
+		const IntLiteral* a_lit = a.downcastToPtr<IntLiteral>();
 		if(isIntExactlyRepresentableAsFloat(a_lit->value))
 		{
-			a = ASTNodeRef(new FloatLiteral((float)a_lit->value, a->srcLocation()));
+			a = new FloatLiteral((float)a_lit->value, a->srcLocation());
 			payload.tree_changed = true;
 		}
 	}
@@ -439,27 +423,20 @@ static bool canDoImplicitIntToFloatTypeCoercion(const ASTNodeRef& a, const ASTNo
 	const TypeRef a_type = a->type(); 
 	const TypeRef b_type = b->type();
 
-	// TODO: Handle bitness
+	// TODO: Handle integer bitness
 
 	// 3.0 > 4		=>		3.0 > 4.0
 	if(a_type.nonNull() && a_type->getType() == Type::FloatType && b->nodeType() == ASTNode::IntLiteralType)
-	{
-		IntLiteral* b_lit = static_cast<IntLiteral*>(b.getPointer());
-		if(isIntExactlyRepresentableAsFloat(b_lit->value))
+		if(isIntExactlyRepresentableAsFloat(b.downcastToPtr<IntLiteral>()->value))
 			return true;
-	}
 
 	// 3 > 4.0      =>        3.0 > 4.0
 	if(b_type.nonNull() && b_type->getType() == Type::FloatType && a->nodeType() == ASTNode::IntLiteralType)
-	{
-		IntLiteral* a_lit = static_cast<IntLiteral*>(a.getPointer());
-		if(isIntExactlyRepresentableAsFloat(a_lit->value))
+		if(isIntExactlyRepresentableAsFloat(a.downcastToPtr<IntLiteral>()->value))
 			return true;
-	}
 
 	return false;
 }
-
 
 
 void doImplicitIntToFloatTypeCoercionForFloatReturn(ASTNodeRef& expr, TraversalPayload& payload)
@@ -470,7 +447,7 @@ void doImplicitIntToFloatTypeCoercionForFloatReturn(ASTNodeRef& expr, TraversalP
 		current_func->declared_return_type.nonNull() && current_func->declared_return_type->getType() == Type::FloatType
 		)
 	{
-		IntLiteral* body_lit = static_cast<IntLiteral*>(expr.getPointer());
+		const IntLiteral* body_lit = expr.downcastToPtr<IntLiteral>();
 		if(isIntExactlyRepresentableAsFloat(body_lit->value))
 		{
 			expr = new FloatLiteral((float)body_lit->value, body_lit->srcLocation());
@@ -480,21 +457,10 @@ void doImplicitIntToFloatTypeCoercionForFloatReturn(ASTNodeRef& expr, TraversalP
 }
 
 
-static bool isIntLiteralAndExactlyRepresentableAsFloat(const ASTNodeRef& node)
-{
-	return node->nodeType() == ASTNode::IntLiteralType && isIntExactlyRepresentableAsFloat(node.downcastToPtr<IntLiteral>()->value);
-}
-
-
-template <class T> 
-T cast(ValueRef& v)
-{
-	assert(dynamic_cast<T>(v.getPointer()) != NULL);
-	return static_cast<T>(v.getPointer());
-}
-
-
-
+//static bool isIntLiteralAndExactlyRepresentableAsFloat(const ASTNodeRef& node)
+//{
+//	return node->nodeType() == ASTNode::IntLiteralType && isIntExactlyRepresentableAsFloat(node.downcastToPtr<IntLiteral>()->value);
+//}
 
 
 /*
@@ -689,6 +655,8 @@ bool BufferRoot::isConstant() const
 
 
 //----------------------------------------------------------------------------------
+
+
 const std::string errorContext(const ASTNode* n)
 {
 	return errorContext(*n);
@@ -1000,7 +968,7 @@ ValueRef Variable::exec(VMState& vmstate)
 		// Get ref to capturedVars structure of values, will be passed in as last arg to function
 		ValueRef captured_struct = vmstate.argument_stack.back();
 		assert(dynamic_cast<StructureValue*>(captured_struct.getPointer()));
-		StructureValue* s = static_cast<StructureValue*>(captured_struct.getPointer());
+		const StructureValue* s = checkedCast<StructureValue>(captured_struct.getPointer());
 
 		return s->fields[this->bound_index];
 	}
@@ -1210,10 +1178,7 @@ Reference<ASTNode> Variable::clone()
 	v->bound_index = bound_index;
 	v->let_frame_offset = let_frame_offset;
 	v->uncaptured_bound_index = uncaptured_bound_index;
-	return ASTNodeRef(v);
-
-	// NOTE: this direct copy seems to leak mem on Linux.
-	//return ASTNodeRef(new Variable(*this));
+	return v;
 }
 
 
@@ -1735,21 +1700,21 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 		{
 			if(b->type()->getType() == Type::VectorTypeType) // float * vector
 			{
-				VectorValue* bval_vec = static_cast<VectorValue*>(bval.getPointer());
+				const VectorValue* bval_vec = checkedCast<VectorValue>(bval);
 
 				vector<ValueRef> elem_values(bval_vec->e.size());
 				for(unsigned int i=0; i<elem_values.size(); ++i)
-					elem_values[i] = ValueRef(new FloatValue(op(
-						static_cast<FloatValue*>(aval.getPointer())->value,
-						static_cast<FloatValue*>(bval_vec->e[i].getPointer())->value
-					)));
+					elem_values[i] = new FloatValue(op(
+						checkedCast<FloatValue>(aval)->value,
+						checkedCast<FloatValue>(bval_vec->e[i])->value
+					));
 				return new VectorValue(elem_values);
 			}
 			else if(b->type()->getType() == Type::FloatType) // Else float * float
 			{
 				return new FloatValue(op(
-					static_cast<FloatValue*>(aval.getPointer())->value,
-					static_cast<FloatValue*>(bval.getPointer())->value
+					checkedCast<FloatValue>(aval)->value,
+					checkedCast<FloatValue>(bval)->value
 				));
 			}
 			else
@@ -1759,21 +1724,21 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 		{
 			if(b->type()->getType() == Type::VectorTypeType) // int * vector
 			{
-				VectorValue* bval_vec = static_cast<VectorValue*>(bval.getPointer());
+				const VectorValue* bval_vec = checkedCast<VectorValue>(bval);
 
 				vector<ValueRef> elem_values(bval_vec->e.size());
 				for(unsigned int i=0; i<elem_values.size(); ++i)
-					elem_values[i] = ValueRef(new IntValue(op(
-						static_cast<IntValue*>(aval.getPointer())->value,
-						static_cast<IntValue*>(bval_vec->e[i].getPointer())->value
-					)));
+					elem_values[i] = new IntValue(op(
+						checkedCast<IntValue>(aval)->value,
+						checkedCast<IntValue>(bval_vec->e[i])->value
+					));
 				return new VectorValue(elem_values);
 			}
 			else if(b->type()->getType() == Type::IntType) // Else int * int
 			{
 				return new IntValue(op(
-					static_cast<IntValue*>(aval.getPointer())->value,
-					static_cast<IntValue*>(bval.getPointer())->value
+					checkedCast<IntValue>(aval)->value,
+					checkedCast<IntValue>(bval)->value
 				));
 			}
 			else
@@ -1781,10 +1746,11 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 		}
 	case Type::VectorTypeType:
 		{
-			TypeRef this_type = a->type();
-			VectorType* vectype = static_cast<VectorType*>(this_type.getPointer());
+			const TypeRef this_type = a->type();
 
-			VectorValue* aval_vec = static_cast<VectorValue*>(aval.getPointer());
+			const VectorType* vectype = static_cast<VectorType*>(this_type.getPointer());
+
+			const VectorValue* aval_vec = checkedCast<VectorValue>(aval);
 		
 			vector<ValueRef> elem_values(aval_vec->e.size());
 			switch(vectype->elem_type->getType())
@@ -1796,21 +1762,20 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 						if(b->type().downcast<VectorType>()->num != vectype->num)
 							throw BaseException("Invalid types to binary op.");
 
-						VectorValue* bval_vec = static_cast<VectorValue*>(bval.getPointer());
+						const VectorValue* bval_vec = checkedCast<VectorValue>(bval);
 						for(unsigned int i=0; i<elem_values.size(); ++i)
-							elem_values[i] = ValueRef(new FloatValue(op(
-								static_cast<FloatValue*>(aval_vec->e[i].getPointer())->value,
-
-								static_cast<FloatValue*>(bval_vec->e[i].getPointer())->value
-							)));
+							elem_values[i] = new FloatValue(op(
+								checkedCast<FloatValue>(aval_vec->e[i])->value,
+								checkedCast<FloatValue>(bval_vec->e[i])->value
+							));
 					}
 					else if(b->type()->getType() == Type::FloatType) // Vector * float
 					{
 						for(unsigned int i=0; i<elem_values.size(); ++i)
-							elem_values[i] = ValueRef(new FloatValue(op(
-								static_cast<FloatValue*>(aval_vec->e[i].getPointer())->value,
-								static_cast<FloatValue*>(bval.getPointer())->value
-							)));
+							elem_values[i] = new FloatValue(op(
+								checkedCast<FloatValue>(aval_vec->e[i])->value,
+								checkedCast<FloatValue>(bval)->value
+							));
 					}
 					else
 					{
@@ -1822,24 +1787,24 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 				{
 					if(b->type()->getType() == Type::VectorTypeType) // Vector * vector
 					{
-						VectorValue* bval_vec = static_cast<VectorValue*>(bval.getPointer());
+						const VectorValue* bval_vec = checkedCast<VectorValue>(bval);
 
 						if(b->type().downcast<VectorType>()->num != vectype->num)
 							throw BaseException("Invalid types to binary op.");
 
 						for(unsigned int i=0; i<elem_values.size(); ++i)
-							elem_values[i] = ValueRef(new IntValue(op(
-								static_cast<IntValue*>(aval_vec->e[i].getPointer())->value,
-								static_cast<IntValue*>(bval_vec->e[i].getPointer())->value
-							)));
+							elem_values[i] = new IntValue(op(
+								checkedCast<IntValue>(aval_vec->e[i])->value,
+								checkedCast<IntValue>(bval_vec->e[i])->value
+							));
 					}
 					else if(b->type()->getType() == Type::IntType) // Vector * int
 					{
 						for(unsigned int i=0; i<elem_values.size(); ++i)
-							elem_values[i] = ValueRef(new IntValue(op(
-								static_cast<IntValue*>(aval_vec->e[i].getPointer())->value,
-								static_cast<IntValue*>(bval.getPointer())->value
-							)));
+							elem_values[i] = new IntValue(op(
+								checkedCast<IntValue>(aval_vec->e[i])->value,
+								checkedCast<IntValue>(bval)->value
+							));
 					}
 					else
 					{
@@ -2546,12 +2511,11 @@ ValueRef DivExpression::exec(VMState& vmstate)
 {
 	ValueRef aval = a->exec(vmstate);
 	ValueRef bval = b->exec(vmstate);
-	ValueRef retval;
 
 	if(this->type()->getType() == Type::FloatType)
 	{
 		if(a->type()->getType() == Type::FloatType && b->type()->getType() == Type::FloatType)
-			return new FloatValue(static_cast<FloatValue*>(aval.getPointer())->value / static_cast<FloatValue*>(bval.getPointer())->value);
+			return new FloatValue(checkedCast<FloatValue>(aval)->value / checkedCast<FloatValue>(bval)->value);
 		else
 			throw BaseException("invalid types for div op.");
 	}
@@ -2560,8 +2524,8 @@ ValueRef DivExpression::exec(VMState& vmstate)
 		if(!(a->type()->getType() == Type::IntType && b->type()->getType() == Type::IntType))
 			throw BaseException("invalid types for div op.");
 
-		const int64 a_int_val = static_cast<IntValue*>(aval.getPointer())->value;
-		const int64 b_int_val = static_cast<IntValue*>(bval.getPointer())->value;
+		const int64 a_int_val = checkedCast<IntValue>(aval)->value;
+		const int64 b_int_val = checkedCast<IntValue>(bval)->value;
 
 		if(b_int_val == 0)
 			throw BaseException("Divide by zero.");
@@ -2569,13 +2533,12 @@ ValueRef DivExpression::exec(VMState& vmstate)
 		if(a_int_val == std::numeric_limits<int32>::min() && b_int_val == -1)
 			throw BaseException("Tried to compute -2147483648 / -1.");
 
-		retval = ValueRef(new IntValue(a_int_val / b_int_val));
+		return new IntValue(a_int_val / b_int_val);
 	}
 	else
 	{
 		throw BaseException("invalid types for div op.");
 	}
-	return retval;
 }
 
 
@@ -2701,9 +2664,6 @@ bool DivExpression::provenDefined() const
 {
 	return false; // TEMP
 }
-
-
-
 
 
 // Try and prove we are not doing INT_MIN / -1
@@ -3012,15 +2972,15 @@ ValueRef BinaryBooleanExpr::exec(VMState& vmstate)
 	if(t == OR)
 	{
 		return ValueRef(new BoolValue(
-			static_cast<BoolValue*>(aval.getPointer())->value || 
-			static_cast<BoolValue*>(bval.getPointer())->value
+			checkedCast<BoolValue>(aval)->value || 
+			checkedCast<BoolValue>(bval)->value
 		));
 	}
 	else if(t == AND)
 	{
 		return ValueRef(new BoolValue(
-			static_cast<BoolValue*>(aval.getPointer())->value &&
-			static_cast<BoolValue*>(bval.getPointer())->value
+			checkedCast<BoolValue>(aval)->value &&
+			checkedCast<BoolValue>(bval)->value
 		));
 	}
 	else
@@ -3152,18 +3112,18 @@ ValueRef UnaryMinusExpression::exec(VMState& vmstate)
 
 	if(this->type()->getType() == Type::FloatType)
 	{
-		return new FloatValue(-cast<FloatValue*>(aval)->value);
+		return new FloatValue(-checkedCast<FloatValue>(aval)->value);
 	}
 	else if(this->type()->getType() == Type::IntType)
 	{
-		return new IntValue(-cast<IntValue*>(aval)->value);
+		return new IntValue(-checkedCast<IntValue>(aval)->value);
 	}
 	else if(this->type()->getType() == Type::VectorTypeType)
 	{
-		TypeRef this_type = expr->type();
-		VectorType* vectype = static_cast<VectorType*>(this_type.getPointer());
+		const TypeRef this_type = expr->type();
+		const VectorType* vectype = this_type.downcastToPtr<VectorType>();
 
-		VectorValue* aval_vec = static_cast<VectorValue*>(aval.getPointer());
+		const VectorValue* aval_vec = checkedCast<VectorValue>(aval);
 		
 		vector<ValueRef> elem_values(aval_vec->e.size());
 		switch(vectype->elem_type->getType())
@@ -3171,19 +3131,19 @@ ValueRef UnaryMinusExpression::exec(VMState& vmstate)
 			case Type::FloatType:
 			{
 				for(unsigned int i=0; i<elem_values.size(); ++i)
-					elem_values[i] = new FloatValue(-static_cast<FloatValue*>(aval_vec->e[i].getPointer())->value);
+					elem_values[i] = new FloatValue(-checkedCast<FloatValue>(aval_vec->e[i])->value);
 				break;
 			}
 			case Type::IntType:
 			{
 				// TODO: over/under float check
 				for(unsigned int i=0; i<elem_values.size(); ++i)
-					elem_values[i] = new IntValue(-static_cast<IntValue*>(aval_vec->e[i].getPointer())->value);
+					elem_values[i] = new IntValue(-checkedCast<IntValue>(aval_vec->e[i])->value);
 				break;
 			}
 			default:
 			{
-				assert(0);
+				throw BaseException("UnaryMinusExpression type invalid!");
 			}
 		}
 		return new VectorValue(elem_values);
@@ -3453,37 +3413,37 @@ bool LetASTNode::isConstant() const
 
 template <class T> static bool lt(Value* a, Value* b)
 {
-	return static_cast<T*>(a)->value < static_cast<T*>(b)->value;
+	return checkedCast<T>(a)->value < checkedCast<T>(b)->value;
 }
 
 
 template <class T> static bool gt(Value* a, Value* b)
 {
-	return static_cast<T*>(a)->value > static_cast<T*>(b)->value;
+	return checkedCast<T>(a)->value > checkedCast<T>(b)->value;
 }
 
 
 template <class T> static bool lte(Value* a, Value* b)
 {
-	return static_cast<T*>(a)->value <= static_cast<T*>(b)->value;
+	return checkedCast<T>(a)->value <= checkedCast<T>(b)->value;
 }
 
 
 template <class T> static bool gte(Value* a, Value* b)
 {
-	return static_cast<T*>(a)->value >= static_cast<T*>(b)->value;
+	return checkedCast<T>(a)->value >= checkedCast<T>(b)->value;
 }
 
 
 template <class T> static bool eq(Value* a, Value* b)
 {
-	return static_cast<T*>(a)->value == static_cast<T*>(b)->value;
+	return checkedCast<T>(a)->value == checkedCast<T>(b)->value;
 }
 
 
 template <class T> static bool neq(Value* a, Value* b)
 {
-	return static_cast<T*>(a)->value != static_cast<T*>(b)->value;
+	return checkedCast<T>(a)->value != checkedCast<T>(b)->value;
 }
 
 
@@ -3651,12 +3611,12 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 
 		if(a_type->getType() == Type::GenericTypeType || a_type->getType() == Type::IntType || a_type->getType() == Type::FloatType || a_type->getType() == Type::BoolType)
 		{
-			if(a_type->getType() != b_type->getType())
+			if(*a_type != *b_type)
 				throw BaseException("Comparison operand types must be the same.  Left operand type: " + a_type->toString() + ", right operand type: " + b_type->toString() + "." + errorContext(*this, payload));
 		}
 		else
 		{
-			throw BaseException("Child type '" + this->type()->toString() + "' does not define Comparison operators. (First child type: " + a_type->toString() + ")." + errorContext(*this, payload));
+			throw BaseException("Type '" + this->type()->toString() + "' does not define Comparison operators. (First child type: " + a_type->toString() + ")." + errorContext(*this, payload));
 		}
 	}
 
@@ -3947,10 +3907,12 @@ bool LetBlock::isConstant() const
 
 ValueRef ArraySubscript::exec(VMState& vmstate)
 {
+	assert(0); // Not called currently.
+
 	// Array pointer is in arg 0.
 	// Index is in arg 1.
-	const ArrayValue* arr = static_cast<const ArrayValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
-	const IntValue* index = static_cast<const IntValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+	const ArrayValue* arr = checkedCast<const ArrayValue>(vmstate.argument_stack[vmstate.func_args_start.back()]);
+	const IntValue* index = checkedCast<const IntValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 1]);
 
 	return arr->e[index->value];
 }

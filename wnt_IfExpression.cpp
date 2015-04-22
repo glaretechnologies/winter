@@ -52,10 +52,9 @@ IfExpression::IfExpression(const SrcLocation& src_loc, const ASTNodeRef& conditi
 
 ValueRef IfExpression::exec(VMState& vmstate)
 {
-	ValueRef condition_val = this->condition->exec(vmstate);
-	assert(dynamic_cast<BoolValue*>(condition_val.getPointer()));
-
-	if(static_cast<BoolValue*>(condition_val.getPointer())->value)
+	const ValueRef condition_val = this->condition->exec(vmstate);
+	
+	if(checkedCast<BoolValue>(condition_val)->value)
 	{
 		// If condition is true:
 		return this->then_expr->exec(vmstate);

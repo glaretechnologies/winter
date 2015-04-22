@@ -98,20 +98,17 @@ FunctionExpression::FunctionExpression(const SrcLocation& src_loc, const std::st
 }
 
 
-FunctionDefinition* FunctionExpression::runtimeBind(VMState& vmstate, FunctionValue*& function_value_out)
+FunctionDefinition* FunctionExpression::runtimeBind(VMState& vmstate, const FunctionValue*& function_value_out)
 {
 	if(use_captured_var)
 	{
 		// Get ref to capturedVars structure of values, will be passed in as last arg to function
 		ValueRef captured_struct = vmstate.argument_stack.back();
-		assert(dynamic_cast<StructureValue*>(captured_struct.getPointer()));
-		StructureValue* s = static_cast<StructureValue*>(captured_struct.getPointer());
+		const StructureValue* s = checkedCast<StructureValue>(captured_struct);
 
 		ValueRef func_val = s->fields[this->captured_var_index];
 
-		assert(dynamic_cast<FunctionValue*>(func_val.getPointer()));
-
-		FunctionValue* function_val = static_cast<FunctionValue*>(func_val.getPointer());
+		const FunctionValue* function_val = checkedCast<FunctionValue>(func_val);
 
 		function_value_out = function_val;
 
@@ -127,8 +124,7 @@ FunctionDefinition* FunctionExpression::runtimeBind(VMState& vmstate, FunctionVa
 	else if(this->binding_type == Arg)
 	{
 		ValueRef arg = vmstate.argument_stack[vmstate.func_args_start.back() + this->bound_index];
-		assert(dynamic_cast<FunctionValue*>(arg.getPointer()));
-		FunctionValue* function_value = static_cast<FunctionValue*>(arg.getPointer());
+		const FunctionValue* function_value = checkedCast<FunctionValue>(arg);
 		function_value_out = function_value;
 		return function_value->func_def;
 	}
@@ -142,8 +138,7 @@ FunctionDefinition* FunctionExpression::runtimeBind(VMState& vmstate, FunctionVa
 		ValueRef arg = this->bound_let_block->lets[this->bound_index]->exec(vmstate);
 
 		//ValueRef arg = vmstate.let_stack[vmstate.let_stack_start.back() + this->bound_index];
-		assert(dynamic_cast<FunctionValue*>(arg.getPointer()));
-		FunctionValue* function_value = static_cast<FunctionValue*>(arg.getPointer());
+		const FunctionValue* function_value = checkedCast<FunctionValue>(arg);
 		function_value_out = function_value;
 		return function_value->func_def;
 	}
@@ -176,7 +171,7 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 
 	// Get target function.  The target function is resolved at runtime, because it may be a function 
 	// passed in as a variable to this function.
-	FunctionValue* function_value = NULL;
+	const FunctionValue* function_value = NULL;
 	FunctionDefinition* use_target_func = runtimeBind(vmstate, function_value);
 
 
@@ -232,7 +227,6 @@ bool FunctionExpression::doesFunctionTypeMatch(const TypeRef& type)
 		return false;
 
 	const Function* func = static_cast<const Function*>(type.getPointer());
-	assert(func);
 
 	std::vector<TypeRef> arg_types(this->argument_expressions.size());
 	for(unsigned int i=0; i<arg_types.size(); ++i)
@@ -607,9 +601,7 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 
 				ValueRef res = this->argument_expressions[1]->exec(vmstate);
 
-				assert(dynamic_cast<VectorValue*>(res.getPointer()));
-
-				VectorValue* res_v = static_cast<VectorValue*>(res.getPointer());
+				const VectorValue* res_v = checkedCast<VectorValue>(res);
 				
 				std::vector<int> mask(res_v->e.size());
 				for(size_t i=0; i<mask.size(); ++i)
@@ -645,9 +637,7 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 
 				ValueRef res = this->argument_expressions[1]->exec(vmstate);
 
-				assert(dynamic_cast<IntValue*>(res.getPointer()));
-
-				IntValue* res_i = static_cast<IntValue*>(res.getPointer());
+				const IntValue* res_i = checkedCast<IntValue>(res.getPointer());
 
 				index = res_i->value;
 			}
@@ -687,15 +677,14 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 					VMState vmstate;
 					vmstate.func_args_start.push_back(0);
 					ValueRef res = this->argument_expressions[0]->exec(vmstate);
-					assert(dynamic_cast<FunctionValue*>(res.getPointer()));
 
-					FunctionValue* res_f = static_cast<FunctionValue*>(res.getPointer());
+					const FunctionValue* res_f = checkedCast<FunctionValue>(res);
 
 					fold_func->specialiseForFunctionArg(res_f->func_def);
 				}
 				catch(BaseException& e)
 				{
-					throw BaseException("Failed to eval second arg of elem(tuple, i): " + e.what());
+					throw BaseException("Failed to eval first arg of fold " + e.what());
 				}
 			}
 		}
