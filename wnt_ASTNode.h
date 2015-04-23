@@ -328,6 +328,8 @@ protected:
 	//void setParent(ASTNode* p) { parent = p; }
 
 private:
+//	INDIGO_DISABLE_COPY(ASTNode)
+
 	//ASTNode* parent;
 	ASTNodeType node_type;
 	SrcLocation location;

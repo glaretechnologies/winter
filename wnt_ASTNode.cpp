@@ -1364,7 +1364,7 @@ llvm::Value* FloatLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 
 Reference<ASTNode> FloatLiteral::clone()
 {
-	return new FloatLiteral(*this);
+	return new FloatLiteral(value, srcLocation());
 }
 
 
@@ -1415,7 +1415,7 @@ llvm::Value* IntLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* r
 
 Reference<ASTNode> IntLiteral::clone()
 {
-	return new IntLiteral(*this);
+	return new IntLiteral(value, num_bits, srcLocation());
 }
 
 
@@ -1462,7 +1462,7 @@ llvm::Value* BoolLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* 
 
 Reference<ASTNode> BoolLiteral::clone()
 {
-	return new BoolLiteral(*this);
+	return new BoolLiteral(value, srcLocation());
 }
 
 
@@ -1709,7 +1709,7 @@ void StringLiteral::emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 
 Reference<ASTNode> StringLiteral::clone()
 {
-	return new StringLiteral(*this);
+	return new StringLiteral(value, srcLocation());
 }
 
 
@@ -1769,7 +1769,7 @@ void CharLiteral::emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* s
 
 Reference<ASTNode> CharLiteral::clone()
 {
-	return new CharLiteral(*this);
+	return new CharLiteral(value, srcLocation());
 }
 
 //-----------------------------------------------------------------------------------------------
