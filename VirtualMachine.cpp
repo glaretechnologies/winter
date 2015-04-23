@@ -217,6 +217,10 @@ public:
 			return (uint64_t)logf;
 		else if(name == "_memcpy")
 			return (uint64_t)memcpy;
+#if defined(OSX)
+		else if(name == "_exp2f")
+			return (uint64_t)exp2f;
+#endif
 
 		// If function was not in func_map (i.e. was not an 'external' function), then use normal symbol resolution, for functions like sinf, cosf etc..
 
