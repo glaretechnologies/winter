@@ -215,6 +215,8 @@ public:
 			return (uint64_t)expf;
 		else if(name == "_logf")
 			return (uint64_t)logf;
+		else if(name == "_memcpy")
+			return (uint64_t)memcpy;
 
 		// If function was not in func_map (i.e. was not an 'external' function), then use normal symbol resolution, for functions like sinf, cosf etc..
 
