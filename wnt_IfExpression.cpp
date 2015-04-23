@@ -69,13 +69,13 @@ ValueRef IfExpression::exec(VMState& vmstate)
 
 void IfExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
-	if(payload.operation == TraversalPayload::ConstantFolding)
+	/*if(payload.operation == TraversalPayload::ConstantFolding)
 	{
 		checkFoldExpression(condition, payload);
 		checkFoldExpression(then_expr, payload);
 		checkFoldExpression(else_expr, payload);
 	}
-	else if(payload.operation == TraversalPayload::TypeCoercion)
+	else */if(payload.operation == TraversalPayload::TypeCoercion)
 	{
 		// If we are the top level expression in a function definition, then see if we can coerce arg1 and arg2 to be what the function wants to return
 		if(stack.back()->nodeType() == ASTNode::FunctionDefinitionType)
@@ -129,6 +129,16 @@ void IfExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 		if(*this->then_expr->type() != *this->else_expr->type())
 			throw BaseException("Second and third arguments to if expression must have same type." + errorContext(*this->then_expr));
 	}
+	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
+	{
+		//this->can_constant_fold = condition->can_constant_fold && then_expr->can_constant_fold && else_expr->can_constant_fold && expressionIsWellTyped(*this, payload);
+
+		const bool a_is_literal = checkFoldExpression(condition, payload);
+		const bool b_is_literal = checkFoldExpression(then_expr, payload);
+		const bool c_is_literal = checkFoldExpression(else_expr, payload);
+			
+		this->can_maybe_constant_fold = a_is_literal && b_is_literal && c_is_literal;
+	}
 	
 	stack.pop_back();
 }
@@ -163,7 +173,7 @@ void IfExpression::print(int depth, std::ostream& s) const
 
 std::string IfExpression::sourceString() const
 {
-	std::string s = "if " + condition->sourceString() + " then " + then_expr->sourceString() + " else " + else_expr->sourceString();
+	std::string s = "if " + condition->sourceString() + " then " + then_expr->sourceString() + " else " + else_expr->sourceString() + "";
 	return s;
 }
 

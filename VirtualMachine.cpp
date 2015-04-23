@@ -483,10 +483,13 @@ static void optimiseFunctions(llvm::FunctionPassManager& fpm, llvm::Module* modu
 
 void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vector<SourceBufferRef>& source_buffers, const std::vector<FunctionDefinitionRef>& preconstructed_func_defs)
 {
-	vector<FunctionDefinitionRef> func_defs;
-	vector<NamedConstantRef> named_constants;
 	std::map<std::string, TypeRef> named_types;
 	int function_order_num = 0;
+
+	for(size_t i=0; i<preconstructed_func_defs.size(); ++i)
+		linker.top_level_defs.push_back(preconstructed_func_defs[i]);
+
+	linker.addExternalFunctions(this->external_functions);
 
 	LangParser parser;
 	for(size_t i=0; i<source_buffers.size(); ++i)
@@ -494,122 +497,49 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		std::vector<Reference<TokenBase> > tokens;
 		Lexer::process(source_buffers[i], tokens);
 
-		vector<FunctionDefinitionRef> buffer_func_defs;
-		Reference<BufferRoot> buffer_root = parser.parseBuffer(tokens, source_buffers[i], buffer_func_defs, named_types, named_types_ordered, function_order_num);
-
-		// Add named_types 
+		Reference<BufferRoot> buffer_root = parser.parseBuffer(tokens, source_buffers[i], named_types, named_types_ordered, function_order_num);
 
 		// Run any function rewriters passed in by the user on the parsed function definitions.
 		for(size_t z=0; z<args.function_rewriters.size(); ++z)
-			args.function_rewriters[z]->rewrite(buffer_func_defs, source_buffers[i]);
+		{
+			// TODO: just rewrite one function at a time?
+			vector<FunctionDefinitionRef> func_defs;
+			for(size_t q=0; q<buffer_root->top_level_defs.size(); ++q)
+				if(buffer_root->top_level_defs[q]->nodeType() == ASTNode::FunctionDefinitionType)
+					func_defs.push_back(buffer_root->top_level_defs[q].downcast<FunctionDefinition>());
+			
+			args.function_rewriters[z]->rewrite(func_defs, source_buffers[i]);
+		}
 
-		// Assign function numbers to establish an ordering
-		//for(size_t z=0; z<buffer_func_defs.size(); ++z)
-		//	buffer_func_defs[z]->function_order_num = function_order_num++;
-
-		// Assign function numbers to establish an ordering
-		//for(size_t z=0; z<buffer_func_defs.size(); ++z)
-		//	buffer_func_defs[z]->function_order_num = function_order_num++;
-
-		// TODO: use buffer_root instead.
-		//func_defs.insert(func_defs.end(), buffer_func_defs.begin(), buffer_func_defs.end());
-		append(func_defs, buffer_func_defs);
-
-
-
-		append(named_constants, buffer_root->named_constants);
+		// Add functions and named constants parsed from this source buffer to linker.
+		linker.addTopLevelDefs(buffer_root->top_level_defs);
 	}
-
-	func_defs.insert(func_defs.end(), preconstructed_func_defs.begin(), preconstructed_func_defs.end());
-
-
-	// Copy func defs to top level frame
-	/*FrameRef top_lvl_frame(new Frame());
-	for(size_t i=0; i<func_defs.size(); ++i)
-		top_lvl_frame->name_to_functions_map[func_defs[i]->sig.name].push_back(func_defs[i]);
-
-	for(size_t i=0; i<named_constants.size(); ++i)
-	{
-		if(top_lvl_frame->named_constant_map.find(named_constants[i]->name) != top_lvl_frame->named_constant_map.end())
-			throw BaseException("Named constant with name '" + named_constants[i]->name + "' already defined." + errorContext(named_constants[i].getPointer()) + 
-			"\nalready defined here: " + errorContext(top_lvl_frame->named_constant_map[named_constants[i]->name].getPointer()));
-
-		top_lvl_frame->named_constant_map[named_constants[i]->name] = named_constants[i];
-	}
-
-	*/
-
-	for(size_t i=0; i<named_constants.size(); ++i)
-	{
-		if(linker.named_constant_map.find(named_constants[i]->name) != linker.named_constant_map.end())
-			throw BaseException("Named constant with name '" + named_constants[i]->name + "' already defined." + errorContext(named_constants[i].getPointer()) + 
-			"\nalready defined here: " + errorContext(linker.named_constant_map[named_constants[i]->name].getPointer()));
-
-		linker.named_constant_map[named_constants[i]->name] = named_constants[i];
-	}
-
-
-	//BufferRoot* root = dynamic_cast<BufferRoot*>(rootref.getPointer());
-
-	// Do Type Coercion
-
-	// TEMP HACK IMPORTANT NO TYPE COERCION
-	/*{
-		std::vector<ASTNode*> stack;
-		TraversalPayload payload(TraversalPayload::TypeCoercion, hidden_voidptr_arg, env);
-		for(size_t i=0; i<func_defs.size(); ++i)
-			func_defs[i]->traverse(payload, stack);
-		//root->traverse(payload, stack);
-		assert(stack.size() == 0);
-	}*/
-
-
-	// Link functions
-	linker.addExternalFunctions(this->external_functions);
-	linker.addFunctions(func_defs);
 
 	// TEMP: print out functions
 	//for(size_t i=0; i<func_defs.size(); ++i)
 	//	func_defs[i]->print(0, std::cout);
 
-	// Bind variables
+	// Bind variables and function names
 	{
 		std::vector<ASTNode*> stack;
 		TraversalPayload payload(TraversalPayload::BindVariables);
-		//payload.top_lvl_frame = top_lvl_frame;
 		payload.linker = &linker;
-		for(size_t i=0; i<linker.func_defs.size(); ++i)
-			if(!linker.func_defs[i]->is_anon_func)
-				linker.func_defs[i]->traverse(payload, stack);
-		
-		for(size_t i=0; i<named_constants.size(); ++i)
-			named_constants[i]->traverse(payload, stack);
+		for(size_t i=0; i<linker.top_level_defs.size(); ++i)
+			linker.top_level_defs[i]->traverse(payload, stack);
 
-		//root->traverse(payload, stack);
 		assert(stack.size() == 0);
 	}
 
-	
 	/*if(!linker.concrete_funcs.empty())
 	{
 		append(func_defs, linker.concrete_funcs);
 		linker.concrete_funcs.resize(0);
 	}*/
 	
-
-
-
-	//{
-	//	std::vector<ASTNode*> stack;
-	//	TraversalPayload payload(TraversalPayload::LinkFunctions, hidden_voidptr_arg, env);
-	//	payload.linker = &linker;
-	//	root->traverse(payload, stack);
-	//	assert(stack.size() == 0);
-	//}
-
-	// Do Operator overloading conversion
+	// Do Operator overloading conversion.
+	// NOTE: This is done during binding stage now.
 	bool op_overloading_changed_tree = false;
-	{
+	/*{
 		std::vector<ASTNode*> stack;
 		TraversalPayload payload(TraversalPayload::OperatorOverloadConversion);
 		
@@ -628,7 +558,7 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		assert(stack.size() == 0);
 
 		op_overloading_changed_tree = payload.tree_changed;
-	}
+	}*/
 	
 	// Link functions again if tree has changed due to operator overloading conversion,
 	// because we will now have unbound references to functions like 'op_add'.
@@ -641,7 +571,7 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 	//	assert(stack.size() == 0);
 	//}
 	// Bind variables
-	if(op_overloading_changed_tree)
+	/*if(op_overloading_changed_tree)
 	{
 		std::vector<ASTNode*> stack;
 		TraversalPayload payload(TraversalPayload::BindVariables);
@@ -656,19 +586,26 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 
 		//root->traverse(payload, stack);
 		assert(stack.size() == 0);
-	}
+	}*/
 
-
-	//for(size_t i=0; i<func_defs.size(); ++i)
-	//	func_defs[i]->print(0, std::cout);
-
-	
 	while(true)
 	{
 		bool tree_changed = false;
-
+		
 		// Do Constant Folding
 		{
+			std::vector<ASTNode*> stack;
+			TraversalPayload payload(TraversalPayload::ComputeCanConstantFold);
+			for(size_t i=0; i<linker.top_level_defs.size(); ++i)
+				linker.top_level_defs[i]->traverse(payload, stack);
+			
+			assert(stack.size() == 0);
+
+			tree_changed = tree_changed || payload.tree_changed;
+		}
+
+		
+		/*{
 			std::vector<ASTNode*> stack;
 			TraversalPayload payload(TraversalPayload::ConstantFolding);
 			for(size_t i=0; i<linker.func_defs.size(); ++i)
@@ -682,7 +619,7 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 			assert(stack.size() == 0);
 
 			tree_changed = tree_changed || payload.tree_changed;
-		}
+		}*/
 
 		// Do Function inlining
 		/*{
@@ -700,21 +637,16 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		{
 			std::vector<ASTNode*> stack;
 			TraversalPayload payload(TraversalPayload::TypeCoercion);
-			for(size_t i=0; i<linker.func_defs.size(); ++i)
-				if(!linker.func_defs[i]->is_anon_func)
-					linker.func_defs[i]->traverse(payload, stack);
+			for(size_t i=0; i<linker.top_level_defs.size(); ++i)
+				linker.top_level_defs[i]->traverse(payload, stack);
 
-			for(size_t i=0; i<named_constants.size(); ++i)
-				named_constants[i]->traverse(payload, stack);
-
-			//root->traverse(payload, stack);
 			assert(stack.size() == 0);
 
 			tree_changed = tree_changed || payload.tree_changed;
 		}
 
 		// Do another bind pass as type coercion may have allowed some previously unbound functions to be bound now due to e.g. int->float type coercion.
-		{
+		/*{
 			std::vector<ASTNode*> stack;
 			TraversalPayload payload(TraversalPayload::BindVariables);
 			//payload.top_lvl_frame = top_lvl_frame;
@@ -728,17 +660,27 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 
 			//root->traverse(payload, stack);
 			assert(stack.size() == 0);
-		}
+		}*/
 
 //		rootref->print(0, std::cout);
 
+		// NOTE: do we even need to loop here in any circumstance?
 		if(!tree_changed)
 			break;
 	}
 
 
+	// Do a final bind variables pass, with check_bindings true
+	{
+		std::vector<ASTNode*> stack;
+		TraversalPayload payload(TraversalPayload::BindVariables);
+		payload.check_bindings = true;
+		payload.linker = &linker;
+		for(size_t i=0; i<linker.top_level_defs.size(); ++i)
+			linker.top_level_defs[i]->traverse(payload, stack);
 
-	
+		assert(stack.size() == 0);
+	}
 
 	
 	/*while(true)
@@ -782,23 +724,14 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 
 	
 
-	// TypeCheck
+	// TypeCheck.  Will throw a BaseException if anything is mistyped.
 	{
 		std::vector<ASTNode*> stack;
 		TraversalPayload payload(TraversalPayload::TypeCheck);
 
-		for(size_t i=0; i<named_constants.size(); ++i)
-			named_constants[i]->traverse(payload, stack);
-
-		for(size_t i=0; i<linker.func_defs.size(); ++i)
-			if(!linker.func_defs[i]->is_anon_func)
-			{
-				linker.func_defs[i]->traverse(payload, stack);
-				assert(stack.size() == 0);
-			}
-
+		for(size_t i=0; i<linker.top_level_defs.size(); ++i)
+			linker.top_level_defs[i]->traverse(payload, stack);
 		
-		//root->traverse(payload, stack);
 		assert(stack.size() == 0);
 	}
 
@@ -809,12 +742,8 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 	{
 		std::vector<ASTNode*> stack;
 		TraversalPayload payload(TraversalPayload::CheckInDomain);
-		for(size_t i=0; i<linker.func_defs.size(); ++i)
-			if(!linker.func_defs[i]->is_anon_func)
-				linker.func_defs[i]->traverse(payload, stack);
-
-		for(size_t i=0; i<named_constants.size(); ++i)
-			named_constants[i]->traverse(payload, stack);
+		for(size_t i=0; i<linker.top_level_defs.size(); ++i)
+			linker.top_level_defs[i]->traverse(payload, stack);
 
 		assert(stack.size() == 0);
 	}
@@ -871,15 +800,27 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 	// Verify module
 	{
 #if TARGET_LLVM_VERSION >= 36
+		std::string error_string_stream_str;
+		llvm::raw_string_ostream error_string_stream(error_string_stream_str);
+
 		const bool ver_errors = llvm::verifyModule(
-			*this->llvm_module
-			// TODO: pass std out
+			*this->llvm_module,
+			&error_string_stream
 		);
 
 		if(ver_errors)
 		{
 			std::cout << "Module verification errors." << std::endl;
-			this->llvm_module->dump();
+			//this->llvm_module->dump();
+			std::cout << "------errors:------" << std::endl;
+			std::cout << error_string_stream_str << std::endl;
+
+			//TEMP: write to disk
+			/*{
+				std::ofstream f("verification_errors.txt");
+				f << error_string_stream_str;
+			}*/
+
 			throw BaseException("Module verification errors.");
 		}
 #else
@@ -944,9 +885,9 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 			std::vector<std::string> export_list_strings;
 			for(unsigned int i=0; i<args.entry_point_sigs.size(); ++i)
 			{
-				FunctionDefinitionRef func = linker.findMatchingFunction(args.entry_point_sigs[i], SrcLocation::invalidLocation());
+				FunctionDefinitionRef func = linker.findMatchingFunctionSimple(args.entry_point_sigs[i]);
 
-				if(func.nonNull())
+				if(func.nonNull() && func->built_llvm_function)
 					export_list_strings.push_back(func->built_llvm_function->getName()); // NOTE: is LLVM func built yet?
 			}
 
@@ -1049,7 +990,6 @@ int truncateToInt_float_(float x) { return (int)x; } \n\
 		{
 			StructureType* struct_type = static_cast<StructureType*>(named_types_ordered[i].getPointer());
 			s += struct_type->getOpenCLCDefinition();
-
 		}
 
 
@@ -1062,13 +1002,13 @@ int truncateToInt_float_(float x) { return (int)x; } \n\
 Reference<FunctionDefinition> VirtualMachine::findMatchingFunction(
 	const FunctionSignature& sig)
 {
-	return linker.findMatchingFunction(sig, SrcLocation::invalidLocation());
+	return linker.findMatchingFunctionSimple(sig);
 }
 
 
 void* VirtualMachine::getJittedFunction(const FunctionSignature& sig)
 {
-	FunctionDefinitionRef func = linker.findMatchingFunction(sig, SrcLocation::invalidLocation());
+	FunctionDefinitionRef func = linker.findMatchingFunctionSimple(sig);
 
 	if(func.isNull())
 		throw Winter::BaseException("Failed to find function " + sig.toString());

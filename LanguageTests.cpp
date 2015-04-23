@@ -6,6 +6,12 @@
 
 
 #include "LanguageTestUtils.h"
+#include "FuzzTests.h"
+#include "wnt_ArrayLiteral.h"
+#include "wnt_VectorLiteral.h"
+#include "wnt_TupleLiteral.h"
+#include "wnt_IfExpression.h"
+#include "wnt_FunctionExpression.h"
 #include <utils/Timer.h>
 #include <utils/MTwister.h>
 #include <utils/Task.h>
@@ -13,6 +19,9 @@
 #include <utils/MemMappedFile.h>
 #include <utils/FileUtils.h>
 #include <unordered_set>
+
+
+#if BUILD_TESTS
 
 
 namespace Winter
@@ -67,6 +76,269 @@ static const bool DO_OPENCL_TESTS = false;
 void LanguageTests::run()
 {
 	Timer timer;
+
+
+	// This test triggers a problem with __chkstk when >= 4K is allocated on stack
+	/*{
+		const int len = 1024;
+		js::Vector<int, 32> vals(len, 0);
+		js::Vector<int, 32> b(len, 0);
+		js::Vector<int, 32> target_results(len, 0);
+		target_results[0] = len;
+
+		testIntArray("																\n\
+		def f(array<int, 1024> counts, int x) array<int, 1024> :			\n\
+				update(counts, x, elem(counts, x) + 1)			\n\
+		def main(array<int, 1024> vals, array<int, 1024> initial_counts) array<int, 1024>:  fold(f, vals, initial_counts)",
+			&vals[0], &b[0], &target_results[0], vals.size(),
+			true // allow_unsafe_operations
+		);
+	}*/
+
+	//testMainFloatArg("def f(array<float, 1024> a, float x) float : a[0]       def main(float x) float : f([x]a1024, x) ", 2.f, 2.f);
+
+	// Test that binding to a let variable overrides (shadows) a global function definition
+	testMainIntegerArg("def f(int x) int : 1		   def main(int x) int : let y = 1 f = 2 in f", 10, 2);
+
+	testMainIntegerArg("def f(int x) tuple<int, int> : [1, 2]t		   def main(int x) int : f(x)[1 - 1]", 10, 1);
+
+	testMainIntegerArg("def f() bool : 1 + 2 < 3         def main(int x) int : x", 1, 1);
+	//testMainIntegerArg("def f() bool : 1 + 2 * 3         def main(int x) int : x", 1, 1);
+
+	//TEMP:
+	testMainFloatArgInvalidProgram("def main(float x) float :  x [bleh");
+
+	testMainIntegerArg("def f(int x) tuple<int, int> : [1, 2]t		   def main(int x) int : f(x)[0]", 10, 1);
+		//testMainIntegerArg("def f(int x) tuple<int, int> : if x < 0 [1, 2]t else [3, 4]t			\n\
+		//			   def main(int x) int : f(x)[0]", 10, 3);
+
+	testMainIntegerArg("def f(int x) tuple<int> : if x < 0 [1]t else [3]t			\n\
+					   def main(int x) int : f(x)[0]", 10, 3);
+
+
+
+
+	//testMainFloatArg("struct vec2 { vector<float, 2> v }     def main(float x) float : let a = vec2([1.0, 2.0]v)  in a.v[0]", 0.f, 1.0f);
+	testMainFloatArg("struct vec2 { vector<float, 2> v }     def main(float x) float : let a = vec2([1.0, 2.0]v) in a.v[0]", 0.f, 1.0f);
+
+	testMainFloatArg("struct s { float y }     def main(float x) float : s(x).y", 3.f, 3.0f);
+
+	testMainFloatArg("struct vec2 { vector<float, 2> v }     def main(float x) float : let a = vec2([x, 2.0]v)  in (a.v)[0]", 3.f, 3.0f);
+	testMainFloatArg("struct vec2 { vector<float, 2> v }     def main(float x) float : let a = vec2([1.0, 2.0]v)  in a.v[0]", 0.f, 1.0f);
+	testMainFloatArg("struct vec2 { vector<float, 2> v }     def main(float x) float : let a = vec2([x, 2.0]v)  in a.v[0]", 3.f, 3.0f);
+	testMainFloatArg("struct vec2 { vector<float, 2> v }     def main(float x) float : let a = vec2([1.0, 2.0]v)  in  elem(a.v, 0)", 0.f, 1.0f);
+
+
+
+	// Test constant folding with a vector literal that is not well typed (has boolean element).
+	// Make sure that constant folding doesn't allow it.
+	testMainFloatArgInvalidProgram("def main(float x) float : elem(  [2.0, false]v   , 0)");
+
+	// Check constant folding with elem() and collections
+	testMainFloatArgCheckConstantFolded("def main(float x) float : elem([1.0, 2.0]v, 1)", 1.f, 2.f);
+	testMainFloatArgCheckConstantFolded("def main(float x) float : elem([1.0, 2.0]t, 1)", 1.f, 2.f);
+	testMainFloatArgCheckConstantFolded("def main(float x) float : elem([1.0, 2.0]a, 1)", 1.f, 2.f);
+
+	// Check constant folding with elem() and collections, and operations on collections
+	testMainFloatArgCheckConstantFolded("def main(float x) float : elem([1.0, 2.0]v + [3.0, 4.0]v, 1)", 1.f, 6.f);
+	testMainFloatArgCheckConstantFolded("def main(float x) float : elem([1.0, 2.0]v - [3.0, 4.0]v, 1)", 1.f, -2.f);
+	testMainFloatArgCheckConstantFolded("def main(float x) float : elem([1.0, 2.0]v * [3.0, 4.0]v, 1)", 1.f, 8.f);
+
+
+
+	testMainFloatArg("def main(float x) float : elem([x, 2.0]v, 1)", 1.f, 2.f);
+
+
+	testMainFloatArgCheckConstantFolded("def main(float x) float : 1.0 + 2.0", 1.f, 3.f);
+
+	testFuzzProgram("def main(float x) float : x!");
+
+	testFuzzProgram("struct vec3 { float x, float y, float z }	 		def vec3(float v) vec3 : vec3(v, v, v)		 		def op_add(vec3 a, vec3 b) vec3 : vec3(a.x+b.x, a.y+b.y, a.z+b.z)	 		def eval(vec3 pos) vec3 :					 			let											 				scale = 2/0.0							 			in											 				vec3(scale) + vec3(0.2)					 		def main(float x) float: x(eval(vec3(x, x, x)))");
+
+	testFuzzProgram("def main(float x) float : (1 * (1 * ((1 + 1) * (1 - 1 + 1)) - 1 - ((1 + (((((1 + 		 1 / (1 + (((1 + 1 / (1 * (1 - 1 + 1 / 1 / 1))) - 1 - 1 - (1 + 1 / 1) + (((1 * 1 		) * 1) * 1) / 1) - 1 + 1)) - 1 / 1) + (1 * 1)) + 1 - 1) + 1) * 1)) + 1) / (1 + 1 		) / 1 - ((1 + 1 / 1 - (((1 * ((1 - 1 - 1 / 1 - 1 * 1) - (1 / 1 - 1 * 1) + ((1 +	 		1) - 1 * 1) - 1 / 1)) + (1 / 1 / 1 - 1 - (1 + 1) / (1 + 1) + 1)) * (1 * ((((1 +	 		1) * 1) / 1 - 1 - 1 - (((1 + 1) * 1 - (((1 / 1 * 1) * (1 + 1) - 1) / 1 / 1 / 1 - 		 (1 + (((1 + 1) + 1) * 1)) - 1 / ((1 + 1) / (1 * 1) / (1 + (1 / 1 * 1 / 1 - 1 -	 		(1 * 1) / (1 + 1) - 1 - 1 - 1 - 1 - 1 / 1)) / (1 / 1 * 1) + (((1 + 1) * ((1 + 1) 		 * 1)) / 1 + ((1 - ((1 * 1) + 1) + 1) + 1 - 1 / ((1 / (1 - ((1 + 1) - ((((1 - (( 		1 * ((1 * ((1 + 1) + ((1 - (1 * 1) + (1 - (1 - 1 - (1 * 1) / (1 + 1) / 1 * (1 -	 		1 + (1 + 1) - ((1 / 1 / 1 + 1) * 1) - (1 - 1 * 1))) * 1) - 1 - 1 - 1 - (1 * (((1 		 * 1) * ((1 + (1 / (1 * 1) * 1 - 1)) * (1 + (((1 + 1) + 1) + 1)))) + 1) / 1)) +	 		1 / 1) / 1 - 1)) * 1 - 1)) / 1 * (1 * 1) - 1 - 1 / (1 * ((((1 + 1) + 1) * 1 - 1	 		- 1 / ((1 + 1) / (1 * 1) - ((1 / 1 + 1) * 1) + (1 + (1 * 1) - 1 - 1 - 1 - (1 + ( 		1 + 1))) / 1)) - 1 * (1 / ((1 * 1) + ((1 - 1 + (1 + 1)) + ((1 int  + 1) * 1))) / 1 *	 		1)) - 1) / 1 / 1 / 1) / 1 + 1) / (1 / (1 + (1 + (1 * 1 - 1)) - 1) / 1 - ((1 * 1	 		/ 1 / (1 / (1 * 1 / 1 - 1) / 1 * 1) / 1) - 1 * ((1 + (((1 + 1) + 1) - ((1 * ((1	 		+ 1) + 1)) * ((1 * 1) * 1) - 1) / 1 / (1 - 1 / (1 - 1 * 1) / 1 * 1) / ((1 - (1 + 		 1) / 1 * 1) + 1 - (1 + (1 * 1)) - 1) - 1 * 1) - 1 / 1) * 1)) + (((1 - (1 / 1 -	 		1 + 1 - (1 * (1 + 1)) / (1 + (1 + 1))) + 1) - ((1 + 1) * (1 * 1 / 1)) * 1 - 1) + 		 1) - 1 / 1 - (((1 * 1 - 1) + 1) - (1 + 1) - 1 - 1 * 1)) / (1 + 1) + (((1 * ((1	 		/ (1 * 1) * 1) * 1)) * 1) + 1 - (1 * 1)) / 1) * 1) + (1 / 1 * 1 / (1 * (1 + (1 / 		 1 / 1 - ((1 + ((1 - 1 / 1 + 1 / 1 - 1) * 1)) * 1) - 1 / 1 / 1 / (1 + 1) - (1 +	 		((1 + (((1 + 1 - 1 / ((1 + 1) * (1 + (1 / 1 + (1 + 1))))) * 1) * ((1 - 1 / (1 +	 		1 - (((1 / 1 - 1 / 1 * (1 + (((1 * 1) * (1 - 1 * (1 * 1))) - 1 + ((1 * 1) * ((1	 		- 1 * 1) / 1 + (1 + 1)))))) * 1) + 1 - 1 - 1 / (1 + ((1 * (1 + 1)) * 1)))) / (1	 		+ 1 - 1) + 1) - 1 * 1) / 1 - 1 / 1 - ((((1 + (1 * 1 - 1)) * ((1 + (1 * 1)) * 1)) 		 * ((1 + 1) + 1)) + 1) / 1 / 1 - ((1 / 1 - (((1 + (1 * 1) - 1) - 1 * 1 - (1 + 1) 		 - 1) + 1) + (1 / (1 + (1 * 1)) / 1 * 1 / 1) / (1 + 1)) * 1 / 1 - 1) - 1 - 1 - 1 		) / 1) * 1) / 1) + 1)) / 1 / 1)) / 1) * ((((1 / 1 + 1) - 1 * 1 / (1 + 1)) * 1 /	 		1) / 1 * 1) / 1 / 1 / 1 - ((1 * (((1 / 1 * (1 * (1 / ((1 - 1 * (1 * 1 / 1)) + (( 		1 * (1 + 1)) * 1)) * (1 + (1 + (1 * (1 + 1 / 1 - (1 - 1 * ((1 + 1) + 1 - (1 * 1) 		) / ((1 - 1 + 1) - 1 + 1)))) - 1 / (1 + 1) / 1 / 1 / 1 / (1 + (1 * (1 - (1 * 1 / 		 1) * 1))) / 1 - 1 - 1))) / ((1 + 1) + 1 /  + (1 * 1) / 1 / (1 * 1 / 1) - 1 - 1 - 1 		 / (1 * ((1 / 1 - 1 / 1 - 1 / 1 / 1 / 1 / 1 * 1) - 1 / (1 - ((1 / 1 + 1) + 1) -	 		1 / (1 * (1 + 1)) / 1 * (1 * 1) / 1) / 1 * 1)) / (1 + 1) / (((1 - 1 * 1) + (1 -	 		(1 + 1) + 1 / 1)) * 1) - (1 / 1 / 1 * 1) - (1 - ((1 * (1 - (1 + 1) + 1)) * (1 +	 		1)) / 1 / 1 + (1 - 1 - (1 + (1 * 1)) - ((1 + 1 - ((1 + ((1 * 1) * 1 - 1 / 1)) +	 		1) - 1) / 1 - 1 + 1) / (((1 * 1) + 1) + 1) * (1 * 1)))) / 1 / ((1 * 1) + 1 - 1)) 		 / 1) * 1) * 1)) * ((1 - (1 * 1 / 1) + 1) * 1 / 1)) / (1 + 1) / 1) + (1 / 1 * (1 		 + 1 / 1 - (1 / (1 - 1 + 1) + 1) / (1 + 1) - (1 * 1)) - (((1 / 1 + 1 - 1 - 1) /	 		1 * 1) + (1 * 1) / (1 / 1 * 1) - 1 - (1 + 1))) / 1) + 1) + 1)) / 1 / 1)) + 1) -	 		1 - (1 * 1 - 1)) * ((1 + 1) * 1)) - 1 * (1 + ((1 * 1) + (1 * 1)))) - 1 * 1)))) * 		 1) - 1 - 1 - 1))");
+
+
+	// NaN
+	testFuzzProgram("def g(float x) float :  pow( -2 + x, -(1.0 / 8.0))         def main(float x) float : g(0.5)");
+
+	//testMainFloatArgReturnsInt("def main(float x) : if(x < 10.0, 3, 4)", 1.f, 3);
+	testMainFloatArg("def main(float x) float : if(x < 10.0, 3, 4)", 1.f, 3.f);
+
+	// Main function that is generic.
+	testMainFloatArgInvalidProgram("struct Float4Struct { vector<float, 4> v }  		\n\
+								   def pow(Float4Struct a, Float4Struct b) : Float4Struct(pow(a.v, b.v))		 	\n\
+								   def main<T>(T x) T : x*x           \n\
+								   def m(Float4Struct a, Float4Struct b) Float4Struct : pow(a, b)");
+
+	testMainFloatArg("def f(int x) int : x*x	      def main(float x) float : f(2)", 2.0f, 4.0f);
+
+	// Some constant folding tests
+	testMainIntegerArgInvalidProgram("def main(int x) int : ((1 + 2) + (3 + true)) + (5 + 6)");
+	testMainIntegerArg("def main(int x) int : ((1 + 2) + (3 + 4)) + (5 + 6)", 1, 21);
+
+	testMainIntegerArgInvalidProgram("def g(function<float, float> f, float x) : f(xow(x, 3))");
+
+
+	timer.reset();
+	testMainFloatArgInvalidProgram("def main(float x) float : (1 * (1 * ((1 + 1) * (1 - 1 + 1)) - 1 - ((1 + (((((1 +\n\
+		 1 / (1 + (((1 + 1 / (1 * (1 - 1 + 1 / 1 / 1))) - 1 - 1 - (1 + 1 / 1) + (((1 * 1\n\
+		) * 1) * 1) / 1) - 1 + 1)) - 1 / 1) + (1 * 1)) + 1 - 1) + 1) * 1)) + 1) / (1 + 1\n\
+		) / 1 - ((1 + 1 / 1 - (((1 * ((1 - 1 - 1 / 1 - 1 * 1) - (1 / 1 - 1 * 1) + ((1 +	\n\
+		1) - 1 * 1) - 1 / 1)) + (1 / 1 / 1 - 1 - (1 + 1) / (1 + 1) + 1)) * (1 * ((((1 +	\n\
+		1) * 1) / 1 - 1 - 1 - (((1 + 1) * 1 - (((1 / 1 * 1) * (1 + 1) - 1) / 1 / 1 / 1 -\n\
+		 (1 + (((1 + 1) + 1) * 1)) - 1 / ((1 + 1) / (1 * 1) / (1 + (1 / 1 * 1 / 1 - 1 -	\n\
+		(1 * 1) / (1 + 1) - 1 - 1 - 1 - 1 - 1 / 1)) / (1 / 1 * 1) + (((1 + 1) * ((1 + 1)\n\
+		 * 1)) / 1 + ((1 - ((1 * 1) + 1) + 1) + 1 - 1 / ((1 / (1 - ((1 + 1) - ((((1 - ((\n\
+		1 * ((1 * ((1 + 1) + ((1 - (1 * 1) + (1 - (1 - 1 - (1 * 1) / (1 + 1) / 1 * (1 -	\n\
+		1 + (1 + 1) - ((1 / 1 / 1 + 1) * 1) - (1 - 1 * 1))) * 1) - 1 - 1 - 1 - (1 * (((1\n\
+		 * 1) * ((1 + (1 / (1 * 1) * 1 - 1)) * (1 + (((1 + 1) + 1) + 1)))) + 1) / 1)) +	\n\
+		1 / 1) / 1 - 1)) * 1 - 1)) / 1 * (1 * 1) - 1 - 1 / (1 * ((((1 + 1) + 1) * 1 - 1	\n\
+		- 1 / ((1 + 1) / (1 * 1) - ((1 / 1 + 1) * 1) + (1 + (1 * 1) - 1 - 1 - 1 - (1 + (\n\
+		1 + 1))) / 1)) - 1 * (1 / ((1 * 1) + ((1 - 1 + (1 + 1)) + ((1 + 1) * 1))) / 1 *	\n\
+		1)) - 1) / 1 / 1 / 1) / 1 + 1) / (1 / (1 + (1 + (1 * 1 - 1)) - 1) / 1 - ((1 * 1	\n\
+		/ 1 / (1 / (1 * 1 / 1 - 1) / 1 * 1) / 1) - 1 * ((1 + (((1 + 1) + 1) - ((1 * ((1	\n\
+		+ 1) + 1)) * ((1 * 1) * 1) - 1) / 1 / (1 - 1 / (1 - 1 * 1) / 1 * 1) / ((1 - (1 +\n\
+		 1) / 1 * 1) + 1 - (1 + (1 * 1)) - 1) - 1 * 1) - 1 / 1) * 1)) + (((1 - (1 / 1 -	\n\
+		1 + 1 - (1 * (1 + 1)) / (1 + (1 + 1))) + 1) - ((1 + 1) * (1 * 1 / 1)) * 1 - 1) +\n\
+		 1) - 1 / 1 - (((1 * 1 - 1) + 1) - (1 + 1) - 1 - 1 * 1)) / (1 + 1) + (((1 * ((1	\n\
+		/ (1 * 1) * 1) * 1)) * 1) + 1 - (1 * 1)) / 1) * 1) + (1 / 1 * 1 / (1 * (1 + (1 /\n\
+		 1 / 1 - ((1 + ((1 - 1 / 1 + 1 / 1 - 1) * 1)) * 1) - 1 / 1 / 1 / (1 + 1) - (1 +	\n\
+		((1 + (((1 + 1 - 1 / ((1 + 1) * (1 + (1 / 1 + (1 + 1))))) * 1) * ((1 - 1 / (1 +	\n\
+		1 - (((1 / 1 - 1 / 1 * (1 + (((1 * 1) * (1 - 1 * (1 * 1))) - 1 + ((1 * 1) * ((1	\n\
+		- 1 * 1) / 1 + (1 + 1)))))) * 1) + 1 - 1 - 1 / (1 + ((1 * (1 + 1)) * 1)))) / (1	\n\
+		+ 1 - 1) + 1) - 1 * 1) / 1 - 1 / 1 - ((((1 + (1 * 1 - 1)) * ((1 + (1 * 1)) * 1))\n\
+		 * ((1 + 1) + 1)) + 1) / 1 / 1 - ((1 / 1 - (((1 + (1 * 1) - 1) - 1 * 1 - (1 + 1)\n\
+		 - 1) + 1) + (1 / (1 + (1 * 1)) / 1 * 1 / 1) / (1 + 1)) * 1 / 1 - 1) - 1 - 1 - 1\n\
+		) / 1) * 1) / 1) + 1)) / 1 / 1)) / 1) * ((((1 / 1 + 1) - 1 * 1 / (1 + 1)) * 1 /	\n\
+		1) / 1 * 1) / 1 / 1 / 1 - ((1 * (((1 / 1 * (1 * (1 / ((1 - 1 * (1 * 1 / 1)) + ((\n\
+		1 * (1 + 1)) * 1)) * (1 + (1 + (1 * (1 + 1 / 1 - (1 - 1 * ((1 + 1) + 1 - (1 * 1)\n\
+		) / ((1 - 1 + 1) - 1 + 1)))) - 1 / (1 + 1) / 1 / 1 / 1 / (1 + (1 * (1 - (1 * 1 /\n\
+		 1) * 1))) / 1 - 1 - 1))) / ((1 + 1) + 1 / (1 * 1) / 1 / (1 * 1 / 1) - 1 - 1 - 1\n\
+		 / (1 * ((1 / 1 - 1 / 1 - 1 / 1 / 1 / 1 / 1 * 1) - 1 / (1 - ((1 / 1 + 1) + 1) -	\n\
+		1 / (1 * (1 + 1)) / 1 * (1 * 1) / 1) / 1 * 1)) / (1 + 1) / (((1 - 1 * 1) + (1 -	\n\
+		(1 + 1) + 1 / 1)) * 1) - (1 / 1 / 1 * 1) - (1 - ((1 * (1 - (1 + 1) + 1)) * (1 +	\n\
+		1)) / 1 / 1 + (1 - 1 - (1 + (1 * 1)) - ((1 + 1 - ((1 + ((1 * 1) * 1 - 1 / 1)) +	\n\
+		1) - 1) / 1 - 1 + 1) / (((1 * 1) + 1) + 1) * (1 * 1)))) / 1 / ((1 * 1) + 1 - 1))\n\
+		 / 1) * 1) * 1)) * ((1 - (1 * 1 / 1) + 1) * 1 / 1)) / (1 + 1) / 1) + (1 / 1 * (1\n\
+		 + 1 / 1 - (1 / (1 - 1 + 1) + 1) / (1 + 1) - (1 * 1)) - (((1 / 1 + 1 - 1 - 1) /	\n\
+		1 * 1) + (1 * 1) / (1 / 1 * 1) - 1 - (1 + 1))) / 1) + 1) + 1)) / 1 / 1)) + 1) -	\n\
+		1 - (1 * 1 - 1)) * ((1 + 1) * 1)) - 1 * (1 + ((1 * 1) + (1 * 1)))) - 1 * 1)))) *\n\
+		 1) - 1 - 1 - 1))");
+
+	std::cout << timer.elapsedString() << std::endl;
+
+
+	testMainIntegerArgInvalidProgram("def f<T>(T x) : x ()        def main() float : 0  +  f(2.0)");
+	testMainIntegerArgInvalidProgram("def f<T>(T x) : x ()        def main() float : 0  -  f(2.0)");
+	testMainIntegerArgInvalidProgram("def f<T>(T x) : x ()        def main() float : 0  *  f(2.0)");
+	testMainIntegerArgInvalidProgram("def f<T>(T x) : x ()        def main() float : 0  /  f(2.0)");
+	testMainIntegerArgInvalidProgram("def f<T>(T x) : x ()        def main() float : 0  <  f(2.0)");
+
+	testMainIntegerArg("def main(int x) int : elem( [1, 1, 1, 1]v + [x, x, x, x]v, 2)", 1, 2);
+	testMainIntegerArg("def main(int x) int : elem( [1, 1, 1, 1]v - [x, x, x, x]v, 2)", 1, 0);
+	testMainIntegerArg("def main(int x) int : elem( [1, 1, 1, 1]v * [x, x, x, x]v, 2)", 1, 1);
+	testMainIntegerArgInvalidProgram("def main(int x) int : elem( [1, 1, 1, 1]v / [x, x, x, x]v, 2)"); // Vector divides are not allowed for now
+
+
+	//fuzzTests();
+
+	testMainFloatArg(
+		"def main(float x) float: elem(   2.0 * [1.0, 2.0, 3, 4]v, 1)",
+		1.0f, 4.0f);
+
+	
+	testMainFloatArgInvalidProgram("def main(float x) float : [1.f, elem([1, 1.f]a, elem([1, 1.f]a, 1))]t");
+	testMainFloatArgInvalidProgram("def main(float x) float : [false, [[1, 1]t, ((true - false) / (1.f / 1))]a]a");
+
+	testMainFloatArgInvalidProgram("def main(float x) float : ([[false, (1.f && 1)]a, elem([1.f, false]v, - (1))]v / elem([1.f, (1 && 1)]v, - (- (1) ) ))");
+
+	testMainFloatArgInvalidProgram("def main(float x) float : ([[[true, 1.f]a, !false]a, 1]v * [([false, 1]a * true), [-true, (false * true)]v]t)");
+
+	testMainFloatArgInvalidProgram("def main(float x) float : ([[1.f, true]v / if 1 then true else 1, (-1 + (1 - 1.f))]a - ([[false, 1.f]t, (false + 1.f)]a - !-1.f))");
+
+	testMainIntegerArg("def main(int x) int : (1 + 2) + (3 + 4)", 1, 10);
+
+
+
+	testMainFloatArg("def main(float x) float : (1 * (1 + ((1 / (1 - 1 / 1 - 1 / ((1 / 1 / 1 + (1 + (1\n\
+		 * 1))) * 1) - 1 - (1 - 1 / 1 - 1 - (1 * 1) * (1 + 1 - 1 / 1)) - (1 + 1) - 1 / (\n\
+		(1 * 1) - ((1 - 1 * 1) + 1 - ((1 + 1) * (1 * 1) - 1) - 1 / 1 - (1 + (((1 + 1) +\n\
+		(1 - 1 - 1 / 1 + 1)) - 1 + 1))) + 1) + ((((1 * (1 + (((1 * ((1 + 1) * 1)) + 1) /\n\
+		 1 * 1) - 1 - 1 / ((1 + 1 - 1) + 1) - 1 - 1)) * (1 + (1 + (1 / (1 * (1 * 1)) - (\n\
+		1 + 1 - (1 * 1)) + 1) - 1)) / 1) * ((1 + 1) + 1) / 1 / 1) / 1 * 1)) + 1) * (1 *\n\
+		1)) - 1 / 1)) / (1 * 1)",
+	1.f, 1.f);
+
+	//fuzzTests();
+
+	// Out of bounds elem()
+	testMainFloatArgInvalidProgram("def main(int x) int :  elem(update([0]a, -1, 1), 0)");
+
+	// Test coercion of int to float, after it is used to bind to a given function (toFloat).
+	testMainFloatArgInvalidProgram("def main(float x) float : toFloat(3*x)");
+	testMainFloatArgInvalidProgram("def main(float x) float : toFloat(truncateToInt(3.1)*x)");
+	testMainFloatArgInvalidProgram("def main(float x) float : toFloat(truncateToInt(3.1)+x)");
+	testMainFloatArgInvalidProgram("def main(float x) float : toFloat(truncateToInt(3.1)-x)");
+	testMainFloatArgInvalidProgram("def main(float x) float : toFloat(truncateToInt(3.1)/x)");
+
+	
+	// Test circular reference between a named constant and function.
+	testMainIntegerArgInvalidProgram("TEN = main(0)		def main(int x) : TEN + x");
+
+
+
+
+	// Test division is only valid for integers, floats
+	testMainFloatArgInvalidProgram("def main(float x) float : [1, 2]a / [3, 4]a"); 	
+
+
+	testMainIntegerArgInvalidProgram("def f<T>(T x) : x        def main() float : f + (2.0)");
+	//	testFuzzProgram("def f(array<int, 16> current_state, int elem) array<int, 16> :				 			let																		 				old_count = elem(current_state, elem)								 				new_count = old_count + 1											 			in																		 				update(curreQnt_state, elem, new int _count)		");
+//	testFuzzProgram("		def main() floa string t : 				 array 	 let a = [1.0[11.0, , 2.0, 3.0, 4.0]v 					 b = [11.0, 12.0, 13.0, 14.0]v in 					 e2(min(a, b)) 		def main() float : 				  let a = [1.0, 2.0, 3.0, 4.0]v 				  b = [11.0, 12.0, 13.0, 14.0]v in 				  e2( 1.0 min(b, a))");
+	testMainIntegerArgInvalidProgram("	struct s { float x, float y }						 				  def op_adsd(s a, s b) : s(a.x + b.x, a.y + b.y)		 				  def f<T>(T a, T b) : a + b							 				  def main() float : x(!f(s(1, 2), s(3, 4)))");
+//	testFuzzProgram("def main(floa string t x) float : 1.0   1  def f(int x) int : f(0)  ");
+
+
+	//testFuzzProgram("def f(array<int, 4> a, int i) int :		 			if inBounds(a, i)						 				elem(a, i)			 										 			else						 				0									 		def main(int i) int :						 			f([1, 2, 3, 4]a, i)");
+	//testFuzzProgram("#	def main(float x) float : 					 l main(float x) fet v = [x, x, x, x]v in\				 dot(v, v)");
+//	testFuzzProgram("struct vec4 { vector<float, 4> v }					 				   struct vec16 { vector<float, 16> v }					 				   st ruct large_struct { vec4 a, vec16 b }				 				   def main(float x) float : large_struct(vec4([x, x, x, x]v), ve char c16([x, x, x, x, x int64 , x, x, x, x, x, x, x, x, x, x, x]v)).a.v.e0");
+	testMainFloatArg("def overloadedFunc(int x) float : 4.0 	  def overloadedFunc(float x) float : 5.0 		def f<T>(T x) float: overloadedFunc(x) / 4  def main(float x) float : f(1.0)", 1.0f, 5.f/4);
+
+	testMainIntegerArg("def main(int x) int : 1 * 2 + 3", 1, 5);
+	testMainIntegerArg("def main(int x) int : 1 * (2 + 3)", 1, 5);
+	testMainIntegerArg("def main(int x) int : [0, 1, 2, 3]a[0] + 1", 1, 1);
+
+	testMainIntegerArg(
+		"struct SpectralVector { vector<float, 8> v }			\n\
+		def f(SpectralVector layer_contribution) float :			\n\
+				layer_contribution.v[0] * 2.0f				\n\
+																\n\
+		def main(int x) int : 1", 1, 1);
+
+	/*testMainIntegerArg(
+		"struct SpectralVector { vector<float, 8> v }			\n\
+		def splatsForLayerContribution(SpectralVector layer_contribution, SpectralVector wavelens) float :			\n\
+			let													\n\
+					XYZ_0 = wavelens.v[0]						\n\
+				in												\n\
+					layer_contribution.v[0] * XYZ_0				\n\
+																\n\
+		def main(int x) int : 1", 1, 1);*/
+
+	// ===================================================================
+	// Test logical negation operator (!)
+	// ===================================================================
+	testMainIntegerArg("def main(int x) int : if !true then 10 else 20", 1, 20);
+	testMainIntegerArg("def main(int x) int : if !false then 10 else 20", 1, 10);
+	testMainIntegerArg("def main(int x) int : if !(x < 5) then 10 else 20", 1, 20);
+	testMainIntegerArg("def main(int x) int : if !(x >= 5) then 10 else 20", 1, 10);
+
+	testMainIntegerArg("def main(int x) int : if !true then 10 else 20", 1, 20);
+	testMainIntegerArg("def main(int x) int : if !!true then 10 else 20", 1, 10);
+	testMainIntegerArg("def main(int x) int : if !!!true then 10 else 20", 1, 20);
+
+	testMainIntegerArgInvalidProgram("def main(int x) int : if !1 then 10 else 20");
+	testMainIntegerArgInvalidProgram("def main(int x) int : if ![1, 2]t then 10 else 20");
 
 	// int64 - int mixing
 	testMainIntegerArgInvalidProgram("def main(int64 x) int :	x + 1");
@@ -169,11 +441,11 @@ void LanguageTests::run()
 	testMainFloatArgInvalidProgram("struct Complex { float re, float im }  struct Complex { float re, float im }   def main(float x) float : x");
 	testMainFloatArgInvalidProgram("struct Complex { float re, float im }  struct Complex { float rm }    def f() Complex : Complex(1.0, 2.0)    def main() float :   f().im");
 
-	testFuzzProgram("struct PolarisationVec { vector<float, 8> e }  		struct PolarisationVec {  string ve }");
+	testMainFloatArgInvalidProgram("struct PolarisationVec { vector<float, 8> e }  		struct PolarisationVec {  string ve }");
 
-	testFuzzProgram("def main(float x)  : if(x < 10.0, 3, 4)");
+//	testMainFloatArg("def main(float x)  : if(x < 10.0, 3, 4)", 1.0f, 3.0f);
 
-	testFuzzProgram("def main(float x) float : let v = [x, x, x, x, x, x, x, x]v in dot(v, v)");
+	testMainFloatArg("def main(float x) float : let v = [x, x, x, x, x, x, x, x]v in dot(v, v)", 1.f, 8.f);
 
 	testMainFloatArgInvalidProgram("def g(function<float, float> f, float x) : f(x)");
 
@@ -226,6 +498,8 @@ void LanguageTests::run()
 	testMainFloatArgInvalidProgram("\t\t\tin\t\t\t\t\t\t\t\t\t\t \t\t\tin\t\t\t\t\t\t\t\t\t\t \t\t\t\telem(a, -1)\t\t\t\t\t\t\t\" \t ");
 	
 
+
+
 	// ===================================================================
 	// Test that recursion is disallowed.
 	// ===================================================================
@@ -267,6 +541,14 @@ void LanguageTests::run()
 	// Test an expression involving a function call
 	testMainIntegerArg("def five() int : 5		TEN = five() * 2			\n\
 					   def main(int x) int : TEN + x", 3, 13);
+
+	// Test named constants with optional declared type.
+	//testMainIntegerArg("int TEN = 10			\n\
+	//				   def main(int x) int : TEN + x", 3, 13);
+
+	// Test int->float type coercion to match declared type for named constants with optional declared type.
+	testMainFloatArg("float TEN = 10			\n\
+					   def main(float x) float : TEN + x", 1.f, 11.f);
 
 
 	// test invalidity of two named constants with same name.
@@ -642,13 +924,15 @@ void LanguageTests::run()
 	//testMainFloatArg("def main(float x) float :  let y = pow(2.0, 3.0) in y", 1.f, 8.f);
 
 	// Check constant folding for expression involving a let variable
-	testMainFloatArg("def main(float x) float :  let y = (1.0 + 1.0) in pow(y, 3.0)", 1.f, 8.f);
+	testMainFloatArgCheckConstantFolded("def main(float x) float :  let y = 2.0 in y", 1.f, 2.f);
+	testMainFloatArgCheckConstantFolded("def main(float x) float :  let y = 1.0 + 1.0 in y", 1.f, 2.f);
+	testMainFloatArgCheckConstantFolded("def main(float x) float :  let y = (1.0 + 1.0) in pow(y, 3.0)", 1.f, 8.f);
 	
 
 	// Check constant folding of a pow function that is inside another function
-	testMainFloatArg("def g(float x) float :  pow(2 + x, -(1.0 / 8.0))         def main(float x) float : g(0.5)", 1.f, std::pow(2.f + 0.5f, -(1.0f / 8.0f)));
+	testMainFloatArgCheckConstantFolded("def g(float x) float :  pow(2 + x, -(1.0 / 8.0))         def main(float x) float : g(0.5)", 1.f, std::pow(2.f + 0.5f, -(1.0f / 8.0f)));
 	
-	testMainFloatArg("def g(float x, float y) float : pow(x, y)         def main(float x) float : g(2.0, 3.0)", 1.f, 8.0f);
+	testMainFloatArgCheckConstantFolded("def g(float x, float y) float : pow(x, y)         def main(float x) float : g(2.0, 3.0)", 1.f, 8.0f);
 
 	// Test promotion to match function return type:  
 	// Test in if statement
@@ -658,12 +942,12 @@ void LanguageTests::run()
 
 
 	// Test calling a function that will only be finished / correct when type promotion is done, but will be called during constant folding phase.
-	testMainFloatArg("def g(float x) float : 1 / x         def main(float x) float : g(2)", 1.f, 0.5f);
+	testMainFloatArgCheckConstantFolded("def g(float x) float : 1 / x         def main(float x) float : g(2)", 1.f, 0.5f);
 	testMainFloatArg("def g(float x) float : 1 / x         def main(float x) float : g(x)", 4.f, 0.25f);
 
 
 	// Test calling a function that will only be finished / correct when type promotion is done, but will be called during constant folding phase.
-	testMainFloatArg("def g(float x) float : 10 + x         def main(float x) float : g(1)", 2.f, 11.f);
+	testMainFloatArgCheckConstantFolded("def g(float x) float : 10 + x         def main(float x) float : g(1)", 2.f, 11.f);
 
 	// Test promotion from int to float
 	testMainFloatArg("def main(float x) float : 1 + x", 2.f, 3.f);
@@ -2849,296 +3133,13 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 	}
 
 
-	// fuzzTests();
+	// Winter::fuzzTests();
 
 	std::cout << "===================All LanguageTests passed.  Elapsed: " << timer.elapsedString() << " =============================" << std::endl;
 }
 
 
-
-// Fuzz testing choice
-struct Choice
-{
-	enum Action
-	{
-		Action_Break,
-		Action_Insert,
-		Action_InsertRandomChar,
-		Action_Copy,
-		Action_CopyFromOtherProgram,
-		Action_Remove
-	};
-
-	Choice() {}
-	Choice(Action action_, float probability_) : action(action_), probability(probability_) {}
-	Choice(Action action_, std::string left_, float probability_) : action(action_), probability(probability_), left(left_) {}
-	Choice(Action action_, std::string left_, std::string right_, float probability_) : action(action_), probability(probability_), left(left_), right(right_) {}
-
-	Action action;
-	float probability;
-	std::string left;
-	std::string right;
-};
+} // end namespace Winter
 
 
-static std::string readRandomProgramFromFuzzerInput(const std::vector<std::string>* fuzzer_input, MTwister& rng)
-{
-	// Pick a random input line to get started
-	std::string start_string;
-	while(start_string.empty())
-	{
-		// Pick a line to start at
-		size_t linenum = myMin(fuzzer_input->size()-1, (size_t)(fuzzer_input->size() * rng.unitRandom()));
-
-		// If we are in whitespace, pick another line.
-		if(::isAllWhitespace((*fuzzer_input)[linenum]))
-			continue;
-
-		// Go up until we are below a whitespace line
-		while(linenum >= 1 && !::isAllWhitespace((*fuzzer_input)[linenum - 1]))
-			linenum--;
-				
-		start_string = (*fuzzer_input)[linenum]; // Get line
-
-		linenum++;
-		// While there are more lines below that aren't just whitespace, then the program continues, so append.
-		for(; linenum<fuzzer_input->size() && !::isAllWhitespace((*fuzzer_input)[linenum]); ++linenum)
-			start_string += " " + (*fuzzer_input)[linenum];
-	}
-	return start_string;
-}
-
-
-class FuzzTask : public Indigo::Task
-{
-public:
-	void run(size_t thread_index)
-	{
-		Timer timer;
-		Timer print_timer;
-		MTwister rng(rng_seed);
-
-		std::ofstream outfile("D:/fuzz_output/fuzz_thread_" + toString(thread_index) + ".txt"); // TEMP HACK HARD CODED PATH
-		
-		// We want to N to be quite large, but not so large that the tested_programs set uses up all our RAM.
-		const int N = 5000000;
-		for(int i=0; i<N; ++i)
-		{
-			// Pick a random program to get started
-			const std::string start_string = readRandomProgramFromFuzzerInput(fuzzer_input, rng);
-
-			std::string s = start_string;
-
-			// Insert tokens
-			while(1)
-			{
-				const float r = rng.unitRandom();
-
-				float probability_sum = 0;
-				for(size_t z=0; z<choices.size(); ++z)
-				{
-					probability_sum += choices[z].probability;
-					if(r < probability_sum)
-					{
-						if(choices[z].action == Choice::Action_Break) // If this is the 'stop-appending tokens' token:
-							goto done;
-						else if(choices[z].action == Choice::Action_Insert)
-						{
-							// Insert choices[z].left randomly in the existing string
-							const size_t startpos = 0; // start_string.size();
-
-							const size_t insert_pos = myMin((size_t)(startpos + rng.unitRandom() * (s.size()-startpos)), s.size() - 1);
-							s.insert(insert_pos, choices[z].left); 
-
-							// Insert choice right
-							if(!choices[z].right.empty() && rng.unitRandom() < 0.8f)
-							{
-								const size_t right_insert_pos = myMin((size_t)(startpos + rng.unitRandom() * (s.size()-startpos)), s.size() - 1);
-								s.insert(right_insert_pos, choices[z].right); 
-							}
-						}
-						else if(choices[z].action == Choice::Action_InsertRandomChar)
-						{
-							const size_t insert_pos = myMin((size_t)(rng.unitRandom() * s.size()), s.size() - 1);
-							s.insert(insert_pos, 1, (char)(rng.unitRandom() * 128)); 
-						}
-						else if(choices[z].action == Choice::Action_Remove)
-						{
-							// Remove random chunk of string
-							if(!s.empty())
-							{
-								const size_t pos = myMin((size_t)(rng.unitRandom() * s.size()), s.size() - 1);
-					
-								const size_t chunk_len = 1 + (size_t)(20.f * rng.unitRandom() * rng.unitRandom());
-
-								s.erase(pos, chunk_len);
-							}
-						}
-						else if(choices[z].action == Choice::Action_Copy)
-						{
-							// Copy random chunk of text and insert somewhere else in string.
-							if(!s.empty())
-							{
-								const size_t src_pos = myMin((size_t)(rng.unitRandom() * s.size()), s.size() - 1);
-								const size_t chunk_len = 1 + (size_t)(20.f * rng.unitRandom() * rng.unitRandom());
-								const std::string chunk = s.substr(src_pos, chunk_len);
-
-								const size_t insert_pos = myMin((size_t)(rng.unitRandom() * s.size()), s.size());
-								s.insert(insert_pos, chunk); 
-							}
-						}
-						else if(choices[z].action == Choice::Action_CopyFromOtherProgram)
-						{
-							// Copy random chunk of text from some other program and insert somewhere in string.
-							const std::string src_string = readRandomProgramFromFuzzerInput(fuzzer_input, rng);
-
-							const size_t src_pos = myMin((size_t)(rng.unitRandom() * src_string.size()), src_string.size() - 1);
-							const size_t chunk_len = 1 + (size_t)(src_string.size() * 2 * rng.unitRandom() * rng.unitRandom());
-							const std::string chunk = src_string.substr(src_pos, chunk_len);
-
-							const size_t insert_pos = myMin((size_t)(rng.unitRandom() * s.size()), s.size());
-							s.insert(insert_pos, chunk); 
-						}
-
-
-						break;
-					}
-				}
-			}
-done:
-			//std::cout << "\n------------------------------------------------------\n" << s << 
-			//	"\n------------------------------------------------------\n" << std::endl;
-
-			bool already_tested;
-			size_t num_tested;
-			{
-				Lock lock(*tested_programs_mutex);
-				num_tested = tested_programs->size();
-				already_tested = tested_programs->find(s) != tested_programs->end();
-
-				if(!already_tested)
-					tested_programs->insert(s);
-			}
-
-			if(!already_tested)
-			{
-				// Write program source to disk, so if testFuzzProgram crashes we will have a record of the program.
-				outfile << s << std::endl;
-
-				testFuzzProgram(s);
-			}
-			
-
-			if(print_timer.elapsed() > 2.0)
-			{
-				const double tests_per_sec = i / timer.elapsed();
-				std::cout << (std::string("Iterations: ") + toString(i) + ", Num tested: " + toString(num_tested) + ", Test speed: " + doubleToStringNDecimalPlaces(tests_per_sec, 1) + " tests/s\n");
-				print_timer.reset();
-			}
-		}
-	}
-
-	int rng_seed;
-	std::vector<Choice> choices;
-	Mutex* tested_programs_mutex;
-	std::unordered_set<std::string>* tested_programs;
-	std::vector<std::string>* fuzzer_input;
-};
-
-
-void LanguageTests::fuzzTests()
-{
-	try
-	{
-		std::vector<Choice> choices;
-		choices.push_back(Choice(Choice::Action_Break, 20.f)); // Break loop choice.  Should be reasonably high probability so we don't make too many random changes each test.
-		choices.push_back(Choice(Choice::Action_InsertRandomChar, 5.f));
-		choices.push_back(Choice(Choice::Action_Remove, 5.f));
-		choices.push_back(Choice(Choice::Action_Copy, 5.f));
-		choices.push_back(Choice(Choice::Action_CopyFromOtherProgram, 5));
-		
-		choices.push_back(Choice(Choice::Action_Insert, " 1.0 ", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, " 0 ", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, " 1 ", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, " x ", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, "(", ")", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, " if ", " else ", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, " then ", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, " + ", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, " * ", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, " < ", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, " true ", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, " < ", " > ", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, " [ ", " ]t ", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, " [ ", " ] ", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, " { ", " } ", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, " struct ", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, ",", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, ".", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, " let ", " in ", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, " = ", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, " def ", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, " f ", " def f(int x) int : ", 1.0f));
-
-		choices.push_back(Choice(Choice::Action_Insert, " int ", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, " int64 ", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, " string ", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, " char ", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, " opaque ", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, " float ", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, " bool ", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, " map ", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, " array ", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, " function ", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, " vector ", 1.0f));
-		choices.push_back(Choice(Choice::Action_Insert, " tuple ", 1.0f));
-		
-
-		// Normalise probabilities.
-		float sum = 0;
-		for(size_t i=0; i<choices.size(); ++i)
-			sum += choices[i].probability;
-		for(size_t i=0; i<choices.size(); ++i)
-			choices[i].probability /= sum;
-
-		std::vector<std::string> fuzzer_input;
-		std::string filecontent;
-		FileUtils::readEntireFileTextMode("N:/winter/trunk/fuzzer_input.txt", filecontent); // TEMP HACK hardcoded path
-		fuzzer_input = ::split(filecontent, '\n');
-
-
-		// Each stage has different random number seeds, and after each stage tested_programs will be cleared, otherwise it gets too large and uses up too much RAM.
-		int rng_seed = 120;
-		for(int stage=0; stage<1000000; ++stage)
-		{
-			std::cout << "=========================== Stage " << stage << "===========================================" << std::endl;
-
-			Mutex tested_programs_mutex;
-			std::unordered_set<std::string> tested_programs;
-
-			const int NUM_THREADS = 4;
-			Indigo::TaskManager manager(NUM_THREADS);
-			for(int i=0; i<NUM_THREADS; ++i)
-			{
-				Reference<FuzzTask> t = new FuzzTask();
-				t->rng_seed = rng_seed;
-				t->choices = choices;
-				t->tested_programs_mutex = &tested_programs_mutex;
-				t->tested_programs = &tested_programs;
-				t->fuzzer_input = &fuzzer_input;
-				manager.addTask(t);
-
-				rng_seed++;
-			}
-		}
-	}
-	catch(FileUtils::FileUtilsExcep& e)
-	{
-		std::cerr << "Test failed: " << e.what() << std::endl;
-		assert(0);
-		exit(1);
-	}
-}
-
-
-}
+#endif // BUILD_TESTS

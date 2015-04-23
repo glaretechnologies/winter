@@ -122,16 +122,22 @@ void VectorLiteral::print(int depth, std::ostream& s) const
 
 	for(unsigned int i=0; i<this->elements.size(); ++i)
 	{
-		printMargin(depth+1, s);
-		this->elements[i]->print(depth+2, s);
+		this->elements[i]->print(depth + 1, s);
 	}
 }
 
 
 std::string VectorLiteral::sourceString() const
 {
-	assert(0);
-	return "";
+	std::string s = "[";
+	for(size_t i=0; i<elements.size(); ++i)
+	{
+		s += elements[i]->sourceString();
+		if(i + 1 < elements.size())
+			s += ", ";
+	}
+	s += "]v";
+	return s;
 }
 
 
@@ -163,12 +169,12 @@ std::string VectorLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 void VectorLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
-	if(payload.operation == TraversalPayload::ConstantFolding)
+	/*if(payload.operation == TraversalPayload::ConstantFolding)
 	{
 		for(size_t i=0; i<elements.size(); ++i)
 			checkFoldExpression(elements[i], payload);
 	}
-	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	else */if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
 		for(size_t i=0; i<elements.size(); ++i)
 			convertOverloadedOperators(elements[i], payload, stack);
@@ -192,7 +198,7 @@ void VectorLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 					const IntLiteral* int_lit = static_cast<const IntLiteral*>(elements[i].getPointer());
 					if(isIntExactlyRepresentableAsFloat(int_lit->value))
 					{
-						elements[i] = ASTNodeRef(new FloatLiteral((float)int_lit->value, int_lit->srcLocation()));
+						elements[i] = new FloatLiteral((float)int_lit->value, int_lit->srcLocation());
 						payload.tree_changed = true;
 					}
 				}
@@ -233,6 +239,23 @@ void VectorLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 
 		if(!(elem_type->getType() == Type::IntType || elem_type->getType() == Type::FloatType))
 			throw BaseException("Vector types can only contain float or int elements." + errorContext(*this, payload));
+	}
+	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
+	{
+		/*this->can_constant_fold = true;
+		for(unsigned int i=0; i<elements.size(); ++i)
+			if(!elements[i]->can_constant_fold)
+			{
+				this->can_constant_fold = false;
+				break;
+			}
+		this->can_constant_fold = this->can_constant_fold && expressionIsWellTyped(*this, payload);*/
+		this->can_maybe_constant_fold = true;
+		for(size_t i=0; i<elements.size(); ++i)
+		{
+			const bool elem_is_literal = checkFoldExpression(elements[i], payload);
+			this->can_maybe_constant_fold = this->can_maybe_constant_fold && elem_is_literal;
+		}
 	}
 }
 
@@ -320,7 +343,7 @@ Reference<ASTNode> VectorLiteral::clone()
 	std::vector<ASTNodeRef> elems(this->elements.size());
 	for(size_t i=0; i<elements.size(); ++i)
 		elems[i] = this->elements[i]->clone();
-	return ASTNodeRef(new VectorLiteral(elems, srcLocation(), has_int_suffix, int_suffix));
+	return new VectorLiteral(elems, srcLocation(), has_int_suffix, int_suffix);
 }
 
 

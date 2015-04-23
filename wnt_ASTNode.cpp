@@ -1,10 +1,8 @@
 /*=====================================================================
 ASTNode.cpp
 -----------
+Copyright Glare Technologies Limited 2015 -
 File created by ClassTemplate on Wed Jun 11 03:55:25 2008
-Code By Nicholas Chapman.
-
-Copyright 2009 Nicholas Chapman
 =====================================================================*/
 #include "wnt_ASTNode.h"
 
@@ -14,6 +12,9 @@ Copyright 2009 Nicholas Chapman
 #include "wnt_Diagnostics.h"
 #include "wnt_RefCounting.h"
 #include "wnt_LLVMVersion.h"
+#include "wnt_ArrayLiteral.h"
+#include "wnt_VectorLiteral.h"
+#include "wnt_TupleLiteral.h"
 #include "VMState.h"
 #include "Value.h"
 #include "VMState.h"
@@ -88,14 +89,14 @@ bool isIntExactlyRepresentableAsFloat(int64 x)
 }
 
 
-static bool expressionIsWellTyped(ASTNodeRef& e, TraversalPayload& payload_)
+bool expressionIsWellTyped(ASTNode& e, TraversalPayload& payload_)
 {
 	// NOTE: do this without exceptions?
 	try
 	{
 		vector<ASTNode*> stack;
 		TraversalPayload payload(TraversalPayload::TypeCheck);
-		e->traverse(payload, stack);
+		e.traverse(payload, stack);
 		assert(stack.size() == 0);
 
 		return true;
@@ -109,21 +110,102 @@ static bool expressionIsWellTyped(ASTNodeRef& e, TraversalPayload& payload_)
 
 bool shouldFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
 {
-	if(e.nonNull() && e->isConstant())
+	assert(e.nonNull());
+
+	if(e->can_maybe_constant_fold)
+	{
+		// Do type check of subtree.
+		// We need to do this otherwise constant folding could allow otherwise mistyped programs to compile, e.g. elem([1, true]v, 0)
+		const bool expr_is_well_typed = expressionIsWellTyped(*e, payload);
+		const TypeRef e_type = e->type();
+		return expr_is_well_typed && e_type.nonNull() && 
+			(	(e_type->getType() == Type::FloatType && (e->nodeType() != ASTNode::FloatLiteralType)) ||
+				(e_type->getType() == Type::BoolType &&	(e->nodeType() != ASTNode::BoolLiteralType)) ||
+				(e_type->getType() == Type::IntType && (e->nodeType() != ASTNode::IntLiteralType)) ||
+				(e_type->getType() == Type::VectorTypeType && (e->nodeType() != ASTNode::VectorLiteralType)) ||
+				(e_type->getType() == Type::ArrayTypeType && (e->nodeType() != ASTNode::ArrayLiteralType)) ||
+				(e_type->getType() == Type::TupleTypeType && (e->nodeType() != ASTNode::TupleLiteralType))
+			);
+	}
+
+	return false;
+	/*if(e.nonNull() && e->isConstant())
 	{
 		const TypeRef e_type = e->type();
-		return e->type().nonNull() && 
-			(	(e->type()->getType() == Type::FloatType &&		
+		return e_type.nonNull() && 
+			(	(e_type->getType() == Type::FloatType &&		
 				(e->nodeType() != ASTNode::FloatLiteralType)) ||
-				(e->type()->getType() == Type::BoolType &&		
+				(e_type->getType() == Type::BoolType &&		
 				(e->nodeType() != ASTNode::BoolLiteralType)) ||
-				(e->type()->getType() == Type::IntType &&
+				(e_type->getType() == Type::IntType &&
 				(e->nodeType() != ASTNode::IntLiteralType))
 			) &&
-			expressionIsWellTyped(e, payload);
+			expressionIsWellTyped(*e, payload);
 	}
 	else
-		return false;
+		return false;*/
+}
+
+
+static ASTNodeRef makeLiteralASTNodeFromValue(const ValueRef& value, const SrcLocation& src_location, const TypeRef& type)
+{
+	if(dynamic_cast<FloatValue*>(value.getPointer()))
+	{
+		if(type->getType() != Type::FloatType)
+			throw BaseException("invalid type");
+
+		return new FloatLiteral(value.downcastToPtr<FloatValue>()->value, src_location);
+	}
+	else if(dynamic_cast<IntValue*>(value.getPointer())) // e->type()->getType() == Type::IntType)
+	{
+		if(type->getType() != Type::IntType)
+			throw BaseException("invalid type");
+
+		return new IntLiteral(value.downcastToPtr<IntValue>()->value, type.downcastToPtr<Int>()->numBits(), src_location);
+	}
+	else if(dynamic_cast<BoolValue*>(value.getPointer())) // e->type()->getType() == Type::BoolType)
+	{
+		if(type->getType() != Type::BoolType)
+			throw BaseException("invalid type");
+
+		return new BoolLiteral(value.downcastToPtr<BoolValue>()->value, src_location);
+	}
+	else if(dynamic_cast<ArrayValue*>(value.getPointer()))
+	{
+		if(type->getType() != Type::ArrayTypeType)
+			throw BaseException("invalid type");
+
+		const ArrayValue* array_val = value.downcastToPtr<ArrayValue>();
+		vector<ASTNodeRef> elem_literals(array_val->e.size());
+		for(size_t i=0; i<array_val->e.size(); ++i)
+			elem_literals[i] = makeLiteralASTNodeFromValue(array_val->e[i], src_location, type.downcastToPtr<ArrayType>()->elem_type);
+
+		// TODO: preserve int suffix, useful for large arrays etc..
+		return new ArrayLiteral(elem_literals, src_location,
+			false, // has int suffix
+			0 // int suffix
+		);
+	}
+	else if(dynamic_cast<VectorValue*>(value.getPointer()))
+	{
+		if(type->getType() != Type::VectorTypeType)
+			throw BaseException("invalid type");
+
+		const VectorValue* vector_val = value.downcastToPtr<VectorValue>();
+		vector<ASTNodeRef> elem_literals(vector_val->e.size());
+		for(size_t i=0; i<vector_val->e.size(); ++i)
+			elem_literals[i] = makeLiteralASTNodeFromValue(vector_val->e[i], src_location, type.downcastToPtr<VectorType>()->elem_type);
+
+		// TODO: preserve int suffix, useful for large vectors etc..
+		return new VectorLiteral(elem_literals, src_location,
+			false, // has int suffix
+			0 // int suffix
+		);
+	}
+	else
+	{
+		throw BaseException("invalid type");
+	}
 }
 	
 
@@ -138,49 +220,44 @@ ASTNodeRef foldExpression(ASTNodeRef& e, TraversalPayload& payload)
 
 	vmstate.func_args_start.pop_back();
 
-	if(dynamic_cast<FloatValue*>(retval.getPointer())) //e->type()->getType() == Type::FloatType)
-	{
-		if(e->type()->getType() != Type::FloatType)
-			throw BaseException("invalid type");
-
-		return new FloatLiteral(retval.downcastToPtr<FloatValue>()->value, e->srcLocation());
-	}
-	else if(dynamic_cast<IntValue*>(retval.getPointer())) // e->type()->getType() == Type::IntType)
-	{
-		if(e->type()->getType() != Type::IntType)
-			throw BaseException("invalid type");
-
-		return ASTNodeRef(new IntLiteral(retval.downcastToPtr<IntValue>()->value, e->type().downcastToPtr<Int>()->numBits(), e->srcLocation()));
-	}
-	else if(dynamic_cast<BoolValue*>(retval.getPointer())) // e->type()->getType() == Type::BoolType)
-	{
-		if(e->type()->getType() != Type::BoolType)
-			throw BaseException("invalid type");
-
-		return ASTNodeRef(new BoolLiteral(retval.downcastToPtr<BoolValue>()->value, e->srcLocation()));
-	}
-	else
-	{
-		throw BaseException("invalid type");
-	}
+	const ASTNodeRef literal_node = makeLiteralASTNodeFromValue(retval, e->srcLocation(), e->type());
+	return literal_node;
 }
 
 
-void checkFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
+// Returns true if folding took place or e is already a literal.
+bool checkFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
 {
+	if(e.isNull())
+		return false;
+
 	if(shouldFoldExpression(e, payload))
 	{
 		try
 		{
 			e = foldExpression(e, payload);
 			payload.tree_changed = true;
+			return true;
 		}
 		catch(BaseException& )
 		{
 			// An invalid operation was performed, such as dividing by zero, while trying to eval the AST node.
 			// In this case we will consider the folding as not taking place.
+			return false;
 		}
 	}
+	
+	// e may already be a literal
+	const TypeRef e_type = e->type();
+	const bool e_is_literal = e_type.nonNull() && 
+		(	(e_type->getType() == Type::FloatType && (e->nodeType() == ASTNode::FloatLiteralType)) ||
+			(e_type->getType() == Type::BoolType &&	(e->nodeType() == ASTNode::BoolLiteralType)) ||
+			(e_type->getType() == Type::IntType && (e->nodeType() == ASTNode::IntLiteralType)) ||
+			(e_type->getType() == Type::VectorTypeType && (e->nodeType() == ASTNode::VectorLiteralType)) ||
+			(e_type->getType() == Type::ArrayTypeType && (e->nodeType() == ASTNode::ArrayLiteralType)) ||
+			(e_type->getType() == Type::TupleTypeType && (e->nodeType() == ASTNode::TupleLiteralType))
+		);
+	return e_is_literal && e->can_maybe_constant_fold;
 }
 
 
@@ -425,15 +502,26 @@ static bool canDoImplicitIntToFloatTypeCoercion(const ASTNodeRef& a, const ASTNo
 
 	// TODO: Handle integer bitness
 
-	// 3.0 > 4		=>		3.0 > 4.0
-	if(a_type.nonNull() && a_type->getType() == Type::FloatType && b->nodeType() == ASTNode::IntLiteralType)
-		if(isIntExactlyRepresentableAsFloat(b.downcastToPtr<IntLiteral>()->value))
+	if(a_type.nonNull() && b_type.nonNull())
+	{
+		// 3.0 > 4		=>		3.0 > 4.0
+		if(a_type->getType() == Type::FloatType && b_type->getType() == Type::IntType)
 			return true;
 
-	// 3 > 4.0      =>        3.0 > 4.0
-	if(b_type.nonNull() && b_type->getType() == Type::FloatType && a->nodeType() == ASTNode::IntLiteralType)
-		if(isIntExactlyRepresentableAsFloat(a.downcastToPtr<IntLiteral>()->value))
+		// 3 > 4.0      =>        3.0 > 4.0
+		if(a_type->getType() == Type::IntType && b_type->getType() == Type::FloatType)
 			return true;
+	}
+
+	//// 3.0 > 4		=>		3.0 > 4.0
+	//if(a_type.nonNull() && a_type->getType() == Type::FloatType && b_type.nonNull() && b_type->getType() == Type::IntType) //b->nodeType() == ASTNode::IntLiteralType)
+	//	//if(isIntExactlyRepresentableAsFloat(b.downcastToPtr<IntLiteral>()->value))
+	//		return true;
+
+	//// 3 > 4.0      =>        3.0 > 4.0
+	//if(b_type.nonNull() && b_type->getType() == Type::FloatType && a_type.nonNull() && a_type->getType() == Type::IntType) // a->nodeType() == ASTNode::IntLiteralType)
+	//	//if(isIntExactlyRepresentableAsFloat(a.downcastToPtr<IntLiteral>()->value))
+	//		return true;
 
 	return false;
 }
@@ -591,8 +679,11 @@ void BufferRoot::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 	stack.resize(0);
 	stack.push_back(this);
 
-	for(unsigned int i=0; i<func_defs.size(); ++i)
-		func_defs[i]->traverse(payload, stack);
+	//for(unsigned int i=0; i<func_defs.size(); ++i)
+	//	func_defs[i]->traverse(payload, stack);
+
+	for(unsigned int i=0; i<top_level_defs.size(); ++i)
+		top_level_defs[i]->traverse(payload, stack);
 
 	stack.pop_back();
 }
@@ -601,9 +692,9 @@ void BufferRoot::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 void BufferRoot::print(int depth, std::ostream& s) const
 {
 	//s << "========================================================\n";
-	for(unsigned int i=0; i<func_defs.size(); ++i)
+	for(unsigned int i=0; i<top_level_defs.size(); ++i)
 	{
-		func_defs[i]->print(depth+1, s);
+		top_level_defs[i]->print(depth+1, s);
 		s << "\n";
 	}
 }
@@ -612,9 +703,9 @@ void BufferRoot::print(int depth, std::ostream& s) const
 std::string BufferRoot::sourceString() const
 {
 	std::string s;
-	for(unsigned int i=0; i<func_defs.size(); ++i)
+	for(unsigned int i=0; i<top_level_defs.size(); ++i)
 	{
-		s += func_defs[i]->sourceString();
+		s += top_level_defs[i]->sourceString();
 		s += "\n";
 	}
 	return s;
@@ -624,9 +715,9 @@ std::string BufferRoot::sourceString() const
 std::string BufferRoot::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
 	std::string s;
-	for(unsigned int i=0; i<func_defs.size(); ++i)
+	for(unsigned int i=0; i<top_level_defs.size(); ++i)
 	{
-		s += func_defs[i]->emitOpenCLC(params);
+		s += top_level_defs[i]->emitOpenCLC(params);
 		s += "\n";
 	}
 	return s;
@@ -712,6 +803,7 @@ Variable::Variable(const std::string& name_, const SrcLocation& loc)
 	//use_captured_var(false),
 	//captured_var_index(0)
 {
+	this->can_maybe_constant_fold = false;
 }
 
 
@@ -861,7 +953,7 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 
 		// Only bind to a named constant defined earlier, and only bind to a named constant earlier than all functions we are defining.
 		if((!payload.current_named_constant || target_func_def->order_num < payload.current_named_constant->order_num) &&
-			isTargetDefinedBeforeAllInStack(payload.func_def_stack, target_func_def->order_num))
+			isTargetDefinedBeforeAllInStack(payload.func_def_stack, target_func_def->order_num) && !target_func_def->isGenericFunction())
 		{
 			this->vartype = BoundToGlobalDefVariable;
 			this->bound_function = target_func_def;
@@ -933,8 +1025,21 @@ void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 		this->bindVariables(payload, stack);
 	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
+		assert(this->vartype != UnboundVariable);
 		if(this->vartype == UnboundVariable)
 			BaseException("No such function, function argument, named constant or let definition '" + this->name + "'." + errorContext(*this, payload));
+	}
+	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
+	{
+		if(this->vartype == LetVariable)
+		{
+			const bool let_val_is_literal = checkFoldExpression(this->bound_let_block->lets[this->bound_index]->expr, payload);
+			//this->can_constant_fold = a->can_constant_fold && b->can_constant_fold && expressionIsWellTyped(*this, payload);
+			//const bool a_is_literal = checkFoldExpression(a, payload);
+			//const bool b_is_literal = checkFoldExpression(b, payload);
+			
+			this->can_maybe_constant_fold = let_val_is_literal;
+		}
 	}
 }
 
@@ -1207,6 +1312,18 @@ bool Variable::isConstant() const
 //------------------------------------------------------------------------------------
 
 
+static const std::string floatValueString(float x)
+{
+	const std::string s = toString(x);
+
+	// OpenCL seems fussy about types so make sure we have a 'f' suffix on our float literals.
+	if(StringUtils::containsChar(s, '.'))
+		return s + "f"; // e.g '2.3' -> '2.3f'
+	else
+		return s + ".f"; // e.g. '2'  ->  '2.f'
+}
+
+
 ValueRef FloatLiteral::exec(VMState& vmstate)
 {
 	return new FloatValue(value);
@@ -1216,25 +1333,19 @@ ValueRef FloatLiteral::exec(VMState& vmstate)
 void FloatLiteral::print(int depth, std::ostream& s) const
 {
 	printMargin(depth, s);
-	s << "Float literal, value=" << this->value << "\n";
+	s << "Float literal: " + floatValueString(this->value) + "\n";
 }
 
 
 std::string FloatLiteral::sourceString() const
 {
-	return toString(this->value);
+	return floatValueString(this->value);
 }
 
 
 std::string FloatLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
-	const std::string s = toString(this->value);
-
-	// OpenCL seems fussy about types so make sure we have a 'f' suffix on our float literals.
-	if(StringUtils::containsChar(s, '.'))
-		return s + "f"; // e.g '2.3' -> '2.3f'
-	else
-		return s + ".f"; // e.g. '2'  ->  '2.f'
+	return floatValueString(this->value);
 }
 
 
@@ -1253,7 +1364,7 @@ llvm::Value* FloatLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 
 Reference<ASTNode> FloatLiteral::clone()
 {
-	return ASTNodeRef(new FloatLiteral(*this));
+	return new FloatLiteral(*this);
 }
 
 
@@ -1269,7 +1380,7 @@ ValueRef IntLiteral::exec(VMState& vmstate)
 void IntLiteral::print(int depth, std::ostream& s) const
 {
 	printMargin(depth, s);
-	s << "Int literal, value=" << this->value << "\n";
+	s << "Int literal: " << this->value << "\n";
 }
 
 
@@ -1304,7 +1415,7 @@ llvm::Value* IntLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* r
 
 Reference<ASTNode> IntLiteral::clone()
 {
-	return ASTNodeRef(new IntLiteral(*this));
+	return new IntLiteral(*this);
 }
 
 
@@ -1320,7 +1431,7 @@ ValueRef BoolLiteral::exec(VMState& vmstate)
 void BoolLiteral::print(int depth, std::ostream& s) const
 {
 	printMargin(depth, s);
-	s << "Bool literal, value=" << this->value << "\n";
+	s << "Bool literal: " + boolToString(this->value) + "\n";
 }
 
 
@@ -1351,7 +1462,7 @@ llvm::Value* BoolLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* 
 
 Reference<ASTNode> BoolLiteral::clone()
 {
-	return ASTNodeRef(new BoolLiteral(*this));
+	return new BoolLiteral(*this);
 }
 
 
@@ -1415,7 +1526,7 @@ std::string MapLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 void MapLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
-	if(payload.operation == TraversalPayload::ConstantFolding)
+	/*if(payload.operation == TraversalPayload::ConstantFolding)
 	{
 		for(size_t i=0; i<items.size(); ++i)
 		{
@@ -1423,7 +1534,7 @@ void MapLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 			checkFoldExpression(items[i].second, payload);
 		}
 	}
-	else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	else */if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
 		for(size_t i=0; i<items.size(); ++i)
 		{
@@ -1455,7 +1566,7 @@ Reference<ASTNode> MapLiteral::clone()
 	m->maptype = this->maptype;
 	for(size_t i=0; i<items.size(); ++i)
 		m->items.push_back(std::make_pair(items[0].first->clone(), items[0].second->clone()));
-	return ASTNodeRef(m);
+	return m;
 }
 
 
@@ -1598,7 +1709,7 @@ void StringLiteral::emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 
 Reference<ASTNode> StringLiteral::clone()
 {
-	return ASTNodeRef(new StringLiteral(*this));
+	return new StringLiteral(*this);
 }
 
 
@@ -1658,7 +1769,7 @@ void CharLiteral::emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* s
 
 Reference<ASTNode> CharLiteral::clone()
 {
-	return ASTNodeRef(new CharLiteral(*this));
+	return new CharLiteral(*this);
 }
 
 //-----------------------------------------------------------------------------------------------
@@ -1868,20 +1979,24 @@ void AdditionExpression::bindVariables(const std::vector<ASTNode*>& stack)
 
 TypeRef AdditionExpression::type() const
 {
-	if(canDoImplicitIntToFloatTypeCoercion(a, b))
-		return new Float();
-	else
-		return a->type();
+	if(expr_type.isNull())
+	{
+		if(canDoImplicitIntToFloatTypeCoercion(a, b))
+			expr_type = new Float();
+		else
+			expr_type = a->type();
+	}
+	return expr_type;
 }
 
 
 void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
-	if(payload.operation == TraversalPayload::ConstantFolding)
+	/*if(payload.operation == TraversalPayload::ConstantFolding)
 	{
 		checkFoldExpression(a, payload);
 		checkFoldExpression(b, payload);
-	}
+	}*/
 	
 
 	stack.push_back(this);
@@ -1934,6 +2049,9 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
 		const TypeRef& this_type = this->type();
+		if(this_type.isNull())
+			throw BaseException("Unknown operand type." + errorContext(*this, payload));
+
 		if(this_type->getType() == Type::GenericTypeType || this_type->getType() == Type::IntType || this_type->getType() == Type::FloatType)
 		{
 			if(*a->type() != *b->type())
@@ -1953,9 +2071,66 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 			throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
 		}
 	}
+	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
+	{
+		//this->can_constant_fold = a->can_constant_fold && b->can_constant_fold; // && expressionIsWellTyped(*this, payload);
+		/*if(this->can_constant_fold)
+		{
+			try
+			{
+				typeCheck(payload);
+			}
+			catch(BaseException&)
+			{
+				this->can_constant_fold = false;
+			}
+		}*/
+		//if(this->can_constant_fold)
+		//{
+		//a->print(0, std::cout);
+		//b->print(0, std::cout);
+		const bool a_is_literal = checkFoldExpression(a, payload);
+		const bool b_is_literal = checkFoldExpression(b, payload);
+			
+		this->can_maybe_constant_fold = a_is_literal && b_is_literal;
+		//}
+	}
 
 	stack.pop_back();
 }
+
+
+//bool AdditionExpression::typeCheck(TraversalPayload& payload) const
+//{
+//	const TypeRef& this_type = this->type();
+//	if(this_type.isNull())
+//		throw BaseException("Unknown operand type." + errorContext(*this, payload));
+//
+//	const TypeRef a_type = a->type();
+//	const TypeRef b_type = b->type();
+//
+//	if(a_type.isNull() || b_type.isNull())
+//		throw BaseException("AdditionExpression: Binary operator '+' not defined for Unknown types." + errorContext(*this, payload));
+//
+//	if(this_type->getType() == Type::GenericTypeType || this_type->getType() == Type::IntType || this_type->getType() == Type::FloatType)
+//	{
+//		if(*a_type != *b_type)
+//			throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
+//	}
+//	else if(a_type->getType() == Type::VectorTypeType && b_type->getType() == Type::VectorTypeType) // Vector + vector addition.
+//	{
+//		if(*a_type != *b_type)
+//			throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
+//
+//		// Check element type is int or float
+//		if(!(a_type.downcast<VectorType>()->elem_type->getType() == Type::IntType || a_type.downcast<VectorType>()->elem_type->getType() == Type::FloatType))
+//			throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
+//	}
+//	else
+//	{
+//		throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'." + errorContext(*this, payload));
+//	}
+//}
 
 
 llvm::Value* AdditionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
@@ -2010,10 +2185,7 @@ llvm::Value* AdditionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 Reference<ASTNode> AdditionExpression::clone()
 {
-	AdditionExpression* e = new AdditionExpression(this->srcLocation());
-	e->a = this->a->clone();
-	e->b = this->b->clone();
-	return ASTNodeRef(e);
+	return new AdditionExpression(this->srcLocation(), this->a->clone(), this->b->clone());
 }
 
 
@@ -2043,7 +2215,7 @@ void SubtractionExpression::print(int depth, std::ostream& s) const
 
 std::string SubtractionExpression::sourceString() const
 {
-	return a->sourceString() + " - " + b->sourceString();
+	return "(" + a->sourceString() + " - " + b->sourceString() + ")";
 }
 
 
@@ -2071,20 +2243,24 @@ void SubtractionExpression::bindVariables(const std::vector<ASTNode*>& stack)
 
 TypeRef SubtractionExpression::type() const
 {
-	if(canDoImplicitIntToFloatTypeCoercion(a, b))
-		return new Float();
-	else
-		return a->type();
+	if(expr_type.isNull())
+	{
+		if(canDoImplicitIntToFloatTypeCoercion(a, b))
+			expr_type = new Float();
+		else
+			expr_type = a->type();
+	}
+	return expr_type;
 }
 
 
 void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
-	if(payload.operation == TraversalPayload::ConstantFolding)
+	/*if(payload.operation == TraversalPayload::ConstantFolding)
 	{
 		checkFoldExpression(a, payload);
 		checkFoldExpression(b, payload);
-	}
+	}*/
 
 
 	stack.push_back(this);
@@ -2137,7 +2313,11 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 
 	if(payload.operation == TraversalPayload::TypeCheck)
 	{
-		if(this->type()->getType() == Type::GenericTypeType || this->type()->getType() == Type::IntType || this->type()->getType() == Type::FloatType)
+		const TypeRef& this_type = this->type();
+		if(this_type.isNull())
+			throw BaseException("Unknown operand type." + errorContext(*this, payload));
+
+		if(this_type->getType() == Type::GenericTypeType || this_type->getType() == Type::IntType || this_type->getType() == Type::FloatType)
 		{
 			if(*a->type() != *b->type())
 				throw BaseException("AdditionExpression: Binary operator '-' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
@@ -2156,15 +2336,66 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 			throw BaseException("AdditionExpression: Binary operator '-' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
 		}
 	}
+	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
+	{
+		//this->can_constant_fold = a->can_constant_fold && b->can_constant_fold;// && expressionIsWellTyped(*this, payload);
+		//if(this->can_constant_fold)
+		//{
+		//	try
+		//	{
+		//		typeCheck(payload);
+		//	}
+		//	catch(BaseException&)
+		//	{
+		//		this->can_constant_fold = false;
+		//	}
+		//}
+		const bool a_is_literal = checkFoldExpression(a, payload);
+		const bool b_is_literal = checkFoldExpression(b, payload);
+			
+		this->can_maybe_constant_fold = a_is_literal && b_is_literal;
+	}
 
 	stack.pop_back();
 }
 
 
+//bool SubtractionExpression::typeCheck(TraversalPayload& payload) const
+//{
+//	const TypeRef& this_type = this->type();
+//	if(this_type.isNull())
+//		throw BaseException("Unknown operand type." + errorContext(*this, payload));
+//
+//	const TypeRef a_type = a->type();
+//	const TypeRef b_type = b->type();
+//	if(a_type.isNull() || b_type.isNull())
+//		throw BaseException("SubtractionExpression: Binary operator '-' not defined for Unknown types." + errorContext(*this, payload));
+//
+//	if(this_type->getType() == Type::GenericTypeType || this_type->getType() == Type::IntType || this_type->getType() == Type::FloatType)
+//	{
+//		if(*a->type() != *b->type())
+//			throw BaseException("SubtractionExpression: Binary operator '-' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
+//	}
+//	else if(a->type()->getType() == Type::VectorTypeType && b->type()->getType() == Type::VectorTypeType) // Vector + vector addition.
+//	{
+//		if(*a->type() != *b->type())
+//			throw BaseException("SubtractionExpression: Binary operator '-' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
+//
+//		// Check element type is int or float
+//		if(!(a->type().downcast<VectorType>()->elem_type->getType() == Type::IntType || a->type().downcast<VectorType>()->elem_type->getType() == Type::FloatType))
+//			throw BaseException("SubtractionExpression: Binary operator '-' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
+//	}
+//	else
+//	{
+//		throw BaseException("SubtractionExpression: Binary operator '-' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
+//	}
+//}
+
+
 llvm::Value* SubtractionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
 #if USE_LLVM
-	if(this->type()->getType() == Type::VectorTypeType || this->type()->getType() == Type::FloatType)
+	if(this->type()->getType() == Type::FloatType || (this->type()->getType() == Type::VectorTypeType && this->type().downcastToPtr<VectorType>()->elem_type->getType() == Type::FloatType))
 	{
 		return params.builder->CreateBinOp(
 			llvm::Instruction::FSub, 
@@ -2172,7 +2403,7 @@ llvm::Value* SubtractionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llv
 			b->emitLLVMCode(params)
 		);
 	}
-	else if(this->type()->getType() == Type::IntType)
+	else if(this->type()->getType() == Type::IntType || (this->type()->getType() == Type::VectorTypeType && this->type().downcastToPtr<VectorType>()->elem_type->getType() == Type::IntType))
 	{
 		return params.builder->CreateBinOp(
 			llvm::Instruction::Sub, 
@@ -2182,7 +2413,7 @@ llvm::Value* SubtractionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llv
 	}
 	else
 	{
-		throw BaseException("Unknown type for AdditionExpression code emission");
+		throw BaseException("Unknown type for SubtractionExpression code emission");
 	}
 #else
 	return NULL;
@@ -2192,10 +2423,7 @@ llvm::Value* SubtractionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llv
 
 Reference<ASTNode> SubtractionExpression::clone()
 {
-	SubtractionExpression* e = new SubtractionExpression(this->srcLocation());
-	e->a = this->a->clone();
-	e->b = this->b->clone();
-	return ASTNodeRef(e);
+	return new SubtractionExpression(this->srcLocation(), this->a->clone(), this->b->clone());
 }
 
 
@@ -2205,7 +2433,7 @@ bool SubtractionExpression::isConstant() const
 }
 
 
-//-------------------------------------------------------------------------------------------------------
+//-------------------------------------7------------------------------------------------------------------
 
 
 ValueRef MulExpression::exec(VMState& vmstate)
@@ -2216,18 +2444,24 @@ ValueRef MulExpression::exec(VMState& vmstate)
 
 TypeRef MulExpression::type() const
 {
-	// For cases like vector<float, n> * float, we want to return the vector type.
-	const TypeRef a_type = a->type(); // May be null if non-bound var.
-	const TypeRef b_type = b->type();
-	if(a_type.nonNull() && a_type->getType() == Type::VectorTypeType)
-		return a->type();
-	else if(b_type.nonNull() && b_type->getType() == Type::VectorTypeType)
-		return b->type();
-
-	if(canDoImplicitIntToFloatTypeCoercion(a, b))
-		return new Float();
-	else
-		return a->type();
+	if(expr_type.isNull())
+	{
+		// For cases like vector<float, n> * float, we want to return the vector type.
+		const TypeRef a_type = a->type(); // May be null if non-bound var.
+		const TypeRef b_type = b->type();
+		if(a_type.nonNull() && a_type->getType() == Type::VectorTypeType)
+			expr_type = a->type();
+		else if(b_type.nonNull() && b_type->getType() == Type::VectorTypeType)
+			expr_type = b->type();
+		else
+		{
+			if(canDoImplicitIntToFloatTypeCoercion(a, b))
+				expr_type = new Float();
+			else
+				expr_type = a->type();
+		}
+	}
+	return expr_type;
 }
 
 
@@ -2242,11 +2476,11 @@ TypeRef MulExpression::type() const
 
 void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
-	if(payload.operation == TraversalPayload::ConstantFolding)
+	/*if(payload.operation == TraversalPayload::ConstantFolding)
 	{
 		checkFoldExpression(a, payload);
 		checkFoldExpression(b, payload);
-	}
+	}*/
 
 	stack.push_back(this);
 	a->traverse(payload, stack);
@@ -2297,7 +2531,11 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	}
 	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
-		if(this->type()->getType() == Type::GenericTypeType || this->type()->getType() == Type::IntType || this->type()->getType() == Type::FloatType)
+		const TypeRef& this_type = this->type();
+		if(this_type.isNull())
+			throw BaseException("Unknown operand type." + errorContext(*this, payload));
+
+		if(this_type->getType() == Type::GenericTypeType || this_type->getType() == Type::IntType || this_type->getType() == Type::FloatType)
 		{
 			if(*a->type() != *b->type())
 				throw BaseException("AdditionExpression: Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
@@ -2332,9 +2570,77 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 			throw BaseException("AdditionExpression: Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
 		}
 	}
+	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
+	{
+		//this->can_constant_fold = a->can_constant_fold && b->can_constant_fold;// && expressionIsWellTyped(*this, payload);
+		//if(this->can_constant_fold)
+		//{
+		//	try
+		//	{
+		//		typeCheck(payload);
+		//	}
+		//	catch(BaseException&)
+		//	{
+		//		this->can_constant_fold = false;
+		//	}
+		//}
+		const bool a_is_literal = checkFoldExpression(a, payload);
+		const bool b_is_literal = checkFoldExpression(b, payload);
+			
+		this->can_maybe_constant_fold = a_is_literal && b_is_literal;
+	}
 
 	stack.pop_back();
 }
+
+
+//bool MulExpression::typeCheck(TraversalPayload& payload) const
+//{
+//	const TypeRef& this_type = this->type();
+//	if(this_type.isNull())
+//		throw BaseException("Unknown operand type." + errorContext(*this, payload));
+//
+//	const TypeRef a_type = a->type();
+//	const TypeRef b_type = b->type();
+//	if(a_type.isNull() || b_type.isNull())
+//		throw BaseException("MulExpression: Binary operator '*' not defined for Unknown types." + errorContext(*this, payload));
+//
+//
+//		if(this_type->getType() == Type::GenericTypeType || this_type->getType() == Type::IntType || this_type->getType() == Type::FloatType)
+//		{
+//			if(*a->type() != *b->type())
+//				throw BaseException("MulExpression: Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
+//		}
+//		else if(a->type()->getType() == Type::VectorTypeType && b->type()->getType() == Type::VectorTypeType) // Vector + vector addition.
+//		{
+//			if(*a->type() != *b->type())
+//				throw BaseException("MulExpression: Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
+//
+//			// Check element type is int or float
+//			if(!(a->type().downcast<VectorType>()->elem_type->getType() == Type::IntType || a->type().downcast<VectorType>()->elem_type->getType() == Type::FloatType))
+//				throw BaseException("MulExpression: Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
+//		}
+//		else if(a->type()->getType() == Type::VectorTypeType && *b->type() == *a->type().downcast<VectorType>()->elem_type)
+//		{
+//			// A is a vector<T>, and B is of type T
+//
+//			// Check element type is int or float
+//			if(!(a->type().downcast<VectorType>()->elem_type->getType() == Type::IntType || a->type().downcast<VectorType>()->elem_type->getType() == Type::FloatType))
+//				throw BaseException("MulExpression: Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
+//		}
+//		else if(b->type()->getType() == Type::VectorTypeType && *a->type() == *b->type().downcast<VectorType>()->elem_type)
+//		{
+//			// B is a vector<T>, and A is of type T
+//
+//			// Check element type is int or float
+//			if(!(b->type().downcast<VectorType>()->elem_type->getType() == Type::IntType || b->type().downcast<VectorType>()->elem_type->getType() == Type::FloatType))
+//				throw BaseException("MulExpression: Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
+//		}
+//		else
+//		{
+//			throw BaseException("MulExpression: Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
+//		}
+//}
 
 
 void MulExpression::print(int depth, std::ostream& s) const
@@ -2491,10 +2797,7 @@ llvm::Value* MulExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 
 Reference<ASTNode> MulExpression::clone()
 {
-	MulExpression* e = new MulExpression(this->srcLocation());
-	e->a = this->a->clone();
-	e->b = this->b->clone();
-	return ASTNodeRef(e);
+	return new MulExpression(this->srcLocation(), this->a->clone(), this->b->clone());
 }
 
 
@@ -2547,7 +2850,7 @@ TypeRef DivExpression::type() const
 	// See if we can do type coercion
 
 	// Type may be null if 'a' is a variable node that has not been bound yet.
-	const TypeRef a_type = a->type(); 
+	/*const TypeRef a_type = a->type(); 
 	const TypeRef b_type = b->type();
 
 	if(a_type.nonNull() && a_type->getType() == Type::FloatType && b->nodeType() == ASTNode::IntLiteralType)
@@ -2565,17 +2868,25 @@ TypeRef DivExpression::type() const
 			return new Float();
 	}
 
-	return a->type();
+	return a->type();*/
+	if(expr_type.isNull())
+	{
+		if(canDoImplicitIntToFloatTypeCoercion(a, b))
+			expr_type = new Float();
+		else
+			expr_type = a->type();
+	}
+	return expr_type;
 }
 
 
 void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
-	if(payload.operation == TraversalPayload::ConstantFolding)
+	/*if(payload.operation == TraversalPayload::ConstantFolding)
 	{
 		checkFoldExpression(a, payload);
 		checkFoldExpression(b, payload);
-	}
+	}*/
 
 
 	stack.push_back(this);
@@ -2613,7 +2924,7 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 			IntLiteral* b_lit = static_cast<IntLiteral*>(b.getPointer());
 			if(isIntExactlyRepresentableAsFloat(b_lit->value) && (b_lit->value != 0))
 			{
-				b = ASTNodeRef(new FloatLiteral((float)b_lit->value, b->srcLocation()));
+				b = new FloatLiteral((float)b_lit->value, b->srcLocation());
 				payload.tree_changed = true;
 			}
 		}
@@ -2624,15 +2935,20 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 			IntLiteral* a_lit = static_cast<IntLiteral*>(a.getPointer());
 			if(isIntExactlyRepresentableAsFloat(a_lit->value))
 			{
-				a = ASTNodeRef(new FloatLiteral((float)a_lit->value, a->srcLocation()));
+				a = new FloatLiteral((float)a_lit->value, a->srcLocation());
 				payload.tree_changed = true;
 			}
 		}
 	}
 	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
-		if(this->type()->getType() == Type::GenericTypeType || *this->type() == Int() || *this->type() == Float())
+		const TypeRef& this_type = this->type();
+		if(this_type.isNull())
+			throw BaseException("Unknown operand type." + errorContext(*this, payload));
+
+		if(this_type->getType() == Type::GenericTypeType || *this_type == Int() || *this_type == Float())
 		{
+			// Make sure both operands have the same type
 			if(*a->type() != *b->type())
 				throw BaseException("Binary operator '/' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
 		}
@@ -2655,9 +2971,59 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 
 		this->proven_defined = true;
 	}
+	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
+	{
+		//this->can_constant_fold = a->can_constant_fold && b->can_constant_fold;// && expressionIsWellTyped(*this, payload);
+		//if(this->can_constant_fold)
+		//{
+		//	try
+		//	{
+		//		typeCheck(payload);
+		//	}
+		//	catch(BaseException&)
+		//	{
+		//		this->can_constant_fold = false;
+		//	}
+		//}
+		const bool a_is_literal = checkFoldExpression(a, payload);
+		const bool b_is_literal = checkFoldExpression(b, payload);
+			
+		this->can_maybe_constant_fold = a_is_literal && b_is_literal;
+	}
 
 	stack.pop_back();
 }
+
+
+//bool DivExpression::typeCheck(TraversalPayload& payload) const
+//{
+//	const TypeRef& this_type = this->type();
+//	if(this_type.isNull())
+//		throw BaseException("Unknown operand type." + errorContext(*this, payload));
+//
+//	const TypeRef a_type = a->type();
+//	const TypeRef b_type = b->type();
+//	if(a_type.isNull() || b_type.isNull())
+//		throw BaseException("DivExpression: Binary operator '/' not defined for Unknown types." + errorContext(*this, payload));
+//
+//
+//		if(this_type->getType() == Type::GenericTypeType || *this_type == Int() || *this_type == Float())
+//		{
+//			// Make sure both operands have the same type
+//			if(*a->type() != *b->type())
+//				throw BaseException("Binary operator '/' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
+//		}
+//		/*else if(a->type()->getType() == Type::VectorTypeType && b->type()->getType() == Type::VectorTypeType)
+//		{
+//			// this is alright.
+//			// NOTE: need to do more checking tho.
+//			// Need to check number of elements is same in both vectors, and field types are the same.
+//		}*/
+//		else
+//		{
+//			throw BaseException("Binary operator '/' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
+//		}
+//}
 
 
 bool DivExpression::provenDefined() const
@@ -2897,7 +3263,7 @@ void DivExpression::print(int depth, std::ostream& s) const
 
 std::string DivExpression::sourceString() const
 {
-	return a->sourceString() + " / " + b->sourceString();
+	return "(" + a->sourceString() + " / " + b->sourceString() + ")";
 }
 
 
@@ -2940,10 +3306,7 @@ llvm::Value* DivExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 
 Reference<ASTNode> DivExpression::clone()
 {
-	DivExpression* e = new DivExpression(this->srcLocation());
-	e->a = this->a->clone();
-	e->b = this->b->clone();
-	return ASTNodeRef(e);
+	return new DivExpression(this->srcLocation(), this->a->clone(), this->b->clone());
 }
 
 
@@ -2993,11 +3356,11 @@ ValueRef BinaryBooleanExpr::exec(VMState& vmstate)
 
 void BinaryBooleanExpr::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
-	if(payload.operation == TraversalPayload::ConstantFolding)
+	/*if(payload.operation == TraversalPayload::ConstantFolding)
 	{
 		checkFoldExpression(a, payload);
 		checkFoldExpression(b, payload);
-	}
+	}*/
 
 
 	stack.push_back(this);
@@ -3022,11 +3385,26 @@ void BinaryBooleanExpr::traverse(TraversalPayload& payload, std::vector<ASTNode*
 	}
 	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
-		if(a->type()->getType() != Winter::Type::BoolType)
+		const TypeRef& a_type = this->a->type();
+		if(a_type.isNull())
+			throw BaseException("Unknown operand type." + errorContext(*this, payload));
+		const TypeRef& b_type = this->b->type();
+		if(b_type.isNull())
+			throw BaseException("Unknown operand type." + errorContext(*this, payload));
+
+		if(a_type->getType() != Winter::Type::BoolType)
 			throw BaseException("First child does not have boolean type." + errorContext(*this, payload));
 
-		if(b->type()->getType() != Winter::Type::BoolType)
+		if(b_type->getType() != Winter::Type::BoolType)
 			throw BaseException("Second child does not have boolean type." + errorContext(*this, payload));
+	}
+	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
+	{
+		//this->can_constant_fold = a->can_constant_fold && b->can_constant_fold && expressionIsWellTyped(*this, payload);
+		const bool a_is_literal = checkFoldExpression(a, payload);
+		const bool b_is_literal = checkFoldExpression(b, payload);
+			
+		this->can_maybe_constant_fold = a_is_literal && b_is_literal;
 	}
 
 	stack.pop_back();
@@ -3038,9 +3416,9 @@ void BinaryBooleanExpr::print(int depth, std::ostream& s) const
 	printMargin(depth, s);
 	s << "Binary boolean Expression ";
 	if(t == OR)
-		s << " (OR)";
+		s << "OR";
 	else if(t == AND)
-		s << " (AND)";
+		s << "AND";
 	s << "\n";
 
 	this->a->print(depth+1, s);
@@ -3050,7 +3428,7 @@ void BinaryBooleanExpr::print(int depth, std::ostream& s) const
 
 std::string BinaryBooleanExpr::sourceString() const
 {
-	return a->sourceString() + (this->t == OR ? " || " : " && ") + b->sourceString();
+	return "(" + a->sourceString() + (this->t == OR ? " || " : " && ") + b->sourceString() + ")";
 }
 
 
@@ -3093,7 +3471,7 @@ llvm::Value* BinaryBooleanExpr::emitLLVMCode(EmitLLVMCodeParams& params, llvm::V
 
 Reference<ASTNode> BinaryBooleanExpr::clone()
 {
-	return ASTNodeRef(new BinaryBooleanExpr(t, a->clone(), b->clone(), srcLocation()));
+	return new BinaryBooleanExpr(t, a->clone(), b->clone(), srcLocation());
 }
 
 
@@ -3157,10 +3535,10 @@ ValueRef UnaryMinusExpression::exec(VMState& vmstate)
 
 void UnaryMinusExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
-	if(payload.operation == TraversalPayload::ConstantFolding)
+	/*if(payload.operation == TraversalPayload::ConstantFolding)
 	{
 		checkFoldExpression(expr, payload);
-	}
+	}*/
 
 
 	stack.push_back(this);
@@ -3177,10 +3555,14 @@ void UnaryMinusExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 	}
 	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
-		if(this->type()->getType() == Type::GenericTypeType || this->type()->getType() == Type::IntType || this->type()->getType() == Type::FloatType)
+		const TypeRef& this_type = this->type();
+		if(this_type.isNull())
+			throw BaseException("Unknown operand type." + errorContext(*this, payload));
+
+		if(this_type->getType() == Type::GenericTypeType || this_type->getType() == Type::IntType || this_type->getType() == Type::FloatType)
 		{}
-		else if(this->type()->getType() == Type::VectorTypeType && 
-			(static_cast<VectorType*>(this->type().getPointer())->elem_type->getType() == Type::FloatType || static_cast<VectorType*>(this->type().getPointer())->elem_type->getType() == Type::IntType))
+		else if(this_type->getType() == Type::VectorTypeType && 
+			(static_cast<VectorType*>(this_type.getPointer())->elem_type->getType() == Type::FloatType || static_cast<VectorType*>(this_type.getPointer())->elem_type->getType() == Type::IntType))
 		{
 		}
 		else
@@ -3191,6 +3573,12 @@ void UnaryMinusExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 	else if(payload.operation == TraversalPayload::BindVariables)
 	{
 		convertOverloadedOperators(expr, payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
+	{
+		//this->can_constant_fold = expr->can_constant_fold && expressionIsWellTyped(*this, payload);
+		const bool is_literal = checkFoldExpression(expr, payload);
+		this->can_maybe_constant_fold = is_literal;
 	}
 
 	stack.pop_back();
@@ -3275,13 +3663,113 @@ llvm::Value* UnaryMinusExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm
 
 Reference<ASTNode> UnaryMinusExpression::clone()
 {
-	UnaryMinusExpression* e = new UnaryMinusExpression(this->srcLocation());
-	e->expr = this->expr->clone();
-	return ASTNodeRef(e);
+	return new UnaryMinusExpression(this->srcLocation(), this->expr->clone());
 }
 
 
 bool UnaryMinusExpression::isConstant() const
+{
+	return expr->isConstant();
+}
+
+
+//----------------------------------------------------------------------------------------
+
+
+ValueRef LogicalNegationExpr::exec(VMState& vmstate)
+{
+	const ValueRef expr_val = expr->exec(vmstate);
+
+	return new BoolValue(!checkedCast<BoolValue>(expr_val)->value);
+}
+
+
+void LogicalNegationExpr::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
+{
+	/*if(payload.operation == TraversalPayload::ConstantFolding)
+	{
+		checkFoldExpression(expr, payload);
+	}*/
+
+
+	stack.push_back(this);
+	expr->traverse(payload, stack);
+	
+
+	if(payload.operation == TraversalPayload::InlineFunctionCalls)
+	{
+		checkInlineExpression(expr, payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	{
+		checkSubstituteVariable(expr, payload);
+	}
+	else if(payload.operation == TraversalPayload::TypeCheck)
+	{
+		const TypeRef& this_type = this->type();
+		if(this_type.isNull())
+			throw BaseException("Unknown operand type." + errorContext(*this, payload));
+
+		if(this_type->getType() != Type::BoolType)
+			throw BaseException("Type '" + this->type()->toString() + "' does not define logical negation operator '!'.");
+	}
+	else if(payload.operation == TraversalPayload::BindVariables)
+	{
+		convertOverloadedOperators(expr, payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
+	{
+		//this->can_constant_fold = expr->can_constant_fold && expressionIsWellTyped(*this, payload);
+		const bool is_literal = checkFoldExpression(expr, payload);
+		this->can_maybe_constant_fold = is_literal;
+	}
+
+	stack.pop_back();
+}
+
+
+void LogicalNegationExpr::print(int depth, std::ostream& s) const
+{
+	printMargin(depth, s);
+	s << "Logical negation Expression\n";
+	this->expr->print(depth+1, s);
+}
+
+
+std::string LogicalNegationExpr::sourceString() const
+{
+	return "!" + expr->sourceString();
+}
+
+
+std::string LogicalNegationExpr::emitOpenCLC(EmitOpenCLCodeParams& params) const
+{
+	return "!" + expr->emitOpenCLC(params);
+}
+
+
+llvm::Value* LogicalNegationExpr::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
+{
+	if(this->type()->getType() == Type::BoolType)
+	{
+		return params.builder->CreateNot(
+			expr->emitLLVMCode(params)
+		);
+	}
+	else
+	{
+		throw BaseException("LogicalNegationExpr type invalid!");
+	}
+}
+
+
+Reference<ASTNode> LogicalNegationExpr::clone()
+{
+	return new LogicalNegationExpr(this->srcLocation(), this->expr->clone());
+}
+
+
+bool LogicalNegationExpr::isConstant() const
 {
 	return expr->isConstant();
 }
@@ -3319,10 +3807,10 @@ std::string LetASTNode::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 void LetASTNode::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
-	if(payload.operation == TraversalPayload::ConstantFolding)
+	/*if(payload.operation == TraversalPayload::ConstantFolding)
 	{
 		checkFoldExpression(expr, payload);
-	}
+	}*/
 	/*else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
 		convertOverloadedOperators(expr, payload, stack);
@@ -3369,6 +3857,12 @@ void LetASTNode::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 			}
 		}
 	}
+	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
+	{
+		//this->can_constant_fold = expr->can_constant_fold && expressionIsWellTyped(*this, payload);
+		const bool is_literal = checkFoldExpression(expr, payload);
+		this->can_maybe_constant_fold = is_literal;
+	}
 
 	stack.pop_back();
 }
@@ -3398,7 +3892,7 @@ Reference<ASTNode> LetASTNode::clone()
 {
 	LetASTNode* e = new LetASTNode(this->variable_name, this->declared_type, this->srcLocation());
 	e->expr = this->expr->clone();
-	return ASTNodeRef(e);
+	return e;
 }
 
 
@@ -3531,7 +4025,7 @@ static const std::string tokenString(unsigned int token_type)
 
 std::string ComparisonExpression::sourceString() const
 {
-	return a->sourceString() + tokenString(this->token->getType()) + b->sourceString();
+	return "(" + a->sourceString() + tokenString(this->token->getType()) + b->sourceString() + ")";
 }
 
 
@@ -3543,11 +4037,11 @@ std::string ComparisonExpression::emitOpenCLC(EmitOpenCLCodeParams& params) cons
 
 void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
-	if(payload.operation == TraversalPayload::ConstantFolding)
+	/*if(payload.operation == TraversalPayload::ConstantFolding)
 	{
 		checkFoldExpression(a, payload);
 		checkFoldExpression(b, payload);
-	}
+	}*/
 
 
 	stack.push_back(this);
@@ -3618,6 +4112,14 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 		{
 			throw BaseException("Type '" + this->type()->toString() + "' does not define Comparison operators. (First child type: " + a_type->toString() + ")." + errorContext(*this, payload));
 		}
+	}
+	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
+	{
+		//this->can_constant_fold = a->can_constant_fold && b->can_constant_fold && expressionIsWellTyped(*this, payload);
+		const bool a_is_literal = checkFoldExpression(a, payload);
+		const bool b_is_literal = checkFoldExpression(b, payload);
+			
+		this->can_maybe_constant_fold = a_is_literal && b_is_literal;
 	}
 
 	stack.pop_back();
@@ -3802,10 +4304,10 @@ std::string LetBlock::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 void LetBlock::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
-	if(payload.operation == TraversalPayload::ConstantFolding)
+	/*if(payload.operation == TraversalPayload::ConstantFolding)
 	{
 		checkFoldExpression(expr, payload);
-	}
+	}*/
 
 
 	stack.push_back(this);
@@ -3833,6 +4335,23 @@ void LetBlock::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 	else if(payload.operation == TraversalPayload::BindVariables)
 	{
 		convertOverloadedOperators(expr, payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
+	{
+		/*this->can_constant_fold = true;
+		for(unsigned int i=0; i<lets.size(); ++i)
+			this->can_constant_fold = this->can_constant_fold && lets[i]->can_constant_fold;
+		this->can_constant_fold = this->can_constant_fold && expr->can_constant_fold;
+		this->can_constant_fold = this->can_constant_fold && expressionIsWellTyped(*this, payload);*/
+
+		this->can_maybe_constant_fold = checkFoldExpression(expr, payload);
+
+		for(size_t i=0; i<lets.size(); ++i)
+		{
+			const bool let_is_literal = checkFoldExpression(lets[i]->expr, payload); // NOTE: this correct?
+			this->can_maybe_constant_fold = this->can_maybe_constant_fold && let_is_literal;
+		}
+
 	}
 
 	stack.pop_back();
@@ -3876,7 +4395,7 @@ Reference<ASTNode> LetBlock::clone()
 	for(size_t i=0; i<new_lets.size(); ++i)
 		new_lets[i] = Reference<LetASTNode>(static_cast<LetASTNode*>(lets[i]->clone().getPointer()));
 	Winter::ASTNodeRef clone = this->expr->clone();
-	return ASTNodeRef(new LetBlock(clone, new_lets, this->srcLocation()));
+	return new LetBlock(clone, new_lets, this->srcLocation());
 }
 
 
@@ -3943,10 +4462,10 @@ std::string ArraySubscript::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 void ArraySubscript::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
-	if(payload.operation == TraversalPayload::ConstantFolding)
+	/*if(payload.operation == TraversalPayload::ConstantFolding)
 	{
 		checkFoldExpression(subscript_expr, payload);
-	}
+	}*/
 
 	
 	stack.push_back(this);
@@ -3967,6 +4486,12 @@ void ArraySubscript::traverse(TraversalPayload& payload, std::vector<ASTNode*>& 
 	else if(payload.operation == TraversalPayload::BindVariables)
 	{
 		convertOverloadedOperators(subscript_expr, payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
+	{
+		//this->can_constant_fold = subscript_expr->can_constant_fold && expressionIsWellTyped(*this, payload);
+		const bool is_literal = checkFoldExpression(subscript_expr, payload);
+		this->can_maybe_constant_fold = is_literal;
 	}
 
 	stack.pop_back();
@@ -3993,6 +4518,15 @@ bool ArraySubscript::isConstant() const
 
 
 //----------------------------------------------------------------------------------------
+
+
+TypeRef NamedConstant::type() const
+{
+	if(declared_type.nonNull())
+		return declared_type;
+	
+	return value_expr->type();
+}
 
 
 ValueRef NamedConstant::exec(VMState& vmstate)
@@ -4025,10 +4559,10 @@ std::string NamedConstant::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 void NamedConstant::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
-	if(payload.operation == TraversalPayload::ConstantFolding)
+	/*if(payload.operation == TraversalPayload::ConstantFolding)
 	{
 		checkFoldExpression(value_expr, payload);
-	}
+	}*/
 
 	//payload.named_constant_stack.push_back(this);
 	payload.current_named_constant = this;
@@ -4051,11 +4585,42 @@ void NamedConstant::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	{
 		convertOverloadedOperators(value_expr, payload, stack);
 	}
+	if(payload.operation == TraversalPayload::TypeCoercion)
+	{
+		if(declared_type.nonNull() && declared_type->getType() == Type::FloatType && 
+			value_expr.nonNull() && value_expr->nodeType() == ASTNode::IntLiteralType)
+		{
+			IntLiteral* body_lit = static_cast<IntLiteral*>(value_expr.getPointer());
+			if(isIntExactlyRepresentableAsFloat(body_lit->value))
+			{
+				this->value_expr = new FloatLiteral((float)body_lit->value, body_lit->srcLocation());
+				payload.tree_changed = true;
+			}
+		}
+	}
 	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
 		// Check that value_expr is constant now.  NOTE: not sure this is the best place/phase to do it.
 		if(!value_expr->isConstant())
 			throw BaseException("Named constant value was not constant. " + errorContext(*this, payload));
+
+		const TypeRef expr_type = value_expr->type();
+		if(expr_type.isNull())
+			throw BaseException("Failed to compute type for named constant. " + errorContext(*this, payload));
+
+		// Check that the type of the body expression is equal to the declared type.
+		if(this->declared_type.nonNull())
+		{
+			if(*expr_type != *this->declared_type)
+				throw BaseException("Type error for named constant '" + name + "': Computed return type '" + expr_type->toString() + 
+					"' is not equal to the declared return type '" + declared_type->toString() + "'." + errorContext(*this));
+		}
+	}
+	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
+	{
+		//this->can_constant_fold = value_expr->can_constant_fold && expressionIsWellTyped(*this, payload);
+		const bool is_literal = checkFoldExpression(value_expr, payload);
+		this->can_maybe_constant_fold = is_literal;
 	}
 
 	stack.pop_back();
@@ -4072,7 +4637,7 @@ llvm::Value* NamedConstant::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 
 Reference<ASTNode> NamedConstant::clone()
 {
-	return new NamedConstant(name, value_expr->clone(), srcLocation(), order_num);
+	return new NamedConstant(declared_type, name, value_expr->clone(), srcLocation(), order_num);
 }
 
 

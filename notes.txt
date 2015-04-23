@@ -1,4 +1,7 @@
-Copyright 2009- Nicholas Chapman
+//engine_builder.setRelocationModel(llvm::Reloc::Static);
+//engine_builder.setCodeModel(llvm::CodeModel::Large);
+		
+		Copyright 2009- Nicholas Chapman
 
 
 
@@ -6,18 +9,70 @@ Copyright 2009- Nicholas Chapman
 
 
 Parsing precedence:
+====================
+links back to parseExpression are not shown.
+General parsing principle is that back-links are not allowed unless at least one token has been comsumed.  This avoids infinite parsing loops.
+
+
+
+parseFunctionDefinition
+|
+parseFunctionDefinitionGivenName             parseNamedConstant
+|                                                |
+-------------------------------------------------
+|
+parseExpression
+|
+parseLetBLock
+|
+----------------------------------------	    
+|                                      |
+|                                    parseLet
+parseBinaryLogicalExpression       
+parseComparisonExpression        
+parseAddSubExpression
+parseMulDivExpression
+parseUnaryExpression
+parseHighPrecedenceExpression (function call, array subscript, field access)
+parseBasicExpression
+|
+------------------------------------------------------------------------------------------------
+|                   |                             |                        |
+parseLiteral	parseIfExpression     parseVariableExpression   parseMapLiteralExpression	   parseArrayOrVectorLiteralOrArraySubscriptExpression
+
+
+
+
+
+
+
+
+OLD:
+// TODO: parseExpression does nothing, also move this to top
 
 parseLetBlock
-parseExpression
-parseArraySubscriptExpression
-parseBinaryLogicalExpression
-parseComparisonExpression
+|
+---------------------------------------
+   |                                   |
+parseExpression	                   parseLet
+parseBinaryLogicalExpression           |
+parseComparisonExpression          parseExpression
 parseAddSubExpression
 parseMulDivExpression
 parseUnaryExpression
 parseParenExpression
+parseArraySubscriptExpression
 parseBasicExpression
-parseFieldExpression	parseLiteral	parseMapLiteralExpression	parseArrayOrVectorLiteralOrArraySubscriptExpression
+|
+------------------------------------------------------------------------------------------------
+    |                                      |                     |                   |
+parseFieldExpression				parseLiteral	parseMapLiteralExpression	parseArrayOrVectorLiteralOrArraySubscriptExpression
+|                                                                                           |
+--------------------------------------------------								parseExpression
+    |                 |                           |
+parseIfExpression  parseFunctionExpression	parseVariableExpression
+|                      |
+parseLetBlock		parseExpression
 
 
 

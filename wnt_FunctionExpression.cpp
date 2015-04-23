@@ -230,7 +230,11 @@ bool FunctionExpression::doesFunctionTypeMatch(const TypeRef& type)
 
 	std::vector<TypeRef> arg_types(this->argument_expressions.size());
 	for(unsigned int i=0; i<arg_types.size(); ++i)
+	{
 		arg_types[i] = this->argument_expressions[i]->type();
+		if(arg_types[i].isNull())
+			return false;
+	}
 
 	if(arg_types.size() != func->arg_types.size())
 		return false;
@@ -412,8 +416,15 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 		{
 			const FunctionSignature sig(this->function_name, argtypes);
 
+			// Work out effective call site position.
+			int effective_callsite_order_num = 1000000000;
+			if(payload.current_named_constant)
+				effective_callsite_order_num = payload.current_named_constant->order_num;
+			for(size_t z=0; z<payload.func_def_stack.size(); ++z)
+				effective_callsite_order_num = myMin(effective_callsite_order_num, payload.func_def_stack[z]->order_num);
+
 			// Try and resolve to internal function.
-			this->target_function = linker.findMatchingFunction(sig, this->srcLocation(), &payload.func_def_stack).getPointer();
+			this->target_function = linker.findMatchingFunction(sig, this->srcLocation(), effective_callsite_order_num/*&payload.func_def_stack*/).getPointer();
 			if(this->target_function/* && isTargetDefinedBeforeAllInStack(payload.func_def_stack, target_function)*/) // Disallow recursion for now: Check the linked function is not the current function.
 			{
 				this->binding_type = BoundToGlobalDef;
@@ -438,7 +449,7 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 				// Try again with our coerced arguments
 				const FunctionSignature coerced_sig(this->function_name, coerced_argtypes);
 
-				this->target_function = linker.findMatchingFunction(coerced_sig, this->srcLocation(), &payload.func_def_stack).getPointer();
+				this->target_function = linker.findMatchingFunction(coerced_sig, this->srcLocation(), effective_callsite_order_num/*&payload.func_def_stack*/).getPointer();
 				if(this->target_function/* && isTargetDefinedBeforeAllInStack(payload.func_def_stack, target_function)*/) // Disallow recursion for now: Check the linked function is not the current function.
 				{
 					this->binding_type = BoundToGlobalDef;
@@ -520,24 +531,24 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 
 void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
-	if(payload.operation == TraversalPayload::ConstantFolding)
-	{
-		for(size_t i=0; i<argument_expressions.size(); ++i)
-			if(shouldFoldExpression(argument_expressions[i], payload))
-			{
-				try
-				{
-					argument_expressions[i] = foldExpression(argument_expressions[i], payload);
-					payload.tree_changed = true;
-				}
-				catch(BaseException& )
-				{
-					// An invalid operation was performed, such as dividing by zero, while trying to eval the AST node.
-					// In this case we will consider the folding as not taking place.
-				}
-			}
-	}
-	else if(payload.operation == TraversalPayload::TypeCoercion)
+	//if(payload.operation == TraversalPayload::ConstantFolding)
+	//{
+	//	for(size_t i=0; i<argument_expressions.size(); ++i)
+	//		if(shouldFoldExpression(argument_expressions[i], payload))
+	//		{
+	//			try
+	//			{
+	//				argument_expressions[i] = foldExpression(argument_expressions[i], payload);
+	//				payload.tree_changed = true;
+	//			}
+	//			catch(BaseException& )
+	//			{
+	//				// An invalid operation was performed, such as dividing by zero, while trying to eval the AST node.
+	//				// In this case we will consider the folding as not taking place.
+	//			}
+	//		}
+	//}
+	/*else */if(payload.operation == TraversalPayload::TypeCoercion)
 	{
 	}
 	else if(payload.operation == TraversalPayload::CustomVisit)
@@ -688,6 +699,19 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 				}
 			}
 		}
+
+		if(payload.check_bindings && this->binding_type == Unbound)
+		{
+			//throw BaseException("Failed to find function '" + this->function_name + "' for the given argument types." + errorContext(*this));
+
+			vector<TypeRef> argtypes;
+			for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
+				argtypes.push_back(this->argument_expressions[i]->type()); // may be NULL
+
+			const FunctionSignature sig(this->function_name, argtypes);
+		
+			throw BaseException("Failed to find function '" + sig.toString() + "'." + errorContext(*this));
+		}
 	}
 	else if(payload.operation == TraversalPayload::CheckInDomain)
 	{
@@ -696,29 +720,46 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 	}
 	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
-		if(this->binding_type == Unbound)
-		{
-			vector<TypeRef> argtypes;
-			//bool has_null_argtype = false;
-			for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
-			{
-				argtypes.push_back(this->argument_expressions[i]->type());
-				//if(argtypes.back().isNull())
-				//	has_null_argtype = true;
-			}
+		assert(this->binding_type != Unbound);
 
-			/*if(has_null_argtype)
-			{
-				throw BaseException("Failed to find function '" + this->function_name + "'." + errorContext(*this));
-			}
-			else*/
-			{
-				const FunctionSignature sig(this->function_name, argtypes);
-		
-				throw BaseException("Failed to find function '" + sig.toString() + "'." + errorContext(*this));
-			}
-		}
-		else if(this->binding_type == BoundToGlobalDef)
+		// Check the argument expression types still match the function argument types.
+		// They may have changed due to e.g. type coercion from int->float, in which case they won't be valid any more.
+		/*vector<TypeRef> argtypes(argument_expressions.size());
+		for(size_t i=0; i<argument_expressions.size(); ++i)
+			argtypes[i] = argument_expressions[i]->type();
+
+		if(this->binding_type == BoundToGlobalDef)
+		{
+			for(size_t i=0; i<argument_expressions.size(); ++i)
+				if(*argument_expressions[i]->type() != *target_function->args[i].type)
+
+
+		}*/
+
+
+		//if(this->binding_type == Unbound)
+		//{
+		//	vector<TypeRef> argtypes;
+		//	//bool has_null_argtype = false;
+		//	for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
+		//	{
+		//		argtypes.push_back(this->argument_expressions[i]->type());
+		//		//if(argtypes.back().isNull())
+		//		//	has_null_argtype = true;
+		//	}
+
+		//	/*if(has_null_argtype)
+		//	{
+		//		throw BaseException("Failed to find function '" + this->function_name + "'." + errorContext(*this));
+		//	}
+		//	else*/
+		//	{
+		//		const FunctionSignature sig(this->function_name, argtypes);
+		//
+		//		throw BaseException("Failed to find function '" + sig.toString() + "'." + errorContext(*this));
+		//	}
+		//}
+		if(this->binding_type == BoundToGlobalDef)
 		{
 			// Check shuffle mask (arg 1) is a vector of ints
 			if(::hasPrefix(this->target_function->sig.name, "shuffle"))
@@ -726,6 +767,25 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 				// TODO
 			}
 		}
+	}
+	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
+	{
+		// TODO: check function is bound etc..?
+		if(this->binding_type == BoundToGlobalDef)
+		{
+			/*this->can_constant_fold = true;
+			for(size_t i=0; i<argument_expressions.size(); ++i)
+				can_constant_fold = can_constant_fold && argument_expressions[i]->can_constant_fold;
+			this->can_constant_fold = this->can_constant_fold && expressionIsWellTyped(*this, payload);*/
+			this->can_maybe_constant_fold = true;
+			for(size_t i=0; i<argument_expressions.size(); ++i)
+			{
+				const bool arg_is_literal = checkFoldExpression(argument_expressions[i], payload);
+				this->can_maybe_constant_fold = this->can_maybe_constant_fold && arg_is_literal;
+			}
+		}
+		else
+			this->can_maybe_constant_fold = false;
 	}
 	
 	stack.pop_back();
@@ -1661,7 +1721,7 @@ Reference<ASTNode> FunctionExpression::clone()
 	e->bound_let_block = this->bound_let_block;
 	e->binding_type = this->binding_type;
 
-	return ASTNodeRef(e);
+	return e;
 }
 
 

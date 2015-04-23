@@ -29,12 +29,17 @@ public:
 	void addFunctions(const std::vector<FunctionDefinitionRef>& func_defs);
 	void addExternalFunctions(std::vector<ExternalFunctionRef>& f);
 
+	void addTopLevelDefs(const std::vector<ASTNodeRef>& defs);
+
 	//void linkFunctions(BufferRoot& root);
 
 	//ExternalFunctionRef findMatchingExternalFunction(const FunctionSignature& sig);
 
+	// Don't match with built-in functions like elem, don't instantiate generic functions, just return from sig_to_function_map.
+	FunctionDefinitionRef findMatchingFunctionSimple(const FunctionSignature& sig); // Returns null ref if not found
+
 	// If func_def_stack is present, makes sure found function is defined before all functions in func_def_stack.
-	FunctionDefinitionRef findMatchingFunction(const FunctionSignature& sig, const SrcLocation& call_src_location, const std::vector<FunctionDefinition*>* func_def_stack = NULL); // Returns null ref if not found
+	FunctionDefinitionRef findMatchingFunction(const FunctionSignature& sig, const SrcLocation& call_src_location, int effective_callsite_order_num = 1000000000/*, const std::vector<FunctionDefinition*>* func_def_stack = NULL*/); // Returns null ref if not found
 	FunctionDefinitionRef findMatchingFunctionByName(const std::string& name); // NOTE: rather unsafe
 
 	void getFuncsWithMatchingName(const std::string& name, std::vector<FunctionDefinitionRef>& funcs_out);
@@ -43,8 +48,7 @@ public:
 
 	const std::string buildOpenCLCode();
 
-	//std::vector<FunctionDefinitionRef> concrete_funcs;
-	std::vector<FunctionDefinitionRef> func_defs;
+	std::vector<ASTNodeRef> top_level_defs; // Either function definitions or named constants.
 
 	typedef std::map<std::string, Reference<NamedConstant> > NamedConstantMap;
 	NamedConstantMap named_constant_map;

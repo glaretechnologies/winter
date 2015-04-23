@@ -75,7 +75,8 @@ private:
 public:
 
 	std::string function_name;
-	std::vector<Reference<ASTNode> > argument_expressions;
+	//ASTNodeRef function_expr;
+	std::vector<ASTNodeRef> argument_expressions;
 
 	//Reference<ASTNode> target_function;
 	//ASTNode* target_function;

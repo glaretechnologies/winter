@@ -238,10 +238,8 @@ ValueRef GetField::invoke(VMState& vmstate)
 	const size_t func_args_start = vmstate.func_args_start.back();
 
 	// Top param on arg stack should be a structure
-	assert(dynamic_cast<const StructureValue*>(vmstate.argument_stack[func_args_start].getPointer()));
-	const StructureValue* s = static_cast<const StructureValue*>(vmstate.argument_stack[func_args_start].getPointer());
+	const StructureValue* s = checkedCast<const StructureValue>(vmstate.argument_stack[func_args_start].getPointer());
 
-	assert(s);
 	assert(this->index < s->fields.size());
 
 	return s->fields[this->index];
@@ -320,20 +318,19 @@ ValueRef UpdateElementBuiltInFunc::invoke(VMState& vmstate)
 {
 	const size_t func_args_start = vmstate.func_args_start.back();
 
-	const Value* collection = vmstate.argument_stack[func_args_start].getPointer();
+	//const Value* collection = vmstate.argument_stack[func_args_start].getPointer();
 
-	assert(dynamic_cast<const IntValue*>(vmstate.argument_stack[func_args_start + 1].getPointer()));
-	const IntValue* inv_val = static_cast<const IntValue*>(vmstate.argument_stack[func_args_start + 1].getPointer());
+	const IntValue* inv_val = checkedCast<const IntValue>(vmstate.argument_stack[func_args_start + 1].getPointer());
 	const int64 index = inv_val->value;
 
 	const ValueRef newval = vmstate.argument_stack[func_args_start + 2];
 
 	if(collection_type->getType() == Type::ArrayTypeType)
 	{
-		assert(dynamic_cast<const ArrayValue*>(collection));
-		const ArrayValue* array_val = static_cast<const ArrayValue*>(collection);
+		const ArrayValue* array_val = checkedCast<const ArrayValue>(vmstate.argument_stack[func_args_start]);
 
-		assert(index >= 0 && index < array_val->e.size());
+		if(index < 0 || index >= (int64)array_val->e.size())
+			throw BaseException("Index out of bounds");
 
 		ValueRef new_collection = array_val->clone();
 		static_cast<ArrayValue*>(new_collection.getPointer())->e[index] = newval;
@@ -343,8 +340,7 @@ ValueRef UpdateElementBuiltInFunc::invoke(VMState& vmstate)
 	else
 	{
 		// TODO: handle other types.
-		assert(0);
-		return NULL;
+		throw BaseException("invalid type");
 	}
 }
 
@@ -395,11 +391,10 @@ ValueRef GetTupleElementBuiltInFunc::invoke(VMState& vmstate)
 	const size_t func_args_start = vmstate.func_args_start.back();
 
 	// Top param on arg stack should be a tuple
-	assert(dynamic_cast<const TupleValue*>(vmstate.argument_stack[func_args_start].getPointer()));
-	const TupleValue* s = static_cast<const TupleValue*>(vmstate.argument_stack[func_args_start].getPointer());
+	const TupleValue* s = checkedCast<const TupleValue>(vmstate.argument_stack[func_args_start].getPointer());
 
-	assert(s);
-	assert(this->index < s->e.size());
+	if(index >= s->e.size())
+		throw BaseException("Index out of bounds");
 
 	return s->e[this->index];
 }
@@ -473,10 +468,10 @@ ValueRef GetVectorElement::invoke(VMState& vmstate)
 {
 	const size_t func_args_start = vmstate.func_args_start.back();
 
-	const VectorValue* vec = static_cast<const VectorValue*>(vmstate.argument_stack[func_args_start].getPointer());
+	const VectorValue* vec = checkedCast<const VectorValue>(vmstate.argument_stack[func_args_start].getPointer());
 
-	assert(vec);
-	assert(this->index < vec->e.size());
+	if(this->index >= vec->e.size())
+		throw BaseException("Index out of bounds");
 
 	return vec->e[this->index];
 }
@@ -515,11 +510,8 @@ ValueRef ArrayMapBuiltInFunc::invoke(VMState& vmstate)
 {
 	const size_t func_args_start = vmstate.func_args_start.back();
 
-	const FunctionValue* f = static_cast<const FunctionValue*>(vmstate.argument_stack[func_args_start].getPointer());
-	const ArrayValue* from = static_cast<const ArrayValue*>(vmstate.argument_stack[func_args_start + 1].getPointer());
-
-	assert(f);
-	assert(from);
+	const FunctionValue* f = checkedCast<const FunctionValue>(vmstate.argument_stack[func_args_start].getPointer());
+	const ArrayValue* from = checkedCast<const ArrayValue>(vmstate.argument_stack[func_args_start + 1].getPointer());
 
 	ArrayValueRef retval = new ArrayValue();
 	retval->e.resize(from->e.size());
@@ -659,8 +651,8 @@ ValueRef ArrayFoldBuiltInFunc::invoke(VMState& vmstate)
 {
 	// fold(function<State, T, State> f, array<T> array, State initial_state) State
 
-	const FunctionValue* f = dynamic_cast<const FunctionValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
-	const ArrayValue* arr = dynamic_cast<const ArrayValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
+	const FunctionValue* f = checkedCast<const FunctionValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+	const ArrayValue* arr = checkedCast<const ArrayValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
 	const ValueRef initial_val = vmstate.argument_stack[vmstate.func_args_start.back() + 2];
 
 	assert(f && arr && initial_val.nonNull());
@@ -1046,11 +1038,11 @@ ValueRef ArraySubscriptBuiltInFunc::invoke(VMState& vmstate)
 {
 	// Array pointer is in arg 0.
 	// Index or index vector is in arg 1.
-	const ArrayValue* arr = static_cast<const ArrayValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+	const ArrayValue* arr = checkedCast<const ArrayValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 
 	if(index_type->getType() == Type::IntType)
 	{
-		const IntValue* index = static_cast<const IntValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
+		const IntValue* index = checkedCast<const IntValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
 
 		if(index->value >= 0 && index->value < arr->e.size())
 			return arr->e[index->value];
@@ -1059,23 +1051,21 @@ ValueRef ArraySubscriptBuiltInFunc::invoke(VMState& vmstate)
 	}
 	else // else index vector
 	{
-		const VectorValue* index_vec = static_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
+		const VectorValue* index_vec = checkedCast<const VectorValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
 
 		vector<ValueRef> res(index_vec->e.size());
 
 		for(size_t i=0; i<index_vec->e.size(); ++i)
 		{
 			ValueRef index_val = index_vec->e[i];
-			if(!dynamic_cast<IntValue*>(index_val.getPointer()))
-				throw BaseException("Index did not have int type");
-			int64 index = static_cast<IntValue*>(index_val.getPointer())->value;
+			const int64 index = checkedCast<IntValue>(index_val.getPointer())->value;
 			if(index < 0 || index >= arr->e.size())
 				throw BaseException("Index out of bounds");
 
 			res[i] = arr->e[index];
 		}
 
-		return new ArrayValue(res);
+		return new VectorValue(res);
 	}
 }
 
@@ -1370,8 +1360,8 @@ ValueRef VectorSubscriptBuiltInFunc::invoke(VMState& vmstate)
 {
 	// Vector is in arg 0.
 	// Index is in arg 1.
-	const VectorValue* vec = static_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back()    ].getPointer());
-	const IntValue* index  = static_cast<const IntValue*>   (vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
+	const VectorValue* vec = checkedCast<const VectorValue>(vmstate.argument_stack[vmstate.func_args_start.back()    ].getPointer());
+	const IntValue* index  = checkedCast<const IntValue>   (vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
 
 	if(index->value >= 0 && index->value < vec->e.size())
 		return vec->e[index->value];
@@ -1494,8 +1484,8 @@ ValueRef ArrayInBoundsBuiltInFunc::invoke(VMState& vmstate)
 {
 	// Array pointer is in arg 0.
 	// Index is in arg 1.
-	const ArrayValue* arr = static_cast<const ArrayValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
-	const IntValue* index = static_cast<const IntValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
+	const ArrayValue* arr = checkedCast<const ArrayValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+	const IntValue* index = checkedCast<const IntValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
 
 	return new BoolValue(index->value >= 0 && index->value < arr->e.size());
 }
@@ -1531,8 +1521,8 @@ ValueRef VectorInBoundsBuiltInFunc::invoke(VMState& vmstate)
 {
 	// Vector pointer is in arg 0.
 	// Index is in arg 1.
-	const VectorValue* arr = static_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
-	const IntValue* index = static_cast<const IntValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
+	const VectorValue* arr = checkedCast<const VectorValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+	const IntValue* index = checkedCast<const IntValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
 
 	return new BoolValue(index->value >= 0 && index->value < arr->e.size());
 }
@@ -1568,7 +1558,7 @@ ValueRef IterateBuiltInFunc::invoke(VMState& vmstate)
 {
 	// iterate(function<State, int, tuple<State, bool>> f, State initial_state) State
 
-	const FunctionValue* f = dynamic_cast<const FunctionValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+	const FunctionValue* f = checkedCast<const FunctionValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 	const ValueRef initial_state = vmstate.argument_stack[vmstate.func_args_start.back() + 1];
 
 	assert(f && initial_state.nonNull());
@@ -1586,13 +1576,10 @@ ValueRef IterateBuiltInFunc::invoke(VMState& vmstate)
 		ValueRef result = f->func_def->invoke(vmstate);
 		
 		// Unpack result
-		assert(dynamic_cast<const TupleValue*>(result.ptr()));
-		const TupleValue* tuple_result = static_cast<const TupleValue*>(result.ptr());
-
-		assert(dynamic_cast<const BoolValue*>(tuple_result->e[1].ptr()));
+		const TupleValue* tuple_result = checkedCast<const TupleValue>(result.ptr());
 
 		ValueRef new_running_val = tuple_result->e[0];
-		bool continue_bool = static_cast<const BoolValue*>(tuple_result->e[1].ptr())->value;
+		bool continue_bool = checkedCast<const BoolValue>(tuple_result->e[1].ptr())->value;
 
 		vmstate.argument_stack.pop_back(); // Pop Value arg
 		vmstate.argument_stack.pop_back(); // Pop Value arg
@@ -1771,16 +1758,13 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 ValueRef DotProductBuiltInFunc::invoke(VMState& vmstate)
 {
-	const VectorValue* a = dynamic_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 0].getPointer());
-	const VectorValue* b = dynamic_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
-	assert(a && b);
+	const VectorValue* a = checkedCast<const VectorValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 0].getPointer());
+	const VectorValue* b = checkedCast<const VectorValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
 
 	FloatValueRef res = new FloatValue(0.0f);
 
 	for(unsigned int i=0; i<vector_type->num; ++i)
-	{
-		res->value += static_cast<const FloatValue*>(a->e[i].getPointer())->value * static_cast<const FloatValue*>(b->e[i].getPointer())->value;
-	}
+		res->value += checkedCast<const FloatValue>(a->e[i].getPointer())->value * checkedCast<const FloatValue>(b->e[i].getPointer())->value;
 
 	return res;
 }
@@ -1891,10 +1875,8 @@ public:
 
 ValueRef VectorMinBuiltInFunc::invoke(VMState& vmstate)
 {
-	const VectorValue* a = dynamic_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 0].getPointer());
-	const VectorValue* b = dynamic_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
-	assert(a && b);
-
+	const VectorValue* a = checkedCast<const VectorValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 0].getPointer());
+	const VectorValue* b = checkedCast<const VectorValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
 	
 	vector<ValueRef> res_values(vector_type->num);
 
@@ -1902,8 +1884,8 @@ ValueRef VectorMinBuiltInFunc::invoke(VMState& vmstate)
 	{
 		for(unsigned int i=0; i<vector_type->num; ++i)
 		{
-			const float x = static_cast<const FloatValue*>(a->e[i].getPointer())->value;
-			const float y = static_cast<const FloatValue*>(b->e[i].getPointer())->value;
+			const float x = checkedCast<const FloatValue>(a->e[i].getPointer())->value;
+			const float y = checkedCast<const FloatValue>(b->e[i].getPointer())->value;
 			res_values[i] = new FloatValue(x < y ? x : y);
 		}
 	}
@@ -1911,14 +1893,14 @@ ValueRef VectorMinBuiltInFunc::invoke(VMState& vmstate)
 	{
 		for(unsigned int i=0; i<vector_type->num; ++i)
 		{
-			const int64 x = static_cast<const IntValue*>(a->e[i].getPointer())->value;
-			const int64 y = static_cast<const IntValue*>(b->e[i].getPointer())->value;
+			const int64 x = checkedCast<const IntValue>(a->e[i].getPointer())->value;
+			const int64 y = checkedCast<const IntValue>(b->e[i].getPointer())->value;
 			res_values[i] = new IntValue(x > y ? x : y);
 		}
 	}
 	else
 	{
-		assert(0);
+		throw BaseException("Invalid type.");
 	}
 
 	return new VectorValue(res_values);
@@ -1996,10 +1978,8 @@ llvm::Value* VectorMinBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 
 ValueRef VectorMaxBuiltInFunc::invoke(VMState& vmstate)
 {
-	const VectorValue* a = dynamic_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 0].getPointer());
-	const VectorValue* b = dynamic_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
-	assert(a && b);
-
+	const VectorValue* a = checkedCast<const VectorValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 0].getPointer());
+	const VectorValue* b = checkedCast<const VectorValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
 
 	vector<ValueRef> res_values(vector_type->num);
 
@@ -2007,8 +1987,8 @@ ValueRef VectorMaxBuiltInFunc::invoke(VMState& vmstate)
 	{
 		for(unsigned int i=0; i<vector_type->num; ++i)
 		{
-			const float x = static_cast<const FloatValue*>(a->e[i].getPointer())->value;
-			const float y = static_cast<const FloatValue*>(b->e[i].getPointer())->value;
+			const float x = checkedCast<const FloatValue>(a->e[i].getPointer())->value;
+			const float y = checkedCast<const FloatValue>(b->e[i].getPointer())->value;
 			res_values[i] = new FloatValue(x > y ? x : y);
 		}
 	}
@@ -2016,14 +1996,14 @@ ValueRef VectorMaxBuiltInFunc::invoke(VMState& vmstate)
 	{
 		for(unsigned int i=0; i<vector_type->num; ++i)
 		{
-			const int64 x = static_cast<const IntValue*>(a->e[i].getPointer())->value;
-			const int64 y = static_cast<const IntValue*>(b->e[i].getPointer())->value;
+			const int64 x = checkedCast<const IntValue>(a->e[i].getPointer())->value;
+			const int64 y = checkedCast<const IntValue>(b->e[i].getPointer())->value;
 			res_values[i] = new IntValue(x > y ? x : y);
 		}
 	}
 	else
 	{
-		assert(0);
+		throw BaseException("Invalid type.");
 	}
 
 
@@ -2060,8 +2040,8 @@ llvm::Value* VectorMaxBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 
 ValueRef ShuffleBuiltInFunc::invoke(VMState& vmstate)
 {
-	const VectorValue* a = dynamic_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 0].getPointer());
-	const VectorValue* index_vec = dynamic_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
+	const VectorValue* a = checkedCast<const VectorValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 0].getPointer());
+	const VectorValue* index_vec = checkedCast<const VectorValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
 	assert(a && index_vec);
 
 
@@ -2145,8 +2125,8 @@ PowBuiltInFunc::PowBuiltInFunc(const TypeRef& type_)
 
 ValueRef PowBuiltInFunc::invoke(VMState& vmstate)
 {
-	const FloatValue* a = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 0].getPointer());
-	const FloatValue* b = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
+	const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 0].getPointer());
+	const FloatValue* b = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
 
 	return new FloatValue(std::pow(a->value, b->value));
 }
@@ -2201,7 +2181,7 @@ ValueRef SqrtBuiltInFunc::invoke(VMState& vmstate)
 {
 	if(type->getType() == Type::FloatType)
 	{
-		const FloatValue* a = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+		const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 		return new FloatValue(std::sqrt(a->value));
 	}
 	else
@@ -2210,12 +2190,12 @@ ValueRef SqrtBuiltInFunc::invoke(VMState& vmstate)
 
 		const VectorType* vector_type = static_cast<const VectorType*>(type.getPointer());
 
-		const VectorValue* a = static_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+		const VectorValue* a = checkedCast<const VectorValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 
 		vector<ValueRef> res_values(vector_type->num);
 		for(unsigned int i=0; i<vector_type->num; ++i)
 		{
-			const float x = static_cast<const FloatValue*>(a->e[i].getPointer())->value;
+			const float x = checkedCast<const FloatValue>(a->e[i].getPointer())->value;
 			res_values[i] = new FloatValue(std::sqrt(x));
 		}
 
@@ -2241,7 +2221,7 @@ ExpBuiltInFunc::ExpBuiltInFunc(const TypeRef& type_)
 
 ValueRef ExpBuiltInFunc::invoke(VMState& vmstate)
 {
-	const FloatValue* a = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+	const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 
 	return new FloatValue(std::exp(a->value));
 }
@@ -2263,7 +2243,7 @@ LogBuiltInFunc::LogBuiltInFunc(const TypeRef& type_)
 
 ValueRef LogBuiltInFunc::invoke(VMState& vmstate)
 {
-	const FloatValue* a = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+	const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 
 	return new FloatValue(std::log(a->value));
 }
@@ -2285,7 +2265,7 @@ SinBuiltInFunc::SinBuiltInFunc(const TypeRef& type_)
 
 ValueRef SinBuiltInFunc::invoke(VMState& vmstate)
 {
-	const FloatValue* a = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+	const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 
 	return new FloatValue(std::sin(a->value));
 }
@@ -2307,7 +2287,7 @@ CosBuiltInFunc::CosBuiltInFunc(const TypeRef& type_)
 
 ValueRef CosBuiltInFunc::invoke(VMState& vmstate)
 {
-	const FloatValue* a = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+	const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 
 	return new FloatValue(std::cos(a->value));
 }
@@ -2329,7 +2309,7 @@ AbsBuiltInFunc::AbsBuiltInFunc(const TypeRef& type_)
 
 ValueRef AbsBuiltInFunc::invoke(VMState& vmstate)
 {
-	const FloatValue* a = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+	const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 
 	return new FloatValue(std::fabs(a->value));
 }
@@ -2353,7 +2333,7 @@ ValueRef FloorBuiltInFunc::invoke(VMState& vmstate)
 {
 	if(type->getType() == Type::FloatType)
 	{
-		const FloatValue* a = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+		const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 		return new FloatValue(std::floor(a->value));
 	}
 	else
@@ -2362,12 +2342,12 @@ ValueRef FloorBuiltInFunc::invoke(VMState& vmstate)
 
 		const VectorType* vector_type = static_cast<const VectorType*>(type.getPointer());
 
-		const VectorValue* a = static_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+		const VectorValue* a = checkedCast<const VectorValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 
 		vector<ValueRef> res_values(vector_type->num);
 		for(unsigned int i=0; i<vector_type->num; ++i)
 		{
-			const float x = static_cast<const FloatValue*>(a->e[i].getPointer())->value;
+			const float x = checkedCast<const FloatValue>(a->e[i].getPointer())->value;
 			res_values[i] = new FloatValue(std::floor(x));
 		}
 
@@ -2394,7 +2374,7 @@ ValueRef CeilBuiltInFunc::invoke(VMState& vmstate)
 {
 	if(type->getType() == Type::FloatType)
 	{
-		const FloatValue* a = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+		const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 		return new FloatValue(std::ceil(a->value));
 	}
 	else
@@ -2403,12 +2383,12 @@ ValueRef CeilBuiltInFunc::invoke(VMState& vmstate)
 
 		const VectorType* vector_type = static_cast<const VectorType*>(type.getPointer());
 
-		const VectorValue* a = static_cast<const VectorValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+		const VectorValue* a = checkedCast<const VectorValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 
 		vector<ValueRef> res_values(vector_type->num);
 		for(unsigned int i=0; i<vector_type->num; ++i)
 		{
-			const float x = static_cast<const FloatValue*>(a->e[i].getPointer())->value;
+			const float x = checkedCast<const FloatValue>(a->e[i].getPointer())->value;
 			res_values[i] = new FloatValue(std::ceil(x));
 		}
 
@@ -2447,7 +2427,7 @@ TypeRef TruncateToIntBuiltInFunc::getReturnType(const TypeRef& arg_type)
 
 ValueRef TruncateToIntBuiltInFunc::invoke(VMState& vmstate)
 {
-	const FloatValue* a = static_cast<const FloatValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+	const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 
 	return new IntValue((int)a->value);
 }
@@ -2492,7 +2472,7 @@ TypeRef ToFloatBuiltInFunc::getReturnType(const TypeRef& arg_type)
 
 ValueRef ToFloatBuiltInFunc::invoke(VMState& vmstate)
 {
-	const IntValue* a = static_cast<const IntValue*>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+	const IntValue* a = checkedCast<const IntValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 
 	return new FloatValue((float)a->value);
 }

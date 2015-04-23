@@ -245,12 +245,17 @@ void FunctionDefinition::bindVariables(const std::vector<ASTNode*>& stack)
 
 void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
-	if(payload.operation == TraversalPayload::ConstantFolding)
+	if(is_anon_func)
+		return;
+
+	if(this->isGenericFunction())
+		return;
+
+
+	/*if(payload.operation == TraversalPayload::ConstantFolding)
 	{
-		// Don't try and fold down generic expressions, since we can't evaluate expressions without knowing the types involved.
-		if(!this->isGenericFunction())
-			checkFoldExpression(body, payload);
-	}
+		checkFoldExpression(body, payload);
+	}*/
 	/*else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
 	{
 		payload.func_def_stack.push_back(this);
@@ -330,17 +335,9 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 	//for(unsigned int i=0; i<lets.size(); ++i)
 	//	lets[i]->traverse(payload, stack);
 
-	//if(this->sig.name == "main")
-	//	int a = 9;//TEMP
-
 	if(this->body.nonNull()) // !this->built_in_func_impl)
 	{
-		if((payload.operation == TraversalPayload::TypeCheck) && this->isGenericFunction())
-		{
-			// Don't typecheck generic functions.
-		}
-		else
-			this->body->traverse(payload, stack);
+		this->body->traverse(payload, stack);
 	}
 
 	
@@ -349,31 +346,24 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 
 	if(payload.operation == TraversalPayload::TypeCheck)
 	{
-		if(this->isGenericFunction())
+		if(this->body.nonNull())
 		{
-			// Don't type check this.  Concrete versions of this func will be type checked individually.
-		}
-		else
-		{
-			if(this->body.nonNull())
+			if(this->declared_return_type.nonNull())
 			{
-				if(this->declared_return_type.nonNull())
-				{
-					const TypeRef body_type = this->body->type();
-					if(body_type.isNull()) // Will happen if body is a function expression bound to a newly concrete function that has not been type-checked yet.
-						throw BaseException("Type error for function '" + this->sig.toString() + "': Computed return type [Unknown] is not equal to the declared return type '" + this->declared_return_type->toString() + "'." + errorContext(*this));
+				const TypeRef body_type = this->body->type();
+				if(body_type.isNull()) // Will happen if body is a function expression bound to a newly concrete function that has not been type-checked yet.
+					throw BaseException("Type error for function '" + this->sig.toString() + "': Computed return type [Unknown] is not equal to the declared return type '" + this->declared_return_type->toString() + "'." + errorContext(*this));
 
-					// Check that the return type of the body expression is equal to the declared return type
-					// of this function.
-					if(*this->body->type() != *this->declared_return_type)
-						throw BaseException("Type error for function '" + this->sig.toString() + "': Computed return type '" + this->body->type()->toString() + 
-							"' is not equal to the declared return type '" + this->declared_return_type->toString() + "'." + errorContext(*this));
-				}
-				else
-				{
-					// Else return type is NULL, so infer it
-					//this->return_type = this->body->type();
-				}
+				// Check that the return type of the body expression is equal to the declared return type
+				// of this function.
+				if(*this->body->type() != *this->declared_return_type)
+					throw BaseException("Type error for function '" + this->sig.toString() + "': Computed return type '" + this->body->type()->toString() + 
+						"' is not equal to the declared return type '" + this->declared_return_type->toString() + "'." + errorContext(*this));
+			}
+			else
+			{
+				// Else return type is NULL, so infer it
+				//this->return_type = this->body->type();
 			}
 		}
 	}
@@ -436,6 +426,14 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 				payload.tree_changed = true;
 			}
 		}
+	}
+	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
+	{
+		//this->can_constant_fold = body.nonNull() && body->can_constant_fold && expressionIsWellTyped(*this, payload);
+
+		const bool body_is_literal = checkFoldExpression(body, payload);
+			
+		this->can_maybe_constant_fold = body_is_literal;
 	}
 
 	stack.pop_back();

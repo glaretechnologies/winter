@@ -1,7 +1,7 @@
 /*=====================================================================
 VirtualMachine.h
 -------------------
-Copyright Glare Technologies Limited 2010 -
+Copyright Glare Technologies Limited 2015 -
 Generated at Mon Sep 13 22:23:44 +1200 2010
 =====================================================================*/
 #pragma once

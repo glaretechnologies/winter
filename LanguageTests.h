@@ -18,8 +18,6 @@ public:
 	static void doLLVMInit();
 	
 	static void run();
-
-	static void fuzzTests();
 private:
 };
 

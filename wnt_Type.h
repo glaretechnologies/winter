@@ -352,6 +352,8 @@ public:
 	std::vector<std::string> component_names;
 };
 
+typedef Reference<StructureType> StructureTypeRef;
+
 
 class TupleType : public Type
 {

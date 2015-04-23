@@ -39,10 +39,10 @@ Linker::~Linker()
 //}
 
 
-void Linker::addFunctions(const vector<FunctionDefinitionRef>& func_defs)
+void Linker::addFunctions(const vector<FunctionDefinitionRef>& new_func_defs)
 {
-	for(unsigned int i=0; i<func_defs.size(); ++i)
-		addFunction(func_defs[i]);
+	for(unsigned int i=0; i<new_func_defs.size(); ++i)
+		addFunction(new_func_defs[i]);
 }
 
 
@@ -54,7 +54,33 @@ void Linker::addFunction(const FunctionDefinitionRef& def)
 
 	this->name_to_functions_map[def->sig.name].push_back(def);
 	this->sig_to_function_map.insert(std::make_pair(def->sig, def));
-	func_defs.push_back(def);
+	top_level_defs.push_back(def);
+}
+
+
+void Linker::addTopLevelDefs(const vector<ASTNodeRef>& defs)
+{
+	for(unsigned int i=0; i<defs.size(); ++i)
+	{
+		if(defs[i]->nodeType() == ASTNode::FunctionDefinitionType)
+			addFunction(defs[i].downcast<FunctionDefinition>());
+		else if(defs[i]->nodeType() == ASTNode::NamedConstantType)
+		{
+			const NamedConstantRef named_constant = defs[i].downcast<NamedConstant>();
+			
+			if(named_constant_map.find(named_constant->name) != named_constant_map.end())
+				throw BaseException("Named constant with name '" + named_constant->name + "' already defined." + errorContext(*named_constant) + 
+				"\nalready defined here: " + errorContext(named_constant_map[named_constant->name].getPointer()));
+
+			named_constant_map[named_constant->name] = named_constant;
+
+			top_level_defs.push_back(named_constant);
+		}
+		else
+		{
+			assert(0);
+		}
+	}
 }
 
 
@@ -204,7 +230,17 @@ static FunctionDefinitionRef makeBuiltInFuncDef(const std::string& name, const T
 }
 
 
-Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignature& sig, const SrcLocation& call_src_location, const std::vector<FunctionDefinition*>* func_def_stack)
+FunctionDefinitionRef Linker::findMatchingFunctionSimple(const FunctionSignature& sig)
+{
+	SigToFuncMapType::iterator sig_lookup_res = sig_to_function_map.find(sig);
+	if(sig_lookup_res != sig_to_function_map.end())
+		return sig_lookup_res->second;
+	else
+		return NULL;
+}
+
+
+Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignature& sig, const SrcLocation& call_src_location, int effective_callsite_order_num) // , const std::vector<FunctionDefinition*>* func_def_stack)
 {
 	/*
 	if sig.name matches eN
@@ -227,8 +263,12 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 	// If the function matching this signature is in the map, return it
 	SigToFuncMapType::iterator sig_lookup_res = sig_to_function_map.find(sig);
 	if(sig_lookup_res != sig_to_function_map.end())
-		if(!func_def_stack || isTargetDefinedBeforeAllInStack(*func_def_stack, sig_lookup_res->second->order_num))
-			return sig_lookup_res->second;
+	{
+		if(sig_lookup_res->second->order_num >= effective_callsite_order_num && effective_callsite_order_num != -1)
+			throw BaseException("Tried to refer to a function defined later: " + sig.toString());
+		//if(sig_lookup_res->second->order_num < effective_callsite_order_num || effective_callsite_order_num == -1) //  !func_def_stack || isTargetDefinedBeforeAllInStack(*func_def_stack, sig_lookup_res->second->order_num))
+		return sig_lookup_res->second;
+	}
 
 	// Handle float->float, or vector<float, N> -> vector<float, N> functions
 	if(sig.param_types.size() == 1)
@@ -368,6 +408,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 					new ArraySubscriptBuiltInFunc(sig.param_types[0].downcast<ArrayType>(), sig.param_types[1]) // built in impl.
 				);
 
+				assert(this->sig_to_function_map.find(sig) == this->sig_to_function_map.end()); // Check not already inserted
 				this->sig_to_function_map.insert(std::make_pair(sig, def));
 				return def;
 			}
@@ -488,14 +529,14 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 			if(sig.name == "elem")
 			{
 				vector<FunctionDefinition::FunctionArg> args(2);
-				args[0].name = "vector";
+				args[0].name = "array";
 				args[0].type = sig.param_types[0];
-				args[1].name = "index";
+				args[1].name = "index_vector";
 				args[1].type = sig.param_types[1];
 				
-				Reference<ArrayType> a_type = sig.param_types[0].downcast<ArrayType>();
+				Reference<ArrayType> array_type = sig.param_types[0].downcast<ArrayType>();
 
-				TypeRef return_type = new VectorType(a_type->elem_type, sig.param_types[1].downcast<VectorType>()->num);
+				TypeRef return_type = new VectorType(array_type->elem_type, sig.param_types[1].downcast<VectorType>()->num);
 
 				FunctionDefinitionRef def = new FunctionDefinition(
 					SrcLocation::invalidLocation(),
@@ -504,7 +545,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 					args, // args
 					NULL, // body expr
 					return_type, // return type
-					new ArraySubscriptBuiltInFunc(a_type, sig.param_types[1]) // built in impl.
+					new ArraySubscriptBuiltInFunc(array_type, sig.param_types[1]) // built in impl.
 				);
 
 				this->sig_to_function_map.insert(std::make_pair(sig, def));
@@ -891,7 +932,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 			const FunctionDefinition& f = *funcs[z];
 			assert(f.sig.name == sig.name);
 
-			if(!func_def_stack || isTargetDefinedBeforeAllInStack(*func_def_stack, f.order_num))
+			if(f.order_num < effective_callsite_order_num) //   !func_def_stack || isTargetDefinedBeforeAllInStack(*func_def_stack, f.order_num))
 			{
 				if(f.isGenericFunction() && f.sig.param_types.size() == sig.param_types.size())
 				{

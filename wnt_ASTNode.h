@@ -1,10 +1,8 @@
 /*=====================================================================
 ASTNode.h
 ---------
+Copyright Glare Technologies Limited 2015 -
 File created by ClassTemplate on Wed Jun 11 03:55:25 2008
-Code By Nicholas Chapman.
-
-Copyright 2009 Nicholas Chapman
 =====================================================================*/
 #pragma once
 
@@ -98,10 +96,11 @@ public:
 		BindVariables,
 		TypeCoercion,
 		TypeCheck,
+		ComputeCanConstantFold,
 		ConstantFolding,
-		SubstituteType, // for making concrete types out of generic types.
+		//SubstituteType, // for making concrete types out of generic types.
 		OperatorOverloadConversion, // Converting '+' to op_add
-		GetCleanupNodes,
+		//GetCleanupNodes,
 		CheckInDomain, // Check that calls to elem() etc.. are in bounds.
 		InlineFunctionCalls, // inline function calls
 		SubstituteVariables, // Used in InlineFunctionCalls passes: replace all variables in the function body with the argument values.
@@ -109,7 +108,7 @@ public:
 	};
 
 	TraversalPayload(Operation e) : 
-		operation(e), tree_changed(false), current_named_constant(NULL) {}
+		operation(e), tree_changed(false), current_named_constant(NULL), check_bindings(false) {}
 
 	Linker* linker;
 
@@ -135,13 +134,15 @@ public:
 	std::vector<Reference<ASTNode> > variable_substitutes; // Used in SubstituteVariables pass
 
 	Reference<ASTNodeVisitor> custom_visitor;
+
+	bool check_bindings; // If this is true, this is the final binding pass.  Any unbound functions or variables should throw an exception.
 };
 
 
 const std::string indent(VMState& vmstate);
 void printMargin(int depth, std::ostream& s);
 bool isIntExactlyRepresentableAsFloat(int64 x);
-void checkFoldExpression(Reference<ASTNode>& e, TraversalPayload& payload);
+bool checkFoldExpression(Reference<ASTNode>& e, TraversalPayload& payload); // Returns true if folding took place or e is already a literal.
 void checkSubstituteVariable(Reference<ASTNode>& e, TraversalPayload& payload);
 void checkInlineExpression(Reference<ASTNode>& e, TraversalPayload& payload, std::vector<ASTNode*>& stack);
 void convertOverloadedOperators(Reference<ASTNode>& e, TraversalPayload& payload, std::vector<ASTNode*>& stack);
@@ -150,6 +151,7 @@ const std::string errorContext(const ASTNode* n);
 const std::string errorContext(const ASTNode& n);
 const std::string errorContext(const ASTNode& n, TraversalPayload& payload);
 bool isTargetDefinedBeforeAllInStack(const std::vector<FunctionDefinition*>& func_def_stack, int target_function_order_num);
+bool expressionIsWellTyped(ASTNode& e, TraversalPayload& payload_);
 
 
 class CleanUpInfo
@@ -263,7 +265,8 @@ public:
 		LetBlockType,
 		ArraySubscriptType,
 		IfExpressionType,
-		NamedConstantType
+		NamedConstantType,
+		LogicalNegationExprType
 	};
 
 	ASTNode(ASTNodeType node_type_, const SrcLocation& loc_) : node_type(node_type_), location(loc_) {}
@@ -313,11 +316,17 @@ public:
 
 
 	const SrcLocation& srcLocation() const { return location; }
+
+
+	// Can this AST node potentially be replaced with a literal node?
+	bool can_maybe_constant_fold;
+
 protected:
 	static llvm::Value* emitExternalLinkageCall(const std::string& target_name, EmitLLVMCodeParams& params);
 
 	//ASTNode* getParent() { return parent; }
 	//void setParent(ASTNode* p) { parent = p; }
+
 private:
 	//ASTNode* parent;
 	ASTNodeType node_type;
@@ -341,9 +350,10 @@ class BufferRoot : public ASTNode
 public:
 	BufferRoot(const SrcLocation& loc) : ASTNode(BufferRootType, loc) 
 	{}
-	std::vector<Reference<FunctionDefinition> > func_defs;
-
-	std::vector<Reference<NamedConstant> > named_constants;
+	
+	//std::vector<Reference<FunctionDefinition> > func_defs;
+	//std::vector<Reference<NamedConstant> > named_constants;
+	std::vector<ASTNodeRef> top_level_defs; // Either function definitions or named constants.
 
 	virtual ValueRef exec(VMState& vmstate){ return ValueRef(); }
 	virtual TypeRef type() const { throw BaseException("root has no type."); }
@@ -415,7 +425,7 @@ public:
 class FloatLiteral : public ASTNode
 {
 public:
-	FloatLiteral(float v, const SrcLocation& loc) : ASTNode(FloatLiteralType, loc), value(v) {}
+	FloatLiteral(float v, const SrcLocation& loc) : ASTNode(FloatLiteralType, loc), value(v) { this->can_maybe_constant_fold = true; }
 
 	virtual ValueRef exec(VMState& vmstate);
 	virtual TypeRef type() const { return TypeRef(new Float()); }
@@ -433,7 +443,7 @@ public:
 class IntLiteral : public ASTNode
 {
 public:
-	IntLiteral(int64 v, int num_bits_, const SrcLocation& loc) : ASTNode(IntLiteralType, loc), value(v), num_bits(num_bits_) { assert(num_bits == 32 || num_bits == 64); }
+	IntLiteral(int64 v, int num_bits_, const SrcLocation& loc) : ASTNode(IntLiteralType, loc), value(v), num_bits(num_bits_) { assert(num_bits == 32 || num_bits == 64); this->can_maybe_constant_fold = true; }
 	int64 value;
 	int num_bits;
 
@@ -491,7 +501,7 @@ public:
 class BoolLiteral : public ASTNode
 {
 public:
-	BoolLiteral(bool v, const SrcLocation& loc) : ASTNode(BoolLiteralType, loc), value(v) {}
+	BoolLiteral(bool v, const SrcLocation& loc) : ASTNode(BoolLiteralType, loc), value(v) { can_maybe_constant_fold = true; }
 	bool value;
 
 	virtual ValueRef exec(VMState& vmstate);
@@ -532,7 +542,7 @@ public:
 class AdditionExpression : public ASTNode
 {
 public:
-	AdditionExpression(const SrcLocation& loc) : ASTNode(AdditionExpressionType, loc) {}
+	AdditionExpression(const SrcLocation& loc, const ASTNodeRef& a_, const ASTNodeRef& b_) : ASTNode(AdditionExpressionType, loc), a(a_), b(b_) {}
 
 	virtual ValueRef exec(VMState& vmstate);
 	virtual TypeRef type() const;
@@ -546,15 +556,19 @@ public:
 	virtual Reference<ASTNode> clone();
 	virtual bool isConstant() const;
 
+	bool typeCheck(TraversalPayload& payload) const;
+
 	ASTNodeRef a;
 	ASTNodeRef b;
+
+	mutable TypeRef expr_type; // cached;
 };
 
 
 class SubtractionExpression : public ASTNode
 {
 public:
-	SubtractionExpression(const SrcLocation& loc) : ASTNode(SubtractionExpressionType, loc) {}
+	SubtractionExpression(const SrcLocation& loc, const ASTNodeRef& a_, const ASTNodeRef& b_) : ASTNode(SubtractionExpressionType, loc), a(a_), b(b_) {}
 
 	virtual ValueRef exec(VMState& vmstate);
 	virtual TypeRef type() const;
@@ -568,15 +582,19 @@ public:
 	virtual Reference<ASTNode> clone();
 	virtual bool isConstant() const;
 
+	bool typeCheck(TraversalPayload& payload) const;
+
 	ASTNodeRef a;
 	ASTNodeRef b;
+
+	mutable TypeRef expr_type; // cached;
 };
 
 
 class MulExpression : public ASTNode
 {
 public:
-	MulExpression(const SrcLocation& loc) : ASTNode(MulExpressionType, loc) {}
+	MulExpression(const SrcLocation& loc, const ASTNodeRef& a_, const ASTNodeRef& b_) : ASTNode(MulExpressionType, loc), a(a_), b(b_) {}
 
 	virtual ValueRef exec(VMState& vmstate);
 	virtual TypeRef type() const;
@@ -590,15 +608,19 @@ public:
 	virtual Reference<ASTNode> clone();
 	virtual bool isConstant() const;
 
+	bool typeCheck(TraversalPayload& payload) const;
+
 	ASTNodeRef a;
 	ASTNodeRef b;
+
+	mutable TypeRef expr_type; // cached;
 };
 
 
 class DivExpression : public ASTNode
 {
 public:
-	DivExpression(const SrcLocation& loc) : ASTNode(DivExpressionType, loc), proven_defined(false) {}
+	DivExpression(const SrcLocation& loc, const ASTNodeRef& a_, const ASTNodeRef& b_) : ASTNode(DivExpressionType, loc), a(a_), b(b_), proven_defined(false) {}
 
 	virtual ValueRef exec(VMState& vmstate);
 	virtual TypeRef type() const;
@@ -611,6 +633,8 @@ public:
 	virtual bool isConstant() const;
 	virtual bool provenDefined() const;
 
+	bool typeCheck(TraversalPayload& payload) const;
+
 private:
 	void checkNoOverflow(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	void checkNoZeroDivide(TraversalPayload& payload, std::vector<ASTNode*>& stack);
@@ -618,6 +642,7 @@ public:
 	ASTNodeRef a;
 	ASTNodeRef b;
 	bool proven_defined;
+	mutable TypeRef expr_type; // cached;
 };
 
 
@@ -648,11 +673,30 @@ public:
 };
 
 
-
 class UnaryMinusExpression : public ASTNode
 {
 public:
-	UnaryMinusExpression(const SrcLocation& loc) : ASTNode(UnaryMinusExpressionType, loc) {}
+	UnaryMinusExpression(const SrcLocation& loc, const ASTNodeRef& expr_) : ASTNode(UnaryMinusExpressionType, loc), expr(expr_) {}
+
+	virtual ValueRef exec(VMState& vmstate);
+	virtual TypeRef type() const { return expr->type(); }
+	virtual void print(int depth, std::ostream& s) const;
+	virtual std::string sourceString() const;
+	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
+	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
+	virtual Reference<ASTNode> clone();
+	virtual bool isConstant() const;
+
+	ASTNodeRef expr;
+};
+
+
+// e.g. !x
+class LogicalNegationExpr : public ASTNode
+{
+public:
+	LogicalNegationExpr(const SrcLocation& loc, const ASTNodeRef& expr_) : ASTNode(LogicalNegationExprType, loc), expr(expr_) {}
 
 	virtual ValueRef exec(VMState& vmstate);
 	virtual TypeRef type() const { return expr->type(); }
@@ -700,7 +744,7 @@ public:
 	  ASTNode(ComparisonExpressionType, loc), token(token_), a(a_), b(b_) {}
 
 	virtual ValueRef exec(VMState& vmstate);
-	virtual TypeRef type() const { return TypeRef(new Bool()); }
+	virtual TypeRef type() const { return new Bool(); }
 	virtual void print(int depth, std::ostream& s) const;
 	virtual std::string sourceString() const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
@@ -746,6 +790,7 @@ public:
 };
 
 
+// Not used currently.
 class ArraySubscript : public ASTNode
 {
 public:
@@ -764,7 +809,6 @@ public:
 	virtual Reference<ASTNode> clone();
 	virtual bool isConstant() const;
 	
-
 	ASTNodeRef subscript_expr;
 };
 
@@ -772,13 +816,13 @@ public:
 class NamedConstant : public ASTNode
 {
 public:
-	NamedConstant(const std::string& name_, const ASTNodeRef& value_expr_, const SrcLocation& loc, int order_num_) : 
-	  ASTNode(NamedConstantType, loc), name(name_), value_expr(value_expr_), order_num(order_num_)
+	NamedConstant(const TypeRef& declared_type_, const std::string& name_, const ASTNodeRef& value_expr_, const SrcLocation& loc, int order_num_) : 
+	  ASTNode(NamedConstantType, loc), declared_type(declared_type_), name(name_), value_expr(value_expr_), order_num(order_num_)
 	{
 	}
 
 	virtual ValueRef exec(VMState& vmstate);
-	virtual TypeRef type() const { return value_expr->type(); }
+	virtual TypeRef type() const;
 	virtual void print(int depth, std::ostream& s) const;
 	virtual std::string sourceString() const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
@@ -787,6 +831,7 @@ public:
 	virtual Reference<ASTNode> clone();
 	virtual bool isConstant() const;
 
+	TypeRef declared_type; // May be NULL if no type was declared.
 	std::string name;
 	ASTNodeRef value_expr;
 	int order_num;

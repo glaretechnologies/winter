@@ -213,6 +213,12 @@ static void testMainFloatArgInvalidProgram(const std::string& src)
 		// Get main function
 		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
 
+		//if(maindef.isNull())
+		//	throw BaseException("Failed to find function " + mainsig.toString());
+		//if(maindef->returnType()->getType() != Type::FloatType)
+		//	throw BaseException("main did not return float.");
+
+
 		vm.getJittedFunction(mainsig);
 
 		std::cerr << "Test failed: Expected compilation failure." << std::endl;
@@ -227,7 +233,7 @@ static void testMainFloatArgInvalidProgram(const std::string& src)
 }
 
 
-static void testMainFloatArg(const std::string& src, float argument, float target_return_val)
+static void doTestMainFloatArg(const std::string& src, float argument, float target_return_val, bool check_constant_folded_to_literal)
 {
 	std::cout << "===================== Winter testMainFloatArg() =====================" << std::endl;
 	try
@@ -256,8 +262,17 @@ static void testMainFloatArg(const std::string& src, float argument, float targe
 		// Get main function
 		
 		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
+		if(maindef.isNull())
+			throw BaseException("Failed to find function " + mainsig.toString());
+		if(maindef->returnType()->getType() != Type::FloatType)
+			throw BaseException("main did not return float.");
+
+		if(check_constant_folded_to_literal)
+			if(maindef->body.isNull() || maindef->body->nodeType() != ASTNode::FloatLiteralType) // body may be null if it is a built-in function (e.g. elem())
+				throw BaseException("main was not folded to a float literal.");
 
 		float(WINTER_JIT_CALLING_CONV*f)(float, void*) = (float(WINTER_JIT_CALLING_CONV*)(float, void*))vm.getJittedFunction(mainsig);
+
 
 
 		// Call the JIT'd function
@@ -423,196 +438,20 @@ static void testMainFloatArg(const std::string& src, float argument, float targe
 }
 
 
-// Returns true if valid program, false otherwise.
-static bool testFuzzProgram(const std::string& src)
+static void testMainFloatArg(const std::string& src, float argument, float target_return_val)
 {
-	try
-	{
-		TestEnv test_env;
-		test_env.val = 10;
-
-		VMConstructionArgs vm_args;
-		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
-		vm_args.env = &test_env;
-		
-		const FunctionSignature mainsig("main", std::vector<TypeRef>(1, TypeRef(new Float())));
-
-		vm_args.entry_point_sigs.push_back(mainsig);
-
-		VirtualMachine vm(vm_args);
-
-		// Remove non-printable chars so console doesn't make bell sounds while printing.
-		//std::cout << ("\nCompiled OK:\n" + StringUtils::removeNonPrintableChars(src) + "\n");
-
-		// Get main function
-		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
-
-		float(WINTER_JIT_CALLING_CONV*f)(float, void*) = (float(WINTER_JIT_CALLING_CONV*)(float, void*))vm.getJittedFunction(mainsig);
-
-		// Check it has return type float
-		if(maindef->returnType()->getType() != Type::FloatType)
-			throw Winter::BaseException("main did not have return type float.");
-
-
-		// Call the JIT'd function
-		const float argument = 1.0f;
-		const float jitted_result = f(argument, &test_env);
-
-		VMState vmstate;
-		vmstate.func_args_start.push_back(0);
-		vmstate.argument_stack.push_back(new FloatValue(argument));
-		//vmstate.argument_stack.push_back(new VoidPtrValue(&test_env));
-
-		ValueRef retval = maindef->invoke(vmstate);
-
-		vmstate.func_args_start.pop_back();
-		FloatValue* val = dynamic_cast<FloatValue*>(retval.getPointer());
-		if(!val)
-		{
-			std::cerr << "main() Return value was of unexpected type." << std::endl;
-			assert(0);
-			exit(1);
-		}
-
-		if(!epsEqual(val->value, jitted_result))
-		{
-			std::cerr << "Test failed: main returned " << val->value << ", jitted_result was " << jitted_result << std::endl;
-			assert(0);
-			exit(1);
-		}
-
-
-		//============================= New: test with OpenCL ==============================
-		const bool TEST_OPENCL = false;
-		if(TEST_OPENCL)
-		{
-#if USE_OPENCL
-			OpenCL* opencl = getGlobalOpenCL();
-
-			cl_context context;
-			cl_command_queue command_queue;
-			opencl->deviceInit(
-				opencl->getDeviceInfo()[0],
-				context,
-				command_queue
-			);
-
-			std::string opencl_code = vm.buildOpenCLCode();
-
-			// OpenCL keeps complaining about 'main must return type int', so rename main to main_.
-			//opencl_code = StringUtils::replaceAll(opencl_code, "main", "main_"); // NOTE: slightly dodgy string-based renaming.
-
-			const std::string extended_source = opencl_code + "\n" + "__kernel void main_kernel(float x, __global float * const restrict output_buffer) { \n" + 
-				"	output_buffer[0] = main_float_(x);		\n" + 
-				" }";
-
-			std::cout << extended_source << std::endl;
-
-			OpenCLBuffer output_buffer(context, sizeof(float), CL_MEM_READ_WRITE);
-
-			std::vector<std::string> program_lines = ::split(extended_source, '\n');
-			for(size_t i=0; i<program_lines.size(); ++i)
-				program_lines[i].push_back('\n');
-
-			std::string options = "-save-temps";
-
-			StandardPrintOutput print_output;
-
-			// Compile and build program.
-			cl_program program = opencl->buildProgram(
-				program_lines,
-				context,
-				opencl->getDeviceInfo()[0].opencl_device,
-				options,
-				print_output
-			);
-
-
-			opencl->dumpBuildLog(program, opencl->getDeviceInfo()[0].opencl_device, print_output); 
-
-			// Create kernel
-			cl_int result;
-			cl_kernel kernel = opencl->clCreateKernel(program, "main_kernel", &result);
-
-			if(!kernel)
-				throw Indigo::Exception("clCreateKernel failed");
-
-
-			if(opencl->clSetKernelArg(kernel, 0, sizeof(cl_float), &argument) != CL_SUCCESS) throw Indigo::Exception("clSetKernelArg failed 0");
-			if(opencl->clSetKernelArg(kernel, 1, sizeof(cl_mem), &output_buffer.getDevicePtr()) != CL_SUCCESS) throw Indigo::Exception("clSetKernelArg failed 1");
-
-			// Launch the kernel
-			const size_t block_size = 1;
-			const size_t global_work_size = 1;
-
-			result = opencl->clEnqueueNDRangeKernel(
-				command_queue,
-				kernel,
-				1,					// dimension
-				NULL,				// global_work_offset
-				&global_work_size,	// global_work_size
-				&block_size,		// local_work_size
-				0,					// num_events_in_wait_list
-				NULL,				// event_wait_list
-				NULL				// event
-			);
-			if(result != CL_SUCCESS)
-				throw Indigo::Exception("clEnqueueNDRangeKernel failed: " + OpenCL::errorString(result));
-
-
-			SSE_ALIGN float host_output_buffer[1];
-
-			// Read back result
-			result = opencl->clEnqueueReadBuffer(
-				command_queue,
-				output_buffer.getDevicePtr(), // buffer
-				CL_TRUE, // blocking read
-				0, // offset
-				sizeof(float), // size in bytes
-				host_output_buffer, // host buffer pointer
-				0, // num events in wait list
-				NULL, // wait list
-				NULL //&readback_event // event
-			);
-			if(result != CL_SUCCESS)
-				throw Indigo::Exception("clEnqueueReadBuffer failed: " + OpenCL::errorString(result));
-
-			// Free the context and command queue for this device.
-			opencl->deviceFree(context, command_queue);
-
-			const float opencl_result = host_output_buffer[0];
-
-			if(!epsEqual(opencl_result, jitted_result))
-			{
-				std::cerr << "Test failed: OpenCL returned " << val->value << ", jitted_result was " << jitted_result << std::endl;
-				assert(0);
-				exit(1);
-			}
-#endif // #if USE_OPENCL
-		}
-	}
-	catch(Winter::BaseException& e)
-	{
-		if(e.what() == "Module verification errors.")
-		{
-			std::cerr << "Module verification errors while compiling " << src << std::endl;
-			assert(0);
-			exit(1);
-		}
-		// Compile failure when fuzzing is alright.
-		//std::cerr << e.what() << std::endl;
-		return false;
-	}
-	catch(Indigo::Exception& )
-	{
-		//std::cerr << e.what() << std::endl;
-		return false;
-	}
-
-	return true;
+	doTestMainFloatArg(src, argument, target_return_val,
+		false // check constant-folded to literal
+	);
 }
 
 
+static void testMainFloatArgCheckConstantFolded(const std::string& src, float argument, float target_return_val)
+{
+	doTestMainFloatArg(src, argument, target_return_val,
+		true // check constant-folded to literal
+	);
+}
 
 static void testMainInteger(const std::string& src, int target_return_val)
 {
@@ -1657,37 +1496,37 @@ static void testFloatArray(const std::string& src, const float* a, const float* 
 }
 
 
-float test()
-{
-	return 10;
-}
-
-//int test2()
+//float test()
 //{
-//	return 3.0f;
+//	return 10;
 //}
+//
+////int test2()
+////{
+////	return 3.0f;
+////}
+//
+//SSE_CLASS_ALIGN test_vec4
+//{
+//	float x[4];
+//};
+//
+//SSE_CLASS_ALIGN test_vec16
+//{
+//	float x[16];
+//};
+//
+//SSE_CLASS_ALIGN large_struct
+//{
+//	test_vec4 a;
+//	test_vec16 b;
+//};
 
-SSE_CLASS_ALIGN test_vec4
-{
-	float x[4];
-};
 
-SSE_CLASS_ALIGN test_vec16
-{
-	float x[16];
-};
-
-SSE_CLASS_ALIGN large_struct
-{
-	test_vec4 a;
-	test_vec16 b;
-};
-
-
-float someFuncBleh(float x)
-{
-	return x + 1; 
-}
+//float someFuncBleh(float x)
+//{
+//	return x + 1; 
+//}
 
 
 } // end namespace Winter

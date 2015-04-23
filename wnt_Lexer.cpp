@@ -332,9 +332,16 @@ void Lexer::process(const SourceBufferRef& src, std::vector<Reference<TokenBase>
 		}
 		else if(parser.current() == '!')
 		{
-			tokens_out.push_back(Reference<TokenBase>(new NOT_EQUALS_Token(parser.currentPos())));
-			if(!parser.parseString("!="))
-				throw LexerExcep("Error while parsing '!='" + errorPosition(src, parser.currentPos()));
+			parser.advance();
+			if(parser.currentIsChar('='))
+			{
+				tokens_out.push_back(Reference<TokenBase>(new NOT_EQUALS_Token(parser.currentPos())));
+				parser.advance();
+			}
+			else
+			{
+				tokens_out.push_back(Reference<TokenBase>(new EXCLAMATION_MARK_Token(parser.currentPos())));
+			}
 		}
 		else if(parser.current() == '.')
 		{
