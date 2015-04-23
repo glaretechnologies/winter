@@ -719,6 +719,26 @@ void LanguageTests::run()
 				[State(current_state.i + 1.0), true]t			\n\
 		def main(float x) float :  iterate(f, State(0.0)).i", 1.0f, 100.0f);
 
+	// Test iterate with optional invariant data:
+
+	// Test with pass-by-value data (integer 2)
+	testMainIntegerArg("															\n\
+		def f(int current_state, int iteration, int invariant_data) tuple<int, bool> :					\n\
+			if iteration >= 100														\n\
+				[current_state, false]t # break										\n\
+			else																	\n\
+				[current_state + invariant_data, true]t											\n\
+		def main(int x) int :  iterate(f, 0, 2)", 17, 200);
+
+	// Test with pass-by-reference data (struct)
+	testMainIntegerArg("															\n\
+		struct s { int x, int y }													\n\
+		def f(int current_state, int iteration, s invariant_data) tuple<int, bool> :					\n\
+			if iteration >= 100														\n\
+				[current_state, false]t # break										\n\
+			else																	\n\
+				[current_state + invariant_data.x, true]t											\n\
+		def main(int x) int :  iterate(f, 0, s(3, 4))", 17, 300);
 
 
 

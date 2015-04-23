@@ -722,20 +722,41 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 	} // End if three params
 
 
-	if(sig.name == "iterate" && sig.param_types.size() == 2	&& sig.param_types[0]->getType() == Type::FunctionType)
+	if(sig.name == "iterate" && (sig.param_types.size() == 2 || sig.param_types.size() == 3) && sig.param_types[0]->getType() == Type::FunctionType)
 	{
 		const Reference<Function> func_type = sig.param_types[0].downcast<Function>();
 		const TypeRef state_type = sig.param_types[1];
+		const TypeRef invariant_data_type = sig.param_types.size() == 3 ? sig.param_types[2] : TypeRef(); // Optional 3rd arg
+
 			
 		// typecheck elems and function arg
 		// iterate(function<State, int, tuple<State, bool>> f, State initial_state) State
-		if(func_type->arg_types.size() != 2)
-			throw BaseException("function argument to iterate must have 2 args.");
+		// or
+		// iterate(function<State, int, LoopInvariantData, tuple<State, bool>> f, State initial_state, LoopInvariantData invariant_data) State
+
+		// Check func_type
+		if(invariant_data_type.nonNull())
+		{
+			if(func_type->arg_types.size() != 3)
+				throw BaseException("function argument to iterate must have 3 args.");
+		}
+		else
+		{
+			if(func_type->arg_types.size() != 2)
+				throw BaseException("function argument to iterate must have 2 args.");
+		}
 		if(*func_type->arg_types[0] != *state_type)
 			throw BaseException("First argument type to function argument to iterate must be same as initial_state type.");
 
 		if(func_type->arg_types[1]->getType() != Type::IntType)
 			throw BaseException("second argument type to function argument to iterate must be int.");
+
+		if(invariant_data_type.nonNull())
+		{
+			if(*func_type->arg_types[2] != *invariant_data_type)
+				throw BaseException("Third argument type to function argument to iterate must be same as invariant_data type.");
+		}
+
 
 		if(func_type->return_type->getType() != Type::TupleTypeType)
 			throw BaseException("function argument to iterate must return tuple<State, bool>");
@@ -754,6 +775,8 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 		args[0].name = "f";
 		args[1].type = state_type;
 		args[1].name = "initial_state";
+		if(invariant_data_type.nonNull())
+			args.push_back(FunctionDefinition::FunctionArg(invariant_data_type, "invariant_data"));
 
 		FunctionDefinitionRef def = new FunctionDefinition(
 			SrcLocation::invalidLocation(),
@@ -764,7 +787,8 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 			state_type, // return type
 			new IterateBuiltInFunc(
 				func_type, // func type
-				state_type
+				state_type,
+				invariant_data_type
 			)
 		);
 
@@ -1025,7 +1049,7 @@ Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDef
 
 	// Make copy of the body expression, with concrete types substituted for generic types.
 
-	ASTNodeRef body(NULL);
+	ASTNodeRef body;
 	BuiltInFunctionImpl* built_in_impl = NULL;
 
 	if(generic_func->body.nonNull())
@@ -1049,7 +1073,7 @@ Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDef
 	}
 
 	// Map across declared return type
-	TypeRef concrete_declared_ret_type(NULL);
+	TypeRef concrete_declared_ret_type;
 	if(generic_func->declared_return_type.nonNull())
 	{
 		if(generic_func->declared_return_type->getType() == Type::GenericTypeType)
@@ -1064,7 +1088,7 @@ Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDef
 	}
 
 
-	Reference<FunctionDefinition> def(new FunctionDefinition(
+	Reference<FunctionDefinition> def = new FunctionDefinition(
 		generic_func->srcLocation(), // Use the generic function's location in src for the location
 		generic_func->order_num,
 		generic_func->sig.name, // name
@@ -1072,7 +1096,7 @@ Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDef
 		body,
 		concrete_declared_ret_type, // return type
 		built_in_impl // built in func impl
-	));
+	);
 
 	if(body.nonNull())
 	{
@@ -1081,7 +1105,6 @@ Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDef
 			TraversalPayload payload(TraversalPayload::BindVariables);
 			payload.func_def_stack.push_back(def.getPointer());
 			payload.linker = this;
-			//payload.top_lvl_frame = 
 			
 			std::vector<ASTNode*> stack;
 			def->traverse(
@@ -1107,7 +1130,3 @@ Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDef
 
 
 }
-
-
-
-
