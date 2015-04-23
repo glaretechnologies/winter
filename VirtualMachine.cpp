@@ -204,6 +204,18 @@ public:
 		if(res != func_map->end())
 			return (uint64_t)res->second;
 
+		// For OS X:
+		if(name == "_sinf")
+			return (uint64_t)sinf;
+		else if(name == "_cosf")
+			return (uint64_t)cosf;
+		else if(name == "_powf")
+			return (uint64_t)powf;
+		else if(name == "_expf")
+			return (uint64_t)expf;
+		else if(name == "_logf")
+			return (uint64_t)logf;
+
 		// If function was not in func_map (i.e. was not an 'external' function), then use normal symbol resolution, for functions like sinf, cosf etc..
 
 		void* f = llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(name);
