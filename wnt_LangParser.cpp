@@ -100,7 +100,7 @@ Reference<BufferRoot> LangParser::parseBuffer(const std::vector<Reference<TokenB
 				Reference<StructureType> t = parseStructType(parseinfo);
 				
 				if(named_types.find(t->name) != named_types.end())
-					throw BaseException("struct with name '" + t->name + "' already defined: " + errorPosition(*source_buffer, i));
+					throw BaseException("struct with name '" + t->name + "' already defined: " + errorPosition(*source_buffer, tokens[i]->char_index));
 
 				named_types[t->name] = t;
 				named_types_ordered_out.push_back(t);
@@ -709,7 +709,14 @@ Reference<ASTNode> LangParser::parseLetBlock(ParseInfo& p)
 		
 		while(p.i < p.tokens.size() && !(p.tokens[p.i]->isIdentifier() && p.tokens[p.i]->getIdentifierValue() == "in"))
 		{
+			const unsigned int let_position = p.i;
 			Reference<LetASTNode> let = parseLet(p);
+
+			// Before we add it, go back over the other lets in the let block to make sure this name is unique.
+			for(size_t z=0; z<lets.size(); ++z)
+				if(lets[z]->variable_name == let->variable_name)
+					throw LangParserExcep("Let with this name already defined in let block." + errorPosition(*p.text_buffer, p.tokens[let_position]->char_index));
+
 			lets.push_back(let);
 		}
 
@@ -717,7 +724,7 @@ Reference<ASTNode> LangParser::parseLetBlock(ParseInfo& p)
 
 		ASTNodeRef main_expr = parseExpression(p);
 
-		return ASTNodeRef(new LetBlock(main_expr, lets, loc));
+		return new LetBlock(main_expr, lets, loc);
 	}
 
 
@@ -1592,9 +1599,9 @@ void LangParser::parseParameterList(ParseInfo& p, std::vector<FunctionDefinition
 }
 
 
-const std::string LangParser::errorPosition(const SourceBuffer& buffer, unsigned int pos)
+const std::string LangParser::errorPosition(const SourceBuffer& buffer, unsigned int char_index)
 {
-	return Diagnostics::positionString(buffer, pos);
+	return Diagnostics::positionString(buffer, char_index);
 }
 
 

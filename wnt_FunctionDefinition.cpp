@@ -7,6 +7,7 @@ Generated at 2011-04-25 19:15:40 +0100
 #include "wnt_FunctionDefinition.h"
 
 
+#include "wnt_LLVMVersion.h"
 #include "wnt_ASTNode.h"
 #include "wnt_SourceBuffer.h"
 #include "VMState.h"
@@ -49,14 +50,12 @@ static const bool VERBOSE_EXEC = false;
 
 
 FunctionDefinition::FunctionDefinition(const SrcLocation& src_loc, int order_num_, const std::string& name, const std::vector<FunctionArg>& args_, 
-									   //const vector<Reference<LetASTNode> >& lets_,
 									   const ASTNodeRef& body_, const TypeRef& declared_rettype, 
 									   const BuiltInFunctionImplRef& impl
 									   )
 :	ASTNode(FunctionDefinitionType, src_loc),
 	order_num(order_num_),
 	args(args_),
-	//lets(lets_),
 	body(body_),
 	declared_return_type(declared_rettype),
 	built_in_func_impl(impl),
@@ -86,17 +85,10 @@ FunctionDefinition::~FunctionDefinition()
 
 TypeRef FunctionDefinition::returnType() const
 {
-	//TEMP NEW:
-	//if(this->body.nonNull() && this->body->type().nonNull())
-	//	return this->body->type();
-
 	if(this->declared_return_type.nonNull())
 		return this->declared_return_type;
-
-	//assert(this->body.nonNull());
-	//assert(this->body->type().nonNull());
+	
 	return this->body->type();
-	//return this->body.nonNull() ? this->body->type() : TypeRef(NULL);
 }
 
 
@@ -195,11 +187,6 @@ ValueRef FunctionDefinition::invoke(VMState& vmstate)
 		return this->built_in_func_impl->invoke(vmstate);
 
 	
-	// Evaluate let clauses, which will each push the result onto the let stack
-	//vmstate.let_stack_start.push_back(vmstate.let_stack.size()); // Push let frame index
-	//for(unsigned int i=0; i<lets.size(); ++i)
-	//	vmstate.let_stack.push_back(lets[i]->exec(vmstate));
-
 	// Execute body of function
 	ValueRef ret = body->exec(vmstate);
 
@@ -209,38 +196,8 @@ ValueRef FunctionDefinition::invoke(VMState& vmstate)
 		throw BaseException("Returned object has invalid type.");
 	}
 
-	// Pop things off let stack
-	//for(unsigned int i=0; i<lets.size(); ++i)
-	//{
-	//	//delete vmstate.let_stack.back();
-	//	vmstate.let_stack.pop_back();
-	//}
-	//// Pop let frame index
-	//vmstate.let_stack_start.pop_back();
-
 	return ret;
 }
-
-
-/*void FunctionDefinition::linkFunctions(Linker& linker)
-{
-	for(unsigned int i=0; i<lets.size(); ++i)
-		lets[i]->linkFunctions(linker);
-
-	this->body->linkFunctions(linker);
-}
-
-
-void FunctionDefinition::bindVariables(const std::vector<ASTNode*>& stack)
-{
-	std::vector<ASTNode*> s(stack);
-	s.push_back(this);
-
-	for(unsigned int i=0; i<lets.size(); ++i)
-		lets[i]->bindVariables(s);
-
-	this->body->bindVariables(s);
-}*/
 
 
 void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
@@ -332,10 +289,7 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 	payload.func_def_stack.push_back(this);
 	stack.push_back(this);
 
-	//for(unsigned int i=0; i<lets.size(); ++i)
-	//	lets[i]->traverse(payload, stack);
-
-	if(this->body.nonNull()) // !this->built_in_func_impl)
+	if(this->body.nonNull())
 	{
 		this->body->traverse(payload, stack);
 	}
@@ -429,8 +383,6 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
-		//this->can_constant_fold = body.nonNull() && body->can_constant_fold && expressionIsWellTyped(*this, payload);
-
 		const bool body_is_literal = checkFoldExpression(body, payload);
 			
 		this->can_maybe_constant_fold = body_is_literal;
@@ -756,13 +708,9 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 	}*/
 
 
-#if 0
-	
-#else
-
-	// NOTE: Check this code works somehow!
 	// NOTE: It looks like function attributes are being removed from function declarations in the IR, when the function is not called anywhere.
-
+	
+	// We can only mark a function as readonly (or readnone) if the return type is pass by value, otherwise this function will need to write through the SRET argument.
 	llvm::AttrBuilder function_attr_builder;
 	function_attr_builder.addAttribute(llvm::Attribute::NoUnwind); // Does not throw exceptions
 	if(this->returnType()->passByValue())
@@ -784,17 +732,10 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 	}
 
 
-	//TEMP HACK:
-	//function_attr_builder.addAttribute(llvm::Attribute::ReadOnly); // This attribute indicates that the function does not write through any pointer arguments etc..
-
-	//function_attr_builder.addAttribute(llvm::Attribute::AlwaysInline);
-
 	llvm::Constant* llvm_func_constant = module->getOrInsertFunction(
 		this->sig.typeMangledName(), //makeSafeStringForFunctionName(this->sig.toString()), // Name
 		functype // Type
 	);
-
-	//llvm_func_constant->dump();
 
 	llvm::Function* llvm_func = static_cast<llvm::Function*>(llvm_func_constant);
 
@@ -805,82 +746,64 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 
 
 	llvm_func->setAttributes(attributes);
-	//llvm_func->addAttributes(llvm::AttributeSet::FunctionIndex, attributes);
-
-#endif
 
 	// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
 	llvm_func->setCallingConv(llvm::CallingConv::C);
 
-	// Set names for all arguments.
-	
-	//NOTE: for some reason this crashes with optimisations enabled.
-	unsigned int i = 0;
+	// Set names and attributes for function arguments.
+	int i = 0;
 	for(llvm::Function::arg_iterator AI = llvm_func->arg_begin(); AI != llvm_func->arg_end(); ++AI, ++i)
 	{
-		if(this->returnType()->passByValue())
-		{					
-			if(i >= this->args.size())
-				AI->setName("hidden");
-			else
-				AI->setName(this->args[i].name);
+		// If return type is pass-by-pointer, there is an extra SRET argument as the first arg for the LLVM function.
+		const int winter_arg_index = this->returnType()->passByValue() ? i : i - 1;
+
+		if(winter_arg_index < 0)
+		{
+			assert(!this->returnType()->passByValue() && i == 0);
+			// This is the SRET arg for when return type is pass-by-pointer.
+			AI->setName("ret");
+
+			// Set SRET and NoAlias attributes.
+			llvm::AttrBuilder builder;
+			builder.addAttribute(llvm::Attribute::StructRet);
+			builder.addAttribute(llvm::Attribute::NoAlias);
+			llvm::AttributeSet set = llvm::AttributeSet::get(module->getContext(), 1, builder);
+			AI->addAttr(set);
+		}
+		else if(winter_arg_index >= (int)this->args.size())
+		{
+			// Hidden pointer to env arg.
+			AI->setName("hidden");
+
+			llvm::AttrBuilder builder;
+			//builder.addAttribute(llvm::Attribute::ByVal);
+#if TARGET_LLVM_VERSION >= 34
+			builder.addAttribute(llvm::Attribute::ReadOnly); // From LLVM Lang ref: 
+			// "On an argument, this attribute indicates that the function does not write through this pointer argument, even though it may write to the memory that the pointer points to."
+#endif			
+			builder.addAttribute(llvm::Attribute::NoAlias);
+			llvm::AttributeSet set = llvm::AttributeSet::get(module->getContext(), 1 + i, builder); // "the attributes for the parameters start at  index `1'." - Attributes.h
+			AI->addAttr(set);
 		}
 		else
 		{
-			if(i == 0) // Return value pointer arg
-			{
-				AI->setName("ret");
+			// Normal function arg.
+			AI->setName(this->args[winter_arg_index].name);
 
-				// Set SRET and NoAlias attributes.
+			if(!this->args[winter_arg_index].type->passByValue()) // If pointer arg:
+			{
 				llvm::AttrBuilder builder;
-				builder.addAttribute(llvm::Attribute::StructRet);
+#if TARGET_LLVM_VERSION >= 34
+				builder.addAttribute(llvm::Attribute::ReadOnly);
+#endif
 				builder.addAttribute(llvm::Attribute::NoAlias);
-				llvm::AttributeSet set = llvm::AttributeSet::get(module->getContext(), 1, builder);
-				AI->addAttr(set);
-			}
-			else if(i > this->args.size()) // Hidden pointer to env arg.
-			{
-				AI->setName("hidden");
 
-				// Mark arg as NoAlias.
-				llvm::AttrBuilder builder;
-				//builder.addAttribute(llvm::Attribute::NoAlias);
-				//builder.addAttribute(llvm::Attribute::ReadOnly); // "On an argument, this attribute indicates that the function does not write through this pointer argument, even though it may write to the memory that the pointer points to."
-				//builder.addAttribute(llvm::Attribute::ByVal);
 				llvm::AttributeSet set = llvm::AttributeSet::get(module->getContext(), 1 + i, builder);
 				AI->addAttr(set);
 			}
-			else // Normal arg.  Due to arg zero being the SRET arg, the index is offset by one.
-			{
-				//std::cout << i << std::endl;
-				AI->setName(this->args[i-1].name);
 
-				if(!this->args[i-1].type->passByValue()) // If pointer arg:
-				{
-					// Mark arg as NoAlias.
-					llvm::AttrBuilder builder;
-					builder.addAttribute(llvm::Attribute::NoAlias);
-
-					//NOTE: in trunk, not in LLVM 3.3 yet.
-					//builder.addAttribute(llvm::Attribute::ReadOnly); // "On an argument, this attribute indicates that the function does not write through this pointer argument, even though it may write to the memory that the pointer points to."
-					llvm::AttributeSet set = llvm::AttributeSet::get(module->getContext(), 1 + i, builder);
-					AI->addAttr(set);
-				}
-
-				if(this->args[i-1].type->getType() == Type::OpaqueTypeType)
-				{
-					// Mark arg as NoAlias.
-					llvm::AttrBuilder builder;
-					//builder.addAttribute(llvm::Attribute::NoAlias);
-
-					//builder.addAttribute(llvm::Attribute::ByVal);
-
-					//NOTE: in trunk, not in LLVM 3.3 yet.
-					//builder.addAttribute(llvm::Attribute::ReadOnly); // "On an argument, this attribute indicates that the function does not write through this pointer argument, even though it may write to the memory that the pointer points to."
-				//	llvm::AttributeSet set = llvm::AttributeSet::get(module->getContext(), 1 + i, builder);
-				//	AI->addAttr(set);
-				}
-			}
+			//if(this->args[i-1].type->getType() == Type::OpaqueTypeType)
+			//	//builder.addAttribute(llvm::Attribute::ByVal);
 		}
 	}
 
@@ -897,8 +820,6 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	//std::map<Lang::FunctionSignature, llvm::Function*>& external_functions
 	)
 {
-#if USE_LLVM
-
 	//NEW: do a pass to get the cleanup nodes first
 	/*{
 		TraversalPayload payload(TraversalPayload::GetCleanupNodes, false, NULL);
@@ -906,10 +827,6 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 		this->body->traverse(payload, stack);
 	}
 */
-	//TEMP:
-	//this->print(0, std::cout);
-	//std::cout << std::endl;
-
 
 	llvm::Function* llvm_func = this->getOrInsertFunction(
 		module,
@@ -1127,9 +1044,6 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 
 	this->built_llvm_function = llvm_func;
 	return llvm_func;
-#else
-	return NULL;
-#endif
 }
 
 

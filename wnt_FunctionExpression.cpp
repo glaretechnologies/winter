@@ -1443,7 +1443,6 @@ TypeRef FunctionExpression::type() const
 
 llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
-#if USE_LLVM
 	llvm::Value* target_llvm_func = NULL;
 	TypeRef target_ret_type = this->type(); //this->target_function_return_type;
 
@@ -1661,11 +1660,15 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		//	args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));
 
 		//TEMP:
-		/*std::cout << "Args to CreateCall() for " << this->target_function->sig.toString() << ":" << std::endl;
+		/*target_llvm_func->dump();
+		std::cout << "Args to CreateCall() for " << this->target_function->sig.toString() << ":" << std::endl;
 		for(int z=0; z<args.size(); ++z)
 		{
-			std::cout << "arg " << z << ": ";
+			std::cout << "\narg " << z << ": \n";
 			args[z]->dump();
+			std::cout << "\n\narg " << z << " type: \n";
+			args[z]->getType()->dump();
+			std::cout << std::endl;
 		}*/
 
 		llvm::CallInst* call_inst = params.builder->CreateCall(target_llvm_func, args);
@@ -1689,9 +1692,6 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 		return return_val_addr;
 	}
-#else
-	return NULL;
-#endif
 }
 
 

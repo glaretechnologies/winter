@@ -2866,6 +2866,16 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 				  z + z\
 				  def main() float : f(2.0)", 6.0);
 
+	// test multiple lets with the same name in the same let block aren't allowed
+	testMainFloatArgInvalidProgram("def f(float x) float :		\n\
+			  let								\n\
+				float y = 2.0					\n\
+				float y = 3.0					\n\
+			  in								\n\
+				x + y							\n\
+			  def main(float x) float : f(x)");
+
+
 
 	// Test creation of struct
 	{

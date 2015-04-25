@@ -32,7 +32,7 @@ SourceBufferRef SourceBuffer::loadFromDisk(const std::string& path) // Throw Bas
 	try
 	{
 		std::string file_contents;
-		FileUtils::readEntireFile(path, file_contents);
+		FileUtils::readEntireFileTextMode(path, file_contents);
 		return Winter::SourceBufferRef(new Winter::SourceBuffer(path, file_contents));
 	}
 	catch(FileUtils::FileUtilsExcep& e)
