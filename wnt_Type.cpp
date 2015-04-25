@@ -438,8 +438,8 @@ const std::string Map::OpenCLCType() const
 StructureType::StructureType(const std::string& name_, const std::vector<TypeRef>& component_types_, const std::vector<std::string>& component_names_) 
 :	Type(StructureTypeType), name(name_), component_types(component_types_), component_names(component_names_)
 {
-	if(component_types_.size() != component_names_.size())
-		throw Winter::BaseException("component_types_.size() != component_names_.size()");
+	//if(component_types_.size() != component_names_.size())
+	//	throw Winter::BaseException("component_types_.size() != component_names_.size()");
 }
 
 

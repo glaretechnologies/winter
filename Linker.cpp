@@ -349,40 +349,43 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 	{
 		if(sig.param_types[0]->getType() == Type::FunctionType && sig.param_types[1]->getType() == Type::ArrayTypeType)
 		{
-			const Reference<ArrayType> array_type = sig.param_types[1].downcast<ArrayType>();
-			const TypeRef array_elem_type = array_type->elem_type;
+			if(sig.name == "map")
+			{
+				const Reference<ArrayType> array_type = sig.param_types[1].downcast<ArrayType>();
+				const TypeRef array_elem_type = array_type->elem_type;
 
-			const Reference<Function> func_type = sig.param_types[0].downcast<Function>();
-			const TypeRef R = func_type->return_type;
+				const Reference<Function> func_type = sig.param_types[0].downcast<Function>();
+				const TypeRef R = func_type->return_type;
 			
-			// map(function<T, R>, array<T, N>) array<R, N>
-			if(func_type->arg_types.size() != 1)
-				throw BaseException("Function argument to map must take one argument.");
+				// map(function<T, R>, array<T, N>) array<R, N>
+				if(func_type->arg_types.size() != 1)
+					throw BaseException("Function argument to map must take one argument.");
 
-			if(*func_type->arg_types[0] != *array_elem_type)
-				throw BaseException("Function argument to map must take same argument type as array element.");
+				if(*func_type->arg_types[0] != *array_elem_type)
+					throw BaseException("Function argument to map must take same argument type as array element.");
 
-			vector<FunctionDefinition::FunctionArg> args(2);
-			args[0].type = func_type;
-			args[0].name = "f";
-			args[1].type = array_type;
-			args[1].name = "array";
+				vector<FunctionDefinition::FunctionArg> args(2);
+				args[0].type = func_type;
+				args[0].name = "f";
+				args[1].type = array_type;
+				args[1].name = "array";
 
-			FunctionDefinitionRef def = new FunctionDefinition(
-				SrcLocation::invalidLocation(),
-				-1, // order number
-				"map",
-				args,
-				ASTNodeRef(NULL), // body expr
-				new ArrayType(R, array_type->num_elems), // return type
-				new ArrayMapBuiltInFunc(
-					array_type, // from array type
-					func_type // func type
-				)
-			);
+				FunctionDefinitionRef def = new FunctionDefinition(
+					SrcLocation::invalidLocation(),
+					-1, // order number
+					"map",
+					args,
+					ASTNodeRef(NULL), // body expr
+					new ArrayType(R, array_type->num_elems), // return type
+					new ArrayMapBuiltInFunc(
+						array_type, // from array type
+						func_type // func type
+					)
+				);
 
-			this->sig_to_function_map.insert(std::make_pair(sig, def));
-			return def;
+				this->sig_to_function_map.insert(std::make_pair(sig, def));
+				return def;
+			}
 		}
 
 		if(sig.param_types[0]->getType() == Type::ArrayTypeType && sig.param_types[1]->getType() == Type::IntType)

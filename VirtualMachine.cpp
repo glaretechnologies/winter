@@ -82,7 +82,7 @@ namespace Winter
 {
 	
 
-static const bool DUMP_MODULE_IR = false; // Dumps to "unoptimised_module.txt", "module.txt" in current working dir.
+static const bool DUMP_MODULE_IR = false; // Dumps to "unoptimised_module_IR.txt", "optimised_module_IR.txt" in current working dir.
 static const bool DUMP_ASSEMBLY = false; // Dumpts to "module_assembly.txt" in current working dir.
 
 
@@ -789,6 +789,20 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 	RefCounting::emitRefCountingFunctions(this->llvm_module, this->llvm_exec_engine->getDataLayout(), common_functions);
 	*/
 
+
+	/*for(size_t i = 0; i != named_types_ordered.size(); ++i)
+	{
+		if(named_types_ordered[i]->getType() == Type::StructureTypeType)
+		{
+			StructureType* struct_type = named_types_ordered[i].downcastToPtr<StructureType>();
+
+			const llvm::StructLayout* struct_layout = this->llvm_exec_engine->getDataLayout()->getStructLayout(static_cast<llvm::StructType*>(named_types_ordered[i]->LLVMType(*this->llvm_context)));
+
+			std::cout << "------------" << struct_type->name << " layout -----------" << std::endl;
+			std::cout << "total size: " << struct_layout->getSizeInBytes() << " B" << std::endl;
+		}
+	}*/
+
 	linker.buildLLVMCode(
 		this->llvm_module,
 		this->llvm_exec_engine->getDataLayout(),
@@ -801,14 +815,14 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 #if TARGET_LLVM_VERSION >= 36
 		std::error_code errorinfo;
 		llvm::raw_fd_ostream f(
-			"unoptimised_module.txt",
+			"unoptimised_module_IR.txt",
 			errorinfo,
 			llvm::sys::fs::F_Text
 		);
 #else
 		std::string errorinfo;
 		llvm::raw_fd_ostream f(
-			"unoptimised_module.txt",
+			"unoptimised_module_IR.txt",
 			errorinfo
 		);
 #endif
@@ -971,14 +985,14 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 #if TARGET_LLVM_VERSION >= 36
 		std::error_code errorinfo;
 		llvm::raw_fd_ostream f(
-			"module.txt",
+			"optimised_module_IR.txt",
 			errorinfo,
 			llvm::sys::fs::F_Text
 		);
 #else
 		std::string errorinfo;
 		llvm::raw_fd_ostream f(
-			"module.txt",
+			"optimised_module_IR.txt",
 			errorinfo
 		);
 #endif
