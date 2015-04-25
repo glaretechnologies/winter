@@ -1603,9 +1603,39 @@ ValueRef IterateBuiltInFunc::invoke(VMState& vmstate)
 }
 
 
-// iterate(function<State, int, tuple<State, bool>> f, State initial_state) State
-// or
-// iterate(function<State, int, LoopInvariantData, tuple<State, bool>> f, State initial_state, LoopInvariantData invariant_data) State
+
+
+/*
+iterate(function<State, int, tuple<State, bool>> f, State initial_state) State
+or
+iterate(function<State, int, LoopInvariantData, tuple<State, bool>> f, State initial_state, LoopInvariantData invariant_data) State
+
+
+Compile as 
+
+state_alloca = alloca space for State
+tuple_alloca = alloca space for tuple<State, bool>
+
+State state = initial_state;
+Store initial_state in state_alloca
+
+iteration = 0;
+while(1)
+{
+	//res = f(state, iteration);
+	f(tuple_alloca, state_alloca, iteration)
+
+	if(tuple_alloca->second == false)
+		copy tuple_alloca->first to result
+		return
+
+	iteration++;
+	
+	// state = res.first;
+	copy tuple_alloca->first to state_alloca
+}
+
+*/
 llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
 	// Get argument pointers/values
@@ -1645,19 +1675,35 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	);
 
 	// Allocate space on stack for the running state, if the state type is not pass-by-value.
-	llvm::Value* running_state_alloca = NULL;
+	llvm::Value* state_alloca = NULL;
 
-	if(!state_type->passByValue())
-	{
-		running_state_alloca = entry_block_builder.CreateAlloca(
+	//if(!state_type->passByValue())
+	//{
+		state_alloca = entry_block_builder.CreateAlloca(
 			state_type->LLVMType(*params.context), // State
 			llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1, true)), // num elems
 			"Running state"
 		);
 
+	// Load and store initial state in running state
+	if(state_type->passByValue())
+	{
+		params.builder->CreateStore(initial_state_ptr_or_value, state_alloca);
+	}
+	else
+	{
+		/*if(state_type->getType() == Type::ArrayTypeType)
+		{
+			llvm::Value* size = llvm::ConstantInt::get(*params.context, llvm::APInt(32, sizeof(int) * state_type.downcast<ArrayType>()->num_elems, true)); // TEMP HACK
+			params.builder->CreateMemCpy(state_alloca, initial_state_ptr_or_value, size, 4);
+		}
+		else
+		{*/
+			params.builder->CreateStore(params.builder->CreateLoad(initial_state_ptr_or_value), state_alloca);
+		//}
 		// Load and store initial state in running state
-		llvm::Value* initial_state = params.builder->CreateLoad(initial_state_ptr_or_value);
-		params.builder->CreateStore(initial_state, running_state_alloca);
+		//llvm::Value* initial_state = params.builder->CreateLoad(initial_state_ptr_or_value);
+		//params.builder->CreateStore(initial_state, state_alloca);
 	}
 	
 
@@ -1674,12 +1720,12 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	params.builder->SetInsertPoint(LoopBB);
 
 	// Create running state value variable phi node
-	llvm::PHINode* running_state_value = NULL;
+	/*llvm::PHINode* running_state_value = NULL;
 	if(state_type->passByValue())
 	{
 		running_state_value = params.builder->CreatePHI(state_type->LLVMType(*params.context), 2, "running_state_value");
 		running_state_value->addIncoming(initial_state_ptr_or_value, PreheaderBB);
-	}
+	}*/
   
 	
 
@@ -1694,7 +1740,7 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	// Call function f
 	vector<llvm::Value*> args;
 	args.push_back(tuple_alloca); // SRET return value arg
-	args.push_back(state_type->passByValue() ? running_state_value : running_state_alloca); // current state
+	args.push_back(state_type->passByValue() ? params.builder->CreateLoad(state_alloca) : state_alloca); // current state
 	args.push_back(loop_index_var); // iteration
 	if(invariant_data_type.nonNull())
 		args.push_back(invariant_data_ptr_or_value);
@@ -1705,7 +1751,13 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	);
 
 	// The result of the function (tuple<State, bool>) should now be stored in 'tuple_alloca'.
-	llvm::Value* next_running_state_value = NULL;
+
+	// copy tuple_alloca->first to state_alloca
+
+	llvm::Value* state = params.builder->CreateLoad(params.builder->CreateStructGEP(tuple_alloca, 0)); // Load the state from tuple_alloca
+	params.builder->CreateStore(state, state_alloca); // Store the state in state_alloca
+
+	/*llvm::Value* next_running_state_value = NULL;
 	if(state_type->passByValue())
 	{
 		// Load the state
@@ -1720,7 +1772,7 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 		// Store the state in running_state_alloca
 		params.builder->CreateStore(state, running_state_alloca);
-	}
+	}*/
 
 	// Load the 'continue boolean'
 	llvm::Value* continue_bool_ptr = params.builder->CreateStructGEP(tuple_alloca, 1);
@@ -1755,15 +1807,17 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	loop_index_var->addIncoming(next_var, LoopEndBB);
 
 
+	
+	// Finally load and store the running state value to the SRET return ptr.
+	llvm::Value* running_state = params.builder->CreateLoad(state_alloca);
 	if(state_type->passByValue())
 	{
-		running_state_value->addIncoming(next_running_state_value, LoopEndBB);
-		return running_state_value;
+		return running_state;
 	}
 	else
 	{
-		// Finally load and store the running state value to the SRET return ptr.
-		llvm::Value* running_state = params.builder->CreateLoad(running_state_alloca);
+		// Copy from state_alloca to return_ptr
+		llvm::Value* running_state = params.builder->CreateLoad(state_alloca);
 		params.builder->CreateStore(running_state, return_ptr);
 		return return_ptr;
 	}
