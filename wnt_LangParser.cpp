@@ -118,8 +118,8 @@ Reference<BufferRoot> LangParser::parseBuffer(const std::vector<Reference<TokenB
 					parseinfo.order_num, // order number
 					t->name, // name
 					args, // arguments
-					ASTNodeRef(NULL), // body expr
-					TypeRef(t.getPointer()), // declard return type
+					ASTNodeRef(), // body expr
+					t, // declard return type
 					new Constructor(t) // built in func impl.
 				);
 				root->top_level_defs.push_back(cons);
@@ -127,7 +127,7 @@ Reference<BufferRoot> LangParser::parseBuffer(const std::vector<Reference<TokenB
 				// Make field access functions
 				vector<FunctionDefinition::FunctionArg> getfield_args(1);
 				getfield_args[0].name = "s";
-				getfield_args[0].type = TypeRef(t.getPointer());
+				getfield_args[0].type = t;
 
 				for(unsigned int i=0; i<t->component_types.size(); ++i)
 				{
@@ -136,7 +136,7 @@ Reference<BufferRoot> LangParser::parseBuffer(const std::vector<Reference<TokenB
 						parseinfo.order_num, // order number
 						t->component_names[i], // name
 						getfield_args, // args
-						ASTNodeRef(NULL), // body expr
+						ASTNodeRef(), // body expr
 						t->component_types[i], // return type
 						new GetField(t, i) // impl
 					));

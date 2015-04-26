@@ -54,7 +54,7 @@ public:
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
-private:
+//private:
 	Reference<StructureType> struct_type;
 	unsigned int index;
 };

@@ -11,6 +11,7 @@ Generated at 2011-04-30 18:53:38 +0100
 #include "wnt_SourceBuffer.h"
 #include "wnt_RefCounting.h"
 #include "wnt_VectorLiteral.h"
+#include "wnt_FunctionDefinition.h"
 #include "VMState.h"
 #include "Value.h"
 #include "Linker.h"
@@ -1541,6 +1542,39 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 	}
 	else if(binding_type == BoundToGlobalDef)
 	{
+		// For structure field access functions, instead of emitting an actual function call, just emit the LLVM code to access the field.
+		if(dynamic_cast<GetField*>(this->target_function->built_in_func_impl.getPointer()))
+		{
+			const GetField* get_field_func = static_cast<const GetField*>(this->target_function->built_in_func_impl.getPointer());
+
+			const int field_index = get_field_func->index;
+
+			const TypeRef field_type = get_field_func->struct_type->component_types[field_index];
+			const std::string field_name = get_field_func->struct_type->component_names[field_index];
+
+			assert(argument_expressions.size() == 1);
+			llvm::Value* struct_ptr = argument_expressions[0]->emitLLVMCode(params, NULL);
+
+			if(field_type->passByValue())
+			{
+				llvm::Value* field_ptr = params.builder->CreateStructGEP(struct_ptr, field_index, field_name + " ptr");
+				llvm::Value* loaded_val = params.builder->CreateLoad(field_ptr, field_name);
+
+				// TEMP NEW: increment ref count if this is a string
+				if(field_type->getType() == Type::StringType)
+					RefCounting::emitIncrementStringRefCount(params, loaded_val);
+
+				return loaded_val;
+			}
+			else
+			{
+				return params.builder->CreateStructGEP(struct_ptr, field_index, field_name + " ptr");
+			}
+		}
+			
+
+
+
 		// Lookup LLVM function, which should already be created and added to the module.
 		/*llvm::Function* target_llvm_func = params.module->getFunction(
 			this->target_function->sig.toString() //internalFuncName(call_target_sig)

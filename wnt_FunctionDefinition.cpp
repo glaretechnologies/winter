@@ -904,23 +904,25 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 			if(true) // this->body->nodeType() == ASTNode::VariableASTNodeType || this->body->nodeType() == ASTNode::IfExpressionType)
 			{
 				if(return_val_ptr != body_code)
-				//if(this->returnType()->getType() == Type::ArrayTypeType)
-				//{
-				//	llvm::Value* size = llvm::ConstantInt::get(*params.context, llvm::APInt(32, sizeof(int) * state_type.downcast<ArrayType>()->num_elems, true)); // TEMP HACK
-				//	params.builder->CreateMemCpy(return_val_ptr, body_code, size, 4);
-				//}
-				//else
 				{
-					// Load value
-					llvm::Value* val = params.builder->CreateLoad(
-						body_code
-					);
+					//if(this->returnType()->getType() == Type::ArrayTypeType)
+					//{
+					//	llvm::Value* size = llvm::ConstantInt::get(*params.context, llvm::APInt(32, sizeof(int) * state_type.downcast<ArrayType>()->num_elems, true)); // TEMP HACK
+					//	params.builder->CreateMemCpy(return_val_ptr, body_code, size, 4);
+					//}
+					//else
+					{
+						// Load value
+						llvm::Value* val = params.builder->CreateLoad(
+							body_code
+						);
 
-					// And store at return_val_ptr
-					params.builder->CreateStore(
-						val, // value
-						return_val_ptr // ptr
-					);
+						// And store at return_val_ptr
+						params.builder->CreateStore(
+							val, // value
+							return_val_ptr // ptr
+						);
+					}
 				}
 
 				/*if(this->body->type()->getType() == Type::ArrayTypeType)
