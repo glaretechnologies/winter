@@ -31,6 +31,7 @@ public:
 typedef Reference<BuiltInFunctionImpl> BuiltInFunctionImplRef;
 
 
+// Construct a struct value
 class Constructor : public BuiltInFunctionImpl
 {
 public:
@@ -45,6 +46,7 @@ private:
 };
 
 
+// Return a field value or pointer to a field from a structure.
 class GetField : public BuiltInFunctionImpl
 {
 public:
@@ -58,6 +60,7 @@ public:
 };
 
 
+// Returns a new collection value with the value at the given index updated to the new value.
 class UpdateElementBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
@@ -83,6 +86,7 @@ public:
 };
 
 
+// Return a field value or pointer to a field from a tuple.
 class GetTupleElementBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
@@ -98,6 +102,7 @@ public:
 };
 
 
+// Return an element with given fixed index from a vector.
 class GetVectorElement : public BuiltInFunctionImpl
 {
 public:
@@ -168,12 +173,10 @@ private:
 };
 
 
+// Get the i-th element from an array.
 class ArraySubscriptBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	/*
-		Get the i-th element from the array.
-	*/
 	ArraySubscriptBuiltInFunc(const Reference<ArrayType>& array_type, const TypeRef& index_type);
 
 	virtual ValueRef invoke(VMState& vmstate);
@@ -184,12 +187,10 @@ private:
 };
 
 
+// Get the i-th element from a vector.
 class VectorSubscriptBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	/*
-		Get the i-th element from the vector.
-	*/
 	VectorSubscriptBuiltInFunc(const Reference<VectorType>& vec_type, const TypeRef& index_type);
 
 	virtual ValueRef invoke(VMState& vmstate);
@@ -200,12 +201,10 @@ private:
 };
 
 
+// Check if the index is in bounds for this array.
 class ArrayInBoundsBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	/*
-		Check if the index is in bounds for this array.
-	*/
 	ArrayInBoundsBuiltInFunc(const Reference<ArrayType>& array_type, const TypeRef& index_type);
 
 	virtual ValueRef invoke(VMState& vmstate);
@@ -216,12 +215,10 @@ private:
 };
 
 
+// Check if the index is in bounds for this vector.
 class VectorInBoundsBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	/*
-		Check if the index is in bounds for this vector.
-	*/
 	VectorInBoundsBuiltInFunc(const Reference<VectorType>& vector_type, const TypeRef& index_type);
 
 	virtual ValueRef invoke(VMState& vmstate);
@@ -276,6 +273,7 @@ private:
 };
 
 
+// Take the dot product of two vectors.
 class DotProductBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
@@ -288,6 +286,7 @@ private:
 };
 
 
+// Element-wise min of two vectors
 class VectorMinBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
@@ -300,6 +299,7 @@ private:
 };
 
 
+// Element-wise max of two vectors
 class VectorMaxBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
