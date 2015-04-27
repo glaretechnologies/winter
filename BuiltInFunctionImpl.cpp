@@ -187,28 +187,33 @@ llvm::Value* Constructor::emitLLVMCode(EmitLLVMCodeParams& params) const
 			// Get the pointer to the structure field.
 			llvm::Value* field_ptr = params.builder->CreateStructGEP(struct_ptr, i);
 
-			llvm::Value* arg_value = LLVMTypeUtils::getNthArg(params.currently_building_func, i + 1);
-			if(!this->struct_type->component_types[i]->passByValue())
+			llvm::Value* arg_value_or_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, i + 1);
+
+			if(this->struct_type->component_types[i]->passByValue())
+			{
+				params.builder->CreateStore(arg_value_or_ptr, field_ptr);
+			}
+			else
 			{
 				// Load the value from memory
-				arg_value = params.builder->CreateLoad(
-					arg_value // ptr
-				);
+				llvm::Value* arg_value = params.builder->CreateLoad(arg_value_or_ptr);
+
+				// Store
+				params.builder->CreateStore(arg_value, field_ptr);
+
+				/*LLVMTypeUtils::createCollectionCopy(
+					this->struct_type->component_types[i], 
+					field_ptr, // dest ptr
+					arg_value_or_ptr, // src ptr
+					params
+				);*/
 			}
 
-			params.builder->CreateStore(
-				arg_value, // value
-				field_ptr // ptr
-			);
-
 			// If the field is of string type, we need to increment its reference count
-			if(this->struct_type->component_types[i]->getType() == Type::StringType)
-				RefCounting::emitIncrementStringRefCount(params, arg_value);
+		//TEMP	if(this->struct_type->component_types[i]->getType() == Type::StringType)
+		//		RefCounting::emitIncrementStringRefCount(params, arg_value);
 		}
 
-		//assert(0);
-		//return struct_ptr;
-		//params.builder->
 		return NULL;
 	}
 }
@@ -1549,8 +1554,8 @@ llvm::Value* VectorInBoundsBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 //------------------------------------------------------------------------------------
 
 
-IterateBuiltInFunc::IterateBuiltInFunc(const Reference<Function>& func_type_, const TypeRef& state_type_, const TypeRef& invariant_data_type_)
-:	func_type(func_type_), state_type(state_type_), invariant_data_type(invariant_data_type_)
+IterateBuiltInFunc::IterateBuiltInFunc(const Reference<Function>& func_type_, const TypeRef& state_type_, const vector<TypeRef>& invariant_data_types_)
+:	func_type(func_type_), state_type(state_type_), invariant_data_types(invariant_data_types_)
 {}
 
 
@@ -1560,9 +1565,9 @@ ValueRef IterateBuiltInFunc::invoke(VMState& vmstate)
 
 	const FunctionValue* f = checkedCast<const FunctionValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 	const ValueRef initial_state = vmstate.argument_stack[vmstate.func_args_start.back() + 1];
-	ValueRef invariant_data;
-	if(invariant_data_type.nonNull())
-		invariant_data = vmstate.argument_stack[vmstate.func_args_start.back() + 2];
+	vector<ValueRef> invariant_data(invariant_data_types.size());
+	for(size_t i=0; i<invariant_data_types.size(); ++i)
+		invariant_data[i] = vmstate.argument_stack[vmstate.func_args_start.back() + 2 + i];
 
 	assert(f && initial_state.nonNull());
 
@@ -1574,8 +1579,8 @@ ValueRef IterateBuiltInFunc::invoke(VMState& vmstate)
 		vmstate.func_args_start.push_back((unsigned int)vmstate.argument_stack.size());
 		vmstate.argument_stack.push_back(running_val); // Push value arg
 		vmstate.argument_stack.push_back(new IntValue(iteration)); // Push iteration
-		if(invariant_data_type.nonNull())
-			vmstate.argument_stack.push_back(invariant_data); // Push invariant_data
+		for(size_t i=0; i<invariant_data_types.size(); ++i)
+			vmstate.argument_stack.push_back(invariant_data[i]);
 		
 		// Call f
 		ValueRef result = f->func_def->invoke(vmstate);
@@ -1586,8 +1591,9 @@ ValueRef IterateBuiltInFunc::invoke(VMState& vmstate)
 		ValueRef new_running_val = tuple_result->e[0];
 		bool continue_bool = checkedCast<const BoolValue>(tuple_result->e[1].ptr())->value;
 
-		if(invariant_data_type.nonNull())
-			vmstate.argument_stack.pop_back(); // Pop invariant_data arg
+		for(size_t i=0; i<invariant_data_types.size(); ++i)
+			vmstate.argument_stack.pop_back();
+
 		vmstate.argument_stack.pop_back(); // Pop iteration arg
 		vmstate.argument_stack.pop_back(); // Pop Value arg
 		vmstate.func_args_start.pop_back();
@@ -1642,23 +1648,23 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	llvm::Value* return_ptr = NULL;
 	llvm::Value* function;
 	llvm::Value* initial_state_ptr_or_value;
-	llvm::Value* invariant_data_ptr_or_value;
+	vector<llvm::Value*> invariant_data_ptr_or_value(invariant_data_types.size());
 
 
 	if(state_type->passByValue())
 	{
 		function = LLVMTypeUtils::getNthArg(params.currently_building_func, 0); // Pointer to function
 		initial_state_ptr_or_value = LLVMTypeUtils::getNthArg(params.currently_building_func, 1); // Pointer to, or value of initial state
-		if(invariant_data_type.nonNull())
-			invariant_data_ptr_or_value = LLVMTypeUtils::getNthArg(params.currently_building_func, 2); // Pointer to, or value of invariant_data
+		for(size_t i=0; i<invariant_data_types.size(); ++i)
+			invariant_data_ptr_or_value[i] = LLVMTypeUtils::getNthArg(params.currently_building_func, 2 + i); // Pointer to, or value of invariant_data
 	}
 	else
 	{
 		return_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0); // Pointer to result structure
 		function = LLVMTypeUtils::getNthArg(params.currently_building_func, 1); // Pointer to function
 		initial_state_ptr_or_value = LLVMTypeUtils::getNthArg(params.currently_building_func, 2); // Pointer to, or value of initial state
-		if(invariant_data_type.nonNull())
-			invariant_data_ptr_or_value = LLVMTypeUtils::getNthArg(params.currently_building_func, 3); // Pointer to, or value of invariant_data
+		for(size_t i=0; i<invariant_data_types.size(); ++i)
+			invariant_data_ptr_or_value[i] = LLVMTypeUtils::getNthArg(params.currently_building_func, 3 + i); // Pointer to, or value of invariant_data
 	}
 
 
@@ -1742,8 +1748,8 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	args.push_back(tuple_alloca); // SRET return value arg
 	args.push_back(state_type->passByValue() ? params.builder->CreateLoad(state_alloca) : state_alloca); // current state
 	args.push_back(loop_index_var); // iteration
-	if(invariant_data_type.nonNull())
-		args.push_back(invariant_data_ptr_or_value);
+	for(size_t i=0; i<invariant_data_types.size(); ++i)
+		args.push_back(invariant_data_ptr_or_value[i]);
 
 	params.builder->CreateCall(
 		function, // Callee

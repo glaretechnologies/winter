@@ -77,6 +77,39 @@ void LanguageTests::run()
 {
 	Timer timer;
 
+	
+	// Test fold built-in function with update
+	/*{
+		const int len = 256;
+		js::Vector<int, 32> vals(len, 0);
+		js::Vector<int, 32> b(len, 0);
+		js::Vector<int, 32> target_results(len, 1);
+
+		testIntArray("																\n\
+		def f(array<int, 256> state, int iteration) tuple<array<int, 256>, bool> :			\n\
+				[update(state, iteration, elem(state, iteration) + 1),					\n\
+				iteration < 255]t																\n\
+																							\n\
+		def main(array<int, 256> vals, array<int, 256> initial_counts) array<int, 256>:  iterate(f, vals)",
+			&vals[0], &b[0], &target_results[0], vals.size(),
+			true // allow_unsafe_operations
+		);
+	}
+
+	std::cout << timer.elapsedString() << std::endl;
+	int a = 9;
+	return;*/
+
+	// Test with pass-by-reference data (struct)
+	testMainIntegerArg("															\n\
+		struct s { int x, int y }													\n\
+		def f(s current_state, int iteration) tuple<s, bool> :					\n\
+			if iteration >= current_state.y												\n\
+				[current_state, false]t # break										\n\
+			else																	\n\
+				[s(current_state.x*current_state.x, current_state.y), true]t					\n\
+		def main(int x) int :  iterate(f, s(x, x)).x", 3, 6561);
+	
 
 	// This test triggers a problem with __chkstk when >= 4K is allocated on stack
 	/*{
@@ -690,11 +723,14 @@ void LanguageTests::run()
 		);
 	}
 
+	}
 
 	// ===================================================================
 	// Test iterate built-in function
 	// ===================================================================
 
+	if(!DO_OPENCL_TESTS)
+	{
 	testMainIntegerArg("															\n\
 		def f(int current_state, int iteration) tuple<int, bool> :					\n\
 			if iteration >= 100														\n\
@@ -739,6 +775,16 @@ void LanguageTests::run()
 			else																	\n\
 				[current_state + invariant_data.x, true]t											\n\
 		def main(int x) int :  iterate(f, 0, s(3, 4))", 17, 300);
+
+	// Test with two invariant data args pass-by-reference data (struct)
+	testMainIntegerArg("															\n\
+		struct s { int x, int y }													\n\
+		def f(int current_state, int iteration, s invariant_data, int m) tuple<int, bool> :					\n\
+			if iteration >= m														\n\
+				[current_state, false]t # break										\n\
+			else																	\n\
+				[current_state + invariant_data.x, true]t											\n\
+		def main(int x) int :  iterate(f, 0, s(3, 4), x)", 17, 3 * 17);
 
 
 

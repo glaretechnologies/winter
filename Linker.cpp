@@ -725,11 +725,15 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 	} // End if three params
 
 
-	if(sig.name == "iterate" && (sig.param_types.size() == 2 || sig.param_types.size() == 3) && sig.param_types[0]->getType() == Type::FunctionType)
+	if(sig.name == "iterate" && (sig.param_types.size() >= 2) && sig.param_types[0]->getType() == Type::FunctionType)
 	{
 		const Reference<Function> func_type = sig.param_types[0].downcast<Function>();
 		const TypeRef state_type = sig.param_types[1];
-		const TypeRef invariant_data_type = sig.param_types.size() == 3 ? sig.param_types[2] : TypeRef(); // Optional 3rd arg
+
+		// Remaining args are invariant data args
+		vector<TypeRef> invariant_data_type;
+		for(size_t i=2; i<sig.param_types.size(); ++i)
+			invariant_data_type.push_back(sig.param_types[i]);
 
 			
 		// typecheck elems and function arg
@@ -738,28 +742,20 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 		// iterate(function<State, int, LoopInvariantData, tuple<State, bool>> f, State initial_state, LoopInvariantData invariant_data) State
 
 		// Check func_type
-		if(invariant_data_type.nonNull())
-		{
-			if(func_type->arg_types.size() != 3)
-				throw BaseException("function argument to iterate must have 3 args.");
-		}
-		else
-		{
-			if(func_type->arg_types.size() != 2)
-				throw BaseException("function argument to iterate must have 2 args.");
-		}
+		if(func_type->arg_types.size() != invariant_data_type.size() + 2)
+			throw BaseException("function argument to iterate must have 2 + 'num invariant data args' args.");
+		
 		if(*func_type->arg_types[0] != *state_type)
 			throw BaseException("First argument type to function argument to iterate must be same as initial_state type.");
 
 		if(func_type->arg_types[1]->getType() != Type::IntType)
 			throw BaseException("second argument type to function argument to iterate must be int.");
 
-		if(invariant_data_type.nonNull())
+		for(size_t i=0; i<invariant_data_type.size(); ++i)
 		{
-			if(*func_type->arg_types[2] != *invariant_data_type)
-				throw BaseException("Third argument type to function argument to iterate must be same as invariant_data type.");
+			if(*func_type->arg_types[2 + i] != *invariant_data_type[i])
+				throw BaseException("Argument type to function argument to iterate must be same as invariant_data type."); // TODO: improve error msg.
 		}
-
 
 		if(func_type->return_type->getType() != Type::TupleTypeType)
 			throw BaseException("function argument to iterate must return tuple<State, bool>");
@@ -778,15 +774,15 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 		args[0].name = "f";
 		args[1].type = state_type;
 		args[1].name = "initial_state";
-		if(invariant_data_type.nonNull())
-			args.push_back(FunctionDefinition::FunctionArg(invariant_data_type, "invariant_data"));
+		for(size_t i=0; i<invariant_data_type.size(); ++i)
+			args.push_back(FunctionDefinition::FunctionArg(invariant_data_type[i], "invariant_data"));
 
 		FunctionDefinitionRef def = new FunctionDefinition(
 			SrcLocation::invalidLocation(),
 			-1, // order number
 			"iterate",
 			args,
-			ASTNodeRef(NULL), // body expr
+			ASTNodeRef(), // body expr
 			state_type, // return type
 			new IterateBuiltInFunc(
 				func_type, // func type

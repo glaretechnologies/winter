@@ -250,9 +250,9 @@ public:
 		
 	iterate(function<State, int, tuple<State, bool>> f, State initial_state) State
 
-	or a different version that takes an additional LoopInvariantData arg:
+	or a different version that takes an additional LoopInvariantData argument(s):
 
-	iterate(function<State, int, LoopInvariantData, tuple<State, bool>> f, State initial_state, LoopInvariantData data) State
+	iterate(function<State, int, LoopInvariantData0, LoopInvariantData1, ..., LoopInvariantDataN, tuple<State, bool>> f, State initial_state, LoopInvariantData0, LoopInvariantData1, ..., LoopInvariantDataN) State
 
 
 	Where f is
@@ -276,7 +276,7 @@ public:
 	
 
 	*/
-	IterateBuiltInFunc(const Reference<Function>& func_type_, const TypeRef& state_type_, const TypeRef& invariant_data_type);
+	IterateBuiltInFunc(const Reference<Function>& func_type_, const TypeRef& state_type_, const std::vector<TypeRef>& invariant_data_types);
 	virtual ~IterateBuiltInFunc(){}
 
 	virtual ValueRef invoke(VMState& vmstate);
@@ -284,7 +284,7 @@ public:
 private:
 	Reference<Function> func_type;
 	TypeRef state_type;
-	TypeRef invariant_data_type; // may be NULL
+	std::vector<TypeRef> invariant_data_types; // may be empty.
 };
 
 
