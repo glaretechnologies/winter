@@ -1571,6 +1571,35 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 				return params.builder->CreateStructGEP(struct_ptr, field_index, field_name + " ptr");
 			}
 		}
+		// For tuple field access functions, instead of emitting an actual function call, just emit the LLVM code to access the field.
+		else if(dynamic_cast<GetTupleElementBuiltInFunc*>(this->target_function->built_in_func_impl.getPointer()))
+		{
+			const GetTupleElementBuiltInFunc* get_field_func = static_cast<const GetTupleElementBuiltInFunc*>(this->target_function->built_in_func_impl.getPointer());
+
+			const int field_index = get_field_func->index;
+
+			const TypeRef field_type = get_field_func->tuple_type->component_types[field_index];
+			const std::string field_name = "field " + toString(field_index);
+
+			assert(argument_expressions.size() == 2);
+			llvm::Value* struct_ptr = argument_expressions[0]->emitLLVMCode(params, NULL);
+
+			if(field_type->passByValue())
+			{
+				llvm::Value* field_ptr = params.builder->CreateStructGEP(struct_ptr, field_index, field_name + " ptr");
+				llvm::Value* loaded_val = params.builder->CreateLoad(field_ptr, field_name);
+
+				// TEMP NEW: increment ref count if this is a string
+				if(field_type->getType() == Type::StringType)
+					RefCounting::emitIncrementStringRefCount(params, loaded_val);
+
+				return loaded_val;
+			}
+			else
+			{
+				return params.builder->CreateStructGEP(struct_ptr, field_index, field_name + " ptr");
+			}
+		}
 			
 
 
