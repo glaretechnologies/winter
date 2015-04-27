@@ -809,6 +809,10 @@ Variable::Variable(const std::string& name_, const SrcLocation& loc)
 
 void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNode*>& stack)
 {
+	// Don't try and do the binding process again if already bound.
+	if(this->vartype != UnboundVariable)
+		return;
+
 	bool in_current_func_def = true;
 	int use_let_frame_offset = 0;
 	for(int s = (int)stack.size() - 1; s >= 0; --s) // Walk up the stack of ancestor nodes
