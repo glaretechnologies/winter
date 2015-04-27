@@ -35,7 +35,6 @@ class Constructor : public BuiltInFunctionImpl
 {
 public:
 	Constructor(Reference<StructureType>& struct_type);
-	virtual ~Constructor(){}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -50,7 +49,6 @@ class GetField : public BuiltInFunctionImpl
 {
 public:
 	GetField(Reference<StructureType>& struct_type_, unsigned int index_) : struct_type(struct_type_), index(index_) {}
-	virtual ~GetField(){}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -76,7 +74,6 @@ public:
 		end
 	*/
 	UpdateElementBuiltInFunc(const TypeRef& collection_type/*, const TypeRef& value_type*/);
-	virtual ~UpdateElementBuiltInFunc(){}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -90,7 +87,6 @@ class GetTupleElementBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
 	GetTupleElementBuiltInFunc(const Reference<TupleType>& tuple_type_, unsigned int index_) : tuple_type(tuple_type_), index(index_) {}
-	virtual ~GetTupleElementBuiltInFunc(){}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -106,7 +102,6 @@ class GetVectorElement : public BuiltInFunctionImpl
 {
 public:
 	GetVectorElement(Reference<VectorType>& vector_type_, unsigned int index_) : vector_type(vector_type_), index(index_) {}
-	virtual ~GetVectorElement(){}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -120,7 +115,6 @@ class ArrayMapBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
 	ArrayMapBuiltInFunc(const Reference<ArrayType>& from_type_, const Reference<Function>& func_type_) : from_type(from_type_), func_type(func_type_) {}
-	virtual ~ArrayMapBuiltInFunc(){}
 
 	/*
 	map(function<T, R>, array<T, N>) array<R, N>
@@ -159,7 +153,6 @@ public:
 		}
 	*/
 	ArrayFoldBuiltInFunc(const Reference<Function>& func_type_, const Reference<ArrayType>& array_type_, const TypeRef& state_type_);
-	virtual ~ArrayFoldBuiltInFunc(){}
 
 	// Specialise for a particular first argument.
 	void specialiseForFunctionArg(FunctionDefinition* f);
@@ -182,7 +175,6 @@ public:
 		Get the i-th element from the array.
 	*/
 	ArraySubscriptBuiltInFunc(const Reference<ArrayType>& array_type, const TypeRef& index_type);
-	virtual ~ArraySubscriptBuiltInFunc(){}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -199,7 +191,6 @@ public:
 		Get the i-th element from the vector.
 	*/
 	VectorSubscriptBuiltInFunc(const Reference<VectorType>& vec_type, const TypeRef& index_type);
-	virtual ~VectorSubscriptBuiltInFunc(){}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -216,7 +207,6 @@ public:
 		Check if the index is in bounds for this array.
 	*/
 	ArrayInBoundsBuiltInFunc(const Reference<ArrayType>& array_type, const TypeRef& index_type);
-	virtual ~ArrayInBoundsBuiltInFunc(){}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -233,7 +223,6 @@ public:
 		Check if the index is in bounds for this vector.
 	*/
 	VectorInBoundsBuiltInFunc(const Reference<VectorType>& vector_type, const TypeRef& index_type);
-	virtual ~VectorInBoundsBuiltInFunc(){}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -277,7 +266,6 @@ public:
 
 	*/
 	IterateBuiltInFunc(const Reference<Function>& func_type_, const TypeRef& state_type_, const std::vector<TypeRef>& invariant_data_types);
-	virtual ~IterateBuiltInFunc(){}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -292,7 +280,6 @@ class DotProductBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
 	DotProductBuiltInFunc(const Reference<VectorType>& vector_type_) : vector_type(vector_type_) {}
-	virtual ~DotProductBuiltInFunc(){}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -305,7 +292,6 @@ class VectorMinBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
 	VectorMinBuiltInFunc(const Reference<VectorType>& vector_type_) : vector_type(vector_type_) {}
-	virtual ~VectorMinBuiltInFunc(){}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -318,7 +304,6 @@ class VectorMaxBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
 	VectorMaxBuiltInFunc(const Reference<VectorType>& vector_type_) : vector_type(vector_type_) {}
-	virtual ~VectorMaxBuiltInFunc(){}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -338,7 +323,6 @@ public:
 		//shuffle_mask(shuffle_mask_) 
 		index_type(index_type_) 
 	{}
-	virtual ~ShuffleBuiltInFunc(){}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -355,7 +339,6 @@ class PowBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
 	PowBuiltInFunc(const TypeRef& type);
-	virtual ~PowBuiltInFunc(){}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -368,7 +351,6 @@ class SqrtBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
 	SqrtBuiltInFunc(const TypeRef& type);
-	virtual ~SqrtBuiltInFunc(){}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -381,7 +363,6 @@ class ExpBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
 	ExpBuiltInFunc(const TypeRef& type);
-	virtual ~ExpBuiltInFunc(){}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -394,7 +375,6 @@ class LogBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
 	LogBuiltInFunc(const TypeRef& type);
-	virtual ~LogBuiltInFunc(){}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -407,7 +387,6 @@ class SinBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
 	SinBuiltInFunc(const TypeRef& type);
-	virtual ~SinBuiltInFunc(){}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -420,7 +399,6 @@ class CosBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
 	CosBuiltInFunc(const TypeRef& type);
-	virtual ~CosBuiltInFunc(){}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -433,7 +411,6 @@ class AbsBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
 	AbsBuiltInFunc(const TypeRef& type);
-	virtual ~AbsBuiltInFunc(){}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -446,7 +423,6 @@ class FloorBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
 	FloorBuiltInFunc(const TypeRef& type);
-	virtual ~FloorBuiltInFunc(){}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -459,7 +435,6 @@ class CeilBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
 	CeilBuiltInFunc(const TypeRef& type);
-	virtual ~CeilBuiltInFunc(){}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -472,7 +447,6 @@ class TruncateToIntBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
 	TruncateToIntBuiltInFunc(const TypeRef& type);
-	virtual ~TruncateToIntBuiltInFunc(){}
 
 	static TypeRef getReturnType(const TypeRef& arg_type);
 
@@ -488,7 +462,6 @@ class ToFloatBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
 	ToFloatBuiltInFunc(const TypeRef& type);
-	virtual ~ToFloatBuiltInFunc(){}
 
 	static TypeRef getReturnType(const TypeRef& arg_type);
 
@@ -503,7 +476,6 @@ private:
 //{
 //public:
 //	AllocateRefCountedStructure() {}
-//	virtual ~AllocateRefCountedStructure(){}
 //
 //	virtual ValueRef invoke(VMState& vmstate);
 //	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
