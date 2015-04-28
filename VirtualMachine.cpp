@@ -460,7 +460,7 @@ void VirtualMachine::addExternalFunction(const ExternalFunctionRef& f, llvm::LLV
 		f->sig.param_types,
 		false, // captured vars struct ptr
 		f->return_type, 
-		context
+		module
 	);
 
 	llvm::Function* llvm_f = static_cast<llvm::Function*>(module.getOrInsertFunction(
@@ -556,8 +556,8 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 	
 	// Do Operator overloading conversion.
 	// NOTE: This is done during binding stage now.
-	bool op_overloading_changed_tree = false;
-	/*{
+	/*bool op_overloading_changed_tree = false;
+	{
 		std::vector<ASTNode*> stack;
 		TraversalPayload payload(TraversalPayload::OperatorOverloadConversion);
 		

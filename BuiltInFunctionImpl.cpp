@@ -161,7 +161,7 @@ llvm::Value* Constructor::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 	if(this->struct_type->passByValue())
 	{
-		llvm::Value* s = llvm::UndefValue::get(this->struct_type->LLVMType(*params.context));
+		llvm::Value* s = llvm::UndefValue::get(this->struct_type->LLVMType(*params.module));
 
 		for(unsigned int i=0; i<this->struct_type->component_types.size(); ++i)
 		{
@@ -631,7 +631,7 @@ llvm::Value* ArrayMapBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	return makeForLoop(
 		params,
 		from_type->num_elems, // num iterations
-		from_type->elem_type->LLVMType(*params.context), // Loop value type
+		from_type->elem_type->LLVMType(*params.module), // Loop value type
 		//initial_value, // initial val
 		&callback
 	);
@@ -718,7 +718,7 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 	if(specialised_f && specialised_f->body->nodeType() == ASTNode::FunctionExpressionType && specialised_f->body.downcast<FunctionExpression>()->function_name == "update")
 	{
 		llvm::Value* running_state_alloca = entry_block_builder.CreateAlloca(
-			state_type->LLVMType(*params.context), // State
+			state_type->LLVMType(*params.module), // State
 			llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1, true)), // num elems
 			"Running state"
 		);
@@ -856,13 +856,13 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 	//if(!state_type->passByValue())
 	{
 		new_state_alloca = entry_block_builder.CreateAlloca(
-			state_type->LLVMType(*params.context), // State
+			state_type->LLVMType(*params.module), // State
 			llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1, true)), // num elems
 			"New running state"
 		);
 
 		running_state_alloca = entry_block_builder.CreateAlloca(
-			state_type->LLVMType(*params.context), // State
+			state_type->LLVMType(*params.module), // State
 			llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1, true)), // num elems
 			"Running state"
 		);
@@ -1164,7 +1164,7 @@ static llvm::Value* loadGatherElements(EmitLLVMCodeParams& params, int arg_offse
 	// Start with a vector of Undefs.
 	llvm::Value* vec = llvm::ConstantVector::getSplat(
 		index_vec_num_elems,
-		llvm::UndefValue::get(array_elem_type->LLVMType(*params.context))
+		llvm::UndefValue::get(array_elem_type->LLVMType(*params.module))
 	);
 
 	for(int i=0; i<index_vec_num_elems; ++i)
@@ -1203,7 +1203,7 @@ llvm::Value* ArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 	if(do_bounds_check)
 	{
 		// Code for out of bounds array access result.
-		llvm::Value* out_of_bounds_val = field_type->getInvalidLLVMValue(*params.context);
+		llvm::Value* out_of_bounds_val = field_type->getInvalidLLVMValue(*params.module);
 
 		
 
@@ -1258,7 +1258,7 @@ llvm::Value* ArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 		the_function->getBasicBlockList().push_back(MergeBB);
 		params.builder->SetInsertPoint(MergeBB);
 		llvm::PHINode *PN = params.builder->CreatePHI(
-			field_type->LLVMType(*params.context), //field_type->passByValue() ? field_type->LLVMType(*params.context) : LLVMTypeUtils::pointerType(*field_type->LLVMType(*params.context)),
+			field_type->LLVMType(*params.module), //field_type->passByValue() ? field_type->LLVMType(*params.context) : LLVMTypeUtils::pointerType(*field_type->LLVMType(*params.context)),
 			0, // num reserved values
 			"iftmp"
 		);
@@ -1675,7 +1675,7 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	llvm::IRBuilder<> entry_block_builder(&params.currently_building_func->getEntryBlock(), params.currently_building_func->getEntryBlock().getFirstInsertionPt());
 
 	llvm::Value* tuple_alloca = entry_block_builder.CreateAlloca(
-		func_type->return_type->LLVMType(*params.context), // tuple<State, bool>
+		func_type->return_type->LLVMType(*params.module), // tuple<State, bool>
 		llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1, true)), // num elems
 		"Tuple space"
 	);
@@ -1686,7 +1686,7 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	//if(!state_type->passByValue())
 	//{
 		state_alloca = entry_block_builder.CreateAlloca(
-			state_type->LLVMType(*params.context), // State
+			state_type->LLVMType(*params.module), // State
 			llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1, true)), // num elems
 			"Running state"
 		);
@@ -2215,7 +2215,7 @@ llvm::Value* PowBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	args[0] = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
 	args[1] = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
 
-	vector<llvm::Type*> types(1, this->type->LLVMType(*params.context));
+	vector<llvm::Type*> types(1, this->type->LLVMType(*params.module));
 
 	llvm::Function* func = llvm::Intrinsic::getDeclaration(params.module, llvm::Intrinsic::pow, types);
 
@@ -2238,7 +2238,7 @@ static llvm::Value* emitUnaryIntrinsic(EmitLLVMCodeParams& params, const TypeRef
 
 	vector<llvm::Value*> args(1, LLVMTypeUtils::getNthArg(params.currently_building_func, 0));
 
-	vector<llvm::Type*> types(1, type->LLVMType(*params.context));
+	vector<llvm::Type*> types(1, type->LLVMType(*params.module));
 
 	llvm::Function* func = llvm::Intrinsic::getDeclaration(params.module, id, types);
 
@@ -2516,7 +2516,7 @@ llvm::Value* TruncateToIntBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) 
 	TypeRef dest_type = getReturnType(type);
 
 	// Get destination LLVM type
-	llvm::Type* dest_llvm_type = dest_type->LLVMType(*params.context);
+	llvm::Type* dest_llvm_type = dest_type->LLVMType(*params.module);
 
 	return params.builder->CreateFPToSI(
 		LLVMTypeUtils::getNthArg(params.currently_building_func, 0), 
@@ -2561,7 +2561,7 @@ llvm::Value* ToFloatBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	TypeRef dest_type = getReturnType(type);
 
 	// Get destination LLVM type
-	llvm::Type* dest_llvm_type = dest_type->LLVMType(*params.context);
+	llvm::Type* dest_llvm_type = dest_type->LLVMType(*params.module);
 
 	return params.builder->CreateSIToFP(
 		LLVMTypeUtils::getNthArg(params.currently_building_func, 0), 

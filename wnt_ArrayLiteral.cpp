@@ -273,15 +273,15 @@ llvm::Value* ArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 			}
 		}
 
-		assert(this->type()->LLVMType(*params.context)->isArrayTy());
+		assert(this->type()->LLVMType(*params.module)->isArrayTy());
 
 		llvm::GlobalVariable* global = new llvm::GlobalVariable(
 			*params.module,
-			this->type()->LLVMType(*params.context), // This type (array type)
+			this->type()->LLVMType(*params.module), // This type (array type)
 			true, // is constant
 			llvm::GlobalVariable::InternalLinkage,
 			llvm::ConstantArray::get(
-				(llvm::ArrayType*)this->type()->LLVMType(*params.context),
+				(llvm::ArrayType*)this->type()->LLVMType(*params.module),
 				array_llvm_values
 			)
 		);
@@ -304,7 +304,7 @@ llvm::Value* ArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 		llvm::IRBuilder<> entry_block_builder(&params.currently_building_func->getEntryBlock(), params.currently_building_func->getEntryBlock().getFirstInsertionPt());
 
 		array_addr = entry_block_builder.CreateAlloca(
-			this->type()->LLVMType(*params.context), // This type (array type)
+			this->type()->LLVMType(*params.module), // This type (array type)
 			llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1, true)), // num elems
 			//this->elements[0]->type()->LLVMType(*params.context),
 			//llvm::ConstantInt::get(*params.context, llvm::APInt(32, this->elements.size(), true)), // num elems

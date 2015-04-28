@@ -317,7 +317,7 @@ llvm::Value* VectorLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 		// Start with a vector of Undefs.
 		llvm::Value* v = llvm::ConstantVector::getSplat(
 			(unsigned int)this->elements.size(),
-			llvm::UndefValue::get(this->elements[0]->type()->LLVMType(*params.context))
+			llvm::UndefValue::get(this->elements[0]->type()->LLVMType(*params.module))
 		);
 
 		// Insert elements one-by-one.

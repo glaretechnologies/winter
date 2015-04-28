@@ -519,7 +519,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 	// Build vector of function args
 	vector<llvm::Type*> llvm_arg_types(this->args.size());
 	for(size_t i=0; i<this->args.size(); ++i)
-		llvm_arg_types[i] = this->args[i].type->LLVMType(*params.context);
+		llvm_arg_types[i] = this->args[i].type->LLVMType(*params.module);
 
 	// Add Pointer to captured var struct, if there are any captured vars
 	//TEMP since we are returning a closure, the functions will always be passed captured vars.  if(use_captured_vars)
@@ -532,14 +532,14 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 	// Construct the function pointer type
 	llvm::Type* func_ptr_type = LLVMTypeUtils::pointerType(*llvm::FunctionType::get(
-		this->returnType()->LLVMType(*params.context), // result type
+		this->returnType()->LLVMType(*params.module), // result type
 		llvm_arg_types,
 		false // is var arg
 	));
 
 
 	/////////////////////// Get full captured var struct type ///////////////
-	llvm::Type* cap_var_type_ = this->getCapturedVariablesStructType()->LLVMType(*params.context);
+	llvm::Type* cap_var_type_ = this->getCapturedVariablesStructType()->LLVMType(*params.module);
 	llvm::StructType* cap_var_type = static_cast<llvm::StructType*>(cap_var_type_);
 
 
@@ -643,7 +643,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 	}
 
 	// Bitcast the closure pointer down to the 'base' closure type.
-	llvm::Type* base_closure_type = this->type()->LLVMType(*params.context);
+	llvm::Type* base_closure_type = this->type()->LLVMType(*params.module);
 
 	return params.builder->CreateBitCast(
 		closure_pointer,
@@ -688,7 +688,7 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 		arg_types, 
 		use_cap_var_struct_ptr, // this->use_captured_vars, // use captured var struct ptr arg
 		returnType(), 
-		module->getContext()
+		*module
 	);
 
 	//TEMP:

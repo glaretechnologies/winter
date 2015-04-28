@@ -129,7 +129,7 @@ llvm::Constant* StructureValue::getConstantLLVMValue(EmitLLVMCodeParams& params,
 
 
 	return llvm::ConstantStruct::get(
-		(llvm::StructType*)type->LLVMType(*params.context),
+		(llvm::StructType*)type->LLVMType(*params.module),
 		llvm_fields
 	);
 }
@@ -185,10 +185,10 @@ llvm::Constant* ArrayValue::getConstantLLVMValue(EmitLLVMCodeParams& params, con
 		llvm_elems[i] = this->e[i]->getConstantLLVMValue(params, type.downcast<ArrayType>()->elem_type);
 
 
-	assert(type->LLVMType(*params.context)->isArrayTy());
+	assert(type->LLVMType(*params.module)->isArrayTy());
 
 	return llvm::ConstantArray::get(
-		(llvm::ArrayType*)type->LLVMType(*params.context),
+		(llvm::ArrayType*)type->LLVMType(*params.module),
 		llvm_elems
 	);
 }
@@ -283,7 +283,7 @@ llvm::Constant* TupleValue::getConstantLLVMValue(EmitLLVMCodeParams& params, con
 
 
 	return llvm::ConstantStruct::get(
-		(llvm::StructType*)type->LLVMType(*params.context),
+		(llvm::StructType*)type->LLVMType(*params.module),
 		llvm_fields
 	);
 }

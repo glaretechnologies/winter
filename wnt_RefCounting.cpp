@@ -67,7 +67,7 @@ void emitRefCountingFunctions(llvm::Module* module, const llvm::DataLayout* targ
 		);*/
 
 		TypeRef string_type = new String();
-		std::vector<llvm::Type*> arg_types(1, string_type->LLVMType(module->getContext()));
+		std::vector<llvm::Type*> arg_types(1, string_type->LLVMType(*module));
 		//arg_types.push_back(LLVMTypeUtils::voidPtrType(module->getContext())); // hidden_voidptr_arg
 
 		llvm::FunctionType* functype = llvm::FunctionType::get(
@@ -180,7 +180,7 @@ void emitRefCountingFunctions(llvm::Module* module, const llvm::DataLayout* targ
 	// Returns: void
 	{
 		TypeRef string_type = new String();
-		std::vector<llvm::Type*> arg_types(1, string_type->LLVMType(module->getContext()));
+		std::vector<llvm::Type*> arg_types(1, string_type->LLVMType(*module));
 		//arg_types.push_back(LLVMTypeUtils::voidPtrType(module->getContext())); // hidden_voidptr_arg
 
 		llvm::FunctionType* functype = llvm::FunctionType::get(

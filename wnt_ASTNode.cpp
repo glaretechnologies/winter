@@ -1248,7 +1248,7 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 		
 
 		llvm::Type* full_cap_var_type = LLVMTypeUtils::pointerType(
-			*params.currently_building_func_def->getCapturedVariablesStructType()->LLVMType(*params.context)
+			*params.currently_building_func_def->getCapturedVariablesStructType()->LLVMType(*params.module)
 		);
 
 		//std::cout << "full_cap_var_type: " << std::endl;

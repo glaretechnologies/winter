@@ -7,8 +7,6 @@ Generated at Wed Oct 20 15:22:37 +1300 2010
 #pragma once
 
 
-
-namespace llvm { class Function; class FunctionType; class Type; class LLVMContext; class Twine; }
 #ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
 #endif
@@ -17,6 +15,10 @@ namespace llvm { class Function; class FunctionType; class Type; class LLVMConte
 #pragma warning(pop) // Re-enable warnings
 #endif
 #include "wnt_Type.h"
+
+
+namespace llvm { class Function; class FunctionType; class Type; class LLVMContext; class Twine; class Module; }
+class EmitLLVMCodeParams;
 
 
 namespace Winter
@@ -45,11 +47,13 @@ llvm::Type* getPtrToBaseCapturedVarStructType(llvm::LLVMContext& context);
 llvm::FunctionType* llvmFunctionType(const std::vector<TypeRef>& arg_types, 
 									 bool captured_var_struct_ptr_arg,
 									 TypeRef return_type, 
-									 llvm::LLVMContext& context
+									 llvm::Module& module
 									 //bool hidden_voidptr_arg
 									 );
 
 llvm::Value* createFieldLoad(llvm::Value* structure_ptr, int field_index, llvm::IRBuilder<>* builder, const llvm::Twine& name);
+
+void createCollectionCopy(const TypeRef& collection_type, llvm::Value* dest_ptr, llvm::Value* src_ptr, EmitLLVMCodeParams& params);
 
 
 }; // end namespace LLVMTypeUtils

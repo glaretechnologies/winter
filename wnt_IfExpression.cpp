@@ -240,7 +240,7 @@ llvm::Value* IfExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 			llvm::IRBuilder<> entry_block_builder(&params.currently_building_func->getEntryBlock(), params.currently_building_func->getEntryBlock().getFirstInsertionPt());
 
 			return_val_addr = entry_block_builder.Insert(new llvm::AllocaInst(
-				ret_type->LLVMType(*params.context), // type
+				ret_type->LLVMType(*params.module), // type
 				NULL, // ArraySize
 				16 // alignment
 				//"return_val_addr" // target_sig.toString() + " return_val_addr"
@@ -289,7 +289,7 @@ llvm::Value* IfExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 
 	// Create phi node for result value
 	llvm::PHINode* phi_node = params.builder->CreatePHI(
-		ret_type->passByValue() ? ret_type->LLVMType(*params.context) : LLVMTypeUtils::pointerType(*ret_type->LLVMType(*params.context)),
+		ret_type->passByValue() ? ret_type->LLVMType(*params.module) : LLVMTypeUtils::pointerType(*ret_type->LLVMType(*params.module)),
 		0, // num reserved values
 		"iftmp"
 	);

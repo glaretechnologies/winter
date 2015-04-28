@@ -7,6 +7,7 @@ Generated at Wed Oct 20 15:22:37 +1300 2010
 #include "LLVMTypeUtils.h"
 
 
+#include "wnt_ASTNode.h"
 #ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
 #endif
@@ -85,23 +86,23 @@ llvm::Type* getPtrToBaseCapturedVarStructType(llvm::LLVMContext& context)
 llvm::FunctionType* llvmFunctionType(const vector<TypeRef>& arg_types, 
 									 bool captured_var_struct_ptr_arg,
 									 TypeRef return_type, 
-									 llvm::LLVMContext& context)
+									 llvm::Module& module)
 {
 	if(return_type->passByValue())
 	{
 		vector<llvm::Type*> llvm_arg_types;
 
 		for(unsigned int i=0; i<arg_types.size(); ++i)
-			llvm_arg_types.push_back(arg_types[i]->passByValue() ? arg_types[i]->LLVMType(context) : LLVMTypeUtils::pointerType(*arg_types[i]->LLVMType(context)));
+			llvm_arg_types.push_back(arg_types[i]->passByValue() ? arg_types[i]->LLVMType(module) : LLVMTypeUtils::pointerType(*arg_types[i]->LLVMType(module)));
 
 		if(captured_var_struct_ptr_arg)
-			llvm_arg_types.push_back(getPtrToBaseCapturedVarStructType(context));
+			llvm_arg_types.push_back(getPtrToBaseCapturedVarStructType(module.getContext()));
 
 		//if(hidden_voidptr_arg)
 		//	llvm_arg_types.push_back(voidPtrType(context));
 
 		return llvm::FunctionType::get(
-			return_type->LLVMType(context), // return type
+			return_type->LLVMType(module), // return type
 			llvm_arg_types,
 			false // varargs
 			);
@@ -111,21 +112,21 @@ llvm::FunctionType* llvmFunctionType(const vector<TypeRef>& arg_types,
 		// The return value is passed by reference, so that means the zero-th argument will be a pointer to memory where the return value will be placed.
 
 		vector<llvm::Type*> llvm_arg_types;
-		llvm_arg_types.push_back(LLVMTypeUtils::pointerType(*return_type->LLVMType(context)));
+		llvm_arg_types.push_back(LLVMTypeUtils::pointerType(*return_type->LLVMType(module)));
 
 		// Append normal arguments
 		for(unsigned int i=0; i<arg_types.size(); ++i)
-			llvm_arg_types.push_back(arg_types[i]->passByValue() ? arg_types[i]->LLVMType(context) : LLVMTypeUtils::pointerType(*arg_types[i]->LLVMType(context)));
+			llvm_arg_types.push_back(arg_types[i]->passByValue() ? arg_types[i]->LLVMType(module) : LLVMTypeUtils::pointerType(*arg_types[i]->LLVMType(module)));
 
 		if(captured_var_struct_ptr_arg)
-			llvm_arg_types.push_back(getPtrToBaseCapturedVarStructType(context));
+			llvm_arg_types.push_back(getPtrToBaseCapturedVarStructType(module.getContext()));
 
 		//if(hidden_voidptr_arg)
 		//	llvm_arg_types.push_back(voidPtrType(context));
 
 		return llvm::FunctionType::get(
 			//LLVMTypeUtils::pointerType(*return_type->LLVMType(context)), 
-			llvm::Type::getVoidTy(context), // return type - void as return value will be written to mem via zero-th arg.
+			llvm::Type::getVoidTy(module.getContext()), // return type - void as return value will be written to mem via zero-th arg.
 			llvm_arg_types,
 			false // varargs
 			);
@@ -144,6 +145,34 @@ llvm::Value* createFieldLoad(llvm::Value* structure_ptr, int field_index,
 	return builder->CreateLoad(field_ptr, name);
 }
 
+
+void createCollectionCopy(const TypeRef& collection_type, llvm::Value* dest_ptr, llvm::Value* src_ptr, EmitLLVMCodeParams& params)
+{
+	//if(collection_type->getType() == Type::ArrayTypeType)
+	//{
+	//	const ArrayType* array_type = collection_type.downcastToPtr<ArrayType>();
+	//	const TypeRef elem_type = array_type->elem_type;
+	//	params.target_data->getABITypeAlignment
+
+	const bool use_memcpy = false; // collection_type->getType() == Type::ArrayTypeType;
+
+	if(use_memcpy)
+	{
+		llvm::Type* llvm_type = collection_type->LLVMType(*params.module);
+		const size_t size_B = params.target_data->getTypeAllocSize(llvm_type);
+		llvm::Value* size = llvm::ConstantInt::get(*params.context, llvm::APInt(64, size_B, /*signed=*/false));
+		params.builder->CreateMemCpy(dest_ptr, src_ptr, size,
+			32 // align
+		);
+	}
+	else
+	{
+		params.builder->CreateStore(
+			params.builder->CreateLoad(src_ptr),
+			dest_ptr
+		);
+	}
+}
 
 
 }; // end namespace LLVMTypeUtils

@@ -1701,7 +1701,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			llvm::IRBuilder<> entry_block_builder(&params.currently_building_func->getEntryBlock(), params.currently_building_func->getEntryBlock().begin());
 
 			return_val_addr = entry_block_builder.Insert(new llvm::AllocaInst(
-				target_ret_type->LLVMType(*params.context), // type
+				target_ret_type->LLVMType(*params.module), // type
 				NULL, // ArraySize
 				16 // alignment
 				//"return_val_addr" // target_sig.toString() + " return_val_addr"

@@ -157,7 +157,7 @@ void TupleLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 	}
 	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
-		// TODO:
+		// Nothing in particular to do here
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
@@ -206,7 +206,7 @@ llvm::Value* TupleLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 		llvm::IRBuilder<> entry_block_builder(&params.currently_building_func->getEntryBlock(), params.currently_building_func->getEntryBlock().getFirstInsertionPt());
 
 		result_struct_val = entry_block_builder.CreateAlloca(
-			tuple_type->LLVMType(*params.context), // This type (tuple type)
+			tuple_type->LLVMType(*params.module), // This type (tuple type)
 			llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1, true)), // num elems
 			"Tuple literal space"
 		);
