@@ -239,13 +239,11 @@ llvm::Value* IfExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 			// We will emit the alloca at the start of the block, so that it doesn't go after any terminator instructions already created which have to be at the end of the block.
 			llvm::IRBuilder<> entry_block_builder(&params.currently_building_func->getEntryBlock(), params.currently_building_func->getEntryBlock().getFirstInsertionPt());
 
-			return_val_addr = entry_block_builder.Insert(new llvm::AllocaInst(
+			return_val_addr = entry_block_builder.CreateAlloca(
 				ret_type->LLVMType(*params.module), // type
-				NULL, // ArraySize
-				16 // alignment
-				//"return_val_addr" // target_sig.toString() + " return_val_addr"
-			),
-			"if ret");
+				llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1, true)), // num elems
+				"if ret"
+			);
 		}
 	}
 

@@ -1700,13 +1700,11 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			// Emit the alloca in the entry block for better code-gen.
 			llvm::IRBuilder<> entry_block_builder(&params.currently_building_func->getEntryBlock(), params.currently_building_func->getEntryBlock().begin());
 
-			return_val_addr = entry_block_builder.Insert(new llvm::AllocaInst(
+			return_val_addr = entry_block_builder.CreateAlloca(
 				target_ret_type->LLVMType(*params.module), // type
-				NULL, // ArraySize
-				16 // alignment
-				//"return_val_addr" // target_sig.toString() + " return_val_addr"
-			),
-			"" + this->target_function->sig.name + "() ret");
+				llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1, true)), // num elems
+				this->target_function->sig.name + "() ret"
+			);
 		}
 
 		vector<llvm::Value*> args(1, return_val_addr); // First argument is return value pointer.
