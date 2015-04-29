@@ -859,6 +859,76 @@ void LanguageTests::run()
 	testMainFloatArgInvalidProgram("def f(float x) tuple<float, float> : [x, x]t   \n\
 		def main(float x) float :  elem(f(x), truncateToInt(x))");
 
+	// ===================================================================
+	// Test tuples with new parenthesis syntax, e.g. (1, 2, 3)
+	// ===================================================================
+	// Test tuple literals being used immediately with subscript operator.
+	//testMainFloatArg("def main(float x) float :  (x)t[0]", 1.0f, 1.0f);
+	testMainFloatArg("def main(float x) float :  (x + 1.0, x + 2.0)[1]", 1.0f, 3.0f);
+
+	// Test tuples with a mix of types, and elem() calls on each type
+	testMainFloatArg("def main(float x) float :  let t = (x + 1.0, 1) in t[0] + toFloat(t[1])", 1.0f, 3.0f);
+
+	// Test tuples being returned from a function, with subscript operator.
+	//testMainFloatArg("def f(float x) tuple<float> : [x]t   \n\
+	//	def main(float x) float :  f(x)[0]", 1.0f, 1.0f);
+
+
+	// Test tuple literals being used immediately
+	//testMainFloatArg("def main(float x) float :  elem([x]t, 0)", 1.0f, 1.0f);
+	testMainFloatArg("def main(float x) float :  elem((x + 1.0, x + 2.0), 1)", 1.0f, 3.0f);
+
+	// Test tuples being returned from a function
+//	testMainFloatArg("def f(float x) tuple<float> : [x]t   \n\
+//		def main(float x) float :  elem(f(x), 0)", 1.0f, 1.0f);
+	testMainFloatArg("def f(float x) tuple<float, float> : (x, x)   \n\
+		def main(float x) float :  elem(f(x), 0)", 1.0f, 1.0f);
+	testMainFloatArg("def f(float x) tuple<float, float> : (x, x + 1.0)   \n\
+		def main(float x) float :  elem(f(x), 1)", 1.0f, 2.0f);
+
+	// Test tuples being passed as a function argument
+	testMainFloatArg("def f(tuple<float, float> t) float : elem(t, 1)   \n\
+		def main(float x) float :  f((x + 1.0, x + 2.0))", 1.0f, 3.0f);
+
+	// Test tuples being passed as a function argument and returned
+	testMainFloatArg("def f(tuple<float, float> t) tuple<float, float> : t   \n\
+		def main(float x) float :  elem(f((x + 1.0, x + 2.0)), 1)", 1.0f, 3.0f);
+
+	// Test a tuple with a mixture of types
+	testMainFloatArg("def f(float x) tuple<float, int> : (x, 2)   \n\
+		def main(float x) float :  elem(f(x), 0)", 1.0f, 1.0f);
+
+	testMainFloatArg("def f(float x) tuple<float, int, bool> : (x, 2, true)   \n\
+		def main(float x) float :  elem(f(x), 0)", 1.0f, 1.0f);
+
+	// Test nested tuples
+	testMainFloatArg("def f(float x) tuple<tuple<float, float>, tuple<float, float>> : ((x, x + 1.0), (x + 2.0, x + 3.0))   \n\
+		def main(float x) float :  elem(elem(f(x), 1), 0)", 1.0f, 3.0f);
+
+	// Test a structure in a tuple
+	testMainFloatArg("struct S { float a, int b }		\n\
+		def f(float x) tuple<S, float> : (S(x + 2.0, 1), x)   \n\
+		def main(float x) float :  elem(f(x), 0).a", 1.0f, 3.0f);
+
+	// Test a tuple in a stucture
+	testMainFloatArg("struct S { tuple<float, float> a, int b }		\n\
+		def f(float x) S : S((x + 2.0, x), 1)   \n\
+		def main(float x) float :  elem(f(x).a, 0)", 1.0f, 3.0f);
+
+
+	// Test empty tumple - not allowed.
+	testMainFloatArgInvalidProgram("def f(float x) tuple<> : ()   \n\
+		def main(float x) float :  elem(f(x), 0)");
+
+	// Test tuple index out of bounds
+	testMainFloatArgInvalidProgram("def f(float x) tuple<float, float> : (x, x)   \n\
+		def main(float x) float :  elem(f(x), -1)");
+	testMainFloatArgInvalidProgram("def f(float x) tuple<float, float> : (x, x)   \n\
+		def main(float x) float :  elem(f(x), 2)");
+
+	// Test varying index (invalid)
+	testMainFloatArgInvalidProgram("def f(float x) tuple<float, float> : (x, x)   \n\
+		def main(float x) float :  elem(f(x), truncateToInt(x))");
 
 	} // end if DO_OPENCL_TESTS
 

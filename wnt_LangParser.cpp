@@ -744,12 +744,44 @@ ASTNodeRef LangParser::parseBasicExpression(ParseInfo& p)
 	if(p.i >= p.tokens.size())
 		throw LangParserExcep("End of buffer while parsing basic expression." + errorPosition(p));
 
+	SrcLocation loc = locationForParseInfo(p);
+
 	if(isTokenCurrent(OPEN_PARENTHESIS_TOKEN, p))
 	{
 		// Parse parenthesised expression
-		parseToken(OPEN_PARENTHESIS_TOKEN, p);
+		p.i++; // Comsume open paren
+
+		if(isTokenCurrent(CLOSE_PARENTHESIS_TOKEN, p))
+		{
+			// Then this is an empty tuple, which we won't allow
+			throw LangParserExcep("Empty tuples not allowed." + errorPosition(p));
+		}
 
 		const ASTNodeRef e = parseExpression(p);
+
+		if(isTokenCurrent(COMMA_TOKEN, p)) // If there is a comma here, we are parsing a tuple, e.g. "(1, 2)"
+		{
+			p.i++; // Consume comma
+
+			vector<ASTNodeRef> tuple_elems(1, e);
+			while(1)
+			{
+				tuple_elems.push_back(parseExpression(p));
+
+				if(isTokenCurrent(CLOSE_PARENTHESIS_TOKEN, p))
+				{
+					// done.
+					p.i++;
+					return new TupleLiteral(tuple_elems, loc);
+				}
+				else if(isTokenCurrent(COMMA_TOKEN, p))
+				{
+					p.i++;
+				}
+				else
+					throw LangParserExcep("Unexpected token while parsing tuple." + errorPosition(p));
+			}
+		}
 
 		parseToken(CLOSE_PARENTHESIS_TOKEN, p);
 
