@@ -195,18 +195,12 @@ llvm::Value* Constructor::emitLLVMCode(EmitLLVMCodeParams& params) const
 			}
 			else
 			{
-				// Load the value from memory
-				llvm::Value* arg_value = params.builder->CreateLoad(arg_value_or_ptr);
-
-				// Store
-				params.builder->CreateStore(arg_value, field_ptr);
-
-				/*LLVMTypeUtils::createCollectionCopy(
+				LLVMTypeUtils::createCollectionCopy(
 					this->struct_type->component_types[i], 
 					field_ptr, // dest ptr
 					arg_value_or_ptr, // src ptr
 					params
-				);*/
+				);
 			}
 
 			// If the field is of string type, we need to increment its reference count
@@ -263,7 +257,7 @@ llvm::Value* GetField::emitLLVMCode(EmitLLVMCodeParams& params) const
 	}
 	else
 	{
-		TypeRef field_type = this->struct_type->component_types[this->index];
+		const TypeRef field_type = this->struct_type->component_types[this->index];
 		const std::string field_name = this->struct_type->component_names[this->index];
 
 		if(field_type->passByValue())
@@ -294,14 +288,11 @@ llvm::Value* GetField::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 			llvm::Value* field_ptr = params.builder->CreateStructGEP(struct_ptr, this->index, field_name + " ptr");
 
-			llvm::Value* field_val = params.builder->CreateLoad(
-				field_ptr,
-				field_name // name
-			);
-
-			params.builder->CreateStore(
-				field_val, // value
-				return_ptr // ptr
+			LLVMTypeUtils::createCollectionCopy(
+				field_type, 
+				return_ptr, // dest ptr
+				field_ptr, // src ptr
+				params
 			);
 
 			return NULL;
@@ -419,7 +410,7 @@ llvm::Value* GetTupleElementBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 	}
 	else
 	{
-		TypeRef field_type = this->tuple_type->component_types[this->index];
+		const TypeRef field_type = this->tuple_type->component_types[this->index];
 		const std::string field_name = "field " + ::toString(this->index);
 
 		if(field_type->passByValue())
@@ -450,14 +441,11 @@ llvm::Value* GetTupleElementBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 
 			llvm::Value* field_ptr = params.builder->CreateStructGEP(struct_ptr, this->index, field_name + " ptr");
 
-			llvm::Value* field_val = params.builder->CreateLoad(
-				field_ptr,
-				field_name // name
-			);
-
-			params.builder->CreateStore(
-				field_val, // value
-				return_ptr // ptr
+			LLVMTypeUtils::createCollectionCopy(
+				field_type, 
+				return_ptr, // dest ptr
+				field_ptr, // src ptr
+				params
 			);
 
 			return NULL;

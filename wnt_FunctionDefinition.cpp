@@ -672,7 +672,7 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 		//bool hidden_voidptr_arg
 	) const
 {
-	vector<TypeRef> arg_types = this->sig.param_types;
+	const vector<TypeRef> arg_types = this->sig.param_types;
 
 	/*if(use_captured_vars) // !this->captured_vars.empty())
 	{
@@ -736,6 +736,12 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 		this->sig.typeMangledName(), //makeSafeStringForFunctionName(this->sig.toString()), // Name
 		functype // Type
 	);
+
+	if(!llvm::isa<llvm::Function>(llvm_func_constant))
+	{
+		assert(0);
+		throw BaseException("Internal error while building function '" + sig.toString() + "', result was not a function.");
+	}
 
 	llvm::Function* llvm_func = static_cast<llvm::Function*>(llvm_func_constant);
 
@@ -913,14 +919,11 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 					//else
 					{
 						// Load value
-						llvm::Value* val = params.builder->CreateLoad(
-							body_code
-						);
-
-						// And store at return_val_ptr
-						params.builder->CreateStore(
-							val, // value
-							return_val_ptr // ptr
+						LLVMTypeUtils::createCollectionCopy(
+							body->type(), 
+							return_val_ptr, // dest ptr
+							body_code, // src ptr
+							params
 						);
 					}
 				}

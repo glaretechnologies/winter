@@ -791,6 +791,18 @@ void LanguageTests::run()
 	// ===================================================================
 	// Test tuples
 	// ===================================================================
+	// Test tuple literals being used immediately with subscript operator.
+	testMainFloatArg("def main(float x) float :  [x]t[0]", 1.0f, 1.0f);
+	testMainFloatArg("def main(float x) float :  [x + 1.0, x + 2.0]t[1]", 1.0f, 3.0f);
+
+	// Test tuples with a mix of types, and elem() calls on each type
+	testMainFloatArg("def main(float x) float :  let t = [x + 1.0, 1]t in t[0] + toFloat(t[1])", 1.0f, 3.0f);
+
+	// Test tuples being returned from a function, with subscript operator.
+	testMainFloatArg("def f(float x) tuple<float> : [x]t   \n\
+		def main(float x) float :  f(x)[0]", 1.0f, 1.0f);
+
+
 	// Test tuple literals being used immediately
 	testMainFloatArg("def main(float x) float :  elem([x]t, 0)", 1.0f, 1.0f);
 	testMainFloatArg("def main(float x) float :  elem([x + 1.0, x + 2.0]t, 1)", 1.0f, 3.0f);

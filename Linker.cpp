@@ -518,10 +518,9 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 					new GetTupleElementBuiltInFunc(sig.param_types[0].downcast<TupleType>(), std::numeric_limits<unsigned int>::max()) // built in impl.
 				);
 
-				// NOTE: because shuffle is unusual in that it has the shuffle mask 'baked into it', we need a unique ShuffleBuiltInFunc impl each time.
-				// So don't add to function map, so that it isn't reused.
-				// However, we need to add it to unique_functions to prevent it from being deleted, as calling function expr doesn't hold a ref to it.
-				unique_functions.push_back(def);
+				// This isn't really a proper function, and cannot be, because the return type depends on the index.
+				// So it will just be special cased in the FunctionExpression node code emission, and no actual func should be generated for it.
+				unique_functions_no_codegen.push_back(def);
 				return def;
 			}
 		}

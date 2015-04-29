@@ -154,15 +154,19 @@ void createCollectionCopy(const TypeRef& collection_type, llvm::Value* dest_ptr,
 	//	const TypeRef elem_type = array_type->elem_type;
 	//	params.target_data->getABITypeAlignment
 
-	const bool use_memcpy = false; // collection_type->getType() == Type::ArrayTypeType;
+	const bool use_memcpy = 
+		collection_type->getType() == Type::ArrayTypeType; //||
+		// gives module verification errors: collection_type->getType() == Type::StructureTypeType;
 
 	if(use_memcpy)
 	{
+		const unsigned int type_alignment = params.target_data->getABITypeAlignment(collection_type->LLVMType(*params.module));
+
 		llvm::Type* llvm_type = collection_type->LLVMType(*params.module);
 		const size_t size_B = params.target_data->getTypeAllocSize(llvm_type);
 		llvm::Value* size = llvm::ConstantInt::get(*params.context, llvm::APInt(64, size_B, /*signed=*/false));
 		params.builder->CreateMemCpy(dest_ptr, src_ptr, size,
-			32 // align
+			type_alignment // align
 		);
 	}
 	else

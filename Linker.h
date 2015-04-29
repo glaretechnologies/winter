@@ -65,6 +65,8 @@ private:
 
 	std::vector<Reference<FunctionDefinition> > unique_functions;
 
+	std::vector<Reference<FunctionDefinition> > unique_functions_no_codegen; // hang on to them, don't generate code for them though.
+
 	typedef std::map<FunctionSignature, ExternalFunctionRef > ExternalFuncMapType;
 	ExternalFuncMapType external_functions;
 

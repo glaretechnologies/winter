@@ -218,24 +218,29 @@ llvm::Value* TupleLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 		// Get the pointer to the structure field.
 		llvm::Value* field_ptr = params.builder->CreateStructGEP(result_struct_val, i);
 
-		llvm::Value* arg_value = this->elements[i]->emitLLVMCode(params);
+		llvm::Value* arg_value_or_ptr = this->elements[i]->emitLLVMCode(params);
 
-		if(!tuple_type->component_types[i]->passByValue())
+		if(tuple_type->component_types[i]->passByValue())
 		{
-			// Load the value from memory
-			arg_value = params.builder->CreateLoad(
-				arg_value // ptr
+			params.builder->CreateStore(
+				arg_value_or_ptr, // value
+				field_ptr // ptr
+			);
+		}
+		else
+		{
+			LLVMTypeUtils::createCollectionCopy(
+				tuple_type->component_types[i], 
+				field_ptr, // dest ptr
+				arg_value_or_ptr, // src ptr
+				params
 			);
 		}
 
-		params.builder->CreateStore(
-			arg_value, // value
-			field_ptr // ptr
-		);
 
 		// If the field is of string type, we need to increment its reference count
 		if(tuple_type->component_types[i]->getType() == Type::StringType)
-			RefCounting::emitIncrementStringRefCount(params, arg_value);
+			RefCounting::emitIncrementStringRefCount(params, arg_value_or_ptr);
 	}
 
 	return result_struct_val;
