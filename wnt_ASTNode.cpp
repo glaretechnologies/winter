@@ -85,7 +85,15 @@ void printMargin(int depth, std::ostream& s)
 
 bool isIntExactlyRepresentableAsFloat(int64 x)
 {
-	return ((int64)((float)x)) == x;
+	//return ((int64)((float)x)) == x;
+
+	// Make the floating point value pass through an SSE register so it gets rounded to 32-bits.
+	// Otherwise it may just get stored in a higher-precision float register.
+	const float y = (float)x;
+	float y2;
+	_mm_store_ss(&y2, _mm_load_ss(&y));
+
+	return (int64)y2 == x;
 }
 
 
