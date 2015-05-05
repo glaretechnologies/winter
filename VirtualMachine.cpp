@@ -204,6 +204,20 @@ public:
 		if(res != func_map->end())
 			return (uint64_t)res->second;
 
+		// For some reason, DynamicLibrary::SearchForAddressOfSymbol() doesn't seem to work on Windows 32-bit.  So just manually resolve these symbols.
+		if(name == "sinf")
+			return (uint64_t)sinf;
+		else if(name == "cosf")
+			return (uint64_t)cosf;
+		else if(name == "powf")
+			return (uint64_t)powf;
+		else if(name == "expf")
+			return (uint64_t)expf;
+		else if(name == "logf")
+			return (uint64_t)logf;
+		else if(name == "memcpy")
+			return (uint64_t)memcpy;
+
 		// For OS X:
 		if(name == "_sinf")
 			return (uint64_t)sinf;
