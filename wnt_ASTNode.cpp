@@ -26,6 +26,7 @@ File created by ClassTemplate on Wed Jun 11 03:55:25 2008
 #include "maths/mathstypes.h"
 #include "maths/vec2.h"
 #include <ostream>
+#include <xmmintrin.h> // SSE header file
 #ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
 #endif
