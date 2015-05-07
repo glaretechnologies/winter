@@ -316,7 +316,7 @@ static void doTestMainFloatArg(const std::string& src, float argument, float tar
 
 
 		//============================= New: test with OpenCL ==============================
-		const bool TEST_OPENCL = true;
+		const bool TEST_OPENCL = false;
 		if(!(test_flags & INVALID_OPENCL) && TEST_OPENCL)
 		{
 #if USE_OPENCL
@@ -599,7 +599,7 @@ static void testMainIntegerArg(const std::string& src, int x, int target_return_
 		}
 
 		//============================= New: test with OpenCL ==============================
-		const bool TEST_OPENCL = true;
+		const bool TEST_OPENCL = false;
 		if(TEST_OPENCL)
 		{
 #if USE_OPENCL
