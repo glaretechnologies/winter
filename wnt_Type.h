@@ -20,6 +20,8 @@ namespace Winter
 
 
 class Value;
+class EmitLLVMCodeParams;
+class TupleType;
 
 
 class Type : public RefCounted
@@ -35,6 +37,7 @@ public:
 		BoolType,
 		MapType,
 		ArrayTypeType,
+		VArrayTypeType,
 		FunctionType,
 		StructureTypeType,
 		VectorTypeType,
@@ -55,6 +58,8 @@ public:
 	virtual bool passByValue() const { return true; }
 	virtual Reference<Value> getInvalidValue() const; // For array out-of-bounds
 	virtual llvm::Value* getInvalidLLVMValue(llvm::Module& module) const; // For array out-of-bounds
+	virtual void emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const; // Default implementation does nothing.
+	virtual void emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const; // Default implementation does nothing.
 
 	inline TypeType getType() const { return type; }
 private:
@@ -165,6 +170,8 @@ public:
 	virtual llvm::Type* LLVMType(llvm::Module& module) const;
 	virtual const std::string OpenCLCType() const { return "string"; }
 	virtual bool passByValue() const { return true; } // Pass the pointer 'by value'
+	virtual void emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const;
+	virtual void emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const;
 };
 
 
@@ -318,6 +325,38 @@ public:
 };
 
 
+// Variable-length array
+class VArrayType : public Type
+{
+public:
+	VArrayType(const TypeRef& elem_type_) : Type(VArrayTypeType), elem_type(elem_type_) { assert(elem_type_.nonNull()); }
+	virtual const std::string toString() const;
+	virtual bool lessThan(const Type& b) const
+	{
+		if(getType() < b.getType())
+			return true;
+		else if(b.getType() < getType())
+			return false;
+		else
+		{
+			// else b is a structure as well
+			const VArrayType& b_array = static_cast<const VArrayType&>(b);
+			return this->elem_type->lessThan(*b_array.elem_type);
+		}
+	}
+	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
+
+	virtual llvm::Type* LLVMType(llvm::Module& module) const;
+	virtual const std::string OpenCLCType() const;
+	virtual bool passByValue() const { return true; } // Pass the pointer 'by value'
+
+	virtual void emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const;
+	virtual void emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const;
+
+	TypeRef elem_type;
+};
+
+
 class StructureType : public Type
 {
 public:
@@ -344,8 +383,12 @@ public:
 	virtual const std::string OpenCLCType() const { return name; }
 	virtual bool passByValue() const { return false; }
 
+	virtual void emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const;
+	virtual void emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const;
+
 	const std::string getOpenCLCDefinition(); // Get full definition string, e.g. struct a { float b; };
 
+	std::vector<Reference<TupleType> > getElementTupleTypes() const;
 
 	std::string name;
 	std::vector<TypeRef> component_types;
@@ -394,10 +437,12 @@ public:
 	virtual const std::string OpenCLCType() const;
 	virtual bool passByValue() const { return false; }
 
-	const std::string getOpenCLCDefinition(); // Get full definition string, e.g. struct a { float b; };
+	const std::string getOpenCLCDefinition() const; // Get full definition string, e.g. struct a { float b; };
 
 	std::vector<TypeRef> component_types;
 };
+
+typedef Reference<TupleType> TupleTypeRef;
 
 
 class VectorType : public Type
@@ -551,6 +596,12 @@ inline bool operator != (const Type& a, const Type& b)
 {
 	return a.lessThan(b) || b.lessThan(a);
 }
+
+
+struct TypeRefLessThan
+{
+	bool operator() (const TypeRef& a, const TypeRef& b) const { return *a < *b; }
+};
 
 
 } // end namespace Winter

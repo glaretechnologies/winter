@@ -26,6 +26,7 @@ File created by ClassTemplate on Wed Jun 11 03:55:25 2008
 #endif
 #include <string>
 #include <vector>
+#include <set>
 namespace llvm { class Function; };
 namespace llvm { class Value; };
 namespace llvm { class Module; };
@@ -169,9 +170,15 @@ class CommonFunctions
 public:
 	FunctionDefinition* allocateStringFunc;
 	FunctionDefinition* freeStringFunc;
+	
+	FunctionDefinition* allocateVArrayFunc;
+	FunctionDefinition* freeVArrayFunc;
 
 	llvm::Function* decrStringRefCountLLVMFunc;
 	llvm::Function* incrStringRefCountLLVMFunc;
+
+	llvm::Function* decrVArrayRefCountLLVMFunc;
+	llvm::Function* incrVArrayRefCountLLVMFunc;
 };
 
 
@@ -207,6 +214,8 @@ public:
 	std::string file_scope_code;
 
 	std::vector<std::string> blocks;
+
+	std::set<TupleTypeRef, TypeRefLessThan> tuple_types_used;
 
 	int uid;
 };
@@ -293,7 +302,7 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* return_space_pointer = NULL) const = 0;
 
 	// Emit cleanup (ref count decrement and delete) code at the end of the function
-	virtual void emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* val) const;
+	//virtual void emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* val) const;
 
 	// For the global const array optimisation: Return the AST node as a LLVM value directly.
 	virtual llvm::Value* getConstantLLVMValue(EmitLLVMCodeParams& params) const;
@@ -472,7 +481,7 @@ public:
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
-	virtual void emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* val) const;
+	//virtual void emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* val) const;
 	virtual Reference<ASTNode> clone();
 	virtual bool isConstant() const { return true; }
 
@@ -492,7 +501,7 @@ public:
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
-	virtual void emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* val) const;
+	//virtual void emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* val) const;
 	virtual Reference<ASTNode> clone();
 	virtual bool isConstant() const { return true; }
 
@@ -729,13 +738,14 @@ public:
 	//virtual void bindVariables(const std::vector<ASTNode*>& stack);
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
-	virtual void emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* val) const;
+	//virtual void emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* val) const;
 	virtual Reference<ASTNode> clone();
 	virtual bool isConstant() const;
 
 	std::string variable_name;
 	ASTNodeRef expr;
 	TypeRef declared_type;
+	//mutable llvm::Value* llvm_value;
 };
 
 
@@ -819,7 +829,7 @@ class NamedConstant : public ASTNode
 {
 public:
 	NamedConstant(const TypeRef& declared_type_, const std::string& name_, const ASTNodeRef& value_expr_, const SrcLocation& loc, int order_num_) : 
-	  ASTNode(NamedConstantType, loc), declared_type(declared_type_), name(name_), value_expr(value_expr_), order_num(order_num_)
+	  ASTNode(NamedConstantType, loc), declared_type(declared_type_), name(name_), value_expr(value_expr_), order_num(order_num_), llvm_value(NULL)
 	{
 	}
 
@@ -837,6 +847,7 @@ public:
 	std::string name;
 	ASTNodeRef value_expr;
 	int order_num;
+	mutable llvm::Value* llvm_value;
 };
 
 typedef Reference<NamedConstant> NamedConstantRef;

@@ -38,7 +38,7 @@ namespace Winter
 {
 
 
-
+const uint32 INVALID_OPENCL = 1; // Flag value
 
 
 static bool epsEqual(float x, float y)
@@ -233,7 +233,7 @@ static void testMainFloatArgInvalidProgram(const std::string& src)
 }
 
 
-static void doTestMainFloatArg(const std::string& src, float argument, float target_return_val, bool check_constant_folded_to_literal)
+static void doTestMainFloatArg(const std::string& src, float argument, float target_return_val, bool check_constant_folded_to_literal, bool allow_unsafe_operations, uint32 test_flags)
 {
 	std::cout << "===================== Winter testMainFloatArg() =====================" << std::endl;
 	try
@@ -244,6 +244,7 @@ static void doTestMainFloatArg(const std::string& src, float argument, float tar
 		VMConstructionArgs vm_args;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
 		vm_args.env = &test_env;
+		vm_args.allow_unsafe_operations = allow_unsafe_operations;
 
 		{
 			ExternalFunctionRef f(new ExternalFunction());
@@ -315,8 +316,8 @@ static void doTestMainFloatArg(const std::string& src, float argument, float tar
 
 
 		//============================= New: test with OpenCL ==============================
-		const bool TEST_OPENCL = false;
-		if(TEST_OPENCL)
+		const bool TEST_OPENCL = true;
+		if(!(test_flags & INVALID_OPENCL) && TEST_OPENCL)
 		{
 #if USE_OPENCL
 			OpenCL* opencl = getGlobalOpenCL();
@@ -338,7 +339,11 @@ static void doTestMainFloatArg(const std::string& src, float argument, float tar
 				"	output_buffer[0] = main_float_(x);		\n" + 
 				" }";
 
-			std::cout << extended_source << std::endl;
+			/*std::cout << extended_source << std::endl;
+			{
+				std::ofstream f("opencl_source.c");
+				f << extended_source;
+			}*/
 
 			OpenCLBuffer output_buffer(context, sizeof(float), CL_MEM_READ_WRITE);
 
@@ -360,7 +365,7 @@ static void doTestMainFloatArg(const std::string& src, float argument, float tar
 			);
 
 
-			opencl->dumpBuildLog(program, opencl->getDeviceInfo()[0].opencl_device, print_output); 
+			//opencl->dumpBuildLog(program, opencl->getDeviceInfo()[0].opencl_device, print_output); 
 
 			// Create kernel
 			cl_int result;
@@ -438,18 +443,32 @@ static void doTestMainFloatArg(const std::string& src, float argument, float tar
 }
 
 
-static void testMainFloatArg(const std::string& src, float argument, float target_return_val)
+static void testMainFloatArg(const std::string& src, float argument, float target_return_val, uint32 test_flags = 0)
 {
 	doTestMainFloatArg(src, argument, target_return_val,
-		false // check constant-folded to literal
+		false, // check constant-folded to literal
+		false, // allow_unsafe_operations
+		test_flags
 	);
 }
 
 
-static void testMainFloatArgCheckConstantFolded(const std::string& src, float argument, float target_return_val)
+static void testMainFloatArgAllowUnsafe(const std::string& src, float argument, float target_return_val, uint32 test_flags = 0)
 {
 	doTestMainFloatArg(src, argument, target_return_val,
-		true // check constant-folded to literal
+		false, // check constant-folded to literal
+		true, // allow_unsafe_operations
+		test_flags
+	);
+}
+
+
+static void testMainFloatArgCheckConstantFolded(const std::string& src, float argument, float target_return_val, uint32 test_flags = 0)
+{
+	doTestMainFloatArg(src, argument, target_return_val,
+		true, // check constant-folded to literal
+		false, // allow_unsafe_operations
+		test_flags
 	);
 }
 
@@ -580,7 +599,7 @@ static void testMainIntegerArg(const std::string& src, int x, int target_return_
 		}
 
 		//============================= New: test with OpenCL ==============================
-		const bool TEST_OPENCL = false;
+		const bool TEST_OPENCL = true;
 		if(TEST_OPENCL)
 		{
 #if USE_OPENCL
@@ -608,10 +627,9 @@ static void testMainIntegerArg(const std::string& src, int x, int target_return_
 				"	output_buffer[0] = main_int_(x);		\n" + 
 				" }";
 
-			std::cout << extended_source << std::endl;
-
-			/*{
-				std::ofstream f("opencl_source.txt");
+			/*std::cout << extended_source << std::endl;
+			{
+				std::ofstream f("opencl_source.c");
 				f << extended_source;
 			}*/
 
@@ -635,9 +653,7 @@ static void testMainIntegerArg(const std::string& src, int x, int target_return_
 			);
 
 
-	#if BUILD_TESTS
-			opencl->dumpBuildLog(program, opencl->getDeviceInfo()[0].opencl_device, print_output); 
-	#endif
+			//opencl->dumpBuildLog(program, opencl->getDeviceInfo()[0].opencl_device, print_output); 
 
 			// Create kernel
 			cl_int result;

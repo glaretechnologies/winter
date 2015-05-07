@@ -149,6 +149,21 @@ public:
 typedef Reference<ArrayValue> ArrayValueRef;
 
 
+class VArrayValue : public Value
+{
+public:
+	VArrayValue(){}
+	VArrayValue(const std::vector<ValueRef>& e_) : e(e_) {}
+	~VArrayValue();
+	virtual Value* clone() const;
+	virtual const std::string toString() const;
+	virtual llvm::Constant* getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const;
+
+	std::vector<ValueRef> e;
+};
+typedef Reference<VArrayValue> VArrayValueRef;
+
+
 class VectorValue : public Value
 {
 public:

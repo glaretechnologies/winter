@@ -40,6 +40,16 @@ llvm::Value* Type::getInvalidLLVMValue(llvm::Module& module) const // For array 
 }
 
 
+void Type::emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const // Default implementation does nothing.
+{
+}
+
+
+void Type::emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const // Default implementation does nothing.
+{
+}
+
+
 //==========================================================================
 
 
@@ -194,6 +204,18 @@ llvm::Type* String::LLVMType(llvm::Module& module) const
 	));
 
 	//return LLVMTypeUtils::voidPtrType(context);
+}
+
+
+void String::emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const
+{
+	params.builder->CreateCall(params.common_functions.incrStringRefCountLLVMFunc, ref_counted_value);
+}
+
+
+void String::emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const
+{
+	params.builder->CreateCall(params.common_functions.decrStringRefCountLLVMFunc, ref_counted_value);
 }
 
 
@@ -414,6 +436,111 @@ llvm::Type* ArrayType::LLVMType(llvm::Module& module) const
 //==========================================================================
 
 
+const std::string VArrayType::toString() const
+{ 
+	return "varray<" + elem_type->toString() + ">";
+}
+
+
+const std::string VArrayType::OpenCLCType() const
+{
+	// For e.g. an array of floats, use type 'float*'.
+	return elem_type->OpenCLCType() + "*";
+}
+
+
+bool VArrayType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
+{
+	if(this->getType() != b.getType())
+		return false;
+
+	// So b is a VArray as well.
+	const VArrayType* b_ = static_cast<const VArrayType*>(&b);
+
+	return this->elem_type->matchTypes(*b_->elem_type, type_mapping);
+}
+
+
+llvm::Type* VArrayType::LLVMType(llvm::Module& module) const
+{
+	// See if there is a struct with this name already:
+	/*const std::string use_name = makeSafeStringForFunctionName(this->toString());
+	llvm::StructType* existing_struct_type = module.getTypeByName(use_name);
+	if(existing_struct_type)
+		return LLVMTypeUtils::pointerType(*existing_struct_type);
+
+	// else create the named struct:
+
+	llvm::Type* field_types[] = {
+		llvm::Type::getInt64Ty(module.getContext()), // Reference count field
+		LLVMTypeUtils::pointerType(*this->elem_type->LLVMType(module)) // Pointer to element type
+	};
+
+	llvm::StructType* struct_type = llvm::StructType::create(
+		module.getContext(),
+		llvm::makeArrayRef(field_types, 2)
+		// NOTE: is_packed is default = false.
+	);
+
+	return LLVMTypeUtils::pointerType(*struct_type);*/
+
+	//return LLVMTypeUtils::pointerType(
+	//	*this->elem_type->LLVMType(module) // Element type
+	//);
+	/*llvm::Type* field_types[] = {
+		llvm::Type::getInt64Ty(module.getContext()), // Reference count field
+		LLVMTypeUtils::pointerType(*this->elem_type->LLVMType(module)) // Pointer to element type
+	};
+
+	return LLVMTypeUtils::pointerType(*llvm::StructType::get(
+		module.getContext(),
+		llvm::makeArrayRef(field_types, 2)
+	));*/
+
+	/*return LLVMTypeUtils::pointerType(
+		*llvm::Type::getInt64Ty(module.getContext())
+	);*/
+
+	llvm::Type* field_types[] = {
+		llvm::Type::getInt64Ty(module.getContext()), // Reference count field
+		llvm::ArrayType::get(  // Variable-size array of element types
+			this->elem_type->LLVMType(module),
+			0 // Num elements
+		)
+	};
+
+	return LLVMTypeUtils::pointerType(*llvm::StructType::get(
+		module.getContext(),
+		llvm::makeArrayRef(field_types, 2)
+	));
+}
+
+
+void VArrayType::emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const
+{
+	const TypeRef dummy_varray_type = new VArrayType(new Int());
+
+	// Cast to dummy_varray_type
+	llvm::Value* cast_val = params.builder->CreatePointerCast(ref_counted_value, dummy_varray_type->LLVMType(*params.module));
+
+	params.builder->CreateCall(params.common_functions.incrVArrayRefCountLLVMFunc, cast_val);
+}
+
+
+void VArrayType::emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const
+{
+	const TypeRef dummy_varray_type = new VArrayType(new Int());
+
+	// Cast to dummy_varray_type
+	llvm::Value* cast_val = params.builder->CreatePointerCast(ref_counted_value, dummy_varray_type->LLVMType(*params.module));
+
+	params.builder->CreateCall(params.common_functions.decrVArrayRefCountLLVMFunc, cast_val);
+}
+
+
+//==========================================================================
+
+
 bool Map::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
 {
 	throw BaseException("Map::matchTypes: unimplemented.");
@@ -510,14 +637,14 @@ llvm::Type* StructureType::LLVMType(llvm::Module& module) const
 
 const std::string StructureType::getOpenCLCDefinition() // Get full definition string, e.g. struct a { float b; };
 {
-	std::string s = "typedef struct\n{\n";
+	std::string s = "typedef struct " + name + "\n{\n";
 
 	for(size_t i=0; i<component_types.size(); ++i)
 	{
 		s += "\t" + component_types[i]->OpenCLCType() + " " + component_names[i] + ";\n";
 	}
 
-	s += "} " + name + ";\n";
+	s += "} " + name + ";\n\n";
 
 
 	// Make constructor.
@@ -527,6 +654,7 @@ const std::string StructureType::getOpenCLCDefinition() // Get full definition s
 	// FunctionDefinition::Funct
 	FunctionSignature sig(name, component_types);
 
+	s += "// Constructor for " + toString() + "\n";
 	s += name + " " + sig.typeMangledName() + "(";
 
 	for(size_t i=0; i<component_types.size(); ++i)
@@ -541,9 +669,72 @@ const std::string StructureType::getOpenCLCDefinition() // Get full definition s
 	for(size_t i=0; i<component_types.size(); ++i)
 		s += "s_." + component_names[i] + " = " + component_names[i] + "; ";
 
-	s += "return s_; }\n";
+	s += "return s_; }\n\n";
 
 	return s;
+}
+
+
+std::vector<Reference<TupleType> > StructureType::getElementTupleTypes() const
+{
+	// TODO: recursive search for tuples.
+	std::vector<Reference<TupleType> > res;
+	for(size_t i = 0; i<component_types.size(); ++i)
+		if(component_types[i]->getType() == Type::TupleTypeType)
+			res.push_back(component_types[i].downcast<TupleType>());
+	return res;
+}
+
+
+void StructureType::emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const
+{
+
+}
+
+
+void StructureType::emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const
+{
+	for(size_t i=0; i<component_types.size(); ++i)
+	{
+		// Recursivly call emitCleanupLLVMCode on each refcounted element.
+		if(component_types[i]->getType() == Type::StringType ||
+			component_types[i]->getType() == Type::VArrayTypeType/* ||
+			struct_type.component_types[i]->getType() == Type::StructureTypeType*/) // TODO: handle this
+		{
+
+			llvm::Value* ptr = params.builder->CreateStructGEP(ref_counted_value, (unsigned int)i);
+			llvm::Value* val = params.builder->CreateLoad(ptr);
+
+			component_types[i]->emitDecrRefCount(params, val);
+		}
+
+		/*if(struct_type.component_types[i]->getType() == Type::StringType)
+		{
+			// Emit code to load the string value:
+			//structure_val->dump();
+			//structure_val->getType()->dump();
+			llvm::Value* str_ptr = params.builder->CreateStructGEP(structure_val, (unsigned int)i, struct_type.name + ".str ptr");
+
+			// Load the string value
+			//str_ptr->dump();
+			//str_ptr->getType()->dump();
+			llvm::Value* str = params.builder->CreateLoad(str_ptr, struct_type.name + ".str");
+
+			//str->dump();
+			//str->getType()->dump();
+			emitStringCleanupLLVMCode(params, str);
+		}
+		else if(struct_type.component_types[i]->getType() == Type::VArrayTypeType)
+		{
+			// Emit code to load the varray value:
+			llvm::Value* ptr = params.builder->CreateStructGEP(structure_val, (unsigned int)i, struct_type.name + ".varray ptr");
+
+			// Load the  value
+			llvm::Value* varray_val = params.builder->CreateLoad(ptr, struct_type.name + ".str");
+
+			emitVArrayCleanupLLVMCode(params, varray_val);
+		}*/
+	}
 }
 
 
@@ -614,24 +805,37 @@ const std::string TupleType::toString() const
 //}
 
 
+/*
+ struct { float e0; float e1; }
+*/
 const std::string TupleType::OpenCLCType() const
 {
 	return makeSafeStringForFunctionName(this->toString());
+	/*std::string s = "struct { ";
+
+	for(size_t i=0; i<component_types.size(); ++i)
+	{
+		s += component_types[i]->OpenCLCType() + " field_" + ::toString(i) + "; ";
+	}
+
+	s += "}";
+	return s;*/
 }
 
 
-const std::string TupleType::getOpenCLCDefinition() // Get full definition string, e.g. struct a { float b; };
+const std::string TupleType::getOpenCLCDefinition() const // Get full definition string, e.g. struct a { float b; };
 {
-	std::string s = "typedef struct\n{\n";
+	std::string s = "// Definition of tuple " + toString() + "\n";
+	s += "typedef struct\n{\n";
 
-	const std::string tuple_typename = OpenCLCType(); // makeSafeStringForFunctionName(this->toString());
+ 	const std::string tuple_typename = OpenCLCType(); // makeSafeStringForFunctionName(this->toString());
 
 	for(size_t i=0; i<component_types.size(); ++i)
 	{
 		s += "\t" + component_types[i]->OpenCLCType() + " field_" + ::toString(i) + ";\n";
 	}
 
-	s += "} " + tuple_typename + ";\n";
+	s += "} " + tuple_typename + ";\n\n";
 
 
 	// Make constructor.
@@ -640,6 +844,7 @@ const std::string TupleType::getOpenCLCDefinition() // Get full definition strin
 
 	const std::string constructor_name = makeSafeStringForFunctionName(this->toString()) + "_cnstr";
 
+	s += "// Constructor for " + toString() + "\n";
 	s += tuple_typename + " " + constructor_name + "(";
 
 	for(size_t i=0; i<component_types.size(); ++i)
@@ -654,7 +859,7 @@ const std::string TupleType::getOpenCLCDefinition() // Get full definition strin
 	for(size_t i=0; i<component_types.size(); ++i)
 		s += "s_.field_" + ::toString(i) + " = field_" + ::toString(i) + "; ";
 
-	s += "return s_; }\n";
+	s += "return s_; }\n\n";
 
 	return s;
 }

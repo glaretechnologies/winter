@@ -25,8 +25,8 @@ File created by ClassTemplate on Wed Jun 11 03:55:25 2008
 #include "utils/StringUtils.h"
 #include "maths/mathstypes.h"
 #include "maths/vec2.h"
-#include <ostream>
 #include <xmmintrin.h> // SSE header file
+#include <ostream>
 #ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
 #endif
@@ -117,6 +117,26 @@ bool expressionIsWellTyped(ASTNode& e, TraversalPayload& payload_)
 }
 
 
+static bool isLiteral(const ASTNode& e)
+{
+	return e.nodeType() == ASTNode::FloatLiteralType ||
+		e.nodeType() == ASTNode::BoolLiteralType ||
+		e.nodeType() == ASTNode::IntLiteralType ||
+		e.nodeType() == ASTNode::VectorLiteralType ||
+		e.nodeType() == ASTNode::ArrayLiteralType ||
+		e.nodeType() == ASTNode::TupleLiteralType;
+}
+
+
+static bool isReferenceToArray(const ASTNodeRef& e)
+{
+	if(e->nodeType() == ASTNode::LetType &&
+		e->type()->getType() == Type::ArrayTypeType)
+		return true;
+	return false;
+}
+
+
 bool shouldFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
 {
 	assert(e.nonNull());
@@ -132,7 +152,7 @@ bool shouldFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
 				(e_type->getType() == Type::BoolType &&	(e->nodeType() != ASTNode::BoolLiteralType)) ||
 				(e_type->getType() == Type::IntType && (e->nodeType() != ASTNode::IntLiteralType)) ||
 				(e_type->getType() == Type::VectorTypeType && (e->nodeType() != ASTNode::VectorLiteralType)) ||
-				(e_type->getType() == Type::ArrayTypeType && (e->nodeType() != ASTNode::ArrayLiteralType)) ||
+				(e_type->getType() == Type::ArrayTypeType && (e->nodeType() != ASTNode::ArrayLiteralType && e->nodeType() != ASTNode::VariableASTNodeType)) ||
 				(e_type->getType() == Type::TupleTypeType && (e->nodeType() != ASTNode::TupleLiteralType))
 			);
 	}
@@ -234,7 +254,7 @@ ASTNodeRef foldExpression(ASTNodeRef& e, TraversalPayload& payload)
 }
 
 
-// Returns true if folding took place or e is already a literal.
+// Returns true if folding took place or e is already a literal. (Or could be folded to a literal if needed, such as a let var referring to an array)
 bool checkFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
 {
 	if(e.isNull())
@@ -263,7 +283,7 @@ bool checkFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
 			(e_type->getType() == Type::BoolType &&	(e->nodeType() == ASTNode::BoolLiteralType)) ||
 			(e_type->getType() == Type::IntType && (e->nodeType() == ASTNode::IntLiteralType)) ||
 			(e_type->getType() == Type::VectorTypeType && (e->nodeType() == ASTNode::VectorLiteralType)) ||
-			(e_type->getType() == Type::ArrayTypeType && (e->nodeType() == ASTNode::ArrayLiteralType)) ||
+			(e_type->getType() == Type::ArrayTypeType && (e->nodeType() == ASTNode::ArrayLiteralType || e->nodeType() == ASTNode::VariableASTNodeType)) ||
 			(e_type->getType() == Type::TupleTypeType && (e->nodeType() == ASTNode::TupleLiteralType))
 		);
 	return e_is_literal && e->can_maybe_constant_fold;
@@ -633,10 +653,10 @@ TypeRef CapturedVar::type() const
 //----------------------------------------------------------------------------------
 
 
-void ASTNode::emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* val) const
-{
-	assert(0);
-}
+//void ASTNode::emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* val) const
+//{
+//	assert(0);
+//}
 
 
 // For the global const array optimisation: Return the AST node as a LLVM value directly.
@@ -1053,6 +1073,11 @@ void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 			
 			this->can_maybe_constant_fold = let_val_is_literal;
 		}
+		else if(this->vartype == BoundToNamedConstant)
+		{
+			const bool let_val_is_literal = checkFoldExpression(this->bound_named_constant->value_expr, payload);
+			this->can_maybe_constant_fold = let_val_is_literal;
+		}
 	}
 }
 
@@ -1325,7 +1350,7 @@ bool Variable::isConstant() const
 //------------------------------------------------------------------------------------
 
 
-static const std::string floatValueString(float x)
+/*static const std::string floatValueString(float x)
 {
 	const std::string s = toString(x);
 
@@ -1334,7 +1359,7 @@ static const std::string floatValueString(float x)
 		return s + "f"; // e.g '2.3' -> '2.3f'
 	else
 		return s + ".f"; // e.g. '2'  ->  '2.f'
-}
+}*/
 
 
 ValueRef FloatLiteral::exec(VMState& vmstate)
@@ -1346,19 +1371,19 @@ ValueRef FloatLiteral::exec(VMState& vmstate)
 void FloatLiteral::print(int depth, std::ostream& s) const
 {
 	printMargin(depth, s);
-	s << "Float literal: " + floatValueString(this->value) + "\n";
+	s << "Float literal: " + floatLiteralString(this->value) + "\n";
 }
 
 
 std::string FloatLiteral::sourceString() const
 {
-	return floatValueString(this->value);
+	return floatLiteralString(this->value);
 }
 
 
 std::string FloatLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
-	return floatValueString(this->value);
+	return floatLiteralString(this->value);
 }
 
 
@@ -1547,7 +1572,7 @@ void MapLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 			checkFoldExpression(items[i].second, payload);
 		}
 	}
-	else */if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	else */if(payload.operation == TraversalPayload::BindVariables)
 	{
 		for(size_t i=0; i<items.size(); ++i)
 		{
@@ -1617,8 +1642,7 @@ void StringLiteral::print(int depth, std::ostream& s) const
 
 std::string StringLiteral::sourceString() const
 {
-	assert(0);
-	return "";
+	return "\"" + this->value + "\"";
 }
 
 
@@ -1714,10 +1738,10 @@ llvm::Value* StringLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 }
 
 
-void StringLiteral::emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* string_val) const
-{
-	RefCounting::emitStringCleanupLLVMCode(params, string_val);
-}
+//void StringLiteral::emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* string_val) const
+//{
+//	//RefCounting::emitStringCleanupLLVMCode(params, string_val);
+//}
 
 
 Reference<ASTNode> StringLiteral::clone()
@@ -1774,10 +1798,10 @@ llvm::Value* CharLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* 
 }
 
 
-void CharLiteral::emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* string_val) const
-{
-	//emitStringCleanupLLVMCode(params, string_val);
-}
+//void CharLiteral::emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* string_val) const
+//{
+//	//emitStringCleanupLLVMCode(params, string_val);
+//}
 
 
 Reference<ASTNode> CharLiteral::clone()
@@ -2234,7 +2258,7 @@ std::string SubtractionExpression::sourceString() const
 
 std::string SubtractionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
-	return a->emitOpenCLC(params) + " - " + b->emitOpenCLC(params);
+	return "(" + a->emitOpenCLC(params) + " - " + b->emitOpenCLC(params) + ")";
 }
 
 
@@ -2673,7 +2697,10 @@ std::string MulExpression::sourceString() const
 
 std::string MulExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
-	return "(" + a->emitOpenCLC(params) + " * " + b->emitOpenCLC(params) + ")";
+	const std::string a_res = a->emitOpenCLC(params);
+	const std::string b_res = b->emitOpenCLC(params);
+
+	return "(" + a_res + " * " + b_res + ")";
 }
 
 
@@ -3282,7 +3309,7 @@ std::string DivExpression::sourceString() const
 
 std::string DivExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
-	return a->emitOpenCLC(params) + " / " + b->emitOpenCLC(params);
+	return "(" + a->emitOpenCLC(params) + " / " + b->emitOpenCLC(params) + ")";
 }
 
 
@@ -3724,7 +3751,7 @@ void LogicalNegationExpr::traverse(TraversalPayload& payload, std::vector<ASTNod
 			throw BaseException("Unknown operand type." + errorContext(*this, payload));
 
 		if(this_type->getType() != Type::BoolType)
-			throw BaseException("Type '" + this->type()->toString() + "' does not define logical negation operator '!'.");
+			throw BaseException("Type '" + this->type()->toString() + "' does not define logical negation operator '!'." + errorContext(*this, payload));
 	}
 	else if(payload.operation == TraversalPayload::BindVariables)
 	{
@@ -3883,7 +3910,13 @@ void LetASTNode::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 
 llvm::Value* LetASTNode::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
-	llvm::Value* v = expr->emitLLVMCode(params);
+	//if(!llvm_value)
+	//	llvm_value = expr->emitLLVMCode(params);
+
+	//return llvm_value;
+	return expr->emitLLVMCode(params);
+
+	//llvm::Value* v = expr->emitLLVMCode(params);
 	
 	// If this is a string value, need to decr ref count at end of func.
 	/*if(this->type()->getType() == Type::StringType)
@@ -3891,14 +3924,18 @@ llvm::Value* LetASTNode::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* r
 		params.cleanup_values.push_back(CleanUpInfo(this, v));
 	}*/
 
-	return v;
+	//return v;
+
+
 }
 
 
-void LetASTNode::emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* val) const
-{
-	RefCounting::emitCleanupLLVMCode(params, this->type(), val);
-}
+//void LetASTNode::emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* val) const
+//{
+//	//if(!(expr->nodeType() == ASTNode::VariableASTNodeType && expr.downcastToPtr<Variable>()->vartype == Variable::LetVariable)) // Don't decr let var ref counts, the ref block will do that.
+//	//	this->type()->emitDecrRefCount(params, val);
+//		// RefCounting::emitCleanupLLVMCode(params, this->type(), val);
+//}
 
 
 Reference<ASTNode> LetASTNode::clone()
@@ -4044,7 +4081,7 @@ std::string ComparisonExpression::sourceString() const
 
 std::string ComparisonExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
-	return a->emitOpenCLC(params) + tokenString(this->token->getType()) + b->emitOpenCLC(params);
+	return "(" + a->emitOpenCLC(params) + tokenString(this->token->getType()) + b->emitOpenCLC(params) + ")";
 }
 
 
@@ -4379,7 +4416,8 @@ llvm::Value* LetBlock::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 	//for(size_t i=0; i<lets.size(); ++i)
 	//	let_exprs_llvm_value[i] = this->lets[i]->emitLLVMCode(params, ret_space_ptr);
 
-	params.let_block_let_values.insert(std::make_pair(this, std::vector<llvm::Value*>()));
+	//params.let_block_let_values.insert(std::make_pair(this, std::vector<llvm::Value*>()));
+	params.let_block_let_values[this] = std::vector<llvm::Value*>();
 
 	//std::vector<llvm::Value*> let_values(lets.size());
 	for(size_t i=0; i<lets.size(); ++i)
@@ -4397,6 +4435,15 @@ llvm::Value* LetBlock::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 	llvm::Value* expr_value = expr->emitLLVMCode(params, ret_space_ptr);
 
 	params.let_block_stack.pop_back();
+
+	// Decrement ref counts on all let blocks
+	for(size_t i=0; i<lets.size(); ++i)
+	{
+		if(!(this->lets[i]->expr->nodeType() == ASTNode::VariableASTNodeType))
+			this->lets[i]->type()->emitDecrRefCount(params, params.let_block_let_values[this][i]);
+
+		//this->lets[i]->emitCleanupLLVMCode(params, params.let_block_let_values[this][i]);
+	}
 
 	return expr_value;
 }
@@ -4559,14 +4606,13 @@ void NamedConstant::print(int depth, std::ostream& s) const
 
 std::string NamedConstant::sourceString() const
 {
-	assert(0);
-	return "";
+	return name + " = " + value_expr->sourceString();
 }
 
 
 std::string NamedConstant::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
-	return name + " = " + value_expr->emitOpenCLC(params);
+	return "" + type()->OpenCLCType() + " __constant " + name + " = " + value_expr->emitOpenCLC(params) + ";";
 }
 
 
@@ -4613,6 +4659,10 @@ void NamedConstant::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	}
 	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
+		//TEMP:
+		//if(!isLiteral(*this->value_expr))
+		//	throw BaseException("Named constant was not reduced to a literal. " + errorContext(*this, payload));
+
 		// Check that value_expr is constant now.  NOTE: not sure this is the best place/phase to do it.
 		if(!value_expr->isConstant())
 			throw BaseException("Named constant value was not constant. " + errorContext(*this, payload));
@@ -4632,8 +4682,19 @@ void NamedConstant::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
 		//this->can_constant_fold = value_expr->can_constant_fold && expressionIsWellTyped(*this, payload);
+		
 		const bool is_literal = checkFoldExpression(value_expr, payload);
 		this->can_maybe_constant_fold = is_literal;
+
+	/*	if(!this->isConstant())
+			throw BaseException("Named constant value expression was not constant." + errorContext(*this));
+
+		VMState vmstate;
+		vmstate.func_args_start.push_back(0);
+
+		ValueRef retval = this->value_expr->exec(vmstate);
+
+		this->value_expr = makeLiteralASTNodeFromValue(retval, this->srcLocation(), this->type());*/
 	}
 
 	stack.pop_back();
@@ -4644,7 +4705,14 @@ void NamedConstant::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 
 llvm::Value* NamedConstant::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
-	return value_expr->emitLLVMCode(params, ret_space_ptr);
+	if(isLiteral(*this->value_expr))
+	{
+		if(!llvm_value)
+			llvm_value = value_expr->emitLLVMCode(params, ret_space_ptr);
+		return llvm_value;
+	}
+	else
+		return value_expr->emitLLVMCode(params, ret_space_ptr);
 }
 
 

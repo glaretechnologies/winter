@@ -10,6 +10,7 @@ Generated at 2011-04-25 19:15:40 +0100
 #include "wnt_LLVMVersion.h"
 #include "wnt_ASTNode.h"
 #include "wnt_SourceBuffer.h"
+#include "wnt_RefCounting.h"
 #include "VMState.h"
 #include "Value.h"
 #include "Linker.h"
@@ -440,11 +441,11 @@ std::string FunctionDefinition::sourceString() const
 
 std::string FunctionDefinition::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
-	assert(declared_return_type.nonNull());
+	assert(returnType().nonNull());
 
 
 	// Emit forwards declaration to file scope code:
-	std::string opencl_sig = this->declared_return_type->OpenCLCType() + " ";
+	std::string opencl_sig = this->returnType()->OpenCLCType() + " ";
 	opencl_sig += sig.typeMangledName() + "(";
 	for(unsigned int i=0; i<args.size(); ++i)
 	{
@@ -753,6 +754,13 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 
 	llvm_func->setAttributes(attributes);
 
+	
+	// Mark return type as nonnull if it's a pointer
+	if(this->returnType()->getType() == Type::VArrayTypeType)
+	{
+	//	llvm_func->addAttribute(llvm::AttributeSet::ReturnIndex, llvm::Attribute::NonNull);
+	}
+
 	// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
 	llvm_func->setCallingConv(llvm::CallingConv::C);
 
@@ -880,17 +888,27 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	}
 	else
 	{
+		// Increment ref counts on all (ref counted) arguments:
+		const size_t num_sret_args = this->returnType()->passByValue() ? 0 : 1;
+		for(size_t i=0; i<this->sig.param_types.size(); ++i)
+			sig.param_types[i]->emitIncrRefCount(params, LLVMTypeUtils::getNthArg(llvm_func, i + num_sret_args));
+
+
 		if(this->returnType()->passByValue())
 		{
 			llvm::Value* body_code = this->body->emitLLVMCode(params);
 
 			// Emit cleanup code for reference-counted values.
-			for(size_t z=0; z<params.cleanup_values.size(); ++z)
+			/*for(size_t z=0; z<params.cleanup_values.size(); ++z)
 			{
 				// Don't want to clean up (decr ref) the return value.
-				if(params.cleanup_values[z].node != this->body.getPointer())
+				//if(params.cleanup_values[z].node != this->body.getPointer())
 					params.cleanup_values[z].node->emitCleanupLLVMCode(params, params.cleanup_values[z].value);
-			}
+			}*/
+
+			// Decrement ref counts on all (ref counted) arguments:
+			for(size_t i=0; i<this->sig.param_types.size(); ++i)
+				sig.param_types[i]->emitDecrRefCount(params, LLVMTypeUtils::getNthArg(llvm_func, i));
 
 			builder.CreateRet(body_code);
 		}
@@ -964,12 +982,16 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 			}
 
 			// Emit cleanup code for reference-counted values.
-			for(size_t z=0; z<params.cleanup_values.size(); ++z)
+			/*for(size_t z=0; z<params.cleanup_values.size(); ++z)
 			{
 				// Don't want to clean up (decr ref) the return value.
 				if(params.cleanup_values[z].node != this->body.getPointer())
 					params.cleanup_values[z].node->emitCleanupLLVMCode(params, params.cleanup_values[z].value);
-			}
+			}*/
+
+			// Decrement ref counts on all (ref counted) arguments:
+			for(size_t i=0; i<this->sig.param_types.size(); ++i)
+				sig.param_types[i]->emitDecrRefCount(params, LLVMTypeUtils::getNthArg(llvm_func, i));
 
 			builder.CreateRetVoid();
 

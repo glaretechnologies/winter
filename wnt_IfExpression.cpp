@@ -334,19 +334,19 @@ llvm::Value* IfExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 	}
 
 	// If this is a string value, need to decr ref count at end of func.
-	if(ret_type->getType() == Type::StringType)
+	/*if(ret_type->getType() == Type::StringType)
 	{
 		params.cleanup_values.push_back(CleanUpInfo(this, phi_node));
-	}
+	}*/
 
 	return phi_node;
 }
 
 
-void IfExpression::emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* val) const
-{
-	RefCounting::emitCleanupLLVMCode(params, this->type(), val);
-}
+//void IfExpression::emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* val) const
+//{
+//	//RefCounting::emitCleanupLLVMCode(params, this->type(), val);
+//}
 
 
 //llvm::Value* IfExpression::getConstantLLVMValue(EmitLLVMCodeParams& params) const

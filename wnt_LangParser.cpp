@@ -15,6 +15,7 @@ File created by ClassTemplate on Wed Jun 11 02:56:20 2008
 #include "wnt_VectorLiteral.h"
 #include "wnt_ArrayLiteral.h"
 #include "wnt_TupleLiteral.h"
+#include "wnt_VArrayLiteral.h"
 #include "BuiltInFunctionImpl.h"
 #include "indigo/TestUtils.h"
 #include "indigo/globals.h"
@@ -97,10 +98,11 @@ Reference<BufferRoot> LangParser::parseBuffer(const std::vector<Reference<TokenB
 			}
 			else if(tokens[i]->isIdentifier() && tokens[i]->getIdentifierValue() == "struct")
 			{
+				const unsigned int struct_position = parseinfo.i;
 				Reference<StructureType> t = parseStructType(parseinfo);
 				
 				if(named_types.find(t->name) != named_types.end())
-					throw BaseException("struct with name '" + t->name + "' already defined: " + errorPosition(*source_buffer, tokens[i]->char_index));
+					throw BaseException("struct with name '" + t->name + "' already defined: " + errorPosition(*parseinfo.text_buffer, struct_position));
 
 				named_types[t->name] = t;
 				named_types_ordered_out.push_back(t);
@@ -655,19 +657,19 @@ ASTNodeRef LangParser::parseLiteral(ParseInfo& p)
 	}
 	else if(p.tokens[p.i]->getType() == FLOAT_LITERAL_TOKEN)
 	{
-		return ASTNodeRef( new FloatLiteral(p.tokens[p.i++]->getFloatLiteralValue(), loc) );
+		return new FloatLiteral(p.tokens[p.i++]->getFloatLiteralValue(), loc);
 	}
-	/*TEMP NO STRING LITERALS else if(p.tokens[p.i]->getType() == STRING_LITERAL_TOKEN)
+	else if(p.tokens[p.i]->getType() == STRING_LITERAL_TOKEN)
 	{
-		return ASTNodeRef( new StringLiteral(p.tokens[p.i++]->getStringLiteralValue(), loc) );
-	}*/
+		return new StringLiteral(p.tokens[p.i++]->getStringLiteralValue(), loc);
+	}
 	else if(p.tokens[p.i]->getType() == CHAR_LITERAL_TOKEN)
 	{
-		return ASTNodeRef( new CharLiteral(p.tokens[p.i++]->getCharLiteralValue(), loc) );
+		return new CharLiteral(p.tokens[p.i++]->getCharLiteralValue(), loc);
 	}
 	else if(p.tokens[p.i]->getType() == BOOL_LITERAL_TOKEN)
 	{
-		return ASTNodeRef( new BoolLiteral(p.tokens[p.i++]->getBoolLiteralValue(), loc) );
+		return new BoolLiteral(p.tokens[p.i++]->getBoolLiteralValue(), loc);
 	}
 	else
 	{
@@ -847,25 +849,27 @@ TypeRef LangParser::parseElementaryType(ParseInfo& p)
 {
 	const std::string t = parseIdentifier("type", p);
 	if(t == "float" || t == "real")
-		return TypeRef(new Float());
+		return new Float();
 	else if(t == "int")
-		return TypeRef(new Int());
+		return new Int();
 	else if(t == "int64")
-		return TypeRef(new Int(64));
-	//else if(t == "string")
-	//	return TypeRef(new String());
+		return new Int(64);
+	else if(t == "string")
+		return new String();
 	else if(t == "char")
-		return TypeRef(new CharType());
+		return new CharType();
 	else if(t == "opaque" || t == "voidptr")
-		return TypeRef(new OpaqueType());
+		return new OpaqueType();
 	else if(t == "bool")
-		return TypeRef(new Bool());
+		return new Bool();
 	//else if(t == "error")
 	//	return new ErrorType();
 	else if(t == "map")
 		return parseMapType(p);
 	else if(t == "array")
 		return parseArrayType(p);
+	else if(t == "varray")
+		return parseVArrayType(p);
 	else if(t == "function")
 		return parseFunctionType(p);
 	else if(t == "vector")
@@ -925,6 +929,18 @@ TypeRef LangParser::parseArrayType(ParseInfo& p)
 	parseToken(RIGHT_ANGLE_BRACKET_TOKEN, p);
 
 	return new ArrayType(t, int_literal->value);
+}
+
+
+TypeRef LangParser::parseVArrayType(ParseInfo& p)
+{
+	parseToken(LEFT_ANGLE_BRACKET_TOKEN, p);
+
+	TypeRef t = parseType(p);
+
+	parseToken(RIGHT_ANGLE_BRACKET_TOKEN, p);
+
+	return new VArrayType(t);
 }
 
 
@@ -1405,6 +1421,21 @@ ASTNodeRef LangParser::parseArrayOrVectorOrTupleLiteral(ParseInfo& p)
 				throw LangParserExcep("Invalid square bracket literal suffix '" + id + "'.");
 		}
 		return ASTNodeRef(new ArrayLiteral(elems, loc, has_int_suffix, int_suffix));
+	}
+	else if(hasPrefix(id, "va"))
+	{
+		int int_suffix = 0;
+		bool has_int_suffix = false;
+		Parser temp_p(id.c_str(), (int)id.size());
+		temp_p.advance(); // Advance past 'v'
+		temp_p.advance(); // Advance past 'a'
+		if(!temp_p.eof())
+		{
+			has_int_suffix = true;
+			if(!temp_p.parseInt(int_suffix))
+				throw LangParserExcep("Invalid square bracket literal suffix '" + id + "'.");
+		}
+		return new VArrayLiteral(elems, loc, has_int_suffix, int_suffix);
 	}
 	else if(hasPrefix(id, "v"))
 	{

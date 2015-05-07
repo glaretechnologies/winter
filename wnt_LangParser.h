@@ -69,7 +69,8 @@ public:
 		const SourceBufferRef& source_buffer,
 		std::map<std::string, TypeRef>& named_types,
 		std::vector<TypeRef>& named_types_ordered_out,
-		int& function_order_num);
+		int& function_order_num
+	);
 
 	static void test();
 
@@ -103,6 +104,7 @@ private:
 	TypeRef parseElementaryType(ParseInfo& parseinfo);
 	TypeRef parseMapType(ParseInfo& parseinfo);
 	TypeRef parseArrayType(ParseInfo& parseinfo);
+	TypeRef parseVArrayType(ParseInfo& parseinfo);
 	TypeRef parseFunctionType(ParseInfo& parseinfo);
 	Reference<StructureType> parseStructType(ParseInfo& parseinfo);
 	TypeRef parseVectorType(ParseInfo& parseinfo);

@@ -61,7 +61,7 @@ public:
 	virtual std::string sourceString() const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
-	virtual void emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* string_val) const;
+	//virtual void emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* string_val) const;
 	virtual llvm::Value* getConstantLLVMValue(EmitLLVMCodeParams& params) const;
 	virtual Reference<ASTNode> clone();
 	virtual bool isConstant() const;

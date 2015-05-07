@@ -203,9 +203,8 @@ llvm::Value* Constructor::emitLLVMCode(EmitLLVMCodeParams& params) const
 				);
 			}
 
-			// If the field is of string type, we need to increment its reference count
-		//TEMP	if(this->struct_type->component_types[i]->getType() == Type::StringType)
-		//		RefCounting::emitIncrementStringRefCount(params, arg_value);
+			// If the field is a ref-counted type, we need to increment its reference count, since the newly constructed struct now holds a reference to it.
+			this->struct_type->component_types[i]->emitIncrRefCount(params, arg_value_or_ptr);
 		}
 
 		return NULL;
@@ -273,8 +272,8 @@ llvm::Value* GetField::emitLLVMCode(EmitLLVMCodeParams& params) const
 			);
 
 			// TEMP NEW: increment ref count if this is a string
-			if(field_type->getType() == Type::StringType)
-				RefCounting::emitIncrementStringRefCount(params, loaded_val);
+			//if(field_type->getType() == Type::StringType)
+			//	RefCounting::emitIncrementStringRefCount(params, loaded_val);
 
 			return loaded_val;
 		}
@@ -426,8 +425,8 @@ llvm::Value* GetTupleElementBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 			);
 
 			// TEMP NEW: increment ref count if this is a string
-			if(field_type->getType() == Type::StringType)
-				RefCounting::emitIncrementStringRefCount(params, loaded_val);
+			//if(field_type->getType() == Type::StringType)
+			//	RefCounting::emitIncrementStringRefCount(params, loaded_val);
 
 			return loaded_val;
 		}
@@ -1344,6 +1343,126 @@ llvm::Value* ArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 //------------------------------------------------------------------------------------
 
 
+//------------------------------------------------------------------------------------
+
+
+VArraySubscriptBuiltInFunc::VArraySubscriptBuiltInFunc(const Reference<VArrayType>& array_type_, const TypeRef& index_type_)
+:	array_type(array_type_), index_type(index_type_)
+{}
+
+
+ValueRef VArraySubscriptBuiltInFunc::invoke(VMState& vmstate)
+{
+	// Array pointer is in arg 0.
+	// Index or index vector is in arg 1.
+	const VArrayValue* arr = checkedCast<const VArrayValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+
+	if(index_type->getType() == Type::IntType)
+	{
+		const IntValue* index = checkedCast<const IntValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
+
+		if(index->value >= 0 && index->value < arr->e.size())
+			return arr->e[index->value];
+		else
+			throw BaseException("VArray index out of bounds"); // return this->array_type->elem_type->getInvalidValue();
+	}
+	else // else index vector
+	{
+		const VectorValue* index_vec = checkedCast<const VectorValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
+
+		vector<ValueRef> res(index_vec->e.size());
+
+		for(size_t i=0; i<index_vec->e.size(); ++i)
+		{
+			ValueRef index_val = index_vec->e[i];
+			const int64 index = checkedCast<IntValue>(index_val.getPointer())->value;
+			if(index < 0 || index >= arr->e.size())
+				throw BaseException("Index out of bounds");
+
+			res[i] = arr->e[index];
+		}
+
+		return new VectorValue(res);
+	}
+}
+
+
+llvm::Value* VArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	// Let's assume VArrays are always pass-by-pointer for now.
+
+	TypeRef field_type = this->array_type->elem_type;
+
+	const int arg_offset = field_type->passByValue() ? 0 : 1;
+	llvm::Value* index     = LLVMTypeUtils::getNthArg(params.currently_building_func, arg_offset + 1);
+
+	
+	if(index_type->getType() == Type::IntType)
+	{
+		// Scalar index
+
+		if(field_type->passByValue())
+		{
+			llvm::Value* varray_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, arg_offset + 0); // Type: { i64, [0 x float] }*
+			
+			varray_ptr->dump();
+			varray_ptr->getType()->dump();
+
+			//llvm::Value* data_ptr_ptr = params.builder->CreateStructGEP(varray_ptr, 1, "data ptr ptr");
+			//llvm::Value* data_ptr = params.builder->CreateLoad(data_ptr_ptr);
+			llvm::Value* data_ptr = params.builder->CreateStructGEP(varray_ptr, 1, "data_ptr"); // [0 x T]*
+
+			data_ptr->dump();
+			data_ptr->getType()->dump();
+
+			llvm::Value* indices[] = { llvm::ConstantInt::get(*params.context, llvm::APInt(64, 0)), index };
+			llvm::Value* elem_ptr = params.builder->CreateInBoundsGEP(data_ptr, llvm::makeArrayRef(indices));
+
+			
+			elem_ptr->dump();
+			elem_ptr->getType()->dump();
+
+			return params.builder->CreateLoad(elem_ptr);
+		}
+		else // Else if element type is pass-by-pointer
+		{
+			assert(0);
+			//TODO
+
+			// Pointer to memory for return value will be 0th argument.
+			llvm::Value* return_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+
+			llvm::Value* elem_val = loadElement(
+				params, 
+				1 // arg offset - we have an sret arg.
+			);
+
+			// Store the element
+			params.builder->CreateStore(
+				elem_val, // value
+				return_ptr // ptr
+			);
+
+			return NULL;
+		}
+	}
+	else if(index_type->getType() == Type::VectorTypeType)
+	{
+		//TODO
+		assert(0);
+		return NULL;
+	}
+	else
+	{
+		assert(0);
+		return NULL;
+	}
+}
+
+
+//------------------------------------------------------------------------------------
+
+
 VectorSubscriptBuiltInFunc::VectorSubscriptBuiltInFunc(const Reference<VectorType>& vec_type_, const TypeRef& index_type_)
 :	vec_type(vec_type_), index_type(index_type_)
 {}
@@ -1815,6 +1934,76 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 		params.builder->CreateStore(running_state, return_ptr);
 		return return_ptr;
 	}
+}
+
+
+/*
+iterate(function<State, int, LoopInvariantData0, LoopInvariantData1, ..., LoopInvariantDataN, tuple<State, bool>> f, State initial_state, LoopInvariantData0, LoopInvariantData1, ..., LoopInvariantDataN) State
+
+
+State state = initial_state;
+Store initial_state in state_alloca
+
+iteration = 0;
+while(1)
+{
+	//res = f(state, iteration);
+	f(tuple_alloca, state_alloca, iteration)
+
+	if(tuple_alloca->second == false)
+		copy tuple_alloca->first to result
+		return
+
+	iteration++;
+	
+	// state = res.first;
+	copy tuple_alloca->first to state_alloca
+}
+*/
+const std::string IterateBuiltInFunc::emitOpenCLForFunctionArg(EmitOpenCLCodeParams& params,
+		const FunctionDefinition* f, // arg 0
+		const std::vector<ASTNodeRef>& argument_expressions
+	)
+{
+	const std::string state_typename = argument_expressions[1]->type()->OpenCLCType();
+	const std::string tuple_typename = f->returnType()->OpenCLCType();
+
+	std::string s;
+	// Emit
+	s = state_typename + " iterate_" + toString(params.uid++) + "(" + state_typename + " initial_state";
+
+	// Add invariant data args
+	for(size_t i = 0; i<invariant_data_types.size(); ++i)
+		s += ", " + invariant_data_types[i]->OpenCLCType() + " LoopInvariantData" + toString(i);
+
+	s += ")\n";
+	s += "{\n";
+	s += "\t" + state_typename + " state = initial_state;\n";
+	s += "\tint iteration = 0;\n";
+	s += "\twhile(1)\n";
+	s += "\t{\n";
+
+	// Emit "tuple<State, bool> res = f(state, iteration, LoopInvariantData0, LoopInvariantData1, ..., LoopInvariantDataN)"
+	s += "\t\t" + tuple_typename + " res = " + f->sig.typeMangledName() + "(state, iteration";
+	for(size_t i = 0; i<invariant_data_types.size(); ++i)
+		s += ", LoopInvariantData" + toString(i);
+	s += ");\n";
+
+	// Emit "if(tuple_alloca->second == false)"
+	s += "\t\tif(res.field_1 == false)\n";
+	s += "\t\t\treturn res.field_0;\n";
+	s += "\t\titeration++;\n";
+	s += "\t\tstate = res.field_0;\n";
+	s += "\t}\n";
+	s += "}\n";
+	params.file_scope_code += s;
+
+	// Return a call to the function
+	std::string call_code = "iterate_" + toString(params.uid - 1) + "(" + argument_expressions[1]->emitOpenCLC(params);
+	for(size_t i = 0; i<invariant_data_types.size(); ++i)
+		call_code += ", " + argument_expressions[2 + i]->emitOpenCLC(params);
+	call_code += ")";
+	return call_code;
 }
 
 
@@ -2560,6 +2749,30 @@ llvm::Value* ToFloatBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 //----------------------------------------------------------------------------------------------
 
+
+VoidPtrToInt64BuiltInFunc::VoidPtrToInt64BuiltInFunc(const TypeRef& type)
+{}
+
+
+ValueRef VoidPtrToInt64BuiltInFunc::invoke(VMState& vmstate)
+{
+	const VoidPtrValue* a = checkedCast<const VoidPtrValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+
+	return new IntValue((int64)a->value);
+}
+
+
+llvm::Value* VoidPtrToInt64BuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	TypeRef int_type = new Int(64);
+	return params.builder->CreatePtrToInt(
+		LLVMTypeUtils::getNthArg(params.currently_building_func, 0), 
+		int_type->LLVMType(*params.module) // dest type
+	);
+}
+
+
+//----------------------------------------------------------------------------------------------
 
 //ValueRef AllocateRefCountedStructure::invoke(VMState& vmstate)
 //{

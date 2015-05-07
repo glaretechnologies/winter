@@ -197,6 +197,55 @@ llvm::Constant* ArrayValue::getConstantLLVMValue(EmitLLVMCodeParams& params, con
 //------------------------------------------------------------------------------------------
 
 
+VArrayValue::~VArrayValue()
+{
+}
+
+
+Value* VArrayValue::clone() const
+{
+	VArrayValue* ret = new VArrayValue();
+	ret->e.resize(this->e.size());
+
+	for(unsigned int i=0; i<this->e.size(); ++i)
+		ret->e[i] = this->e[i]->clone();
+
+	return ret;
+}
+
+
+const std::string VArrayValue::toString() const
+{
+	std::string s = "varray[";
+	for(unsigned int i=0; i<this->e.size(); ++i)
+	{
+		s += this->e[i]->toString() + (i + 1 < e.size() ? ", " : "");
+	}
+	return s + "]";
+}
+
+
+llvm::Constant* VArrayValue::getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const
+{
+	assert(type->getType() == Type::VArrayTypeType);
+
+	vector<llvm::Constant*> llvm_elems(this->e.size());
+	for(unsigned int i=0; i<this->e.size(); ++i)
+		llvm_elems[i] = this->e[i]->getConstantLLVMValue(params, type.downcast<VArrayType>()->elem_type);
+
+
+	assert(type->LLVMType(*params.module)->isArrayTy());
+
+	return llvm::ConstantArray::get(
+		(llvm::ArrayType*)type->LLVMType(*params.module),
+		llvm_elems
+	);
+}
+
+
+//------------------------------------------------------------------------------------------
+
+
 VectorValue::~VectorValue()
 {
 	//for(unsigned int i=0; i<this->e.size(); ++i)

@@ -104,12 +104,54 @@ std::string TupleLiteral::sourceString() const
 	return s;
 }
 
+/*
+Generate something like
 
+struct
+{
+	float field_0;
+	float field_1;
+} temp_xx;
+
+temp_xx.field_0 = 1;
+temp_xx.field_1 = 2;
+
+*/
 std::string TupleLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
-	TypeRef t = this->type();
+	const Reference<TupleType> t = this->type().downcast<TupleType>();
 
-	const std::string constructor_name = t.downcast<TupleType>()->OpenCLCType() + "_cnstr";
+	params.tuple_types_used.insert(t);
+
+	const std::string struct_var_name = "tuple_" + toString(params.uid++);
+	
+	// struct { float e0; float e1; } temp_xx;
+	/*std::string s = "struct { ";
+
+	for(size_t i=0; i<t->component_types.size(); ++i)
+	{
+		s += t->component_types[i]->OpenCLCType() + " field_" + ::toString(i) + "; ";
+	}
+
+	s += "} " + struct_var_name + ";\n";*/
+	std::string s = t->OpenCLCType() + " " + struct_var_name + ";\n";
+
+
+	for(size_t i=0; i<elements.size(); ++i)
+	{
+		// Emit code for let variable
+		params.blocks.push_back("");
+		const std::string elem_expression = this->elements[i]->emitOpenCLC(params);
+		StringUtils::appendTabbed(s, params.blocks.back(), 1);
+		params.blocks.pop_back();
+
+		s += struct_var_name + ".field_" + toString(i) + " = " + elem_expression + ";\n";
+	}
+	params.blocks.back() += s;
+
+	return struct_var_name;
+
+	/*const std::string constructor_name = t.downcast<TupleType>()->OpenCLCType() + "_cnstr";
 
 	std::string s = constructor_name + "(";
 	for(size_t i=0; i<elements.size(); ++i)
@@ -119,7 +161,7 @@ std::string TupleLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 			s += ", ";
 	}
 	s += ")";
-	return s;
+	return s;*/
 }
 
 
@@ -130,7 +172,7 @@ void TupleLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 		for(size_t i=0; i<elements.size(); ++i)
 			checkFoldExpression(elements[i], payload);
 	}
-	else */if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	else */if(payload.operation == TraversalPayload::BindVariables)
 	{
 		for(size_t i=0; i<elements.size(); ++i)
 			convertOverloadedOperators(elements[i], payload, stack);
@@ -239,8 +281,8 @@ llvm::Value* TupleLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 
 
 		// If the field is of string type, we need to increment its reference count
-		if(tuple_type->component_types[i]->getType() == Type::StringType)
-			RefCounting::emitIncrementStringRefCount(params, arg_value_or_ptr);
+		//if(tuple_type->component_types[i]->getType() == Type::StringType)
+		//	RefCounting::emitIncrementStringRefCount(params, arg_value_or_ptr);
 	}
 
 	return result_struct_val;

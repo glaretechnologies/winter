@@ -12,6 +12,7 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include <fstream>
 #include "utils/FileUtils.h"
 #include "utils/StringUtils.h"
+#include "utils/ContainerUtils.h"
 #include "wnt_Lexer.h"
 #include "TokenBase.h"
 #include "wnt_LangParser.h"
@@ -89,11 +90,7 @@ static const bool DUMP_ASSEMBLY = false; // Dumpts to "module_assembly.txt" in c
 static const bool USE_MCJIT = true;
 
 
-static void* allocateRefCountedStructure(uint32 size, void* env)
-{
-	// TEMP:
-	return malloc(size);
-}
+//=====================================================================================
 
 
 class StringRep
@@ -118,8 +115,14 @@ static const std::string& getStringArg(const vector<ValueRef>& arg_values, int i
 }
 
 
+static int64 string_count = 0;//TEMP
+static int64 varray_count = 0;//TEMP
+
+
 static StringRep* allocateString(const char* initial_string_val/*, void* env*/)
 {
+	string_count++;//TEMP
+
 	StringRep* r = new StringRep();
 	//r->refcount = 1;
 	r->string = std::string(initial_string_val);
@@ -129,9 +132,6 @@ static StringRep* allocateString(const char* initial_string_val/*, void* env*/)
 
 static ValueRef allocateStringInterpreted(const vector<ValueRef>& args)
 {
-	//StringRep* r = new StringRep();
-	//r->refcount = 1;
-	//r->string = std::string((const char*)(getVoidPtrArg(args, 0)));
 	return new StringValue((const char*)(getVoidPtrArg(args, 0)));
 }
 
@@ -139,6 +139,8 @@ static ValueRef allocateStringInterpreted(const vector<ValueRef>& args)
 // NOTE: just return an int here as all external funcs need to return something (non-void).
 static int freeString(StringRep* str/*, void* env*/)
 {
+	string_count--;//TEMP
+
 	assert(str->refcount == 1);
 	delete str;
 	return 0;
@@ -160,6 +162,8 @@ static ValueRef stringLengthInterpreted(const vector<ValueRef>& args)
 
 static StringRep* concatStrings(StringRep* a, StringRep* b, void* env)
 {
+	string_count++;//TEMP
+
 	StringRep* s = new StringRep();
 	s->refcount = 1;
 	s->string = a->string + b->string;
@@ -171,6 +175,58 @@ static ValueRef concatStringsInterpreted(const vector<ValueRef>& args)
 {
 	return new StringValue( getStringArg(args, 0) + getStringArg(args, 1) );
 }
+
+
+//=====================================================================================
+
+
+//class VArrayRep
+//{
+//public:
+//	uint64 refcount;
+//	//uint8* data;
+//};
+
+
+static uint8* allocateVArray(const int elem_size_B, const int num_elems)
+{
+	varray_count++;//TEMP
+
+	/*VArrayRep* r = new VArrayRep();
+	//r->refcount = 1;
+	r->data = new uint8[sizeof(uint64) + elem_size_B * num_elems];
+	return r;*/
+
+	// Allocate space for the reference count and data.
+	uint8* varray = new uint8[sizeof(uint64) + elem_size_B * num_elems];
+	return varray;
+}
+
+
+static ValueRef allocateVArrayInterpreted(const vector<ValueRef>& args)
+{
+	assert(0);
+	return NULL;
+}
+
+
+// NOTE: just return an int here as all external funcs need to return something (non-void).
+static int freeVArray(uint8* varray)
+{
+	varray_count--;//TEMP
+
+	/*assert(varray->refcount == 1);
+	delete[] varray->data;
+	delete varray;
+	return 0;*/
+	assert(*((uint64*)varray) == 1);
+	delete[] varray;
+	return 0;
+}
+
+
+//=====================================================================================
+
 
 
 #if TARGET_LLVM_VERSION >= 34
@@ -302,11 +358,79 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 	llvm_module(NULL),
 	llvm_exec_engine(NULL)
 {
+	assert(string_count == 0 && varray_count == 0);
+
 	try
 	{
 		hidden_voidptr_arg = true;
 
 		this->external_functions = args.external_functions;
+
+
+		// Add allocateString
+		{
+			external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
+				(void*)allocateString,
+				allocateStringInterpreted, // interpreted func
+				FunctionSignature("allocateString", vector<TypeRef>(1, new OpaqueType())),
+				new String() // return type
+			)));
+			external_functions.back()->has_side_effects = true;
+		}
+
+		// Add freeString
+		{
+			vector<TypeRef> arg_types(1, new String());
+			//arg_types.push_back(new VoidPtrType());
+			external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
+				(void*)freeString,
+				NULL, // interpreted func TEMP
+				FunctionSignature("freeString", arg_types),
+				new Int() // return type
+			)));
+			external_functions.back()->has_side_effects = true;
+		}
+
+		// Add stringLength
+		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
+			(void*)stringLength,
+			stringLengthInterpreted, // interpreted func
+			FunctionSignature("stringLength", vector<TypeRef>(1, new String())),
+			new Int() // return type
+		)));
+
+		// Add concatStrings
+		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
+			(void*)concatStrings,
+			concatStringsInterpreted, // interpreted func
+			FunctionSignature("concatStrings", vector<TypeRef>(2, new String())),
+			new String() // return type
+		)));
+
+
+		
+		// Add allocateVArray
+		{
+			external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
+				(void*)allocateVArray,
+				allocateVArrayInterpreted, // interpreted func
+				FunctionSignature("allocateVArray", vector<TypeRef>(2, new Int())),
+				new VArrayType(new Int()) //new OpaqueType() // return type.  Just make this a void*, will cast return value to correct type
+			)));
+			external_functions.back()->has_side_effects = true;
+		}
+
+		// Add freeVArray
+		{
+			external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
+				(void*)freeVArray,
+				NULL, // interpreted func TEMP
+				FunctionSignature("freeVArray", vector<TypeRef>(1, new VArrayType(new Int()))), // new OpaqueType())),
+				new Int() // return type
+			)));
+			external_functions.back()->has_side_effects = true;
+		}
+
 
 		// Load source buffers
 		loadSource(args, args.source_buffers, args.preconstructed_func_defs);
@@ -365,51 +489,16 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 		//this->llvm_exec_engine->DisableSymbolSearching(); // Symbol searching is required for sin, pow intrinsics etc..
 
 
-		/*
-		ExternalFunctionRef alloc_ref(new ExternalFunction());
+		
+		/*ExternalFunctionRef alloc_ref(new ExternalFunction());
 		alloc_ref->interpreted_func = NULL;
 		alloc_ref->return_type = TypeRef(new OpaqueType());
 		alloc_ref->sig = FunctionSignature("allocateRefCountedStructure", std::vector<TypeRef>(1, TypeRef(new Int())));
 		alloc_ref->func = (void*)(allocateRefCountedStructure);
-		this->external_functions.push_back(alloc_ref);
+		this->external_functions.push_back(alloc_ref);*/
 
-		// Add allocateString
-		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
-			(void*)allocateString,
-			allocateStringInterpreted, // interpreted func
-			FunctionSignature("allocateString", vector<TypeRef>(1, new OpaqueType())),
-			new String() // return type
-		)));
-
-		// Add freeString
-		{
-			vector<TypeRef> arg_types(1, new String());
-			//arg_types.push_back(new VoidPtrType());
-			external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
-				(void*)freeString,
-				NULL, // interpreted func TEMP
-				FunctionSignature("freeString", arg_types),
-				new Int() // return type
-			)));
-			external_functions.back()->has_side_effects = true;
-		}
-
-		// Add stringLength
-		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
-			(void*)stringLength,
-			stringLengthInterpreted, // interpreted func
-			FunctionSignature("stringLength", vector<TypeRef>(1, new String())),
-			new Int() // return type
-		)));
-
-		// Add concatStrings
-		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
-			(void*)concatStrings,
-			concatStringsInterpreted, // interpreted func
-			FunctionSignature("concatStrings", vector<TypeRef>(2, new String())),
-			new String() // return type
-		)));
-		*/
+		
+		
 
 		// There is a problem with LLVM 3.3 and earlier with the pow intrinsic getting turned into exp2f().
 		// So for now just use our own pow() external function.
@@ -443,6 +532,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 VirtualMachine::~VirtualMachine()
 {
 	// llvm_exec_engine will delete llvm_module.
+	assert(string_count == 0 && varray_count == 0);
 
 	delete this->llvm_exec_engine;
 
@@ -788,20 +878,25 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 
 	
 	CommonFunctions common_functions;
-	/*TEMP{
+	{
 		const FunctionSignature allocateStringSig("allocateString", vector<TypeRef>(1, new OpaqueType()));
 		common_functions.allocateStringFunc = findMatchingFunction(allocateStringSig).getPointer();
 		assert(common_functions.allocateStringFunc);
 
 		vector<TypeRef> argtypes(1, new String());
-		//argtypes.push_back(new VoidPtrType());
 		const FunctionSignature freeStringSig("freeString", argtypes);
 		common_functions.freeStringFunc = findMatchingFunction(freeStringSig).getPointer();
 		assert(common_functions.freeStringFunc);
+
+		common_functions.allocateVArrayFunc = findMatchingFunction(FunctionSignature("allocateVArray", vector<TypeRef>(2, new Int()))).getPointer();
+		assert(common_functions.allocateVArrayFunc);
+
+		common_functions.freeVArrayFunc = findMatchingFunction(FunctionSignature("freeVArray", vector<TypeRef>(1, new VArrayType(new Int()))))./*new OpaqueType*/getPointer();
+		assert(common_functions.freeVArrayFunc);
 	}
 
 	RefCounting::emitRefCountingFunctions(this->llvm_module, this->llvm_exec_engine->getDataLayout(), common_functions);
-	*/
+	
 
 
 	/*for(size_t i = 0; i != named_types_ordered.size(); ++i)
@@ -879,7 +974,11 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 		if(ver_errors)
 		{
 			std::cout << "Module verification errors: " << error_str << std::endl;
-			this->llvm_module->dump();
+			{
+				std::ofstream f("verification_errors.txt");
+				f << error_str;
+			}
+			//this->llvm_module->dump();
 			throw BaseException("Module verification errors: " + error_str);
 		}
 #endif
@@ -1028,20 +1127,70 @@ const std::string VirtualMachine::buildOpenCLCode()
 	s +=
 "float toFloat_int_(int x) { return (float)x; } \n\
 int truncateToInt_float_(float x) { return (int)x; } \n\
+int8 truncateToInt_vector_float__8__(float8 v) { return convert_int8(v); }  \n\
+long toInt_opaque_(void* p) { return (long)p; }  \n\
+float print_float_(float x) { printf(\"%f\", x); return x; }    \n\
 \n";
 
+
+
+
+	EmitOpenCLCodeParams params;
+	params.uid = 0;
+
+	std::string top_level_def_src;
+	for(size_t i=0; i<linker.top_level_defs.size(); ++i)
+	{
+		if(linker.top_level_defs[i]->nodeType() == ASTNode::FunctionDefinitionType)
+		{
+			const FunctionDefinitionRef f = linker.top_level_defs[i].downcast<FunctionDefinition>();
+			if(!f->isGenericFunction() && !f->isExternalFunction() && f->built_in_func_impl.isNull())
+				top_level_def_src += f->emitOpenCLC(params) + "\n";
+		}
+		else if(linker.top_level_defs[i]->nodeType() == ASTNode::NamedConstantType)
+		{
+			top_level_def_src += linker.top_level_defs[i]->emitOpenCLC(params) + "\n";
+		}
+	}
+
+	// Emit tuple struct definitions and constructors
+	//for(std::set<TupleTypeRef>::iterator i = params.tuple_types_used.begin(); i != params.tuple_types_used.end(); ++i)
+	//	s += (*i)->getOpenCLCDefinition();
+
+
+	// TODO: Will need to handle dependecies between tuples here as well.
+
+	std::set<TupleTypeRef, TypeRefLessThan> emitted_tuples;
+
 	// Spit out structure definitions and constructors
-	for(size_t i = 0; i != named_types_ordered.size(); ++i)
+	for(auto i = 0; i != named_types_ordered.size(); ++i)
 		if(named_types_ordered[i]->getType() == Type::StructureTypeType)
 		{
 			StructureType* struct_type = static_cast<StructureType*>(named_types_ordered[i].getPointer());
-			s += struct_type->getOpenCLCDefinition();
+
+			// Emit definitions of any tuples used in this structure, that haven't been defined already.
+			std::vector<TupleTypeRef> used_tuples = struct_type->getElementTupleTypes();
+			for(size_t z=0; z<used_tuples.size(); ++z)
+			{
+				if(!ContainerUtils::contains(emitted_tuples, used_tuples[z])) // If not emitted yet:
+				{
+					s += used_tuples[z]->getOpenCLCDefinition();
+					emitted_tuples.insert(used_tuples[z]); // Add to set of emitted tuples
+				}
+			}
+
+			s += struct_type->getOpenCLCDefinition(); // Emit structure definition
 		}
+
+	// Spit out any remaining tuple definitions
+	for(auto i = params.tuple_types_used.begin(); i != params.tuple_types_used.end(); ++i)
+		if(!ContainerUtils::contains(emitted_tuples, *i)) // If not emitted yet:
+			s += (*i)->getOpenCLCDefinition();
 
 
 	// Spit out function definitions
-	s += linker.buildOpenCLCode();
-	return s;
+	//s += linker.buildOpenCLCode();
+	return s + "\n\n" + params.file_scope_code + "\n\n" + top_level_def_src;
 }
 
 

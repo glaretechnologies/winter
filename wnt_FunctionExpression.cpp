@@ -1197,7 +1197,9 @@ static const char* opencl_built_in_func_names[] = {
 	"cospi", "erfc", "erf", "exp",
 	"exp2", "exp10", "expm1", "fabs",
 	"fdim", "floor", "fma", "fmax",
-	"fmin", "fmod", "fract", "frexp",
+	"fmin", "fmod", 
+	//"fract", OpenCL built-in fract() differs from Winter's.
+	"frexp",
 	"hypot", "ilogb", "ldexp", "lgamma",
 	"lgamma_r", "log", "log2", "log10",
 	"log1p", "logb", "mad", "modf",
@@ -1212,10 +1214,29 @@ static const char* opencl_built_in_func_names[] = {
 	NULL};
 
 
-static bool doesFunctionRequireTypeMangling(const std::string& name)
+static bool isCallToBuiltInOpenCLFunction(const FunctionDefinition* func)
 {
+	// See if the arguments are all basic types.  If not, this isn't a call to a basic OpenCL function
+	for(size_t i=0; i<func->sig.param_types.size(); ++i)
+		if(!(func->sig.param_types[i]->getType() == Type::FloatType || func->sig.param_types[i]->getType() == Type::IntType || func->sig.param_types[i]->getType() == Type::VectorTypeType))
+			return false;
+
 	for(size_t i=0; opencl_built_in_func_names[i] != NULL; ++i)
-		if(name == opencl_built_in_func_names[i])
+		if(func->sig.name == opencl_built_in_func_names[i])
+			return true;
+	return false;
+}
+
+
+// Is the function name something like 'eXX'
+static bool isENFunctionName(const std::string& name)
+{
+	if(name.size() < 2)
+		return false;
+	if(name[0] != 'e')
+		return false;
+	for(size_t i=1; i<name.size(); ++i)
+		if(!isNumeric(name[i]))
 			return false;
 	return true;
 }
@@ -1278,7 +1299,7 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 			return argument_expressions[0]->emitOpenCLC(params) + ".field_" + ::toString(index);
 		}
 		else
-			throw BaseException("Error while emitting OpenCL C: elem() function first arg must be vector or array type.");
+			throw BaseException("Error while emitting OpenCL C: elem() function first arg has unsupported type " + argument_expressions[0]->type()->toString() );
 	}
 	else if(this->function_name == "shuffle")
 	{
@@ -1304,7 +1325,9 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 		return s;
 	}
-	else if(function_name.size() >= 2 && function_name[0] == 'e' && isNumeric(function_name[1]))
+	else if(isENFunctionName(function_name) && 
+		(this->argument_expressions[0]->type()->getType() == Type::VectorTypeType ||
+		this->argument_expressions[0]->type()->getType() == Type::ArrayTypeType))
 	{
 		try
 		{
@@ -1336,7 +1359,7 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 				return argument_expressions[0]->emitOpenCLC(params) + "[" + ::intToHexChar((int)index) + "]";
 			}
 			else
-				throw BaseException("Error while emitting OpenCL C: eN() function first arg must be vector or array type.");
+				throw BaseException("Error while emitting OpenCL C: eN() function first arg not supported for type " + argument_expressions[0]->type()->toString());
 		}
 		catch(StringUtilsExcep&)
 		{
@@ -1376,15 +1399,45 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 		return "((" + argument_expressions[1]->emitOpenCLC(params) + " >= 0) && (" + argument_expressions[1]->emitOpenCLC(params) + " < " + toString(N) + "))";
 	}
-	else if(function_name == "abs")
+	else if(function_name == "abs" && (argument_expressions.size() == 1) && 
+		(argument_expressions[0]->type()->getType() == Type::FloatType || 
+		(argument_expressions[0]->type()->getType() == Type::VectorTypeType && argument_expressions[0]->type().downcastToPtr<VectorType>()->elem_type->getType() == Type::FloatType)))
 	{
-		if(argument_expressions.size() != 1)
+		return "fabs(" + argument_expressions[0]->emitOpenCLC(params) + ")";
+	}
+	else if(function_name == "min" && (argument_expressions.size() == 2) && 
+		(argument_expressions[0]->type()->getType() == Type::FloatType || 
+		(argument_expressions[0]->type()->getType() == Type::VectorTypeType && argument_expressions[0]->type().downcastToPtr<VectorType>()->elem_type->getType() == Type::FloatType)))
+	{
+		return "fmin(" + argument_expressions[0]->emitOpenCLC(params) + ", " + argument_expressions[1]->emitOpenCLC(params) + ")";
+	}
+	else if(function_name == "max" && (argument_expressions.size() == 2) && 
+		(argument_expressions[0]->type()->getType() == Type::FloatType || 
+		(argument_expressions[0]->type()->getType() == Type::VectorTypeType && argument_expressions[0]->type().downcastToPtr<VectorType>()->elem_type->getType() == Type::FloatType)))
+	{
+		return "fmax(" + argument_expressions[0]->emitOpenCLC(params) + ", " + argument_expressions[1]->emitOpenCLC(params) + ")";
+	}
+	else if(function_name == "iterate")
+	{
+		//TODO: check arg 0 is constant.
+		if(!(this->argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType && this->argument_expressions[0].downcastToPtr<Variable>()->vartype == Variable::BoundToGlobalDefVariable))
+			throw BaseException("Error while emitting OpenCL C: First arg to iterate must be a constant reference to a globally defined function.");
+
+
+		
+
+		return this->target_function->built_in_func_impl.downcastToPtr<IterateBuiltInFunc>()->emitOpenCLForFunctionArg(
+			params,
+			this->argument_expressions[0].downcastToPtr<Variable>()->bound_function,
+			this->argument_expressions
+		);
+		/*if(argument_expressions.size() != 1)
 			throw BaseException("Error while emitting OpenCL C: abs function with != 1 arg.");
 
 		if(argument_expressions[0]->type()->getType() == Type::FloatType)
 			return "fabs(" + argument_expressions[0]->emitOpenCLC(params) + ")";
 		else
-			return "abs(" + argument_expressions[0]->emitOpenCLC(params) + ")";
+			return "abs(" + argument_expressions[0]->emitOpenCLC(params) + ")";*/
 	}
 	else
 	{
@@ -1398,7 +1451,8 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 		//if(target_function && target_function->built_in_func_impl.nonNull() && dynamic_cast<Constructor*>(target_function->built_in_func_impl.getPointer()))
 		//	use_func_name += "_cnstr";
 
-		std::string use_func_name = doesFunctionRequireTypeMangling(this->function_name) ? this->target_function->sig.typeMangledName() : this->target_function->sig.name;
+		std::string use_func_name = (/*this->target_function->isExternalFunction() ||*/ isCallToBuiltInOpenCLFunction(this->target_function)) ? 
+			this->target_function->sig.name : this->target_function->sig.typeMangledName();
 
 		std::string s = use_func_name + "(";
 		for(unsigned int i=0; i<argument_expressions.size(); ++i)
@@ -1555,21 +1609,30 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			assert(argument_expressions.size() == 1);
 			llvm::Value* struct_ptr = argument_expressions[0]->emitLLVMCode(params, NULL);
 
+			llvm::Value* result;
 			if(field_type->passByValue())
 			{
 				llvm::Value* field_ptr = params.builder->CreateStructGEP(struct_ptr, field_index, field_name + " ptr");
 				llvm::Value* loaded_val = params.builder->CreateLoad(field_ptr, field_name);
 
 				// TEMP NEW: increment ref count if this is a string
-				if(field_type->getType() == Type::StringType)
-					RefCounting::emitIncrementStringRefCount(params, loaded_val);
+				//if(field_type->getType() == Type::StringType)
+				//	RefCounting::emitIncrementStringRefCount(params, loaded_val);
 
-				return loaded_val;
+				result = loaded_val;
 			}
 			else
 			{
-				return params.builder->CreateStructGEP(struct_ptr, field_index, field_name + " ptr");
+				result = params.builder->CreateStructGEP(struct_ptr, field_index, field_name + " ptr");
 			}
+
+			field_type->emitIncrRefCount(params, result);
+
+			// Decrement argument 0 structure ref count
+			if(!(argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType)) // && argument_expressions[0].downcastToPtr<Variable>()->vartype == Variable::LetVariable)) // Don't decr let var ref counts, the ref block will do that.
+				argument_expressions[0]->type()->emitDecrRefCount(params, struct_ptr);
+
+			return result;
 		}
 		// For tuple field access functions, instead of emitting an actual function call, just emit the LLVM code to access the field.
 		else if(dynamic_cast<GetTupleElementBuiltInFunc*>(this->target_function->built_in_func_impl.getPointer()))
@@ -1590,8 +1653,8 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 				llvm::Value* loaded_val = params.builder->CreateLoad(field_ptr, field_name);
 
 				// TEMP NEW: increment ref count if this is a string
-				if(field_type->getType() == Type::StringType)
-					RefCounting::emitIncrementStringRefCount(params, loaded_val);
+				//if(field_type->getType() == Type::StringType)
+				//	RefCounting::emitIncrementStringRefCount(params, loaded_val);
 
 				return loaded_val;
 			}
@@ -1681,10 +1744,17 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		call_inst->setCallingConv(llvm::CallingConv::C);
 
 		// If this is a string value, need to decr ref count at end of func.
-		if(target_ret_type->getType() == Type::StringType)
+		/*if(target_ret_type->getType() == Type::StringType || target_ret_type->getType() == Type::VArrayTypeType)
 		{
 			params.cleanup_values.push_back(CleanUpInfo(this, call_inst));
-		}
+		}*/
+
+		// Decrement ref counts on arguments
+		for(unsigned int i=0; i<argument_expressions.size(); ++i)
+			if(!(argument_expressions[i]->nodeType() == ASTNode::VariableASTNodeType)) // && argument_expressions[i].downcastToPtr<Variable>()->vartype == Variable::LetVariable)) // Don't decr let var ref counts, the ref block will do that.
+				argument_expressions[i]->type()->emitDecrRefCount(params, args[i]);
+				//if(argument_expressions[i]->type()->getType() == Type::StringType || argument_expressions[i]->type()->getType() == Type::VArrayTypeType)
+				//	RefCounting::emitCleanupLLVMCode(params, argument_expressions[i]->type(), args[i]);
 
 		return call_inst;
 	}
@@ -1738,28 +1808,33 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		call_inst->setCallingConv(llvm::CallingConv::C);
 
 		// If this is a string value, need to decr ref count at end of func.
-		/*if(target_ret_type->getType() == Type::StringType)
-		{
-			params.cleanup_values.push_back(CleanUpInfo(this, call_inst));
-		}
-		else */if(target_ret_type->getType() == Type::StructureTypeType)
-		{
-			//const StructureType& struct_type = static_cast<const StructureType&>(*target_ret_type);
+		///*if(target_ret_type->getType() == Type::StringType)
+		//{
+		//	params.cleanup_values.push_back(CleanUpInfo(this, call_inst));
+		//}
+		//else */if(target_ret_type->getType() == Type::StructureTypeType)
+		//{
+		//	//const StructureType& struct_type = static_cast<const StructureType&>(*target_ret_type);
 
-			//for(size_t i=0; i<struct_type.component_types.size(); ++i)
+		//	//for(size_t i=0; i<struct_type.component_types.size(); ++i)
 
-			params.cleanup_values.push_back(CleanUpInfo(this, return_val_addr));
-		}
+		//	params.cleanup_values.push_back(CleanUpInfo(this, return_val_addr));
+		//}
+
+		// Decrement ref counts on arguments
+		for(unsigned int i=0; i<argument_expressions.size(); ++i)
+			if(!(argument_expressions[i]->nodeType() == ASTNode::VariableASTNodeType)) // && argument_expressions[i].downcastToPtr<Variable>()->vartype == Variable::LetVariable)) // Don't decr let var ref counts, the ref block will do that.
+				argument_expressions[i]->type()->emitDecrRefCount(params, args[i + 1]); // offset by one as furst arg is return value ptr
 
 		return return_val_addr;
 	}
 }
 
 
-void FunctionExpression::emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* val) const
-{
-	RefCounting::emitCleanupLLVMCode(params, this->type(), val);
-}
+//void FunctionExpression::emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* val) const
+//{
+////	RefCounting::emitCleanupLLVMCode(params, this->type(), val);
+//}
 
 
 llvm::Value* FunctionExpression::getConstantLLVMValue(EmitLLVMCodeParams& params) const

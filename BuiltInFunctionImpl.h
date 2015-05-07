@@ -15,6 +15,8 @@ namespace Winter
 class Value;
 class VMState;
 class EmitLLVMCodeParams;
+class EmitOpenCLCodeParams;
+class ASTNode;
 
 
 class BuiltInFunctionImpl : public RefCounted
@@ -187,6 +189,20 @@ private:
 };
 
 
+// Get the i-th element from a varray.
+class VArraySubscriptBuiltInFunc : public BuiltInFunctionImpl
+{
+public:
+	VArraySubscriptBuiltInFunc(const Reference<VArrayType>& array_type, const TypeRef& index_type);
+
+	virtual ValueRef invoke(VMState& vmstate);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+private:
+	Reference<VArrayType> array_type;
+	TypeRef index_type;
+};
+
+
 // Get the i-th element from a vector.
 class VectorSubscriptBuiltInFunc : public BuiltInFunctionImpl
 {
@@ -266,6 +282,12 @@ public:
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+
+	const std::string emitOpenCLForFunctionArg(EmitOpenCLCodeParams& params,
+		const FunctionDefinition* f, // arg 0
+		const std::vector<Reference<ASTNode> >& argument_expressions
+	);
+
 private:
 	Reference<Function> func_type;
 	TypeRef state_type;
@@ -469,6 +491,17 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
 	TypeRef type;
+};
+
+
+// Opaque/voidptr to int64 conversion
+class VoidPtrToInt64BuiltInFunc : public BuiltInFunctionImpl
+{
+public:
+	VoidPtrToInt64BuiltInFunc(const TypeRef& type);
+
+	virtual ValueRef invoke(VMState& vmstate);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 };
 
 

@@ -177,7 +177,7 @@ void ArrayLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 		for(size_t i=0; i<elements.size(); ++i)
 			checkFoldExpression(elements[i], payload);
 	}
-	else */if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	else */if(payload.operation == TraversalPayload::BindVariables)
 	{
 		for(size_t i=0; i<elements.size(); ++i)
 			convertOverloadedOperators(elements[i], payload, stack);
@@ -279,12 +279,13 @@ llvm::Value* ArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 			*params.module,
 			this->type()->LLVMType(*params.module), // This type (array type)
 			true, // is constant
-			llvm::GlobalVariable::InternalLinkage,
+			llvm::GlobalVariable::PrivateLinkage, // llvm::GlobalVariable::InternalLinkage,
 			llvm::ConstantArray::get(
 				(llvm::ArrayType*)this->type()->LLVMType(*params.module),
 				array_llvm_values
 			)
 		);
+		global->setUnnamedAddr(true); // Mark as unnamed_addr - this means the address is not significant, so multiple arrays with the same contents can be combined.
 
 		return global;
 	}

@@ -119,17 +119,6 @@ void Linker::buildLLVMCode(llvm::Module* module, const llvm::DataLayout/*TargetD
 	PlatformUtils::CPUInfo cpu_info;
 	PlatformUtils::getCPUInfo(cpu_info);
 
-	/*CommonFunctions common_functions;
-	{
-		const FunctionSignature allocateStringSig("allocateString", vector<TypeRef>(1, new VoidPtrType()));
-		common_functions.allocateStringFunc = findMatchingFunction(allocateStringSig).getPointer();
-		assert(common_functions.allocateStringFunc);
-
-		const FunctionSignature freeStringSig("freeString", vector<TypeRef>(1, new String()));
-		common_functions.freeStringFunc = findMatchingFunction(freeStringSig).getPointer();
-		assert(common_functions.freeStringFunc);
-	}*/
-
 	for(Linker::SigToFuncMapType::iterator it = sig_to_function_map.begin(); it != sig_to_function_map.end(); ++it)
 	{
 		FunctionDefinition& f = *(*it).second;
@@ -158,6 +147,9 @@ void Linker::buildLLVMCode(llvm::Module* module, const llvm::DataLayout/*TargetD
 
 const std::string Linker::buildOpenCLCode()
 {
+	//NOTE: not called right now
+	assert(0);
+
 	std::string s;
 
 	EmitOpenCLCodeParams params;
@@ -344,6 +336,16 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 				return def;
 			}
 		}
+		else if(sig.param_types[0]->getType() == Type::OpaqueTypeType)
+		{
+			if(sig.name == "toInt")
+			{
+				TypeRef ret_type = new Int(64);
+				FunctionDefinitionRef def = makeBuiltInFuncDef<VoidPtrToInt64BuiltInFunc>(sig.name, sig.param_types[0], ret_type);
+				this->sig_to_function_map.insert(std::make_pair(sig, def));
+				return def;
+			}
+		}
 	}
 	else if(sig.param_types.size() == 2)
 	{
@@ -409,6 +411,35 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 					NULL, // body expr
 					ret_type, // return type
 					new ArraySubscriptBuiltInFunc(sig.param_types[0].downcast<ArrayType>(), sig.param_types[1]) // built in impl.
+				);
+
+				assert(this->sig_to_function_map.find(sig) == this->sig_to_function_map.end()); // Check not already inserted
+				this->sig_to_function_map.insert(std::make_pair(sig, def));
+				return def;
+			}
+		}
+
+		if(sig.param_types[0]->getType() == Type::VArrayTypeType && sig.param_types[1]->getType() == Type::IntType)
+		{
+			if(sig.name == "elem")
+			{
+				vector<FunctionDefinition::FunctionArg> args(2);
+				args[0].name = "varray";
+				args[0].type = sig.param_types[0];
+				args[1].name = "index";
+				args[1].type = sig.param_types[1];
+
+				TypeRef ret_type = sig.param_types[0].downcast<VArrayType>()->elem_type;
+				assert(ret_type.nonNull());
+
+				FunctionDefinitionRef def = new FunctionDefinition(
+					SrcLocation::invalidLocation(),
+					-1, // order number
+					"elem", // name
+					args, // args
+					NULL, // body expr
+					ret_type, // return type
+					new VArraySubscriptBuiltInFunc(sig.param_types[0].downcast<VArrayType>(), sig.param_types[1]) // built in impl.
 				);
 
 				assert(this->sig_to_function_map.find(sig) == this->sig_to_function_map.end()); // Check not already inserted

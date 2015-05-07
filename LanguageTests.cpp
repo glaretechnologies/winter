@@ -77,7 +77,120 @@ void LanguageTests::run()
 {
 	Timer timer;
 
+	testMainFloatArgAllowUnsafe("def main(float x) float : let A = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]a   i = truncateToInt(x) in A[i] + A[i+1]", 2.f, 7.0f);
+
+	const TypeRef ta = new Int();
+	const TypeRef tb = new Int();
+
+	//assert(ta == tb);
+	//assert(!(ta < tb));
+	//assert(!(tb < ta));
+
+	std::set<TypeRef, TypeRefLessThan> type_set;
+	type_set.insert(ta);
+	type_set.insert(tb);
+	assert(type_set.size() == 1);
+
+
+	//testMainFloatArgInvalidProgram("struct s { s a, s b } def main(float x) float : x");
+	//testMainFloatArgInvalidProgram("def main(float x) float : let varray<T> v = [v]va in x");
+
+	// ===================================================================
+	// 
+	// ===================================================================
+	//testMainFloatArgAllowUnsafe("def main(float x) float : let A = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]a   i = truncateToInt(x) in A[i] + A[i+1]", 2.f, 7.0f);
+	//testMainFloatArgAllowUnsafe("A = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]a       def main(float x) float : let i = truncateToInt(x) in A[i] + A[i+1] + A[i+2]", 2.f, 12.0f);
+
+
+
+
+
+	// ===================================================================
+	// Test VArrays
+	// ===================================================================
+
+	// Test VArray let variables.
+	testMainFloatArg("def main(float x) float : let v = [99]va in x", 1.f, 1.0f, INVALID_OPENCL);
+	testMainFloatArg("def main(float x) float : let v = [1.0, 2.0, 3.0]va in x", 1.f, 1.0f, INVALID_OPENCL);
+	testMainFloatArg("def main(float x) float : let v = [x + 1.0, x + 2.0, x + 3.0]va in x", 1.f, 1.0f, INVALID_OPENCL);
+
+	// Two VArray let variables
+	testMainFloatArg("def main(float x) float : let a = [1]va  b = [2]va   in x", 1.f, 1.0f, INVALID_OPENCL);
+
+	// Back-references in let variables
+	testMainFloatArg("def main(float x) float : let a = [1]va  b = a   in x", 1.f, 1.0f, INVALID_OPENCL);
+
+	// Test a reference to a let var from another let block
+	testMainFloatArg("def main(float x) float :			\n\
+					 let								\n\
+						a = [1]va						\n\
+					in									\n\
+						let								\n\
+							b = a						\n\
+						in								\n\
+							x", 1.f, 1.0f, INVALID_OPENCL);
+
+
+	// Return a varray from a function
+	testMainFloatArg("def f() varray<int> : [3]va      def main(float x) float : let v = f() in x", 1.f, 1.0f, INVALID_OPENCL);
 	
+	// Test a varray with access
+	//testMainFloatArgAllowUnsafe("def main(float x) float : [x + 1.0, x + 2.0, x + 3.0]va[1]", 1.f, 3.0f);
+
+	// Test a varray returned from a function with access
+	testMainFloatArgAllowUnsafe("def f(float x) varray<float> : [x]va    def main(float x) float : elem(f(x), 0)", 1.f, 1.0f, INVALID_OPENCL);
+	testMainFloatArgAllowUnsafe("def f(float x) varray<float> : [x + 1.0, x + 2.0, x + 3.0]va    def main(float x) float : f(x)[0]", 1.f, 2.0f, INVALID_OPENCL);
+	testMainFloatArgAllowUnsafe("def f(float x) varray<float> : [x + 1.0, x + 2.0, x + 3.0]va    def main(float x) float : f(x)[2]", 1.f, 4.0f, INVALID_OPENCL);
+	
+	// Test varray returned from an if expression
+	testMainFloatArgAllowUnsafe("def main(float x) float : let v = (if x < 2.0 then [x + 1.0]va else [x + 2.0]va) in elem(v, 0)", 1.f, 2.0f, INVALID_OPENCL);
+	testMainFloatArgAllowUnsafe("def main(float x) float : (if x < 2.0 then [x + 1.0]va else [x + 2.0]va)[0]", 1.f, 2.0f, INVALID_OPENCL);
+
+	// Test varray returned from an if expression in a function
+	testMainFloatArgAllowUnsafe("def f(float x) varray<float> : if x < 2.0 then [x + 1.0]va else [x + 2.0]va      def main(float x) float : f(x)[0]", 1.f, 2.0f, INVALID_OPENCL);
+
+
+
+	testMainFloatArgAllowUnsafe("struct S { float x }     def f(float x) S : S(x)        def main(float x) float : f(x).x", 1.f, 1.0f, INVALID_OPENCL);
+
+	
+
+	// Test varray in struct (just assigned to let var but not used)
+	testMainFloatArgAllowUnsafe("struct S { varray<float> v }     def main(float x) float : let s = S([x]va) in x", 1.f, 1.0f, INVALID_OPENCL);
+	
+	// Test varray in struct
+	testMainFloatArgAllowUnsafe("struct S { varray<float> v }     def main(float x) float : S([x]va).v[0]", 1.f, 1.0f, INVALID_OPENCL);
+
+	// Test two varrays in struct
+	testMainFloatArgAllowUnsafe("struct S { varray<float> a, varray<float> b }  def main(float x) float : S([x]va, [x]va).a[0]", 1.f, 1.0f, INVALID_OPENCL);
+
+	// Test varray in struct returned from function
+	testMainFloatArgAllowUnsafe("struct S { varray<float> v }     def f(float x) S : S([x + 1.0]va)        def main(float x) float : f(x).v[0]", 1.f, 2.0f, INVALID_OPENCL);
+
+	// Test two varrays in struct returned from function
+	testMainFloatArgAllowUnsafe("struct S { varray<float> a, varray<float> b }     def f(float x) S : S([x + 1.0]va, [x + 2.0]va)        def main(float x) float : f(x).a[0]", 1.f, 2.0f, INVALID_OPENCL);
+	
+
+	//------------------------ VArrays as function arguments --------------------------
+	// Test a VArray passed as a function argument (but not used)
+	testMainFloatArgAllowUnsafe("def f(varray<float> v) float : 1.0      def main(float x) float : f([99.0]va)", 1.f, 1.0f, INVALID_OPENCL);
+
+	// Test a VArray passed as a function argument, then indexed into.
+	testMainFloatArgAllowUnsafe("def f(varray<float> v) float : v[0]      def main(float x) float : f([x]va)", 10.f, 10.0f, INVALID_OPENCL);
+
+	// Test two VArrays passed as function arguments, then indexed into.
+	testMainFloatArgAllowUnsafe("def f(varray<float> v_a, varray<float> v_b) float : v_a[0] + v_b[0]      def main(float x) float : f([x]va, [1.0]va)", 10.f, 11.0f, INVALID_OPENCL);
+
+
+	// Test nested function call with varray
+	testMainFloatArgAllowUnsafe("def f(varray<float> v) float : v[0]      def g(varray<float> v) float : f(v)      def main(float x) float : g([x]va)", 10.f, 10.0f, INVALID_OPENCL);
+
+	testMainFloatArgAllowUnsafe("def f(varray<float> v) float : v[0]      def g(varray<float> v) float : f(v) + 1.0     def main(float x) float : g([x]va)", 10.f, 11.0f, INVALID_OPENCL);
+
+	// Test varray function argument being referenced by let
+	testMainFloatArgAllowUnsafe("def f(varray<float> v) float : let v_2 = v in v_2[0]      def main(float x) float : f([x]va)", 10.f, 10.0f, INVALID_OPENCL);
+	testMainFloatArgAllowUnsafe("def f(varray<float> v) float : let v_2 = v in v[0]      def main(float x) float : f([x]va)", 10.f, 10.0f, INVALID_OPENCL);
+
 	// Test fold built-in function with update
 	/*{
 		const int len = 256;
@@ -478,7 +591,7 @@ void LanguageTests::run()
 
 //	testMainFloatArg("def main(float x)  : if(x < 10.0, 3, 4)", 1.0f, 3.0f);
 
-	testMainFloatArg("def main(float x) float : let v = [x, x, x, x, x, x, x, x]v in dot(v, v)", 1.f, 8.f);
+	testMainFloatArg("def main(float x) float : let v = [x, x, x, x, x, x, x, x]v in dot(v, v)", 1.f, 8.f, INVALID_OPENCL); // dot() in OpenCL doesn't work with float8s.
 
 	testMainFloatArgInvalidProgram("def g(function<float, float> f, float x) : f(x)");
 
@@ -571,6 +684,10 @@ void LanguageTests::run()
 	testMainIntegerArg("FIVE = 5		TEN = FIVE * 2			\n\
 					   def main(int x) int : TEN + x", 3, 13);
 
+	// Make sure constant folding works with named constants
+	testMainFloatArgCheckConstantFolded("FIVE = 5.0		TEN = FIVE * 2.0			\n\
+					   def main(float x) float : TEN", 3.0f, 10.0f);
+
 	// Test an expression involving a function call
 	testMainIntegerArg("def five() int : 5		TEN = five() * 2			\n\
 					   def main(int x) int : TEN + x", 3, 13);
@@ -578,11 +695,18 @@ void LanguageTests::run()
 	// Test named constants with optional declared type.
 	//testMainIntegerArg("int TEN = 10			\n\
 	//				   def main(int x) int : TEN + x", 3, 13);
-
+	
 	// Test int->float type coercion to match declared type for named constants with optional declared type.
 	testMainFloatArg("float TEN = 10			\n\
 					   def main(float x) float : TEN + x", 1.f, 11.f);
 
+
+	// Test with a function call on a structure
+	// TODO: make this work
+	//testMainFloatArgCheckConstantFolded("struct S { float x }		\n\
+	//				 def f(S s) S : S(s.x + 1.0)		\n\
+	//				 float X = f(S(1)).x			\n\
+	//				 def main(float x) float : X", 1.f, 2.f);
 
 	// test invalidity of two named constants with same name.
 	testMainFloatArgInvalidProgram("z = 1     z = 2               def main(float x) float : x");
@@ -607,8 +731,6 @@ void LanguageTests::run()
 
 
 	// NOTE: if 'then' token is removed, we get a parse error below.
-	if(!DO_OPENCL_TESTS)
-	{
 
 	testMainIntegerArg("def f(int x) tuple<int> : if x < 0 [1]t else [3]t			\n\
 					   def main(int x) int : f(x)[0]", 10, 3);
@@ -623,9 +745,8 @@ void LanguageTests::run()
 
 	testMainIntegerArg("def f(int x) tuple<int, int> : if x < 0 [1, 2]t else [3, 4]t			\n\
 					   def main(int x) int : f(x)[0]", 10, 3);
-	} // end if DO_OPENCL_TESTS
 
-	if(!DO_OPENCL_TESTS)
+	if(!DO_OPENCL_TESTS) // OpenCL doesn't support new array values at runtime, nor fold() currently.
 	{
 
 	testMainIntegerArg("def main(int x) int : [x]a[0]", 10, 10);
@@ -723,14 +844,12 @@ void LanguageTests::run()
 		);
 	}
 
-	}
+	} // DO_OPENCL_TESTS
 
 	// ===================================================================
 	// Test iterate built-in function
 	// ===================================================================
 
-	if(!DO_OPENCL_TESTS)
-	{
 	testMainIntegerArg("															\n\
 		def f(int current_state, int iteration) tuple<int, bool> :					\n\
 			if iteration >= 100														\n\
@@ -930,8 +1049,6 @@ void LanguageTests::run()
 	testMainFloatArgInvalidProgram("def f(float x) tuple<float, float> : (x, x)   \n\
 		def main(float x) float :  elem(f(x), truncateToInt(x))");
 
-	} // end if DO_OPENCL_TESTS
-
 
 	testMainFloatArg("def main(float x) float :  elem([x, x, x, x]v, 0)", 1.0f, 1.0f);
 
@@ -989,7 +1106,6 @@ void LanguageTests::run()
 	testMainFloatArgInvalidProgram("def main(float x) float : if(x < 1.0)");
 	testMainFloatArgInvalidProgram("def main(float x) float : if(x < 1.0, 2.0)");
 	testMainFloatArgInvalidProgram("def main(float x) float : if(x < 1.0, 2.0, 3.0, 4.0)");
-
 
 	// Test int->float type coercion for addition operands changing return type of tuple elem()
 	testMainFloatArg("def main(float x) float :  elem([0  + 2.0]t, 0)", 1.0f, 2.0f);
@@ -1495,14 +1611,13 @@ void LanguageTests::run()
 	testMainIntegerArg("def main(int x) int : if x < 5 then (if x < 2 then 1 else 2) else 5 ", 2, 2);
 	testMainIntegerArg("def main(int x) int : if x < 5 then (if x < 2 then 1 else 2) else 5 ", 10, 5);
 
-
 	// ===================================================================
 	// Ref counting tests
 	// ===================================================================
+	if(!DO_OPENCL_TESTS)
+	{
+
 	// Test putting a string in a structure, then returning it.
-
-/*TEMP NO OPENCL SUPPORT YET
-
 	testMainIntegerArg(
 		"struct teststruct { string str }										\n\
 		def f() teststruct : teststruct(\"hello world\")						\n\
@@ -1514,12 +1629,19 @@ void LanguageTests::run()
 		"struct teststruct { string str }										\n\
 		def main(int x) int : stringLength(teststruct(\"hello world\").str) ",
 		2, 11);
+	} // DO_OPENCL_TESTS
 
 	
-
 	// ===================================================================
 	// String tests
 	// ===================================================================
+	if(!DO_OPENCL_TESTS)
+	{
+
+	// String test - string literal in let statement, with assignment.
+	testMainIntegerArg(
+		"def main(int x) int : stringLength(concatStrings(\"hello\", \"world\"))",
+		2, 10);
 
 	// Double return of a string
 	testMainIntegerArg(
@@ -1529,10 +1651,7 @@ void LanguageTests::run()
 		2, 11);
 	
 
-	// String test - string literal in let statement, with assignment.
-	testMainIntegerArg(
-		"def main(int x) int : stringLength(concatStrings(\"hello\", \"world\"))",
-		2, 10);
+	
 
 	// String test - string literal in let statement, with assignment.
 	testMainIntegerArg(
@@ -1595,15 +1714,17 @@ void LanguageTests::run()
 				stringLength(s2)",
 		2, 11);
 
+	}
+
 	// Char test
-	testMainIntegerArg(
+	/*testMainIntegerArg(
 		"def main(int x) int :				\n\
 			let								\n\
 				c = 'a'						\n\
 			in								\n\
 				10",
-		2, 10);
-*/
+		2, 10);*/
+
 
 	// test type coercion on vectors: vector<float> initialisation with some int elems
 	testMainFloatArg(
@@ -1701,7 +1822,7 @@ void LanguageTests::run()
 
 	testMainFloatArg(
 		"def main(float x) float: elem( if(x < 0.5, [1.0, 2.0]a, [3.0, 4.0]a), 0)",
-		1.0f, 3.0f);
+		1.0f, 3.0f, INVALID_OPENCL);
 	
 	// Test a structure composed of another structure, and taking the dot product of two vectors in the child structures, in an if statement
 	{
@@ -1904,7 +2025,7 @@ TEMP OPENCL
 	testMainFloatArg(
 		"struct Pair { float a, float b }		\n\
 		def main(float x) float : b(elem([Pair(1.0, 2.0), Pair(3.0, 4.0)]a, 1)) ", 
-		10.0, 4.0f);
+		10.0, 4.0f, INVALID_OPENCL);
 	
 	// Test mixing of int and float in an array - is invalid
 	testMainFloatArgInvalidProgram("def main(float x) float : elem([1.0, 2, 3.0, 4.0]a, 1) + x");
@@ -1927,7 +2048,6 @@ TEMP OPENCL
 	testMainIntegerArg("def main(int x) int : elem([1, 2, 3, 4]a, 1) + x", 10, 12);
 
 	
-
 
 	// Test array with let statement
 	testMainFloatArg(
@@ -1993,8 +2113,11 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 		);
 	}
 */
+
 	// sqrt
 	testMainFloatArg("def main(float x) float : sqrt(x)", 9.0f, std::sqrt(9.0f));
+	testMainFloatArgCheckConstantFolded("def main(float x) float : sqrt(9)", 9.0f, std::sqrt(9.0f));
+	testMainFloatArgCheckConstantFolded("def main(float x) float : sqrt(9.0)", 9.0f, std::sqrt(9.0f));
 
 	// Test sqrt on vector
 	{
@@ -2013,6 +2136,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 	// pow
 	testMainFloatArg("def main(float x) float : pow(2.4, x)", 3.0f, std::pow(2.4f, 3.0f));
 	testMainFloatArg("def main(float x) float : pow(2.0, x)", 3.0f, std::pow(2.0f, 3.0f));
+	testMainFloatArgCheckConstantFolded("def main(float x) float : pow(2.0, 3.0)", 3.0f, std::pow(2.0f, 3.0f));
 
 	// Test pow on vector
 	{
@@ -2031,6 +2155,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 
 	// sin
 	testMainFloatArg("def main(float x) float : sin(x)", 1.0f, std::sin(1.0f));
+	testMainFloatArgCheckConstantFolded("def main(float x) float : sin(1.0)", 1.0f, std::sin(1.0f));
 
 	// Test sin on vector
 	{
@@ -2048,6 +2173,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 
 	// exp
 	testMainFloatArg("def main(float x) float : exp(x)", 3.0f, std::exp(3.0f));
+	testMainFloatArgCheckConstantFolded("def main(float x) float : exp(3.0)", 3.0f, std::exp(3.0f));
 
 	// Test exp on vector
 	{
@@ -2065,6 +2191,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 
 	// log
 	testMainFloatArg("def main(float x) float : log(x)", 3.0f, std::log(3.0f));
+	testMainFloatArgCheckConstantFolded("def main(float x) float : log(3.0)", 3.0f, std::log(3.0f));
 
 	// Test exp on vector
 	{
@@ -2082,6 +2209,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 
 	// cos
 	testMainFloatArg("def main(float x) float : cos(x)", 1.0f, std::cos(1.0f));
+	testMainFloatArgCheckConstantFolded("def main(float x) float : cos(1.0)", 1.0f, std::cos(1.0f));
 
 	// Test cos on vector
 	{
@@ -2102,6 +2230,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 	// Test floor
 	testMainFloatArg("def main(float x) float : floor(x)", 2.3f, 2.0f);
 	testMainFloatArg("def main(float x) float : floor(x)", -2.3f, -3.0f);
+	testMainFloatArgCheckConstantFolded("def main(float x) float : floor(-2.3)", -2.3f, -3.0f);
 
 	// Test floor on vector
 	{
@@ -2120,6 +2249,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 	// Test ceil
 	testMainFloatArg("def main(float x) float : ceil(x)", 2.3f, 3.0f);
 	testMainFloatArg("def main(float x) float : ceil(x)", -2.3f, -2.0f);
+	testMainFloatArgCheckConstantFolded("def main(float x) float : ceil(-2.3)", -2.3f, -2.0f);
 
 	// Test ceil on vector
 	{
@@ -2424,8 +2554,30 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 				  def main() float : x(f(s(1, 2), s(3, 4)))");
 
 
+	// ===================================================================
+	// Test Operator Overloading in collection literals
+	// ===================================================================
 
-	
+	// Without a collection
+	testMainFloat("struct s { float x }									\n\
+				  def op_add(s a, s b) : s(a.x + b.x)					\n\
+				  def main() float : (s(1) + s(3)).x", 4.0f);
+
+	// In Array literal
+	testMainFloat("struct s { float x }									\n\
+				  def op_add(s a, s b) : s(a.x + b.x)					\n\
+				  def main() float : [s(1) + s(3)]a[0].x", 4.0f);
+
+	// In VArray literal
+	//TEMP CRASHES testMainFloatArgAllowUnsafe("struct s { float x }									\n\
+	//			  def op_add(s a, s b) : s(a.x + b.x)					\n\
+	//			  def main(float x) float : [s(1) + s(3)]va[0].x", 1.0f, 4.0f);
+
+	// In Vector literal
+	testMainFloat("struct s { float x }									\n\
+				  def op_add(s a, s b) : s(a.x + b.x)					\n\
+				  def main() float : [(s(1) + s(3)).x]v[0]", 4.0f);
+
 
 	testMainFloat("def f(float x) float : x*x         def main() float : f(10)", 100.0);
 	testMainFloat("def f(float x, float y) float : 1.0f   \n\
@@ -2609,13 +2761,12 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 		10.0f);
 
 
-
-	/*OPENCL 
 	// Test call to external function
 	testMainFloat("def main() float : testExternalFunc(3.0)", 9.0f);
-	testMainFloatArg("def main(float x) float : testExternalFunc(x)", 5.0f, 25.0f);
-	*/
+	testMainFloatArg("def main(float x) float : testExternalFunc(x)", 5.0f, 25.0f, INVALID_OPENCL);
 
+	// Check that we can do constant folding even with an external expression
+	testMainFloatArgCheckConstantFolded("def main(float x) float : testExternalFunc(3.0)", 5.0f, 9.0f, INVALID_OPENCL);
 	
 	// Simple test
 	testMainFloat("def main() float : 1.0", 1.0);

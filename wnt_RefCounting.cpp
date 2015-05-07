@@ -48,195 +48,264 @@ namespace RefCounting
 {
 
 
-void emitRefCountingFunctions(llvm::Module* module, const llvm::DataLayout* target_data, CommonFunctions& common_functions)
+// Emit decrement ref count function (decrStringRefCount etc..)
+// arg 0: pointer to refcounted value
+// Returns: void
+
+//TEMP: new version that checks for NULL ptr:
+#if 0
+llvm::Function* emitDecrRefCountFunc(llvm::Module* module, const llvm::DataLayout* target_data, const string& func_name, const TypeRef& refcounted_type,
+									 FunctionDefinition* free_value_function)
 {
-	//====================================================================================================================
-	// Emit decrement ref count function
-	// arg 0: string pointer
-	// Returns: void
-	{
+	const std::vector<llvm::Type*> arg_types(1, refcounted_type->LLVMType(*module));
 
-		/*std::vector<TypeRef> arg_types(1, new String());
+	llvm::FunctionType* functype = llvm::FunctionType::get(
+		llvm::Type::getVoidTy(module->getContext()), // return type
+		arg_types,
+		false // varargs
+	);
 
-		llvm::FunctionType* functype = LLVMTypeUtils::llvmFunctionType(
-			arg_types, 
-			false, // use_cap_var_struct_ptr, // this->use_captured_vars, // use captured var struct ptr arg
-			new Int(), 
-			module->getContext(),
-			true // hidden_voidptr_arg
-		);*/
+	llvm::Constant* llvm_func_constant = module->getOrInsertFunction(
+		func_name, // Name
+		functype // Type
+	);
 
-		TypeRef string_type = new String();
-		std::vector<llvm::Type*> arg_types(1, string_type->LLVMType(*module));
-		//arg_types.push_back(LLVMTypeUtils::voidPtrType(module->getContext())); // hidden_voidptr_arg
+	// TODO: check cast.
+	llvm::Function* llvm_func = static_cast<llvm::Function*>(llvm_func_constant);
 
-		llvm::FunctionType* functype = llvm::FunctionType::get(
-			llvm::Type::getVoidTy(module->getContext()), // return type
-			arg_types,
-			false // varargs
-		);
+	// Create entry block
+	llvm::BasicBlock* entry_block = llvm::BasicBlock::Create(module->getContext(), "entry", llvm_func);
 
-		llvm::Constant* llvm_func_constant = module->getOrInsertFunction(
-			"decrStringRefCount", // Name
-			functype // Type
-		);
+	// Create blocks for the then and else cases.  Insert the 'then' block at the end of the function
+	llvm::BasicBlock* if_non_null_BB  = llvm::BasicBlock::Create(module->getContext(), "if_non_null", llvm_func);
+	llvm::BasicBlock* ThenBB  = llvm::BasicBlock::Create(module->getContext(), "then", llvm_func);
+	llvm::BasicBlock* ElseBB  = llvm::BasicBlock::Create(module->getContext(), "else", llvm_func);
+	llvm::BasicBlock* MergeBB = llvm::BasicBlock::Create(module->getContext(), "merge", llvm_func);
 
-		llvm::Function* llvm_func = static_cast<llvm::Function*>(llvm_func_constant);
+	llvm::IRBuilder<> builder(entry_block);
 
-		common_functions.decrStringRefCountLLVMFunc = llvm_func;
+	// Get a pointer to the current function
+	//llvm::Function* the_function = builder.GetInsertBlock()->getParent();
 
-		llvm::BasicBlock* block = llvm::BasicBlock::Create(
-			module->getContext(), 
-			"entry", 
-			llvm_func
-		);
+	// Get arg 0.
+	llvm::Value* ptr_to_recounted_val = LLVMTypeUtils::getNthArg(llvm_func, 0);
+	
+	// Branch to if_non_null_BB if !null, else branch to MergeBB
+	llvm::Value* non_null_cond = builder.CreateIsNotNull(ptr_to_recounted_val, "non_null");
+	builder.CreateCondBr(non_null_cond, if_non_null_BB, MergeBB);
 
-
-		llvm::IRBuilder<> builder(block);
-
-		// Get arg 0.
-		llvm::Value* string_val = LLVMTypeUtils::getNthArg(llvm_func, 0);
-
-		// Load ref count
-		//string_val->dump();
-		llvm::Value* ref_ptr = builder.CreateStructGEP(string_val, 0, "ref ptr");
-
-		llvm::Value* ref_count = builder.CreateLoad(ref_ptr, "ref count");
-
-		// Get a pointer to the current function
-		llvm::Function* the_function = builder.GetInsertBlock()->getParent();
-
-		// Create blocks for the then and else cases.  Insert the 'then' block at the end of the function.
-		llvm::BasicBlock* ThenBB  = llvm::BasicBlock::Create(module->getContext(), "then", the_function);
-		llvm::BasicBlock* ElseBB  = llvm::BasicBlock::Create(module->getContext(), "else");
-		llvm::BasicBlock* MergeBB = llvm::BasicBlock::Create(module->getContext(), "ifcont");
-
-		// Compare with ref count value of 1.
-		llvm::Value* condition = builder.CreateICmpEQ(ref_count, llvm::ConstantInt::get(
-			module->getContext(),
-			llvm::APInt(64, 1, 
-				true // signed
-			)
-		));
-
-		builder.CreateCondBr(condition, ThenBB, ElseBB);
-
-		// Emit then value.
-		builder.SetInsertPoint(ThenBB);
-
-		// Create call to freeString()
-		llvm::Function* freeStringLLVMFunc = common_functions.freeStringFunc->getOrInsertFunction(
-			module,
-			false // use_cap_var_struct_ptr: False as global functions don't have captured vars. ?!?!?
-			//true // target_takes_voidptr_arg // params.hidden_voidptr_arg
-		);
-
-		// Set hidden voidptr argument
-		vector<llvm::Value*> args(1, string_val);
-		//const bool target_takes_voidptr_arg = true;
-		//if(target_takes_voidptr_arg)
-		//	args.push_back(LLVMTypeUtils::getLastArg(llvm_func));
-
-		//string_val->dump();
-		//freeStringLLVMFunc->dump();
-		/*llvm::CallInst* call_inst = */builder.CreateCall(freeStringLLVMFunc, args);
+	// Emit code for if_non_null_BB
+	builder.SetInsertPoint(if_non_null_BB);
+	// Load ref count
+	llvm::Value* ref_ptr = builder.CreateStructGEP(ptr_to_recounted_val, 0, "ref_ptr");
+	llvm::Value* ref_count = builder.CreateLoad(ref_ptr, "ref_count");
 
 
-		builder.CreateBr(MergeBB);
+	// Compare with ref count value of 1.
+	llvm::Value* condition = builder.CreateICmpEQ(ref_count, llvm::ConstantInt::get(
+		module->getContext(),
+		llvm::APInt(64, 1, 
+			true // signed
+		)
+	));
 
-		// Codegen of 'Then' can change the current block, update ThenBB for the PHI.
-		ThenBB = builder.GetInsertBlock();
+	builder.CreateCondBr(condition, ThenBB, ElseBB);
 
-		// Emit else block.
-		the_function->getBasicBlockList().push_back(ElseBB);
-		builder.SetInsertPoint(ElseBB);
+	// Emit then block
+	builder.SetInsertPoint(ThenBB);
 
-		// Emit decrement of ref count
-		llvm::Value* decr_ref = builder.CreateSub(ref_count, llvm::ConstantInt::get(
-			module->getContext(),
-			llvm::APInt(64, 1, 
-				true // signed
-			)
-		));
+	// Create call to freeString() or equivalent
+	llvm::Function* freeValueLLVMFunc = free_value_function->getOrInsertFunction(
+		module,
+		false // use_cap_var_struct_ptr: False as global functions don't have captured vars. ?!?!?
+		//true // target_takes_voidptr_arg // params.hidden_voidptr_arg
+	);
 
-		// Store the decremented ref count
-		builder.CreateStore(decr_ref, ref_ptr);
+	builder.CreateCall(freeValueLLVMFunc, ptr_to_recounted_val);
+	builder.CreateBr(MergeBB);
 
-		builder.CreateBr(MergeBB);
+	// Codegen of 'Then' can change the current block, update ThenBB for the PHI.
+	ThenBB = builder.GetInsertBlock();
 
-		// Codegen of 'Else' can change the current block, update ElseBB for the PHI.
-		ElseBB = builder.GetInsertBlock();
+	// Emit else block.
+//	llvm_func->getBasicBlockList().push_back(ElseBB);
+	builder.SetInsertPoint(ElseBB);
 
-		// Emit merge block.
-		the_function->getBasicBlockList().push_back(MergeBB);
-		builder.SetInsertPoint(MergeBB);
+	// Emit decrement of ref count
+	llvm::Value* decr_ref = builder.CreateSub(ref_count, llvm::ConstantInt::get(
+		module->getContext(),
+		llvm::APInt(64, 1, 
+			true // signed
+		)
+	));
 
-		builder.CreateRetVoid();
-	}
+	// Store the decremented ref count
+	builder.CreateStore(decr_ref, ref_ptr);
 
-	//====================================================================================================================
-	// Emit increment ref count function
-	// arg 0: string pointer
-	// Returns: void
-	{
-		TypeRef string_type = new String();
-		std::vector<llvm::Type*> arg_types(1, string_type->LLVMType(*module));
-		//arg_types.push_back(LLVMTypeUtils::voidPtrType(module->getContext())); // hidden_voidptr_arg
+	builder.CreateBr(MergeBB);
 
-		llvm::FunctionType* functype = llvm::FunctionType::get(
-			llvm::Type::getVoidTy(module->getContext()), // return type
-			arg_types,
-			false // varargs
-		);
+	// Codegen of 'Else' can change the current block, update ElseBB for the PHI.
+	//ElseBB = builder.GetInsertBlock();
 
-		llvm::Constant* llvm_func_constant = module->getOrInsertFunction(
-			"incrStringRefCount", // Name
-			functype // Type
-		);
+	// Emit merge block.
+//	llvm_func->getBasicBlockList().push_back(MergeBB);
+	builder.SetInsertPoint(MergeBB);
 
-		llvm::Function* llvm_func = static_cast<llvm::Function*>(llvm_func_constant);
+	builder.CreateRetVoid();
 
-		common_functions.incrStringRefCountLLVMFunc = llvm_func;
-
-		llvm::BasicBlock* block = llvm::BasicBlock::Create(
-			module->getContext(), 
-			"entry", 
-			llvm_func
-		);
+	return llvm_func;
+}
+#endif
 
 
-		llvm::IRBuilder<> builder(block);
+llvm::Function* emitDecrRefCountFunc(llvm::Module* module, const llvm::DataLayout* target_data, const string& func_name, const TypeRef& refcounted_type,
+									 FunctionDefinition* free_value_function)
+{
+	const std::vector<llvm::Type*> arg_types(1, refcounted_type->LLVMType(*module));
 
-		// Get arg 0.
-		llvm::Value* string_val = LLVMTypeUtils::getNthArg(llvm_func, 0);
+	llvm::FunctionType* functype = llvm::FunctionType::get(
+		llvm::Type::getVoidTy(module->getContext()), // return type
+		arg_types,
+		false // varargs
+	);
 
-		// Get pointer to ref count
-		llvm::Value* ref_ptr = builder.CreateStructGEP(string_val, 0, "ref ptr");
+	llvm::Constant* llvm_func_constant = module->getOrInsertFunction(
+		func_name, // Name
+		functype // Type
+	);
 
-		// Load the ref count
-		llvm::Value* ref_count = builder.CreateLoad(ref_ptr, "ref count");
+	// TODO: check cast.
+	llvm::Function* llvm_func = static_cast<llvm::Function*>(llvm_func_constant);
 
-		llvm::Value* one = llvm::ConstantInt::get(
-			module->getContext(),
-			llvm::APInt(64, 1, 
-				true // signed
-			)
-		);
+	llvm::BasicBlock* entry_block = llvm::BasicBlock::Create(module->getContext(), "entry", llvm_func);
 
-		llvm::Value* new_ref_count = builder.CreateAdd(
-			ref_count, 
-			one,
-			"incr ref count"
-		);
+	llvm::IRBuilder<> builder(entry_block);
 
-		// Store the new ref count
-		builder.CreateStore(new_ref_count, ref_ptr);
+	// Get arg 0.
+	llvm::Value* recounted_val = LLVMTypeUtils::getNthArg(llvm_func, 0);
 
-		builder.CreateRetVoid();
-	}
+
+	//recounted_val->dump();
+	//recounted_val->getType()->dump();
+
+	// Load ref count
+	llvm::Value* ref_ptr = builder.CreateStructGEP(recounted_val, 0, "ref_ptr");
+	llvm::Value* ref_count = builder.CreateLoad(ref_ptr, "ref_count");
+
+	// Get a pointer to the current function
+	llvm::Function* the_function = builder.GetInsertBlock()->getParent();
+
+	// Create blocks for the then and else cases.  Insert the 'then' block at the end of the function.
+	llvm::BasicBlock* ThenBB  = llvm::BasicBlock::Create(module->getContext(), "then", the_function);
+	llvm::BasicBlock* ElseBB  = llvm::BasicBlock::Create(module->getContext(), "else");
+	llvm::BasicBlock* MergeBB = llvm::BasicBlock::Create(module->getContext(), "merge");
+
+	// Compare with ref count value of 1.
+	llvm::Value* condition = builder.CreateICmpEQ(ref_count, llvm::ConstantInt::get(
+		module->getContext(),
+		llvm::APInt(64, 1, 
+			true // signed
+		)
+	));
+
+	builder.CreateCondBr(condition, ThenBB, ElseBB);
+
+	// Emit then value.
+	builder.SetInsertPoint(ThenBB);
+
+	// Create call to freeString() or equivalent
+	llvm::Function* freeValueLLVMFunc = free_value_function->getOrInsertFunction(
+		module,
+		false // use_cap_var_struct_ptr: False as global functions don't have captured vars. ?!?!?
+		//true // target_takes_voidptr_arg // params.hidden_voidptr_arg
+	);
+	builder.CreateCall(freeValueLLVMFunc, recounted_val);
+
+	builder.CreateBr(MergeBB);
+
+	// Codegen of 'Then' can change the current block, update ThenBB for the PHI.
+	ThenBB = builder.GetInsertBlock();
+
+	// Emit else block.
+	the_function->getBasicBlockList().push_back(ElseBB);
+	builder.SetInsertPoint(ElseBB);
+
+	// Emit decrement of ref count
+	llvm::Value* decr_ref = builder.CreateSub(ref_count, llvm::ConstantInt::get(
+		module->getContext(),
+		llvm::APInt(64, 1, 
+			true // signed
+		)
+	));
+
+	// Store the decremented ref count
+	builder.CreateStore(decr_ref, ref_ptr);
+
+	builder.CreateBr(MergeBB);
+
+	// Codegen of 'Else' can change the current block, update ElseBB for the PHI.
+	ElseBB = builder.GetInsertBlock();
+
+	// Emit merge block.
+	the_function->getBasicBlockList().push_back(MergeBB);
+	builder.SetInsertPoint(MergeBB);
+
+	builder.CreateRetVoid();
+
+	return llvm_func;
 }
 
 
+// Emit increment ref count function (incrStringRefCount etc..)
+// arg 0: pointer to refcounted value
+// Returns: void
+llvm::Function* emitIncrRefCountFunc(llvm::Module* module, const llvm::DataLayout* target_data, const string& func_name, const TypeRef& refcounted_type)
+{
+	const std::vector<llvm::Type*> arg_types(1, refcounted_type->LLVMType(*module));
+
+	llvm::FunctionType* functype = llvm::FunctionType::get(
+		llvm::Type::getVoidTy(module->getContext()), // return type
+		arg_types,
+		false // varargs
+	);
+
+	llvm::Constant* llvm_func_constant = module->getOrInsertFunction(
+		func_name, // Name
+		functype // Type
+	);
+
+	llvm::Function* llvm_func = static_cast<llvm::Function*>(llvm_func_constant);
+	llvm::BasicBlock* block = llvm::BasicBlock::Create(module->getContext(), "entry", llvm_func);
+	llvm::IRBuilder<> builder(block);
+		
+	llvm::Value* refcounted_val = LLVMTypeUtils::getNthArg(llvm_func, 0); // Get arg 0.
+	llvm::Value* ref_ptr = builder.CreateStructGEP(refcounted_val, 0, "ref_ptr"); // Get pointer to ref count
+	llvm::Value* ref_count = builder.CreateLoad(ref_ptr, "ref_count"); // Load the ref count
+	llvm::Value* one = llvm::ConstantInt::get(module->getContext(), llvm::APInt(64, 1, /*signed=*/true));
+	llvm::Value* new_ref_count = builder.CreateAdd(ref_count, one, "incremented_ref_count");
+		
+	builder.CreateStore(new_ref_count, ref_ptr); // Store the new ref count
+
+	builder.CreateRetVoid();
+
+	return llvm_func;
+}
+
+
+void emitRefCountingFunctions(llvm::Module* module, const llvm::DataLayout* target_data, CommonFunctions& common_functions)
+{
+	const TypeRef string_type = new String();
+	common_functions.decrStringRefCountLLVMFunc = emitDecrRefCountFunc(module, target_data, "decrStringRefCount", string_type, common_functions.freeStringFunc);
+	common_functions.incrStringRefCountLLVMFunc = emitIncrRefCountFunc(module, target_data, "incrStringRefCount", string_type);
+
+	// Since the varray type is generic, decrVArrayRefCount and incrVArrayRefCount will just take an void* arg, and the calling code must cast to void*
+	const TypeRef dummy_varray_type = new VArrayType(new Int());
+	common_functions.decrVArrayRefCountLLVMFunc = emitDecrRefCountFunc(module, target_data, "decrVArrayRefCount", dummy_varray_type, common_functions.freeVArrayFunc);
+	common_functions.incrVArrayRefCountLLVMFunc = emitIncrRefCountFunc(module, target_data, "incrVArrayRefCount", dummy_varray_type);
+}
+
+
+#if 0
 void emitIncrementStringRefCount(EmitLLVMCodeParams& params, llvm::Value* string_val)
 {
 	vector<llvm::Value*> args(1, string_val);
@@ -265,26 +334,70 @@ void emitStringCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* string_v
 }
 
 
+void emitIncrementVArrayRefCount(EmitLLVMCodeParams& params, llvm::Value* varray_val)
+{
+	const TypeRef dummy_varray_type = new VArrayType(new Int());
+
+	// Cast to dummy_varray_type
+	llvm::Value* cast_val = params.builder->CreatePointerCast(varray_val, dummy_varray_type->LLVMType(*params.module));
+
+	params.builder->CreateCall(params.common_functions.incrVArrayRefCountLLVMFunc, cast_val);
+}
+
+
+void emitVArrayCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* varray_val)
+{
+	const TypeRef dummy_varray_type = new VArrayType(new Int());
+
+	// Cast to dummy_varray_type
+	llvm::Value* cast_val = params.builder->CreatePointerCast(varray_val, dummy_varray_type->LLVMType(*params.module));
+
+	params.builder->CreateCall(params.common_functions.decrVArrayRefCountLLVMFunc, cast_val);
+}
+
+
 void emitStructureCleanupLLVMCode(EmitLLVMCodeParams& params, const StructureType& struct_type, llvm::Value* structure_val)
 {
 	for(size_t i=0; i<struct_type.component_types.size(); ++i)
 	{
-		if(struct_type.component_types[i]->getType() == Type::StringType)
+		// Recursivly call emitCleanupLLVMCode on each refcounted element.
+		if(struct_type.component_types[i]->getType() == Type::StringType ||
+			struct_type.component_types[i]->getType() == Type::VArrayTypeType/* ||
+			struct_type.component_types[i]->getType() == Type::StructureTypeType*/) // TODO: handle this
+		{
+
+			llvm::Value* ptr = params.builder->CreateStructGEP(structure_val, (unsigned int)i);
+			llvm::Value* val = params.builder->CreateLoad(ptr);
+
+			emitCleanupLLVMCode(params, struct_type.component_types[i], val);
+		}
+
+		/*if(struct_type.component_types[i]->getType() == Type::StringType)
 		{
 			// Emit code to load the string value:
-			structure_val->dump();
-			structure_val->getType()->dump();
+			//structure_val->dump();
+			//structure_val->getType()->dump();
 			llvm::Value* str_ptr = params.builder->CreateStructGEP(structure_val, (unsigned int)i, struct_type.name + ".str ptr");
 
 			// Load the string value
-			str_ptr->dump();
-			str_ptr->getType()->dump();
+			//str_ptr->dump();
+			//str_ptr->getType()->dump();
 			llvm::Value* str = params.builder->CreateLoad(str_ptr, struct_type.name + ".str");
 
-			str->dump();
-			str->getType()->dump();
+			//str->dump();
+			//str->getType()->dump();
 			emitStringCleanupLLVMCode(params, str);
 		}
+		else if(struct_type.component_types[i]->getType() == Type::VArrayTypeType)
+		{
+			// Emit code to load the varray value:
+			llvm::Value* ptr = params.builder->CreateStructGEP(structure_val, (unsigned int)i, struct_type.name + ".varray ptr");
+
+			// Load the  value
+			llvm::Value* varray_val = params.builder->CreateLoad(ptr, struct_type.name + ".str");
+
+			emitVArrayCleanupLLVMCode(params, varray_val);
+		}*/
 	}
 }
 
@@ -303,10 +416,17 @@ void emitCleanupLLVMCode(EmitLLVMCodeParams& params, const TypeRef& type, llvm::
 			emitStructureCleanupLLVMCode(params, *type.downcast<StructureType>(), val);
 			break;
 		}
+	case Type::VArrayTypeType:
+		{
+			emitVArrayCleanupLLVMCode(params, val);
+			break;
+		}
 	default:
-		assert(0);
+		//assert(0);
+		break;
 	};
 }
+#endif
 
 
 } // end namespace RefCounting

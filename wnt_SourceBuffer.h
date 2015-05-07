@@ -7,9 +7,9 @@ Generated at 2011-06-11 19:19:16 +0100
 #pragma once
 
 
-#include <string>
 #include <utils/Reference.h>
 #include <utils/RefCounted.h>
+#include <string>
 
 
 namespace Winter

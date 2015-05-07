@@ -153,17 +153,38 @@ std::string VectorLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 		assert(0);
 		return "";
 	}*/
-	// TODO: handle int suffix
-	assert(!has_int_suffix);
-	std::string s = "(float" + toString(elements.size()) + ")(";
-	for(size_t i=0; i<elements.size(); ++i)
+
+	// TODO: check vector width
+
+	if(!(this->elements[0]->type()->getType() == Type::FloatType || (this->elements[0]->type()->getType() == Type::IntType && this->elements[0]->type().downcastToPtr<Int>()->numBits() == 32)))
+		throw BaseException("Only vectors of float or int32 supported for OpenCL currently.");
+
+	const std::string elem_typename = this->elements[0]->type()->getType() == Type::FloatType ? "float" : "int";
+	if(has_int_suffix)
 	{
-		s += elements[i]->emitOpenCLC(params);
-		if(i + 1 < elements.size())
-			s += ", ";
+		// "(float4)(1.0f, 2.0f, 3.0f, 4.0)"
+		std::string s = "(" + elem_typename + toString(this->int_suffix) + ")(";
+		for(size_t i=0; i<this->int_suffix; ++i)
+		{
+			s += elements[0]->emitOpenCLC(params);
+			if(i + 1 < this->int_suffix)
+				s += ", ";
+		}
+		s += ")";
+		return s;
 	}
-	s += ")";
-	return s;
+	else
+	{
+		std::string s = "(" + elem_typename + toString(elements.size()) + ")(";
+		for(size_t i=0; i<elements.size(); ++i)
+		{
+			s += elements[i]->emitOpenCLC(params);
+			if(i + 1 < elements.size())
+				s += ", ";
+		}
+		s += ")";
+		return s;
+	}
 }
 
 
@@ -174,7 +195,7 @@ void VectorLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 		for(size_t i=0; i<elements.size(); ++i)
 			checkFoldExpression(elements[i], payload);
 	}
-	else */if(payload.operation == TraversalPayload::OperatorOverloadConversion)
+	else */if(payload.operation == TraversalPayload::BindVariables)
 	{
 		for(size_t i=0; i<elements.size(); ++i)
 			convertOverloadedOperators(elements[i], payload, stack);
