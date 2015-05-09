@@ -1623,7 +1623,7 @@ bool MapLiteral::isConstant() const
 StringLiteral::StringLiteral(const std::string& v, const SrcLocation& loc) 
 :	ASTNode(StringLiteralType, loc), value(v)
 {
-
+	this->can_maybe_constant_fold = true;
 }
 
 
