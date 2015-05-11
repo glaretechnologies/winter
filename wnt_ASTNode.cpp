@@ -3891,13 +3891,13 @@ bool shouldRefCount(EmitLLVMCodeParams& params, const ASTNodeRef& expr)
 
 bool shouldRefCount(EmitLLVMCodeParams& params, const ASTNode& expr)
 {
-	if(expr.nodeType() == ASTNode::VariableASTNodeType && static_cast<const Variable&>(expr).vartype == Variable::ArgumentVariable)
+	/*if(expr.nodeType() == ASTNode::VariableASTNodeType && static_cast<const Variable&>(expr).vartype == Variable::ArgumentVariable)
 	{
 		// If this is a variable bound to a function argument, only need to do ref counting for if it has the same type as the enclosing function return type.
 		const bool same_as_ret_type = *expr.type() == *params.currently_building_func_def->returnType();
 		return same_as_ret_type;
 	}
-	else
+	else*/
 		return true;
 }
 

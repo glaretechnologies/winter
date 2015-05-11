@@ -206,7 +206,7 @@ void LanguageTests::run()
 	// ===================================================================
 	// Test VArrays
 	// ===================================================================
-
+	
 	// Test VArray let variables.
 	testMainFloatArg("def main(float x) float : let v = [99]va in x", 1.f, 1.0f, INVALID_OPENCL);
 	testMainFloatArg("def main(float x) float : let v = [1.0, 2.0, 3.0]va in x", 1.f, 1.0f, INVALID_OPENCL);
@@ -306,7 +306,7 @@ void LanguageTests::run()
 	testMainFloatArgAllowUnsafe("struct S { varray<float> a, varray<float> b }     def f(varray<float> arg) S : S(arg, arg)      def main(float x) float : f([x]va).a[0]", 10.f, 10.0f, INVALID_OPENCL);
 
 	testMainFloatArgAllowUnsafe("struct S { varray<float> a, varray<float> b }     def f(varray<float> arg, varray<float> arg2) S : S(arg, arg2)      def main(float x) float : f([x]va, [x]va).a[0]", 10.f, 10.0f, INVALID_OPENCL);
-
+	
 
 	//------------------------ VArrays in tuples --------------------------
 	testMainFloatArgAllowUnsafe("def f(varray<float> arg) tuple<varray<float>> : [arg]t      def main(float x) float : f([x]va)[0][0]", 10.f, 10.0f, INVALID_OPENCL);
@@ -334,6 +334,23 @@ void LanguageTests::run()
 	testMainFloatArgAllowUnsafe("struct S { string s_a, string s_b }      def main(float x) float : let a = S(\"hello\", \"world\") in x", 10.f, 10.0f, INVALID_OPENCL);
 
 	testMainFloatArgAllowUnsafe("struct S { string s_a, string s_b }      def main(float x) float : let a = [S(\"hello\", \"world\")]va in x", 10.f, 10.0f, INVALID_OPENCL);
+	
+
+
+	//------------------------ Test a tuple, with a ref counted field, in a VArray --------------------------
+	testMainFloatArgAllowUnsafe("struct S { string str }      def main(float x) float : let a = S(\"hello\") in x", 10.f, 10.0f, INVALID_OPENCL);
+	testMainFloatArgAllowUnsafe("def main(float x) float : let a = [\"hello\"]t in x", 10.f, 10.0f, INVALID_OPENCL);
+
+	testMainFloatArgAllowUnsafe("def main(float x) float : let a = [[\"hello\"]t]va in x", 10.f, 10.0f, INVALID_OPENCL);
+
+	testMainFloatArgAllowUnsafe("def main(float x) float : let a = [[\"hello\"]t, [\"world\"]t]va in x", 10.f, 10.0f, INVALID_OPENCL);
+
+	// Test a tuple with two ref counted fields
+	testMainFloatArgAllowUnsafe("def main(float x) float : let a = (\"hello\", \"world\") in x", 10.f, 10.0f, INVALID_OPENCL);
+
+	testMainFloatArgAllowUnsafe("def main(float x) float : let a = [(\"hello\", \"world\")]va in x", 10.f, 10.0f, INVALID_OPENCL);
+
+
 
 	
 	// Test fold built-in function with update

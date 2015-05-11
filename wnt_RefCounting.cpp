@@ -313,20 +313,6 @@ llvm::Function* RefCounting::getOrInsertDestructorForType(llvm::Module* module, 
 void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_data, const CommonFunctions& common_functions, const ConstTypeRef& refcounted_type)
 {
 	//----------- Create the function ------------
-	/*llvm::FunctionType* functype = llvm::FunctionType::get(
-		llvm::Type::getVoidTy(module->getContext()), // return type
-		llvm::makeArrayRef(refcounted_type->passByValue() ? refcounted_type->LLVMType(*module) : LLVMTypeUtils::pointerType(refcounted_type->LLVMType(*module))),
-		false // varargs
-	);
-
-	llvm::Constant* llvm_func_constant = module->getOrInsertFunction(
-		"decr_" + refcounted_type->toString(), // Name
-		functype // Type
-	);
-
-	// TODO: check cast
-	assert(llvm::isa<llvm::Function>(llvm_func_constant));
-	llvm::Function* llvm_func = static_cast<llvm::Function*>(llvm_func_constant);*/
 	llvm::Function* llvm_func = getOrInsertDestructorForType(module, refcounted_type);
 
 	llvm::BasicBlock* entry_block = llvm::BasicBlock::Create(module->getContext(), "entry", llvm_func);
@@ -347,35 +333,50 @@ void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_
 			{
 				// Get a pointer to the field memory.
 				llvm::Value* field_ptr = builder.CreateStructGEP(struct_ptr, (unsigned int)i, struct_type->name + "." + struct_type->component_names[i] + " ptr");
-				//llvm::LoadInst* val = builder.CreateLoad(ptr, this->name + "." + component_names[i] + " ptr");
-				//llvm::Value* val = load_instruction;
-				llvm::Value* field_val;
-
+				
 				// If the field type is heap allocated, this means that the element is just a pointer to the field value.
 				// So we need to load the pointer from the structure.
 				// If the field is not heap allocated, for example another structure embedded in this structure, then the existing pointer is all we need.
+				llvm::Value* field_val;
 				if(struct_type->component_types[i]->isHeapAllocated())
 					field_val = builder.CreateLoad(field_ptr);
 				else
 					field_val = field_ptr;
 
-				/*llvm::FunctionType* elem_destructor_type = llvm::FunctionType::get(
-					llvm::Type::getVoidTy(module->getContext()), // return type
-					llvm::makeArrayRef(struct_type->component_types[i]->LLVMType(*module)),
-					false // varargs
-				);
-
-				elem_destructor_type->dump();
-
-				llvm::Constant* elem_destructor_func_constant = module->getOrInsertFunction(
-					"decr_" + struct_type->component_types[i]->toString(), // Name
-					elem_destructor_type // Type
-				);
-
-				// TODO: check cast
-				llvm::Function* elem_destructor_func = static_cast<llvm::Function*>(elem_destructor_func_constant);*/
-
 				llvm::Function* elem_destructor_func = getOrInsertDestructorForType(module, struct_type->component_types[i]);
+
+				builder.CreateCall(elem_destructor_func, field_val);
+			}
+		}
+
+		builder.CreateRetVoid();
+		return;
+	}
+	else if(refcounted_type->getType() == Type::TupleTypeType)
+	{
+		const TupleType* tuple_type = refcounted_type.downcastToPtr<TupleType>();
+
+		// Get arg 0 - (a pointer to) the ref counted value
+		llvm::Value* struct_ptr = LLVMTypeUtils::getNthArg(llvm_func, 0);
+
+		for(size_t i=0; i<tuple_type->component_types.size(); ++i)
+		{
+			// Call destructor on each element that has a destructor.
+			if(tuple_type->component_types[i]->hasDestructor())
+			{
+				// Get a pointer to the field memory.
+				llvm::Value* field_ptr = builder.CreateStructGEP(struct_ptr, (unsigned int)i, tuple_type->toString() + ".field_" + ::toString(i) + " ptr");
+				
+				// If the field type is heap allocated, this means that the element is just a pointer to the field value.
+				// So we need to load the pointer from the structure.
+				// If the field is not heap allocated, for example another structure embedded in this structure, then the existing pointer is all we need.
+				llvm::Value* field_val;
+				if(tuple_type->component_types[i]->isHeapAllocated())
+					field_val = builder.CreateLoad(field_ptr);
+				else
+					field_val = field_ptr;
+
+				llvm::Function* elem_destructor_func = getOrInsertDestructorForType(module, tuple_type->component_types[i]);
 
 				builder.CreateCall(elem_destructor_func, field_val);
 			}

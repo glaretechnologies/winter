@@ -818,23 +818,7 @@ void StructureType::emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* re
 
 void StructureType::emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const
 {
-	llvm::FunctionType* destructor_type = llvm::FunctionType::get(
-		llvm::Type::getVoidTy(*params.context), // return type
-		llvm::makeArrayRef(LLVMTypeUtils::pointerType(this->LLVMType(*params.module))), // Arg is pointer to the structure.
-		false // varargs
-	);
-
-	llvm::Constant* destructor_func_constant = params.module->getOrInsertFunction(
-		"decr_" + this->toString(), // Name
-		destructor_type // Type
-	);
-
-	// TODO: check cast
-	llvm::Function* destructor_func = static_cast<llvm::Function*>(destructor_func_constant);
-
-	//destructor_func->getType()->dump();
-	//ref_counted_value->getType()->dump();
-
+	llvm::Function* destructor_func = RefCounting::getOrInsertDestructorForType(params.module, this);
 	params.builder->CreateCall(destructor_func, ref_counted_value);
 
 	params.destructors_called_types->insert(this);
@@ -1039,6 +1023,14 @@ void TupleType::emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_co
 
 void TupleType::emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const
 {
+	llvm::Function* destructor_func = RefCounting::getOrInsertDestructorForType(params.module, this);
+
+	params.builder->CreateCall(destructor_func, ref_counted_value);
+
+	params.destructors_called_types->insert(this);
+	this->getContainedTypesWithDestructors(*params.destructors_called_types);
+
+#if 0
 	for(size_t i=0; i<component_types.size(); ++i)
 	{
 		// Recursivly call emitCleanupLLVMCode on each refcounted element.
@@ -1052,6 +1044,19 @@ void TupleType::emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_co
 
 			component_types[i]->emitDecrRefCount(params, val, comment);
 		}
+	}
+#endif
+}
+
+
+void TupleType::getContainedTypesWithDestructors(std::set<ConstTypeRef, ConstTypeRefLessThan>& types) const
+{
+	for(size_t i=0; i<component_types.size(); ++i)
+	{
+		if(component_types[i]->hasDestructor())
+			types.insert(component_types[i]);
+
+		component_types[i]->getContainedTypesWithDestructors(types);
 	}
 }
 

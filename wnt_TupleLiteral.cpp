@@ -281,7 +281,7 @@ llvm::Value* TupleLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 
 
 		// If the field is a ref-counted type, we need to increment its reference count, since the newly constructed tuple now holds a reference to it.
-		tuple_type->component_types[i]->emitIncrRefCount(params, arg_value_or_ptr, "TupleLiteral::emitLLVMCode() for type " + tuple_type->toString());
+		//tuple_type->component_types[i]->emitIncrRefCount(params, arg_value_or_ptr, "TupleLiteral::emitLLVMCode() for type " + tuple_type->toString());
 
 		// If the field is of string type, we need to increment its reference count
 		//if(tuple_type->component_types[i]->getType() == Type::StringType)
