@@ -208,7 +208,7 @@ llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 		)
 	);
 
-	llvm::CallInst* call_inst = params.builder->CreateCall2(allocateVArrayLLVMFunc, size_B_constant, num_elems, "varray");
+	llvm::CallInst* call_inst = params.builder->CreateCall2(allocateVArrayLLVMFunc, size_B_constant, num_elems, "varray_literal");
 
 	// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
 	call_inst->setCallingConv(llvm::CallingConv::C);
@@ -248,18 +248,31 @@ llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 
 
 	// Set the reference count to 1
-	llvm::Value* ref_ptr = params.builder->CreateStructGEP(cast_result, 0, "ref_ptr");
+	llvm::Value* ref_ptr = params.builder->CreateStructGEP(cast_result, 0, "varray_literal_ref_ptr");
+
 	llvm::Value* one = llvm::ConstantInt::get(
 		*params.context,
 		llvm::APInt(64, 1, 
 			true // signed
 		)
 	);
-	params.builder->CreateStore(one, ref_ptr);
+	llvm::StoreInst* store_inst = params.builder->CreateStore(one, ref_ptr);
+	addMetaDataCommentToInstruction(params, store_inst, "VArray literal set intial ref count to 1");
+
+	// Set VArray length
+	llvm::Value* length_ptr = params.builder->CreateStructGEP(cast_result, 1, "varray_literal_length_ptr");
+	llvm::Value* length_constant_int = llvm::ConstantInt::get(
+		*params.context,
+		llvm::APInt(64, this->elements.size(), 
+			true // signed
+		)
+	);
+	llvm::StoreInst* store_length_inst = params.builder->CreateStore(length_constant_int, length_ptr);
+	addMetaDataCommentToInstruction(params, store_length_inst, "VArray literal set intial length count to " + ::toString(this->elements.size()));
 
 	//llvm::Value* data_ptr_ptr = params.builder->CreateStructGEP(cast_result, 1, "data_ptr_ptr");
 	//llvm::Value* data_ptr = params.builder->CreateLoad(data_ptr_ptr);
-	llvm::Value* data_ptr = params.builder->CreateStructGEP(cast_result, 1, "data_ptr");
+	llvm::Value* data_ptr = params.builder->CreateStructGEP(cast_result, 2, "varray_literal_data_ptr");
 
 	//data_ptr->dump();
 	//data_ptr->getType()->dump();
@@ -297,7 +310,7 @@ llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 		{
 			//llvm::Value* element_ptr = params.builder->CreateStructGEP(data_ptr, i);
 			//llvm::Value* element_ptr = params.builder->CreateConstInBoundsGEP1_64(data_ptr, i);
-			llvm::Value* element_ptr = params.builder->CreateConstInBoundsGEP2_64(data_ptr, 0, i, "element_ptr");
+			llvm::Value* element_ptr = params.builder->CreateConstInBoundsGEP2_64(data_ptr, 0, i, "varray_literal_element_ptr");
 
 			if(this->elements[i]->type()->passByValue())
 			{

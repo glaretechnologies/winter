@@ -1,0 +1,161 @@
+
+
+Function application
+---------------------
+code(f(e))
+=	v <- code(e)			# Code to compute argument value
+	r <- f(v)				# Call function with argument value
+	decr(v)					# Consume (decrement) argument value
+	r						# Return result
+	
+Function Definition
+-------------------
+code(def f(x) : bodyexpr)
+=	code(bodyexpr)
+	
+Function argument
+-----------------
+code(arg_i)			# Where arg_i is the i-th function argument
+=	incr(arg_i)
+	arg_i
+
+Basic non-collection literal
+----------------------------
+code(literal)
+=	res <- eval_literal
+	setrefcount(res, 1)
+	res
+
+
+Structure field access
+------------------------
+code(getField_x(s_expr))
+=	s_v <- code(s_expr)		# Get structure value
+	r <- s_v.x				# Get field from structure
+	incr(r)					# Increment field value ref count
+	decr(s_v)				# Decrement struct value rec count
+	r
+
+Structure constructor (direct application/implementation)
+---------------------
+code(S_constructor(x_expr))
+=	x_v <- code(x_expr)		# Compute field value
+	s <- alloc structure
+	setrefcount(s, 1)
+	s.x	<- x_v				# Set field
+	s
+
+Structure constructor (as function)
+----------------------
+code(def S(arg_i))
+=	x_v <- arg_i		# get arg
+	incr(arg_i)			# incr arg
+	s <- alloc structure
+	setrefcount(s, 1)
+	s.x	<- x_v				# Set field
+	s
+
+Application of structure constructor function
+------------------------------------
+code(S(x_expr))
+=	v <- code(x_expr)
+	
+	x_v <- v			# Structure constructor: get arg
+	incr(x_v)			# Structure constructor: incr arg
+	s <- alloc structure
+	setrefcount(s, 1)
+	s.x	<- x_v				# Set field
+
+	r <- s
+	decr(v)
+	r
+
+=	v <- code(x_expr)
+	s <- alloc structure
+	setrefcount(s, 1)
+	s.x	<- v				# Set field
+	s
+
+Which is the same as direct application/implementation	
+
+
+
+
+
+
+
+
+
+Example:
+------------------------------------------
+take the identity function I(x) = x
+
+code (def I(x) : x)
+=	code(x)
+=	incr(x)			# function argument code
+	x				# function argument code
+
+
+So, a function application of I(x) gives:
+
+code(I(x))
+=	v <- code(x)		# Code to compute argument value
+	r <- I(v)			# Call function with argument value
+	decr(v)				# Consume (decrement) argument value
+	r					# Return result
+=	v <- code(x)		# Code to compute argument value
+	incr(v)				# From def I(x)
+	r <- v				# From def I(x)
+	decr(v)				# Consume (decrement) argument value
+	r
+=	v <- code(x)
+	r <- v
+	r
+=   code(x)
+
+
+
+
+	
+Example, where g is def g(x) : 1   (Assume integers are ref counted, assume initial rc(x) = 1
+----------------------------------------------------------------------------------------------
+
+code(g(x)) 
+=	v <- code(x)		# Code to compute argument value
+	r <- g(v)			# Call function with argument value
+	decr(v)				# Consume (decrement) argument value
+	r					# Return result
+=	v <- code(x)
+	r <- 1				# def g body expr
+	setrefcount(r, 1)	# def g body expr
+	decr(v)
+	r
+
+
+
+Example, function application where argument is an argument from the enclosing function
+----------------------------------------------------------------------------------------
+code(f(arg_i))
+=	v <- code(arg_i)			# From function application
+	r <- f(v)				# Call function with argument value
+	decr(v)					# Consume (decrement) argument value
+	r
+=	incr(arg_i)				# from function argument code
+	v <- arg_i				# From function application
+	r <- f(v)				# Call function with argument value
+	decr(v)					# Consume (decrement) argument value
+	r
+=	r <- f(v)
+	r
+
+Conclusion: when emitting code for a function expression/application, and an argument is an argument from the enclosing function,
+can omit reference increment and decrement.
+
+
+
+
+
+	
+
+rc(literal) = 1
+rc(f(x)) = rc(literal) or rc(x)

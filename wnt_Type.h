@@ -10,6 +10,7 @@ Copyright Glare Technologies Limited 2014 -
 #include <utils/RefCounted.h>
 #include <vector>
 #include <string>
+#include <set>
 
 
 namespace llvm { class Type; class Constant; class LLVMContext; class Value; class Module; }
@@ -22,6 +23,7 @@ namespace Winter
 class Value;
 class EmitLLVMCodeParams;
 class TupleType;
+struct ConstTypeRefLessThan;
 
 
 class Type : public RefCounted
@@ -58,8 +60,12 @@ public:
 	virtual bool passByValue() const { return true; }
 	virtual Reference<Value> getInvalidValue() const; // For array out-of-bounds
 	virtual llvm::Value* getInvalidLLVMValue(llvm::Module& module) const; // For array out-of-bounds
-	virtual void emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const; // Default implementation does nothing.
-	virtual void emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const; // Default implementation does nothing.
+	virtual void emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const; // Default implementation does nothing.
+	virtual void emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const; // Default implementation does nothing.
+
+	virtual bool hasDestructor() const { return false; }
+	virtual void getContainedTypesWithDestructors(std::set<Reference<const Type>, ConstTypeRefLessThan>& types) const {}
+	virtual bool isHeapAllocated() const { return false; }
 
 	inline TypeType getType() const { return type; }
 private:
@@ -68,6 +74,7 @@ private:
 
 
 typedef Reference<Type> TypeRef;
+typedef Reference<const Type> ConstTypeRef;
 
 
 inline bool operator < (const Type& a, const Type& b);
@@ -170,8 +177,11 @@ public:
 	virtual llvm::Type* LLVMType(llvm::Module& module) const;
 	virtual const std::string OpenCLCType() const { return "string"; }
 	virtual bool passByValue() const { return true; } // Pass the pointer 'by value'
-	virtual void emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const;
-	virtual void emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const;
+	virtual void emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const;
+	virtual void emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const;
+
+	virtual bool hasDestructor() const { return true; }
+	virtual bool isHeapAllocated() const { return true; }
 };
 
 
@@ -350,8 +360,12 @@ public:
 	virtual const std::string OpenCLCType() const;
 	virtual bool passByValue() const { return true; } // Pass the pointer 'by value'
 
-	virtual void emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const;
-	virtual void emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const;
+	virtual void emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const;
+	virtual void emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const;
+
+	virtual bool hasDestructor() const { return true; }
+	virtual void getContainedTypesWithDestructors(std::set<ConstTypeRef, ConstTypeRefLessThan>& types) const;
+	virtual bool isHeapAllocated() const { return true; }
 
 	TypeRef elem_type;
 };
@@ -383,8 +397,11 @@ public:
 	virtual const std::string OpenCLCType() const { return name; }
 	virtual bool passByValue() const { return false; }
 
-	virtual void emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const;
-	virtual void emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const;
+	virtual void emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const;
+	virtual void emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const;
+
+	virtual bool hasDestructor() const { return true; }
+	virtual void getContainedTypesWithDestructors(std::set<ConstTypeRef, ConstTypeRefLessThan>& types) const;
 
 	const std::string getOpenCLCDefinition(); // Get full definition string, e.g. struct a { float b; };
 
@@ -438,6 +455,9 @@ public:
 	virtual bool passByValue() const { return false; }
 
 	const std::string getOpenCLCDefinition() const; // Get full definition string, e.g. struct a { float b; };
+
+	virtual void emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const;
+	virtual void emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const;
 
 	std::vector<TypeRef> component_types;
 };
@@ -603,5 +623,10 @@ struct TypeRefLessThan
 	bool operator() (const TypeRef& a, const TypeRef& b) const { return *a < *b; }
 };
 
+
+struct ConstTypeRefLessThan
+{
+	bool operator() (const Reference<const Type>& a, const Reference<const Type>& b) const { return *a < *b; }
+};
 
 } // end namespace Winter

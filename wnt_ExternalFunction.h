@@ -34,7 +34,8 @@ public:
 		interpreted_func(interpreted_func_),
 		sig(sig_),
 		return_type(return_type_),
-		has_side_effects(false)
+		has_side_effects(false),
+		is_allocation_function(false)
 	{}
 
 	~ExternalFunction();
@@ -46,6 +47,7 @@ public:
 	TypeRef return_type;
 
 	bool has_side_effects; // Such as the function freeString()
+	bool is_allocation_function;
 private:
 
 };

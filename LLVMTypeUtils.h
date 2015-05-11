@@ -38,6 +38,7 @@ llvm::Value* getNthArg(llvm::Function *func, int n);
 llvm::Value* getLastArg(llvm::Function *func);
 
 llvm::Type* pointerType(llvm::Type& type);
+llvm::Type* pointerType(llvm::Type* type);
 
 llvm::Type* voidPtrType(llvm::LLVMContext& context);
 

@@ -7,6 +7,7 @@
 #include "utils/PlatformUtils.h"
 #include "wnt_ExternalFunction.h"
 #include "wnt_LLVMVersion.h"
+#include "wnt_RefCounting.h"
 
 
 using std::vector;
@@ -119,13 +120,15 @@ void Linker::buildLLVMCode(llvm::Module* module, const llvm::DataLayout/*TargetD
 	PlatformUtils::CPUInfo cpu_info;
 	PlatformUtils::getCPUInfo(cpu_info);
 
+	std::set<Reference<const Type>, ConstTypeRefLessThan> destructors_called_types;
+
 	for(Linker::SigToFuncMapType::iterator it = sig_to_function_map.begin(); it != sig_to_function_map.end(); ++it)
 	{
 		FunctionDefinition& f = *(*it).second;
 
 		if(!f.isGenericFunction() && !f.isExternalFunction())
 		{
-			f.buildLLVMFunction(module, cpu_info, hidden_voidptr_arg, target_data, common_functions);
+			f.buildLLVMFunction(module, cpu_info, hidden_voidptr_arg, target_data, common_functions, destructors_called_types);
 		}
 	}
 
@@ -140,7 +143,15 @@ void Linker::buildLLVMCode(llvm::Module* module, const llvm::DataLayout/*TargetD
 	// Build 'unique' functions (like shuffle())
 	for(unsigned int i=0; i<unique_functions.size(); ++i)
 	{
-		unique_functions[i]->buildLLVMFunction(module, cpu_info, hidden_voidptr_arg, target_data, common_functions);
+		unique_functions[i]->buildLLVMFunction(module, cpu_info, hidden_voidptr_arg, target_data, common_functions, destructors_called_types);
+	}
+
+
+	// Emit destructors
+	for(auto i = destructors_called_types.begin(); i != destructors_called_types.end(); ++i)
+	{
+		if((*i)->hasDestructor())
+			RefCounting::emitDestructorForType(module, target_data, common_functions, *i);
 	}
 }
 

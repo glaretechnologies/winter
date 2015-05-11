@@ -60,6 +60,15 @@ llvm::Type* pointerType(llvm::Type& type)
 }
 
 
+llvm::Type* pointerType(llvm::Type* type)
+{
+	return llvm::PointerType::get(
+		type, 
+		0 // AddressSpace
+	);
+}
+
+
 llvm::Type* voidPtrType(llvm::LLVMContext& context)
 {
 	// Not sure if LLVM has a pointer to void type, so just use a pointer to int32.

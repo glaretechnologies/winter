@@ -5,6 +5,7 @@
 #include "BaseException.h"
 #include "LLVMTypeUtils.h"
 #include "wnt_FunctionDefinition.h"
+#include "wnt_RefCounting.h"
 #include "utils/StringUtils.h"
 #ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
@@ -40,12 +41,12 @@ llvm::Value* Type::getInvalidLLVMValue(llvm::Module& module) const // For array 
 }
 
 
-void Type::emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const // Default implementation does nothing.
+void Type::emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const // Default implementation does nothing.
 {
 }
 
 
-void Type::emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const // Default implementation does nothing.
+void Type::emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const // Default implementation does nothing.
 {
 }
 
@@ -194,6 +195,36 @@ bool String::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
 
 llvm::Type* String::LLVMType(llvm::Module& module) const
 {
+	// See if there is a struct with this name already:
+	const std::string use_name = "string";
+	llvm::StructType* existing_struct_type = module.getTypeByName(use_name);
+	if(existing_struct_type)
+		return LLVMTypeUtils::pointerType(*existing_struct_type);
+
+	// else create the named struct:
+
+	llvm::Type* field_types[] = {
+		llvm::Type::getInt64Ty(module.getContext()), // Reference count field
+		//llvm::Type::getInt64Ty(module.getContext()), // length field (num elements)
+		llvm::ArrayType::get(  // Variable-size array of element types
+			llvm::Type::getIntNTy(module.getContext(), 8),
+			0 // Num elements
+		)
+	};
+
+
+	llvm::StructType* struct_type = llvm::StructType::create(
+		module.getContext(),
+		field_types,
+		use_name
+	);
+
+	return LLVMTypeUtils::pointerType(*struct_type);
+
+
+
+
+/*
 	llvm::Type* field_types[] = {
 		llvm::Type::getInt64Ty(module.getContext()) // Reference count field
 	};
@@ -204,18 +235,45 @@ llvm::Type* String::LLVMType(llvm::Module& module) const
 	));
 
 	//return LLVMTypeUtils::voidPtrType(context);
+	*/
+
 }
 
 
-void String::emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const
+void String::emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const
 {
-	params.builder->CreateCall(params.common_functions.incrStringRefCountLLVMFunc, ref_counted_value);
+	llvm::CallInst* inst = params.builder->CreateCall(params.common_functions.incrStringRefCountLLVMFunc, ref_counted_value);
+
+	addMetaDataCommentToInstruction(params, inst, comment);
 }
 
 
-void String::emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const
+void String::emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const
 {
-	params.builder->CreateCall(params.common_functions.decrStringRefCountLLVMFunc, ref_counted_value);
+	//llvm::CallInst* inst = params.builder->CreateCall(params.common_functions.decrStringRefCountLLVMFunc, ref_counted_value);
+
+	//addMetaDataCommentToInstruction(params, inst, comment);
+
+	
+	/*llvm::FunctionType* destructor_type = llvm::FunctionType::get(
+		llvm::Type::getVoidTy(*params.context), // return type
+		llvm::makeArrayRef(this->LLVMType(*params.module)),
+		false // varargs
+	);
+
+	llvm::Constant* destructor_func_constant = params.module->getOrInsertFunction(
+		"decr_string", // Name
+		destructor_type // Type
+	);
+
+	// TODO: check cast
+	llvm::Function* destructor_func = static_cast<llvm::Function*>(destructor_func_constant);*/
+
+	llvm::Function* destructor_func = RefCounting::getOrInsertDestructorForType(params.module, this);
+
+	params.builder->CreateCall(destructor_func, ref_counted_value);
+
+	params.destructors_called_types->insert(this);
 }
 
 
@@ -501,40 +559,106 @@ llvm::Type* VArrayType::LLVMType(llvm::Module& module) const
 		*llvm::Type::getInt64Ty(module.getContext())
 	);*/
 
+
+	// See if there is a struct with this name already:
+	const std::string use_name = makeSafeStringForFunctionName(this->toString());
+	llvm::StructType* existing_struct_type = module.getTypeByName(use_name);
+	if(existing_struct_type)
+		return LLVMTypeUtils::pointerType(*existing_struct_type);
+
+	// else create the named struct:
+
+	//vector<llvm::Type*> field_types(this->component_types.size());
+	//for(size_t i=0; i<this->component_types.size(); ++i)
+	//	field_types[i] = this->component_types[i]->LLVMType(module);
+
+	//return llvm::StructType::create(
+	//	module.getContext(),
+	//	field_types,
+	//	this->name
+	//	// NOTE: is_packed is default = false.
+	//);
+
+
 	llvm::Type* field_types[] = {
 		llvm::Type::getInt64Ty(module.getContext()), // Reference count field
+		llvm::Type::getInt64Ty(module.getContext()), // length field (num elements)
 		llvm::ArrayType::get(  // Variable-size array of element types
 			this->elem_type->LLVMType(module),
 			0 // Num elements
 		)
 	};
 
-	return LLVMTypeUtils::pointerType(*llvm::StructType::get(
+	//return LLVMTypeUtils::pointerType(*llvm::StructType::get(
+	//	module.getContext(),
+	//	llvm::makeArrayRef(field_types)
+	//));
+
+	llvm::StructType* struct_type = llvm::StructType::create(
 		module.getContext(),
-		llvm::makeArrayRef(field_types, 2)
-	));
+		field_types,
+		use_name
+	);
+
+	return LLVMTypeUtils::pointerType(*struct_type);
 }
 
 
-void VArrayType::emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const
+void VArrayType::emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const
 {
-	const TypeRef dummy_varray_type = new VArrayType(new Int());
+	//if(*params.currently_building_func_def->returnType() == *this) // Only do ref counting for this value if it is of the enclosing function return type.
+	{
+		const TypeRef dummy_varray_type = new VArrayType(new Int());
 
-	// Cast to dummy_varray_type
-	llvm::Value* cast_val = params.builder->CreatePointerCast(ref_counted_value, dummy_varray_type->LLVMType(*params.module));
+		// Cast to dummy_varray_type
+		llvm::Value* cast_val = params.builder->CreatePointerCast(ref_counted_value, dummy_varray_type->LLVMType(*params.module));
 
-	params.builder->CreateCall(params.common_functions.incrVArrayRefCountLLVMFunc, cast_val);
+		llvm::CallInst* inst = params.builder->CreateCall(params.common_functions.incrVArrayRefCountLLVMFunc, cast_val);
+
+		addMetaDataCommentToInstruction(params, inst, comment);
+	}
 }
 
 
-void VArrayType::emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const
+void VArrayType::emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const
 {
-	const TypeRef dummy_varray_type = new VArrayType(new Int());
+	//if(*params.currently_building_func_def->returnType() == *this) // Only do ref counting for this value if it is of the enclosing function return type.
+	/*{
+		const TypeRef dummy_varray_type = new VArrayType(new Int());
 
-	// Cast to dummy_varray_type
-	llvm::Value* cast_val = params.builder->CreatePointerCast(ref_counted_value, dummy_varray_type->LLVMType(*params.module));
+		// Cast to dummy_varray_type
+		llvm::Value* cast_val = params.builder->CreatePointerCast(ref_counted_value, dummy_varray_type->LLVMType(*params.module));
 
-	params.builder->CreateCall(params.common_functions.decrVArrayRefCountLLVMFunc, cast_val);
+		llvm::CallInst* inst = params.builder->CreateCall(params.common_functions.decrVArrayRefCountLLVMFunc, cast_val);
+
+		addMetaDataCommentToInstruction(params, inst, comment);
+	}*/
+
+	llvm::FunctionType* destructor_type = llvm::FunctionType::get(
+		llvm::Type::getVoidTy(*params.context), // return type
+		llvm::makeArrayRef(this->LLVMType(*params.module)),
+		false // varargs
+	);
+
+	llvm::Constant* destructor_func_constant = params.module->getOrInsertFunction(
+		"decr_" + this->toString(), // Name
+		destructor_type // Type
+	);
+
+	// TODO: check cast
+	llvm::Function* destructor_func = static_cast<llvm::Function*>(destructor_func_constant);
+
+	params.builder->CreateCall(destructor_func, ref_counted_value);
+
+	params.destructors_called_types->insert(this);
+	this->getContainedTypesWithDestructors(*params.destructors_called_types);
+}
+
+
+void VArrayType::getContainedTypesWithDestructors(std::set<ConstTypeRef, ConstTypeRefLessThan>& types) const
+{
+	types.insert(elem_type);
+	elem_type->getContainedTypesWithDestructors(types);
 }
 
 
@@ -686,14 +810,37 @@ std::vector<Reference<TupleType> > StructureType::getElementTupleTypes() const
 }
 
 
-void StructureType::emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const
+void StructureType::emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const
 {
 
 }
 
 
-void StructureType::emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value) const
+void StructureType::emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const
 {
+	llvm::FunctionType* destructor_type = llvm::FunctionType::get(
+		llvm::Type::getVoidTy(*params.context), // return type
+		llvm::makeArrayRef(LLVMTypeUtils::pointerType(this->LLVMType(*params.module))), // Arg is pointer to the structure.
+		false // varargs
+	);
+
+	llvm::Constant* destructor_func_constant = params.module->getOrInsertFunction(
+		"decr_" + this->toString(), // Name
+		destructor_type // Type
+	);
+
+	// TODO: check cast
+	llvm::Function* destructor_func = static_cast<llvm::Function*>(destructor_func_constant);
+
+	//destructor_func->getType()->dump();
+	//ref_counted_value->getType()->dump();
+
+	params.builder->CreateCall(destructor_func, ref_counted_value);
+
+	params.destructors_called_types->insert(this);
+	this->getContainedTypesWithDestructors(*params.destructors_called_types);
+
+#if 0
 	for(size_t i=0; i<component_types.size(); ++i)
 	{
 		// Recursivly call emitCleanupLLVMCode on each refcounted element.
@@ -702,14 +849,20 @@ void StructureType::emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* re
 			struct_type.component_types[i]->getType() == Type::StructureTypeType*/) // TODO: handle this
 		{
 
-			llvm::Value* ptr = params.builder->CreateStructGEP(ref_counted_value, (unsigned int)i);
-			llvm::Value* val = params.builder->CreateLoad(ptr);
+			llvm::Value* ptr = params.builder->CreateStructGEP(ref_counted_value, (unsigned int)i, this->name + "." + component_names[i] + " ptr");
+			llvm::LoadInst* val = params.builder->CreateLoad(ptr, this->name + "." + component_names[i] + " ptr");
+			//llvm::Value* val = load_instruction;
 
-			component_types[i]->emitDecrRefCount(params, val);
+			//llvm::MDNode* mdnode = llvm::MDNode::get(*params.context, llvm::MDString::get(*params.context, "my md string content"));
+			//val->setMetadata("the_id_for_the_metadata", mdnode);
+			//const std::string comment =  "StructureType::emitDecrRefCount() for " + this->name + "." + component_names[i];
+			//addMetaDataCommentToInstruction(params, val, comment);
+
+			component_types[i]->emitDecrRefCount(params, val, comment);
 		}
 
 		/*if(struct_type.component_types[i]->getType() == Type::StringType)
-		{
+		{ 
 			// Emit code to load the string value:
 			//structure_val->dump();
 			//structure_val->getType()->dump();
@@ -734,6 +887,19 @@ void StructureType::emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* re
 
 			emitVArrayCleanupLLVMCode(params, varray_val);
 		}*/
+	}
+#endif
+}
+
+
+void StructureType::getContainedTypesWithDestructors(std::set<ConstTypeRef, ConstTypeRefLessThan>& types) const
+{
+	for(size_t i=0; i<component_types.size(); ++i)
+	{
+		if(component_types[i]->hasDestructor())
+			types.insert(component_types[i]);
+
+		component_types[i]->getContainedTypesWithDestructors(types);
 	}
 }
 
@@ -862,6 +1028,31 @@ const std::string TupleType::getOpenCLCDefinition() const // Get full definition
 	s += "return s_; }\n\n";
 
 	return s;
+}
+
+
+void TupleType::emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const
+{
+
+}
+
+
+void TupleType::emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const
+{
+	for(size_t i=0; i<component_types.size(); ++i)
+	{
+		// Recursivly call emitCleanupLLVMCode on each refcounted element.
+		if(component_types[i]->getType() == Type::StringType ||
+			component_types[i]->getType() == Type::VArrayTypeType/* ||
+			struct_type.component_types[i]->getType() == Type::StructureTypeType*/) // TODO: handle this
+		{
+
+			llvm::Value* ptr = params.builder->CreateStructGEP(ref_counted_value, (unsigned int)i, this->toString() + " field " + ::toString(i) + " ptr");
+			llvm::LoadInst* val = params.builder->CreateLoad(ptr, this->toString() + " field " + ::toString(i) + " ptr");
+
+			component_types[i]->emitDecrRefCount(params, val, comment);
+		}
+	}
 }
 
 

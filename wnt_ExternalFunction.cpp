@@ -12,7 +12,8 @@ namespace Winter
 
 	
 ExternalFunction::ExternalFunction()
-:	has_side_effects(false)
+:	has_side_effects(false),
+	is_allocation_function(false)
 {
 
 }

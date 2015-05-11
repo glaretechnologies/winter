@@ -292,15 +292,308 @@ llvm::Function* emitIncrRefCountFunc(llvm::Module* module, const llvm::DataLayou
 }
 
 
+llvm::Function* RefCounting::getOrInsertDestructorForType(llvm::Module* module, const ConstTypeRef& type)
+{
+	llvm::FunctionType* functype = llvm::FunctionType::get(
+		llvm::Type::getVoidTy(module->getContext()), // return type
+		llvm::makeArrayRef(type->passByValue() ? type->LLVMType(*module) : LLVMTypeUtils::pointerType(type->LLVMType(*module))),
+		false // varargs
+	);
+
+	llvm::Constant* llvm_func_constant = module->getOrInsertFunction(
+		"decr_" + type->toString(), // Name
+		functype // Type
+	);
+
+	assert(llvm::isa<llvm::Function>(llvm_func_constant));
+	return static_cast<llvm::Function*>(llvm_func_constant);
+}
+
+
+void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_data, const CommonFunctions& common_functions, const ConstTypeRef& refcounted_type)
+{
+	//----------- Create the function ------------
+	/*llvm::FunctionType* functype = llvm::FunctionType::get(
+		llvm::Type::getVoidTy(module->getContext()), // return type
+		llvm::makeArrayRef(refcounted_type->passByValue() ? refcounted_type->LLVMType(*module) : LLVMTypeUtils::pointerType(refcounted_type->LLVMType(*module))),
+		false // varargs
+	);
+
+	llvm::Constant* llvm_func_constant = module->getOrInsertFunction(
+		"decr_" + refcounted_type->toString(), // Name
+		functype // Type
+	);
+
+	// TODO: check cast
+	assert(llvm::isa<llvm::Function>(llvm_func_constant));
+	llvm::Function* llvm_func = static_cast<llvm::Function*>(llvm_func_constant);*/
+	llvm::Function* llvm_func = getOrInsertDestructorForType(module, refcounted_type);
+
+	llvm::BasicBlock* entry_block = llvm::BasicBlock::Create(module->getContext(), "entry", llvm_func);
+	llvm::IRBuilder<> builder(entry_block);
+
+
+	if(refcounted_type->getType() == Type::StructureTypeType)
+	{
+		const StructureType* struct_type = refcounted_type.downcastToPtr<StructureType>();
+
+		// Get arg 0 - (a pointer to) the ref counted value
+		llvm::Value* struct_ptr = LLVMTypeUtils::getNthArg(llvm_func, 0);
+
+		for(size_t i=0; i<struct_type->component_types.size(); ++i)
+		{
+			// Call destructor on each element that has a destructor.
+			if(struct_type->component_types[i]->hasDestructor())
+			{
+				// Get a pointer to the field memory.
+				llvm::Value* field_ptr = builder.CreateStructGEP(struct_ptr, (unsigned int)i, struct_type->name + "." + struct_type->component_names[i] + " ptr");
+				//llvm::LoadInst* val = builder.CreateLoad(ptr, this->name + "." + component_names[i] + " ptr");
+				//llvm::Value* val = load_instruction;
+				llvm::Value* field_val;
+
+				// If the field type is heap allocated, this means that the element is just a pointer to the field value.
+				// So we need to load the pointer from the structure.
+				// If the field is not heap allocated, for example another structure embedded in this structure, then the existing pointer is all we need.
+				if(struct_type->component_types[i]->isHeapAllocated())
+					field_val = builder.CreateLoad(field_ptr);
+				else
+					field_val = field_ptr;
+
+				/*llvm::FunctionType* elem_destructor_type = llvm::FunctionType::get(
+					llvm::Type::getVoidTy(module->getContext()), // return type
+					llvm::makeArrayRef(struct_type->component_types[i]->LLVMType(*module)),
+					false // varargs
+				);
+
+				elem_destructor_type->dump();
+
+				llvm::Constant* elem_destructor_func_constant = module->getOrInsertFunction(
+					"decr_" + struct_type->component_types[i]->toString(), // Name
+					elem_destructor_type // Type
+				);
+
+				// TODO: check cast
+				llvm::Function* elem_destructor_func = static_cast<llvm::Function*>(elem_destructor_func_constant);*/
+
+				llvm::Function* elem_destructor_func = getOrInsertDestructorForType(module, struct_type->component_types[i]);
+
+				builder.CreateCall(elem_destructor_func, field_val);
+			}
+		}
+
+		builder.CreateRetVoid();
+		return;
+	}
+	
+
+	// Get arg 0 - (a pointer to) the ref counted value
+	llvm::Value* refcounted_val = LLVMTypeUtils::getNthArg(llvm_func, 0);
+
+	// Load ref count
+	llvm::Value* ref_ptr = builder.CreateStructGEP(refcounted_val, 0, "ref_ptr");
+	llvm::Value* ref_count = builder.CreateLoad(ref_ptr, "ref_count");
+
+
+
+	// Create blocks for the then and else cases.  Insert the 'then' block at the end of the function.
+	llvm::BasicBlock* ThenBB  = llvm::BasicBlock::Create(module->getContext(), "then", llvm_func);
+	llvm::BasicBlock* ElseBB  = llvm::BasicBlock::Create(module->getContext(), "else");
+	llvm::BasicBlock* MergeBB = llvm::BasicBlock::Create(module->getContext(), "merge");
+
+	// Compare with ref count value of 1.
+	llvm::Value* condition = builder.CreateICmpEQ(ref_count, llvm::ConstantInt::get(
+		module->getContext(),
+		llvm::APInt(64, 1, 
+			true // signed
+		)
+	));
+
+	builder.CreateCondBr(condition, ThenBB, ElseBB);
+
+	// Emit then value.
+	builder.SetInsertPoint(ThenBB);
+
+	if(refcounted_type->getType() == Type::VArrayTypeType)
+	{
+		const TypeRef elem_type = refcounted_type.downcastToPtr<VArrayType>()->elem_type;
+
+		// Load number of elements
+		llvm::Value* num_elems_ptr = builder.CreateStructGEP(refcounted_val, 1, "ref count ptr");
+		llvm::Value* num_elems = builder.CreateLoad(num_elems_ptr);
+
+		// If elements have destructors, loop over them and call the destructor for each one.
+		if(elem_type->hasDestructor())
+		{
+
+			//----------- Create a loop over vector elements ------------
+			// Make the new basic block for the loop header, inserting after current
+			// block.
+
+
+			//llvm::BasicBlock* PreheaderBB = builder.GetInsertBlock();
+			llvm::BasicBlock* LoopBB = llvm::BasicBlock::Create(module->getContext(), "loop", llvm_func);
+  
+			// Insert an explicit fall through from the current block to the LoopBB.
+			builder.CreateBr(LoopBB);
+
+			// Start insertion in LoopBB.
+			builder.SetInsertPoint(LoopBB);
+  
+
+			// Create loop index (i) variable phi node
+			llvm::PHINode* loop_index_var = builder.CreatePHI(llvm::Type::getInt64Ty(module->getContext()), 2, "loop_index_var");
+			llvm::Value* initial_loop_index_value = llvm::ConstantInt::get(module->getContext(), llvm::APInt(64, 0)); // Initial induction loop index value: Zero
+			loop_index_var->addIncoming(initial_loop_index_value, ThenBB);
+
+	
+			// Emit the body of the loop, which is a call to the destructor for the element type (and ref decr?)
+			//---------------------
+
+			// Get ptr to varray element
+			llvm::Value* data_ptr = builder.CreateStructGEP(refcounted_val, 2, "data_ptr"); // [0 x VArray<T>]*
+
+			//data_ptr->getType()->dump();
+			//std::cout << std::endl;
+
+			// First index of zero selects [0 x VArray<T>], second index gets array element
+			llvm::Value* indices[] = { llvm::ConstantInt::get(module->getContext(), llvm::APInt(64, 0)), loop_index_var, };
+			llvm::Value* elem_ptr = builder.CreateInBoundsGEP(data_ptr, llvm::makeArrayRef(indices));
+
+			//elem_ptr->getType()->dump();
+			//std::cout << std::endl;
+
+			llvm::Value* elem_value;
+			if(elem_type->isHeapAllocated())
+				elem_value = builder.CreateLoad(elem_ptr); // elem value is actually a pointer.
+			else
+				elem_value = elem_ptr;
+
+			//elem_value->getType()->dump();
+			//std::cout << std::endl;
+			
+
+			/*llvm::FunctionType* elem_destructor_type = llvm::FunctionType::get(
+				llvm::Type::getVoidTy(module->getContext()), // return type
+				llvm::makeArrayRef(elem_type->LLVMType(*module)),
+				false // varargs
+			);
+
+			elem_destructor_type->dump();
+
+			llvm::Constant* elem_destructor_func_constant = module->getOrInsertFunction(
+				"decr_" + elem_type->toString(), // Name
+				elem_destructor_type // Type
+			);
+
+			// TODO: check cast
+			llvm::Function* elem_destructor_func = static_cast<llvm::Function*>(elem_destructor_func_constant);
+
+			builder.CreateCall(elem_destructor_func, elem_value);*/
+			llvm::Function* elem_destructor_func = getOrInsertDestructorForType(module, elem_type);
+			builder.CreateCall(elem_destructor_func, elem_value);
+
+			//---------------------
+		
+  
+			// Create increment of loop index
+			llvm::Value* step_val = llvm::ConstantInt::get(module->getContext(), llvm::APInt(64, 1));
+			llvm::Value* next_var = builder.CreateAdd(loop_index_var, step_val, "next_var");
+
+			// Compute the end condition.
+			
+  
+			llvm::Value* end_cond = builder.CreateICmpNE(
+				num_elems, 
+				next_var,
+				"loopcond"
+			);
+  
+			// Create the "after loop" block and insert it.
+			llvm::BasicBlock* LoopEndBB = builder.GetInsertBlock();
+			llvm::BasicBlock* AfterBB = llvm::BasicBlock::Create(module->getContext(), "afterloop", llvm_func);
+  
+			// Insert the conditional branch into the end of LoopEndBB.
+			builder.CreateCondBr(end_cond, LoopBB, AfterBB);
+  
+			// Any new code will be inserted in AfterBB.
+			builder.SetInsertPoint(AfterBB);
+  
+			// Add a new entry to the PHI node for the backedge.
+			loop_index_var->addIncoming(next_var, LoopEndBB);
+		}
+
+
+		// Create call to freeVArrayFunc()
+
+		// Cast to required type
+		const TypeRef dummy_varray_type = new VArrayType(new Int());
+		llvm::Value* cast_val = builder.CreatePointerCast(refcounted_val, dummy_varray_type->LLVMType(*module));
+
+		llvm::Function* freeValueLLVMFunc = common_functions.freeVArrayFunc->getOrInsertFunction(
+			module,
+			false // use_cap_var_struct_ptr: False as global functions don't have captured vars. ?!?!?
+			//true // target_takes_voidptr_arg // params.hidden_voidptr_arg
+		);
+		builder.CreateCall(freeValueLLVMFunc, cast_val);
+	}
+	else if(refcounted_type->getType() == Type::StringType)
+	{
+		// Create call to freeString()
+
+		// Cast to required type
+		//const TypeRef dummy_varray_type = new VArrayType(new Int());
+		//llvm::Value* cast_val = builder.CreatePointerCast(refcounted_val, dummy_varray_type->LLVMType(*module));
+
+		llvm::Function* freeValueLLVMFunc = common_functions.freeStringFunc->getOrInsertFunction(
+			module,
+			false // use_cap_var_struct_ptr: False as global functions don't have captured vars. ?!?!?
+			//true // target_takes_voidptr_arg // params.hidden_voidptr_arg
+		);
+		builder.CreateCall(freeValueLLVMFunc, refcounted_val);
+	}
+
+	builder.CreateBr(MergeBB);
+
+	// Codegen of 'Then' can change the current block, update ThenBB for the PHI.
+	ThenBB = builder.GetInsertBlock();
+
+	// Emit else block.
+	llvm_func->getBasicBlockList().push_back(ElseBB);
+	builder.SetInsertPoint(ElseBB);
+
+	// Emit decrement of ref count
+	llvm::Value* decr_ref = builder.CreateSub(ref_count, llvm::ConstantInt::get(
+		module->getContext(),
+		llvm::APInt(64, 1, 
+			true // signed
+		)
+	));
+
+	// Store the decremented ref count
+	builder.CreateStore(decr_ref, ref_ptr);
+
+	builder.CreateBr(MergeBB);
+
+	// Codegen of 'Else' can change the current block, update ElseBB for the PHI.
+	ElseBB = builder.GetInsertBlock();
+
+	// Emit merge block.
+	llvm_func->getBasicBlockList().push_back(MergeBB);
+	builder.SetInsertPoint(MergeBB);
+
+	builder.CreateRetVoid();
+}
+
+
 void emitRefCountingFunctions(llvm::Module* module, const llvm::DataLayout* target_data, CommonFunctions& common_functions)
 {
 	const TypeRef string_type = new String();
-	common_functions.decrStringRefCountLLVMFunc = emitDecrRefCountFunc(module, target_data, "decrStringRefCount", string_type, common_functions.freeStringFunc);
+	//common_functions.decrStringRefCountLLVMFunc = emitDecrRefCountFunc(module, target_data, "decrStringRefCount", string_type, common_functions.freeStringFunc);
 	common_functions.incrStringRefCountLLVMFunc = emitIncrRefCountFunc(module, target_data, "incrStringRefCount", string_type);
 
 	// Since the varray type is generic, decrVArrayRefCount and incrVArrayRefCount will just take an void* arg, and the calling code must cast to void*
 	const TypeRef dummy_varray_type = new VArrayType(new Int());
-	common_functions.decrVArrayRefCountLLVMFunc = emitDecrRefCountFunc(module, target_data, "decrVArrayRefCount", dummy_varray_type, common_functions.freeVArrayFunc);
+	//common_functions.decrVArrayRefCountLLVMFunc = emitDecrRefCountFunc(module, target_data, "decrVArrayRefCount", dummy_varray_type, common_functions.freeVArrayFunc);
 	common_functions.incrVArrayRefCountLLVMFunc = emitIncrRefCountFunc(module, target_data, "incrVArrayRefCount", dummy_varray_type);
 }
 

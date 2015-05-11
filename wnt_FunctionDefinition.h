@@ -99,7 +99,8 @@ public:
 		const PlatformUtils::CPUInfo& cpu_info,
 		bool hidden_voidptr_arg, 
 		const llvm::DataLayout/*TargetData*/* target_data,
-		const CommonFunctions& common_functions
+		const CommonFunctions& common_functions,
+		std::set<Reference<const Type>, ConstTypeRefLessThan>& destructors_called_types
 		//std::map<Lang::FunctionSignature, llvm::Function*>& external_functions
 	);
 

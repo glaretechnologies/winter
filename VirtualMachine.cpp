@@ -197,8 +197,8 @@ static uint8* allocateVArray(const int elem_size_B, const int num_elems)
 	r->data = new uint8[sizeof(uint64) + elem_size_B * num_elems];
 	return r;*/
 
-	// Allocate space for the reference count and data.
-	uint8* varray = new uint8[sizeof(uint64) + elem_size_B * num_elems];
+	// Allocate space for the reference count, length, and data.
+	uint8* varray = new uint8[sizeof(uint64)*2 + elem_size_B * num_elems];
 	return varray;
 }
 
@@ -376,6 +376,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 				new String() // return type
 			)));
 			external_functions.back()->has_side_effects = true;
+			external_functions.back()->is_allocation_function = true;
 		}
 
 		// Add freeString
@@ -418,6 +419,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 				new VArrayType(new Int()) //new OpaqueType() // return type.  Just make this a void*, will cast return value to correct type
 			)));
 			external_functions.back()->has_side_effects = true;
+			external_functions.back()->is_allocation_function = true;
 		}
 
 		// Add freeVArray

@@ -153,6 +153,9 @@ const std::string errorContext(const ASTNode& n);
 const std::string errorContext(const ASTNode& n, TraversalPayload& payload);
 bool isTargetDefinedBeforeAllInStack(const std::vector<FunctionDefinition*>& func_def_stack, int target_function_order_num);
 bool expressionIsWellTyped(ASTNode& e, TraversalPayload& payload_);
+bool shouldRefCount(EmitLLVMCodeParams& params, const Reference<ASTNode>& expr);
+bool shouldRefCount(EmitLLVMCodeParams& params, const ASTNode& expr);
+void addMetaDataCommentToInstruction(EmitLLVMCodeParams& params, llvm::Instruction* instr, const std::string& s);
 
 
 class CleanUpInfo
@@ -205,6 +208,8 @@ public:
 	CommonFunctions common_functions;
 
 	std::vector<llvm::Value*> argument_values; // Use for function specialisation in Array fold().
+
+	std::set<Reference<const Type>, ConstTypeRefLessThan>* destructors_called_types;
 };
 
 
@@ -379,57 +384,6 @@ public:
 	virtual Reference<ASTNode> clone();
 	virtual bool isConstant() const;
 
-};
-
-
-class Variable : public ASTNode
-{
-public:
-	// More accurately, type of binding
-	enum VariableType
-	{
-		UnboundVariable,
-		LetVariable,
-		ArgumentVariable,
-		BoundToGlobalDefVariable,
-		BoundToNamedConstant,
-		CapturedVariable
-	};
-
-	Variable(const std::string& name, const SrcLocation& loc);
-
-	virtual ValueRef exec(VMState& vmstate);
-	virtual TypeRef type() const;
-	virtual void print(int depth, std::ostream& s) const;
-	virtual std::string sourceString() const;
-	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
-	void bindVariables(TraversalPayload& payload, const std::vector<ASTNode*>& stack);
-	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
-	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
-	virtual Reference<ASTNode> clone();
-	virtual bool isConstant() const;
-
-	// or for what it is a let of.
-	//AnonFunction* parent_anon_function;
-	//ASTNode* referenced_var;
-	//TypeRef referenced_var_type; // Type of the variable.
-	VariableType vartype; // let or arg.
-
-	FunctionDefinition* bound_function; // Function for which the variable is an argument of,
-	LetBlock* bound_let_block;
-	NamedConstant* bound_named_constant;
-
-	int bound_index; // index in parent function definition argument list.
-	//int argument_offset; // Currently, a variable must be an argument to the enclosing function
-	std::string name; // variable name.
-
-	// Offset of zero means use the latest/deepest set of let values.  Offset 1 means the next oldest, etc.
-	int let_frame_offset;
-
-	// bool use_captured_var;
-	// int captured_var_index;
-
-	int uncaptured_bound_index;
 };
 
 

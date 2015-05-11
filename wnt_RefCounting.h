@@ -25,6 +25,10 @@ namespace RefCounting
 // Emit LLVM code for decrStringRefCount(), incrStringRefCount() etc.. to the current LLVM module, store pointers to them in common_functions.
 void emitRefCountingFunctions(llvm::Module* module, const llvm::DataLayout* target_data, CommonFunctions& common_functions);
 
+void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_data, const CommonFunctions& common_functions, const ConstTypeRef& refcounted_type);
+
+llvm::Function* getOrInsertDestructorForType(llvm::Module* module, const ConstTypeRef& type);
+
 //void emitCleanupLLVMCode(EmitLLVMCodeParams& params, const TypeRef& type, llvm::Value* val);
 
 // Emit a call to incrStringRefCount(string_val)

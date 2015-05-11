@@ -64,6 +64,98 @@ if next token == ',', then it's if(,,)
 */
 
 
+static Value* identity(Value* v)
+{
+	return v;
+}
+
+
+static Value* h(Value* v, float x)
+{
+	if(x < 0.5)
+	{
+		Value* ret = new IntValue(99);
+		ret->incRefCount(); // Set ref count to 1
+		return ret;
+	}
+	else
+		return v;
+}
+
+
+static int length(Value* v)
+{
+	return v->toString().size();
+}
+
+// no ref counting on v done in function
+static int f(Value* v)
+{
+	return f(v);
+}
+
+
+
+static int bleh(float x)
+{
+	Value* v = new IntValue(99);
+	v->incRefCount(); // Set v ref count to 1
+
+	Value* v2 = h(v, x); // If we don't know how h is defined, then we may have v2 = v, or we may have v2 = new value
+	// If it just returned v, we have one allocation in total.  Otherwise we have two.  
+	// There is no way of knowing at compile time.
+
+	const int len = length(v2);
+
+	delete v;
+}
+
+
+static int meh()
+{
+	Value* v = new IntValue(99);
+	v->incRefCount(); // Set v ref count to 1
+
+	const int len = length(v);
+
+	delete v; // No ref count check required. Still need to delete though
+}
+
+
+// Function meh2 akes a ref-counted value, no reference counting code required for the argument though, as doesn't return a value of the same type.
+static int meh2(Value* v)
+{
+	const int len = length(v);
+	return len + 2;
+}
+
+
+// Can do another optimisation:  Since meh3 doesn't take a Value as argument, we know that the return value must have refcount = 1.
+static Value* meh3(int x)
+{
+	Value* v = new IntValue(99);
+	v->incRefCount(); // Set v ref count to 1
+	return v;
+}
+
+
+// So take something like:
+static int useKnownReturnRefCountOptimsiation(int x)
+{
+	Value* v = meh3(x);
+	// We know rc(v) = 1
+	const int len = length(v);
+	// We still know rc(v) = 1
+
+	// At this point we can just delete v;
+	assert(v->getRefCount() == 1);
+	v->decRefCount();
+	delete v;
+
+	return len + 2;
+}
+
+
 void LanguageTests::doLLVMInit()
 {
 	testMainFloatArg("def main(float x) float : sqrt(4)", 2.0f, 2.0f);
@@ -75,9 +167,15 @@ static const bool DO_OPENCL_TESTS = false;
 
 void LanguageTests::run()
 {
-	Timer timer;
+	//TEMP///////////////
+	
+	useKnownReturnRefCountOptimsiation(3);
 
-	testMainFloatArgAllowUnsafe("def main(float x) float : let A = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]a   i = truncateToInt(x) in A[i] + A[i+1]", 2.f, 7.0f);
+
+	//////////////////
+
+
+	Timer timer;
 
 	const TypeRef ta = new Int();
 	const TypeRef tb = new Int();
@@ -172,6 +270,17 @@ void LanguageTests::run()
 	
 
 	//------------------------ VArrays as function arguments --------------------------
+	// Test a VArray returned from identity function
+	testMainFloatArgAllowUnsafe("def f(varray<float> v) varray<float> : v      def main(float x) float : f([99.0]va)[0]", 1.f, 99.0f, INVALID_OPENCL);
+	testMainFloatArgAllowUnsafe("def f(varray<float> v) varray<float> : v      def main(float x) float : let v = f([99.0]va) in x", 99.f, 99.0f, INVALID_OPENCL);
+
+	// Test a VArray returned from 'identity' function with two args
+	testMainFloatArgAllowUnsafe("def f(varray<float> v, varray<float> v2) varray<float> : v      def main(float x) float : f([88.0]va, [99.0]va)[0]", 1.f, 88.0f, INVALID_OPENCL);
+	testMainFloatArgAllowUnsafe("def f(varray<float> v, varray<float> v2) varray<float> : v2      def main(float x) float : f([88.0]va, [99.0]va)[0]", 1.f, 99.0f, INVALID_OPENCL);
+
+	testMainFloatArgAllowUnsafe("def f(varray<float> v, varray<float> v2) varray<float> : v2      def main(float x) float : let v = [99.0]va in f(v, v)[0]", 1.f, 99.0f, INVALID_OPENCL);
+
+
 	// Test a VArray passed as a function argument (but not used)
 	testMainFloatArgAllowUnsafe("def f(varray<float> v) float : 1.0      def main(float x) float : f([99.0]va)", 1.f, 1.0f, INVALID_OPENCL);
 
@@ -191,6 +300,42 @@ void LanguageTests::run()
 	testMainFloatArgAllowUnsafe("def f(varray<float> v) float : let v_2 = v in v_2[0]      def main(float x) float : f([x]va)", 10.f, 10.0f, INVALID_OPENCL);
 	testMainFloatArgAllowUnsafe("def f(varray<float> v) float : let v_2 = v in v[0]      def main(float x) float : f([x]va)", 10.f, 10.0f, INVALID_OPENCL);
 
+	// Test varray passed as function argument but returned in struct (tests return of argument via enclosing type)
+	testMainFloatArgAllowUnsafe("struct S { varray<float> v }     def f(varray<float> arg) S : S(arg)      def main(float x) float : f([x]va).v[0]", 10.f, 10.0f, INVALID_OPENCL);
+
+	testMainFloatArgAllowUnsafe("struct S { varray<float> a, varray<float> b }     def f(varray<float> arg) S : S(arg, arg)      def main(float x) float : f([x]va).a[0]", 10.f, 10.0f, INVALID_OPENCL);
+
+	testMainFloatArgAllowUnsafe("struct S { varray<float> a, varray<float> b }     def f(varray<float> arg, varray<float> arg2) S : S(arg, arg2)      def main(float x) float : f([x]va, [x]va).a[0]", 10.f, 10.0f, INVALID_OPENCL);
+
+
+	//------------------------ VArrays in tuples --------------------------
+	testMainFloatArgAllowUnsafe("def f(varray<float> arg) tuple<varray<float>> : [arg]t      def main(float x) float : f([x]va)[0][0]", 10.f, 10.0f, INVALID_OPENCL);
+
+	testMainFloatArgAllowUnsafe("def f(varray<float> arg) tuple<varray<float>, varray<float>> : (arg, arg)      def main(float x) float : f([x]va)[0][0]", 10.f, 10.0f, INVALID_OPENCL);
+
+
+	//------------------------ Test a VArray in a VArray --------------------------
+	testMainFloatArgAllowUnsafe("def main(float x) float : let a = [[99]va]va in x", 10.f, 10.0f, INVALID_OPENCL);
+
+	
+	//------------------------ Test a string in a VArray --------------------------
+	testMainFloatArgAllowUnsafe("def main(float x) float : let a = [\"hello\"]va in x", 10.f, 10.0f, INVALID_OPENCL);
+
+	testMainFloatArgAllowUnsafe("def main(float x) float : let a = [[\"hello\"]va]va in x", 10.f, 10.0f, INVALID_OPENCL);
+	
+	//------------------------ Test a struct, with a ref counted field, in a VArray --------------------------
+	testMainFloatArgAllowUnsafe("struct S { string str }      def main(float x) float : let a = S(\"hello\") in x", 10.f, 10.0f, INVALID_OPENCL);
+
+	testMainFloatArgAllowUnsafe("struct S { string str }      def main(float x) float : let a = [S(\"hello\")]va in x", 10.f, 10.0f, INVALID_OPENCL);
+
+	testMainFloatArgAllowUnsafe("struct S { string str }      def main(float x) float : let a = [S(\"hello\"), S(\"world\")]va in x", 10.f, 10.0f, INVALID_OPENCL);
+
+	// Test a struct with two ref counted fields
+	testMainFloatArgAllowUnsafe("struct S { string s_a, string s_b }      def main(float x) float : let a = S(\"hello\", \"world\") in x", 10.f, 10.0f, INVALID_OPENCL);
+
+	testMainFloatArgAllowUnsafe("struct S { string s_a, string s_b }      def main(float x) float : let a = [S(\"hello\", \"world\")]va in x", 10.f, 10.0f, INVALID_OPENCL);
+
+	
 	// Test fold built-in function with update
 	/*{
 		const int len = 256;

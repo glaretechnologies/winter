@@ -12,6 +12,7 @@ Generated at 2011-04-30 18:53:38 +0100
 #include "wnt_RefCounting.h"
 #include "wnt_VectorLiteral.h"
 #include "wnt_FunctionDefinition.h"
+#include "wnt_Variable.h"
 #include "VMState.h"
 #include "Value.h"
 #include "Linker.h"
@@ -1612,7 +1613,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			llvm::Value* result;
 			if(field_type->passByValue())
 			{
-				llvm::Value* field_ptr = params.builder->CreateStructGEP(struct_ptr, field_index, field_name + " ptr");
+				llvm::Value* field_ptr = params.builder->CreateStructGEP(struct_ptr, field_index, get_field_func->struct_type->name + "." + field_name + " ptr");
 				llvm::Value* loaded_val = params.builder->CreateLoad(field_ptr, field_name);
 
 				// TEMP NEW: increment ref count if this is a string
@@ -1623,14 +1624,15 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			}
 			else
 			{
-				result = params.builder->CreateStructGEP(struct_ptr, field_index, field_name + " ptr");
+				result = params.builder->CreateStructGEP(struct_ptr, field_index, get_field_func->struct_type->name + "." + field_name + " ptr");
 			}
 
-			field_type->emitIncrRefCount(params, result);
+			field_type->emitIncrRefCount(params, result, "GetField " + get_field_func->struct_type->name + "." + field_name + " result increment");
 
 			// Decrement argument 0 structure ref count
-			if(!(argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType)) // && argument_expressions[0].downcastToPtr<Variable>()->vartype == Variable::LetVariable)) // Don't decr let var ref counts, the ref block will do that.
-				argument_expressions[0]->type()->emitDecrRefCount(params, struct_ptr);
+			//if(!(argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType)) // && argument_expressions[0].downcastToPtr<Variable>()->vartype == Variable::LetVariable)) // Don't decr let var ref counts, the ref block will do that.
+			if(shouldRefCount(params, *argument_expressions[0]))
+				argument_expressions[0]->type()->emitDecrRefCount(params, struct_ptr, "GetField " + get_field_func->struct_type->name + "." + field_name + " struct arg decrement");
 
 			return result;
 		}
@@ -1647,6 +1649,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			assert(argument_expressions.size() == 2);
 			llvm::Value* struct_ptr = argument_expressions[0]->emitLLVMCode(params, NULL);
 
+			llvm::Value* result;
 			if(field_type->passByValue())
 			{
 				llvm::Value* field_ptr = params.builder->CreateStructGEP(struct_ptr, field_index, field_name + " ptr");
@@ -1656,12 +1659,21 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 				//if(field_type->getType() == Type::StringType)
 				//	RefCounting::emitIncrementStringRefCount(params, loaded_val);
 
-				return loaded_val;
+				result = loaded_val;
 			}
 			else
 			{
-				return params.builder->CreateStructGEP(struct_ptr, field_index, field_name + " ptr");
+				result = params.builder->CreateStructGEP(struct_ptr, field_index, field_name + " ptr");
 			}
+
+			field_type->emitIncrRefCount(params, result, "GetTupleElement " + get_field_func->tuple_type->toString() + " " + field_name + " result increment");
+
+			// Decrement argument 0 structure ref count
+			//if(!(argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType)) // && argument_expressions[0].downcastToPtr<Variable>()->vartype == Variable::LetVariable)) // Don't decr let var ref counts, the ref block will do that.
+			if(shouldRefCount(params, *argument_expressions[0]))
+				argument_expressions[0]->type()->emitDecrRefCount(params, struct_ptr, "GetTupleElement " + get_field_func->tuple_type->toString() + " " + field_name + " tuple arg decrement");
+
+			return result;
 		}
 			
 
@@ -1751,8 +1763,9 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 		// Decrement ref counts on arguments
 		for(unsigned int i=0; i<argument_expressions.size(); ++i)
-			if(!(argument_expressions[i]->nodeType() == ASTNode::VariableASTNodeType)) // && argument_expressions[i].downcastToPtr<Variable>()->vartype == Variable::LetVariable)) // Don't decr let var ref counts, the ref block will do that.
-				argument_expressions[i]->type()->emitDecrRefCount(params, args[i]);
+			//if(!(argument_expressions[i]->nodeType() == ASTNode::VariableASTNodeType)) // && argument_expressions[i].downcastToPtr<Variable>()->vartype == Variable::LetVariable)) // Don't decr let var ref counts, the ref block will do that.
+			if(shouldRefCount(params, argument_expressions[i]))
+				argument_expressions[i]->type()->emitDecrRefCount(params, args[i], "function expression '" + this->target_function->sig.toString() + "' argument " + toString(i) + " decrement");
 				//if(argument_expressions[i]->type()->getType() == Type::StringType || argument_expressions[i]->type()->getType() == Type::VArrayTypeType)
 				//	RefCounting::emitCleanupLLVMCode(params, argument_expressions[i]->type(), args[i]);
 
@@ -1823,8 +1836,9 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 		// Decrement ref counts on arguments
 		for(unsigned int i=0; i<argument_expressions.size(); ++i)
-			if(!(argument_expressions[i]->nodeType() == ASTNode::VariableASTNodeType)) // && argument_expressions[i].downcastToPtr<Variable>()->vartype == Variable::LetVariable)) // Don't decr let var ref counts, the ref block will do that.
-				argument_expressions[i]->type()->emitDecrRefCount(params, args[i + 1]); // offset by one as furst arg is return value ptr
+			//if(!(argument_expressions[i]->nodeType() == ASTNode::VariableASTNodeType)) // && argument_expressions[i].downcastToPtr<Variable>()->vartype == Variable::LetVariable)) // Don't decr let var ref counts, the ref block will do that.
+			if(shouldRefCount(params, argument_expressions[i]))
+				argument_expressions[i]->type()->emitDecrRefCount(params, args[i + 1], "function expression '" + this->target_function->sig.toString() + "' argument " + toString(i) + " decrement"); // offset by one as furst arg is return value ptr
 
 		return return_val_addr;
 	}

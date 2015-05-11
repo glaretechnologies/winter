@@ -155,12 +155,11 @@ ValueRef Constructor::invoke(VMState& vmstate)
 
 llvm::Value* Constructor::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
-	//TEMP: add type alias for structure type to the module while we're at it.
-	//TEMP not accepted as of llvm 3.0 
-	//params.module->addTypeName(this->struct_type->name, this->struct_type->LLVMType(*params.context));
-
 	if(this->struct_type->passByValue())
 	{
+		// Structs are not passed by value
+		assert(0);
+
 		llvm::Value* s = llvm::UndefValue::get(this->struct_type->LLVMType(*params.module));
 
 		for(unsigned int i=0; i<this->struct_type->component_types.size(); ++i)
@@ -203,8 +202,9 @@ llvm::Value* Constructor::emitLLVMCode(EmitLLVMCodeParams& params) const
 				);
 			}
 
-			// If the field is a ref-counted type, we need to increment its reference count, since the newly constructed struct now holds a reference to it.
-			this->struct_type->component_types[i]->emitIncrRefCount(params, arg_value_or_ptr);
+			// If the field is a ref-counted type, we need to increment its reference count, since the newly constructed struct now holds a reference to it. 
+			// (and to compensate for the decrement of the argument in the function application code)
+			this->struct_type->component_types[i]->emitIncrRefCount(params, arg_value_or_ptr, "Constructor::emitLLVMCode() for type " + this->struct_type->toString());
 		}
 
 		return NULL;
@@ -1405,23 +1405,17 @@ llvm::Value* VArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 		{
 			llvm::Value* varray_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, arg_offset + 0); // Type: { i64, [0 x float] }*
 			
-			varray_ptr->dump();
-			varray_ptr->getType()->dump();
+			//varray_ptr->dump();
+			//varray_ptr->getType()->dump();
 
 			//llvm::Value* data_ptr_ptr = params.builder->CreateStructGEP(varray_ptr, 1, "data ptr ptr");
 			//llvm::Value* data_ptr = params.builder->CreateLoad(data_ptr_ptr);
-			llvm::Value* data_ptr = params.builder->CreateStructGEP(varray_ptr, 1, "data_ptr"); // [0 x T]*
-
-			data_ptr->dump();
-			data_ptr->getType()->dump();
+			llvm::Value* data_ptr = params.builder->CreateStructGEP(varray_ptr, 2, "data_ptr"); // [0 x T]*
 
 			llvm::Value* indices[] = { llvm::ConstantInt::get(*params.context, llvm::APInt(64, 0)), index };
 			llvm::Value* elem_ptr = params.builder->CreateInBoundsGEP(data_ptr, llvm::makeArrayRef(indices));
 
 			
-			elem_ptr->dump();
-			elem_ptr->getType()->dump();
-
 			return params.builder->CreateLoad(elem_ptr);
 		}
 		else // Else if element type is pass-by-pointer

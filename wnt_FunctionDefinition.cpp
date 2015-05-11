@@ -754,6 +754,13 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 
 	llvm_func->setAttributes(attributes);
 
+
+	// If this is an external allocation function, mark the result as noalias.
+	if(external_function.nonNull() && external_function->is_allocation_function)
+	{
+		llvm_func->addAttribute(llvm::AttributeSet::ReturnIndex, llvm::Attribute::NoAlias);
+	}
+
 	
 	// Mark return type as nonnull if it's a pointer
 	if(this->returnType()->getType() == Type::VArrayTypeType)
@@ -830,7 +837,8 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	const PlatformUtils::CPUInfo& cpu_info,
 	bool hidden_voidptr_arg, 
 	const llvm::DataLayout/*TargetData*/* target_data,
-	const CommonFunctions& common_functions
+	const CommonFunctions& common_functions,
+	std::set<Reference<const Type>, ConstTypeRefLessThan>& destructors_called_types
 	//std::map<Lang::FunctionSignature, llvm::Function*>& external_functions
 	)
 {
@@ -876,6 +884,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	params.context = &module->getContext();
 	params.target_data = target_data;
 	params.common_functions = common_functions;
+	params.destructors_called_types = &destructors_called_types;
 
 	//llvm::Value* body_code = NULL;
 	if(this->built_in_func_impl.nonNull())
@@ -889,9 +898,9 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	else
 	{
 		// Increment ref counts on all (ref counted) arguments:
-		const size_t num_sret_args = this->returnType()->passByValue() ? 0 : 1;
-		for(size_t i=0; i<this->sig.param_types.size(); ++i)
-			sig.param_types[i]->emitIncrRefCount(params, LLVMTypeUtils::getNthArg(llvm_func, i + num_sret_args));
+//		const size_t num_sret_args = this->returnType()->passByValue() ? 0 : 1;
+//		for(size_t i=0; i<this->sig.param_types.size(); ++i)
+//			sig.param_types[i]->emitIncrRefCount(params, LLVMTypeUtils::getNthArg(llvm_func, i + num_sret_args));
 
 
 		if(this->returnType()->passByValue())
@@ -907,8 +916,8 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 			}*/
 
 			// Decrement ref counts on all (ref counted) arguments:
-			for(size_t i=0; i<this->sig.param_types.size(); ++i)
-				sig.param_types[i]->emitDecrRefCount(params, LLVMTypeUtils::getNthArg(llvm_func, i));
+//			for(size_t i=0; i<this->sig.param_types.size(); ++i)
+//				sig.param_types[i]->emitDecrRefCount(params, LLVMTypeUtils::getNthArg(llvm_func, i));
 
 			builder.CreateRet(body_code);
 		}
@@ -990,8 +999,8 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 			}*/
 
 			// Decrement ref counts on all (ref counted) arguments:
-			for(size_t i=0; i<this->sig.param_types.size(); ++i)
-				sig.param_types[i]->emitDecrRefCount(params, LLVMTypeUtils::getNthArg(llvm_func, i));
+//			for(size_t i=0; i<this->sig.param_types.size(); ++i)
+//				sig.param_types[i]->emitDecrRefCount(params, LLVMTypeUtils::getNthArg(llvm_func, i));
 
 			builder.CreateRetVoid();
 
