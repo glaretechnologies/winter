@@ -423,8 +423,10 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 		assert(params.let_block_let_values.find(this->bound_let_block) != params.let_block_let_values.end());
 
 		llvm::Value* value = params.let_block_let_values[this->bound_let_block][this->bound_index];
+		
 		// Increment reference count
-		this->type()->emitIncrRefCount(params, value, "Variable::emitLLVMCode for let var " + this->name);
+		if(params.emit_refcounting_code)
+			this->type()->emitIncrRefCount(params, value, "Variable::emitLLVMCode for let var " + this->name);
 
 		return value;
 	}
@@ -451,7 +453,7 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 
 		// Increment reference count
 		//if(*params.currently_building_func_def->returnType() == *this->type()) // Ref-counting optimisation: Only do ref counting for this argument value if it is of the enclosing function return type.
-		if(shouldRefCount(params, *this))
+		if(params.emit_refcounting_code && shouldRefCount(params, *this))
 			this->type()->emitIncrRefCount(params, arg, "Variable::emitLLVMCode for argument var " + this->name);
 
 		return arg;

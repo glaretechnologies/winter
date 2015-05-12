@@ -1193,7 +1193,7 @@ llvm::Value* StringLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 	call_inst->setCallingConv(llvm::CallingConv::C);
 
 	// Set the reference count to 1
-	llvm::Value* ref_ptr = params.builder->CreateStructGEP(call_inst, 0, "ref ptr");
+	llvm::Value* ref_ptr = params.builder->CreateStructGEP(call_inst, 0, "string_ref_ptr");
 
 	llvm::Value* one = llvm::ConstantInt::get(
 		*params.context,
@@ -1202,7 +1202,8 @@ llvm::Value* StringLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 		)
 	);
 
-	params.builder->CreateStore(one, ref_ptr);
+	llvm::StoreInst* store_inst = params.builder->CreateStore(one, ref_ptr);
+	addMetaDataCommentToInstruction(params, store_inst, "string literal set intial ref count to 1");
 
 	CleanUpInfo info;
 	info.node = this;

@@ -26,6 +26,30 @@ code(literal)
 	setrefcount(res, 1)
 	res
 
+Tuple literal
+--------------------
+code([e]t)
+=	v <- code(e)
+	t = tuple_space
+	t[0] = v
+	t
+
+
+Let block
+---------------------
+code(let x = e in body)
+=	v_x <- code(e)
+	code(body)
+	decr(v_x)				# v_x gets decremented as it goes out of block scope.
+
+
+Let variable
+---------------------
+code(v_i)				# Where v_i is the i-th variable declared in a let block
+=	incr(val_for_v_i)	# Where val_for_v_i is the value computed for let variable v_i.
+	val_for_v_i
+
+
 
 Structure field access
 ------------------------
@@ -153,6 +177,20 @@ can omit reference increment and decrement.
 
 
 
+Example, function application where argument is a let variable from enclosing let block
+----------------------------------------------------------------------------------------
+code(f(v_i))
+=	v <- code(v_i_val)		# From function application
+	r <- f(v)				# Call function with argument value
+	decr(v)					# Consume (decrement) argument value
+	r
+=	incr(v_i_val)			# from let var code
+	v <- v_i_val			# From function application
+	r <- f(v)				# Call function with argument value
+	decr(v)					# Consume (decrement) argument value
+	r
+=	r <- f(v_i_val)
+	r
 
 
 	

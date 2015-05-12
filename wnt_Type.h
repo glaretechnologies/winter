@@ -400,7 +400,7 @@ public:
 	virtual void emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const;
 	virtual void emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const;
 
-	virtual bool hasDestructor() const { return true; }
+	virtual bool hasDestructor() const;
 	virtual void getContainedTypesWithDestructors(std::set<ConstTypeRef, ConstTypeRefLessThan>& types) const;
 
 	const std::string getOpenCLCDefinition(); // Get full definition string, e.g. struct a { float b; };

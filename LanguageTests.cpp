@@ -200,6 +200,28 @@ void LanguageTests::run()
 	//testMainFloatArgAllowUnsafe("A = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]a       def main(float x) float : let i = truncateToInt(x) in A[i] + A[i+1] + A[i+2]", 2.f, 12.0f);
 
 
+	testMainFloatArg("struct S { int x }  def f(S s) S : let t = S(1) in s   def main(float x) float : let v = [99]va in x", 1.f, 1.0f, INVALID_OPENCL);
+
+
+	// ===================================================================
+	// Test Refcounting optimisations: test that a let variable used as a function argument is not incremented and decremented
+	// ===================================================================
+
+	testMainIntegerArg("def f(string s, int x) int : stringLength(s) + x       def main(int x) int : let s = \"hello\" in f(s, x)", 1, 6, INVALID_OPENCL);
+
+
+	// ===================================================================
+	// Test Refcounting optimisations: test that a argument variable used as a function argument is not incremented and decremented
+	// ===================================================================
+
+	testMainIntegerArg("def f(string s, int x) int : stringLength(s) + x     def g(string s, int x) int : f(s, x)      def main(int x) int : g(\"hello\", x)", 1, 6, INVALID_OPENCL);
+
+	// test that a argument variable used as a function argument is not incremented and decremented, even when the argument may be stored and returned in the result.
+	testMainIntegerArg("struct S { string str }      def f(string str) S : S(str)     def g(string s) S : f(s)      def main(int x) int : stringLength(g(\"hello\").str)", 1, 5, INVALID_OPENCL);
+
+
+
+	testMainIntegerArg("def f(string s, int x) int : stringLength(s) + x       def main(int x) int : f(\"hello\", x)", 1, 6, INVALID_OPENCL);
 
 
 

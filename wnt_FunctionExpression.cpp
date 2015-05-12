@@ -1724,62 +1724,16 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 	
 
+	vector<llvm::Value*> args;
+	llvm::Value* return_val_addr = NULL;
 
-	
-
-
-	if(target_ret_type->passByValue())
+	if(!target_ret_type->passByValue())
 	{
-		vector<llvm::Value*> args;
-
-		for(unsigned int i=0; i<argument_expressions.size(); ++i)
-			args.push_back(argument_expressions[i]->emitLLVMCode(params, NULL));
-
-		// Append pointer to Captured var struct, if this function was from a closure, and there are captured vars.
-		if(captured_var_struct_ptr != NULL)
-			args.push_back(captured_var_struct_ptr);
-
-		//std::cout << "captured_var_struct_ptr: " << std::endl;
-		//captured_var_struct_ptr->dump();
-
-		// Set hidden voidptr argument
-		//if(target_takes_voidptr_arg) // params.hidden_voidptr_arg)
-		//	args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));
-
-		/*target_llvm_func->dump();
-		for(size_t z=0; z<args.size(); ++z)
-			args[z]->dump();*/
-
-		llvm::CallInst* call_inst = params.builder->CreateCall(target_llvm_func, args);
-
-		// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
-		call_inst->setCallingConv(llvm::CallingConv::C);
-
-		// If this is a string value, need to decr ref count at end of func.
-		/*if(target_ret_type->getType() == Type::StringType || target_ret_type->getType() == Type::VArrayTypeType)
-		{
-			params.cleanup_values.push_back(CleanUpInfo(this, call_inst));
-		}*/
-
-		// Decrement ref counts on arguments
-		for(unsigned int i=0; i<argument_expressions.size(); ++i)
-			//if(!(argument_expressions[i]->nodeType() == ASTNode::VariableASTNodeType)) // && argument_expressions[i].downcastToPtr<Variable>()->vartype == Variable::LetVariable)) // Don't decr let var ref counts, the ref block will do that.
-			if(shouldRefCount(params, argument_expressions[i]))
-				argument_expressions[i]->type()->emitDecrRefCount(params, args[i], "function expression '" + this->target_function->sig.toString() + "' argument " + toString(i) + " decrement");
-				//if(argument_expressions[i]->type()->getType() == Type::StringType || argument_expressions[i]->type()->getType() == Type::VArrayTypeType)
-				//	RefCounting::emitCleanupLLVMCode(params, argument_expressions[i]->type(), args[i]);
-
-		return call_inst;
-	}
-	else
-	{
-		llvm::Value* return_val_addr;
 		if(ret_space_ptr)
 			return_val_addr = ret_space_ptr;
 		else
 		{
 			// Allocate return value on stack
-
 			// Emit the alloca in the entry block for better code-gen.
 			llvm::IRBuilder<> entry_block_builder(&params.currently_building_func->getEntryBlock(), params.currently_building_func->getEntryBlock().begin());
 
@@ -1790,58 +1744,56 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			);
 		}
 
-		vector<llvm::Value*> args(1, return_val_addr); // First argument is return value pointer.
-
-		for(unsigned int i=0; i<argument_expressions.size(); ++i)
-			args.push_back(argument_expressions[i]->emitLLVMCode(params));
-
-		// Append pointer to Captured var struct, if this function was from a closure.
-		if(captured_var_struct_ptr != NULL)
-			args.push_back(captured_var_struct_ptr);
-
-		// Set hidden voidptr argument
-		//if(target_takes_voidptr_arg) // params.hidden_voidptr_arg)
-		//	args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));
-
-		//TEMP:
-		/*target_llvm_func->dump();
-		std::cout << "Args to CreateCall() for " << this->target_function->sig.toString() << ":" << std::endl;
-		for(int z=0; z<args.size(); ++z)
-		{
-			std::cout << "\narg " << z << ": \n";
-			args[z]->dump();
-			std::cout << "\n\narg " << z << " type: \n";
-			args[z]->getType()->dump();
-			std::cout << std::endl;
-		}*/
-
-		llvm::CallInst* call_inst = params.builder->CreateCall(target_llvm_func, args);
-		
-		// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
-		call_inst->setCallingConv(llvm::CallingConv::C);
-
-		// If this is a string value, need to decr ref count at end of func.
-		///*if(target_ret_type->getType() == Type::StringType)
-		//{
-		//	params.cleanup_values.push_back(CleanUpInfo(this, call_inst));
-		//}
-		//else */if(target_ret_type->getType() == Type::StructureTypeType)
-		//{
-		//	//const StructureType& struct_type = static_cast<const StructureType&>(*target_ret_type);
-
-		//	//for(size_t i=0; i<struct_type.component_types.size(); ++i)
-
-		//	params.cleanup_values.push_back(CleanUpInfo(this, return_val_addr));
-		//}
-
-		// Decrement ref counts on arguments
-		for(unsigned int i=0; i<argument_expressions.size(); ++i)
-			//if(!(argument_expressions[i]->nodeType() == ASTNode::VariableASTNodeType)) // && argument_expressions[i].downcastToPtr<Variable>()->vartype == Variable::LetVariable)) // Don't decr let var ref counts, the ref block will do that.
-			if(shouldRefCount(params, argument_expressions[i]))
-				argument_expressions[i]->type()->emitDecrRefCount(params, args[i + 1], "function expression '" + this->target_function->sig.toString() + "' argument " + toString(i) + " decrement"); // offset by one as furst arg is return value ptr
-
-		return return_val_addr;
+		args.push_back(return_val_addr); // First argument is return value pointer.
 	}
+
+	//----------------- Emit code for argument expressions ------------------
+	vector<bool> do_ref_counting_for_arg(argument_expressions.size(), true);
+
+	for(unsigned int i=0; i<argument_expressions.size(); ++i)
+	{
+		if(argument_expressions[i]->nodeType() == ASTNode::VariableASTNodeType)
+		{
+			const Variable* var_node = argument_expressions[i].downcastToPtr<Variable>();
+			if(var_node->vartype == Variable::LetVariable || var_node->vartype == Variable::ArgumentVariable)
+			{
+				const bool old_emit_refcounting_code = params.emit_refcounting_code;
+				params.emit_refcounting_code = false; // Disable ref counting code
+
+				args.push_back(argument_expressions[i]->emitLLVMCode(params, NULL));
+
+				params.emit_refcounting_code = old_emit_refcounting_code; // restore emit_refcounting_code flag.
+
+				do_ref_counting_for_arg[i] = false;
+			}
+			else
+				args.push_back(argument_expressions[i]->emitLLVMCode(params, NULL));
+		}
+		else
+			args.push_back(argument_expressions[i]->emitLLVMCode(params, NULL));
+	}
+
+	// Append pointer to Captured var struct, if this function was from a closure, and there are captured vars.
+	if(captured_var_struct_ptr != NULL)
+		args.push_back(captured_var_struct_ptr);
+
+	// Set hidden voidptr argument
+	//if(target_takes_voidptr_arg) // params.hidden_voidptr_arg)
+	//	args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));
+
+	llvm::CallInst* call_inst = params.builder->CreateCall(target_llvm_func, args);
+
+	// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
+	call_inst->setCallingConv(llvm::CallingConv::C);
+
+	// Decrement ref counts on arguments
+	const int num_sret_args = target_ret_type->passByValue() ? 0 : 1;
+
+	for(unsigned int i=0; i<argument_expressions.size(); ++i)
+		if(shouldRefCount(params, argument_expressions[i]) && do_ref_counting_for_arg[i])
+			argument_expressions[i]->type()->emitDecrRefCount(params, args[i + num_sret_args], "function expression '" + this->target_function->sig.toString() + "' argument " + toString(i) + " decrement");
+
+	return target_ret_type->passByValue() ? call_inst : return_val_addr;
 }
 
 

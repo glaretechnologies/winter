@@ -210,6 +210,8 @@ public:
 	std::vector<llvm::Value*> argument_values; // Use for function specialisation in Array fold().
 
 	std::set<Reference<const Type>, ConstTypeRefLessThan>* destructors_called_types;
+
+	bool emit_refcounting_code;
 };
 
 

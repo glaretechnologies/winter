@@ -885,6 +885,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	params.target_data = target_data;
 	params.common_functions = common_functions;
 	params.destructors_called_types = &destructors_called_types;
+	params.emit_refcounting_code = true;
 
 	//llvm::Value* body_code = NULL;
 	if(this->built_in_func_impl.nonNull())
