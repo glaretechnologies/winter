@@ -292,7 +292,7 @@ llvm::Function* emitIncrRefCountFunc(llvm::Module* module, const llvm::DataLayou
 }
 
 
-llvm::Function* RefCounting::getOrInsertDestructorForType(llvm::Module* module, const ConstTypeRef& type)
+llvm::Function* getOrInsertDestructorForType(llvm::Module* module, const ConstTypeRef& type)
 {
 	llvm::FunctionType* functype = llvm::FunctionType::get(
 		llvm::Type::getVoidTy(module->getContext()), // return type
