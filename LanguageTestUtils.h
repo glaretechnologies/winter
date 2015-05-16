@@ -731,6 +731,83 @@ static void testMainIntegerArg(const std::string& src, int x, int target_return_
 }
 
 
+
+static void testMainInt64Arg(const std::string& src, int64 x, int64 target_return_val, bool allow_unsafe_operations = false)
+{
+	std::cout << "===================== Winter testMainInt64Arg() =====================" << std::endl;
+	try
+	{
+		VMConstructionArgs vm_args;
+		vm_args.allow_unsafe_operations = allow_unsafe_operations;
+		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
+
+		const FunctionSignature mainsig("main", std::vector<TypeRef>(1, new Int(64)));
+
+		vm_args.entry_point_sigs.push_back(mainsig);
+
+		VirtualMachine vm(vm_args);
+
+		// Get main function
+		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
+
+		int64 (WINTER_JIT_CALLING_CONV *f)(int64, void*) = (int64 (WINTER_JIT_CALLING_CONV *)(int64, void*)) vm.getJittedFunction(mainsig);
+
+		TestEnv test_env;
+		test_env.val = 10;
+
+		// Call the JIT'd function
+		const int64 jitted_result = f(x, &test_env);
+
+
+		// Check JIT'd result.
+		if(jitted_result != target_return_val)
+		{
+			std::cerr << "Test failed: JIT'd main returned " << jitted_result << ", target was " << target_return_val << std::endl;
+			assert(0);
+			exit(1);
+		}
+
+		VMState vmstate;
+		vmstate.func_args_start.push_back(0);
+		vmstate.argument_stack.push_back(new IntValue(x));
+		//vmstate.argument_stack.push_back(new VoidPtrValue(&test_env));
+
+		ValueRef retval = maindef->invoke(vmstate);
+
+		vmstate.func_args_start.pop_back();
+		IntValue* val = dynamic_cast<IntValue*>(retval.getPointer());
+		if(!val)
+		{
+			std::cerr << "main() Return value was of unexpected type." << std::endl;
+			assert(0);
+			exit(1);
+		}
+
+		if(val->value != target_return_val)
+		{
+			std::cerr << "Test failed: main returned " << val->value << ", target was " << target_return_val << std::endl;
+			assert(0);
+			exit(1);
+		}
+	}
+	catch(Winter::BaseException& e)
+	{
+		std::cerr << e.what() << std::endl;
+		assert(0);
+		exit(1);
+	}
+	catch(Indigo::Exception& e)
+	{
+		std::cerr << e.what() << std::endl;
+		assert(0);
+		exit(1);
+	}
+}
+
+
+
+
+
 static void testMainIntegerArgInvalidProgram(const std::string& src)
 {
 	std::cout << "===================== Winter testMainIntegerArgInvalidProgram() =====================" << std::endl;

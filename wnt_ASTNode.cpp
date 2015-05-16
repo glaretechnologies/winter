@@ -524,6 +524,35 @@ static void doImplicitIntToFloatTypeCoercion(ASTNodeRef& a, ASTNodeRef& b, Trave
 }
 
 
+static void doImplicitIntTypeCoercion(ASTNodeRef& a, ASTNodeRef& b, TraversalPayload& payload)
+{
+	// Type may be null if 'a' is a variable node that has not been bound yet.
+	const TypeRef a_type = a->type(); 
+	const TypeRef b_type = b->type();
+
+	if(a_type.nonNull() && a_type->getType() == Type::IntType && b_type.nonNull() && b_type->getType() == Type::IntType)
+	{
+		const Int* a_int_type = a_type.downcastToPtr<Int>();
+		const Int* b_int_type = b_type.downcastToPtr<Int>();
+
+		// 3i64 > 4i32		=>		3i64 > 4i64
+		if((a_int_type->numBits() == 64) && (b_int_type->numBits() == 32) && (b->nodeType() == ASTNode::IntLiteralType))
+		{
+			b = new IntLiteral(b.downcastToPtr<IntLiteral>()->value, 64, b->srcLocation());
+			payload.tree_changed = true;
+		}
+
+		// 3i32 > 4i64      =>        3i64 > 4i64
+		if((b_int_type->numBits() == 64) && (a_int_type->numBits() == 32) && (a->nodeType() == ASTNode::IntLiteralType))
+		{
+			a = new IntLiteral(a.downcastToPtr<IntLiteral>()->value, 64, b->srcLocation());
+			payload.tree_changed = true;
+		}
+	}
+}
+
+
+
 static bool canDoImplicitIntToFloatTypeCoercion(const ASTNodeRef& a, const ASTNodeRef& b)
 {
 	// Type may be null if 'a' is a variable node that has not been bound yet.
@@ -3594,6 +3623,8 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 	{
 		doImplicitIntToFloatTypeCoercion(a, b, payload);
 
+		doImplicitIntTypeCoercion(a, b, payload);
+
 		// implicit conversion from int to float
 		// 3.0 > 4      =>       3.0 > 4.0
 
@@ -4226,14 +4257,15 @@ void NamedConstant::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 
 llvm::Value* NamedConstant::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
-	if(isLiteral(*this->value_expr))
+	/*if(isLiteral(*this->value_expr))
 	{
 		if(!llvm_value)
 			llvm_value = value_expr->emitLLVMCode(params, ret_space_ptr);
 		return llvm_value;
 	}
 	else
-		return value_expr->emitLLVMCode(params, ret_space_ptr);
+		return value_expr->emitLLVMCode(params, ret_space_ptr);*/
+	return value_expr->emitLLVMCode(params, ret_space_ptr);
 }
 
 

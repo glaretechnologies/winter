@@ -505,6 +505,18 @@ public:
 };
 
 
+class LengthBuiltInFunc : public BuiltInFunctionImpl
+{
+public:
+	LengthBuiltInFunc(const TypeRef& type_);
+
+	virtual ValueRef invoke(VMState& vmstate);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+
+	TypeRef type;
+};
+
+
 //class AllocateRefCountedStructure : public BuiltInFunctionImpl
 //{
 //public:

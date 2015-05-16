@@ -357,6 +357,19 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 				return def;
 			}
 		}
+
+		if(sig.name == "length")
+		{
+			if(sig.param_types[0]->getType() == Type::ArrayTypeType || sig.param_types[0]->getType() == Type::VArrayTypeType ||
+				sig.param_types[0]->getType() == Type::TupleTypeType || sig.param_types[0]->getType() == Type::VectorTypeType)
+			{
+				TypeRef ret_type = new Int(64);
+				FunctionDefinitionRef def = makeBuiltInFuncDef<LengthBuiltInFunc>(sig.name, sig.param_types[0], ret_type);
+				this->sig_to_function_map.insert(std::make_pair(sig, def));
+				return def;
+			}
+		}
+
 	}
 	else if(sig.param_types.size() == 2)
 	{

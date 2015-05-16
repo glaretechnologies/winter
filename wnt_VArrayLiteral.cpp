@@ -56,6 +56,7 @@ VArrayLiteral::VArrayLiteral(const std::vector<ASTNodeRef>& elems, const SrcLoca
 	if(has_int_suffix && elems.size() != 1)
 		throw BaseException("VArray literal with int suffix must have only one explicit elem." + errorContext(*this));
 
+	// Need to have at least one element, so we can determine the element type.
 	if(elems.empty())
 		throw BaseException("VArray literal can't be empty." + errorContext(*this));
 }

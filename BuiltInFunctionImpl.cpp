@@ -2768,6 +2768,55 @@ llvm::Value* VoidPtrToInt64BuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 
 //----------------------------------------------------------------------------------------------
 
+
+LengthBuiltInFunc::LengthBuiltInFunc(const TypeRef& type_)
+:	type(type_)
+{}
+
+
+ValueRef LengthBuiltInFunc::invoke(VMState& vmstate)
+{
+	switch(type->getType())
+	{
+	case Type::ArrayTypeType:
+		return new IntValue(checkedCast<const ArrayValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer())->e.size());
+	case Type::VArrayTypeType:
+		return new IntValue(checkedCast<const VArrayValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer())->e.size());
+	case Type::TupleTypeType:
+		return new IntValue(checkedCast<const TupleValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer())->e.size());
+	case Type::VectorTypeType:
+		return new IntValue(checkedCast<const VectorValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer())->e.size());
+	default:
+		throw BaseException("unhandled type.");
+	}
+}
+
+
+llvm::Value* LengthBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	switch(type->getType())
+	{
+	case Type::ArrayTypeType:
+		return llvm::ConstantInt::get(*params.context, llvm::APInt(64, type.downcastToPtr<ArrayType>()->num_elems));
+	case Type::VArrayTypeType:
+		{
+			llvm::Value* varray_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+			llvm::Value* len_field_ptr = params.builder->CreateStructGEP(varray_ptr, 1, "len_field_ptr");
+			return params.builder->CreateLoad(len_field_ptr, false, "len_value");
+		}
+	case Type::TupleTypeType:
+		return llvm::ConstantInt::get(*params.context, llvm::APInt(64, type.downcastToPtr<TupleType>()->component_types.size()));
+	case Type::VectorTypeType:
+		return llvm::ConstantInt::get(*params.context, llvm::APInt(64, type.downcastToPtr<VectorType>()->num));
+	default:
+		throw BaseException("unhandled type.");
+	}
+}
+
+
+//----------------------------------------------------------------------------------------------
+
+
 //ValueRef AllocateRefCountedStructure::invoke(VMState& vmstate)
 //{
 //	assert(0);

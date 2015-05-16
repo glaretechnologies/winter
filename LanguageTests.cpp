@@ -224,6 +224,24 @@ void LanguageTests::run()
 	testMainIntegerArg("def f(string s, int x) int : stringLength(s) + x       def main(int x) int : f(\"hello\", x)", 1, 6, INVALID_OPENCL);
 
 
+	// ===================================================================
+	// Test length function
+	// ===================================================================
+	// Test length() function on varrays
+	testMainInt64Arg("def main(int64 x) int64 : length([1.0]va)", 1, 1);
+	testMainInt64Arg("def main(int64 x) int64 : length([1.0, 2.0, 3.0]va)", 1, 3);
+
+	// Test length() function on tuples
+	testMainInt64Arg("def main(int64 x) int64 : length([1.0]t)", 1, 1);
+	testMainInt64Arg("def main(int64 x) int64 : length([1.0, 2.0, 3.0]t)", 1, 3);
+
+	// Test length() function on arrays
+	testMainInt64Arg("def main(int64 x) int64 : length([1.0]a)", 1, 1);
+	testMainInt64Arg("def main(int64 x) int64 : length([1.0, 2.0, 3.0]a)", 1, 3);
+
+	// Test length() function on vectors
+	testMainInt64Arg("def main(int64 x) int64 : length([1.0]v)", 1, 1);
+	testMainInt64Arg("def main(int64 x) int64 : length([1.0, 2.0, 3.0]v)", 1, 3);
 
 	// ===================================================================
 	// Test VArrays
@@ -371,6 +389,16 @@ void LanguageTests::run()
 	testMainFloatArgAllowUnsafe("def main(float x) float : let a = (\"hello\", \"world\") in x", 10.f, 10.0f, INVALID_OPENCL);
 
 	testMainFloatArgAllowUnsafe("def main(float x) float : let a = [(\"hello\", \"world\")]va in x", 10.f, 10.0f, INVALID_OPENCL);
+
+	
+	//------------------------ Test a VArray in a named constant --------------------------
+	testMainFloatArgAllowUnsafe("TEST = [99.0]va     def main(float x) float : TEST[0]", 10.f, 99.0f, INVALID_OPENCL);
+	testMainFloatArgAllowUnsafe("TEST = [99.0]va     def main(float x) float : TEST[0] + TEST[0]", 10.f, 198.0f, INVALID_OPENCL);
+
+	testMainFloatArgAllowUnsafe("TEST = [1.0 + 2.0]va     def main(float x) float : TEST[0] + TEST[0]", 10.f, 6.0f, INVALID_OPENCL);
+
+	testMainFloatArgAllowUnsafe("def f(varray<float> v) : v     TEST = f([3.0]va)     def main(float x) float : TEST[0]", 10.f, 3.0f, INVALID_OPENCL);
+	testMainFloatArgAllowUnsafe("def f(varray<float> v) : v     TEST = f([3.0]va)     def main(float x) float : TEST[0] + TEST[0]", 10.f, 6.0f, INVALID_OPENCL);
 
 
 
@@ -1232,6 +1260,11 @@ void LanguageTests::run()
 	// Test varying index (invalid)
 	testMainFloatArgInvalidProgram("def f(float x) tuple<float, float> : (x, x)   \n\
 		def main(float x) float :  elem(f(x), truncateToInt(x))");
+
+
+
+
+
 
 
 	testMainFloatArg("def main(float x) float :  elem([x, x, x, x]v, 0)", 1.0f, 1.0f);
