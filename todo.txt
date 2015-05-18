@@ -1,3 +1,8 @@
+TODO: need i32 -> i64 coercion
+
+TODO: need some way of making e.g. varrays with no elements.  Can't have a literal with no elements because then we don't know the type.
+
+
 TODO: use CreateCall2() instead of CreateCall etc..  (only do once we know that void* hidden args won't be required to be appended?)
 
 TODO: fold specialisation requires that each fold built-in be unique.

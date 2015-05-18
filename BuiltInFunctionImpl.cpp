@@ -2,7 +2,9 @@
 
 
 #include "VMState.h"
+#include "VirtualMachine.h"
 #include "Value.h"
+#include "wnt_Type.h"
 #include "wnt_ASTNode.h"
 #include "wnt_FunctionDefinition.h"
 #include "wnt_FunctionExpression.h"
@@ -12,6 +14,7 @@
 #include "LLVMTypeUtils.h"
 #include "utils/PlatformUtils.h"
 #include "utils/StringUtils.h"
+#include "utils/TaskManager.h"
 #ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
 #endif
@@ -20,6 +23,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Attributes.h"
 #if TARGET_LLVM_VERSION <= 34
 #include "llvm/Analysis/Verifier.h"
 #include "llvm/ExecutionEngine/JIT.h"
@@ -51,21 +55,18 @@ class CreateLoopBodyCallBack
 {
 public:
 	virtual ~CreateLoopBodyCallBack(){}
-	virtual llvm::Value* emitLoopBody(EmitLLVMCodeParams& params, /*llvm::Value* loop_value_var, */llvm::Value* loop_iter_val) = 0;
+	virtual llvm::Value* emitLoopBody(llvm::IRBuilder<>& Builder, llvm::Module* module, /*llvm::Value* loop_value_var, */llvm::Value* loop_iter_val) = 0;
 };
 
 
 // Make a for loop.  Adapted from http://llvm.org/docs/tutorial/LangImpl5.html#for-loop-expression
-static llvm::Value* makeForLoop(EmitLLVMCodeParams& params, int num_iterations, llvm::Type* loop_value_type, /*llvm::Value* initial_value, */CreateLoopBodyCallBack* create_loop_body_callback)
+static llvm::Value* makeForLoop(llvm::IRBuilder<>& Builder, llvm::Module* module, llvm::Value* begin_index, llvm::Value* end_index, llvm::Type* loop_value_type, /*llvm::Value* initial_value, */CreateLoopBodyCallBack* create_loop_body_callback)
 {
 	// Make the new basic block for the loop header, inserting after current
 	// block.
-
-	llvm::IRBuilder<>& Builder = *params.builder;
-
 	llvm::Function* TheFunction = Builder.GetInsertBlock()->getParent();
 	llvm::BasicBlock* PreheaderBB = Builder.GetInsertBlock();
-	llvm::BasicBlock* LoopBB = llvm::BasicBlock::Create(*params.context, "loop", TheFunction);
+	llvm::BasicBlock* LoopBB = llvm::BasicBlock::Create(module->getContext(), "loop", TheFunction);
   
 	// Insert an explicit fall through from the current block to the LoopBB.
 	Builder.CreateBr(LoopBB);
@@ -74,26 +75,24 @@ static llvm::Value* makeForLoop(EmitLLVMCodeParams& params, int num_iterations, 
 	Builder.SetInsertPoint(LoopBB);
   
 	
-
 	// Create loop index (i) variable phi node
-	llvm::PHINode* loop_index_var = Builder.CreatePHI(llvm::Type::getInt32Ty(*params.context), 2, "loop_index_var");
-	llvm::Value* initial_loop_index_value = llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0)); // Initial induction loop index value: Zero
-	loop_index_var->addIncoming(initial_loop_index_value, PreheaderBB);
+	llvm::PHINode* loop_index_var = Builder.CreatePHI(llvm::Type::getInt64Ty(module->getContext()), 2, "loop_index_var");
+	//llvm::Value* initial_loop_index_value = llvm::ConstantInt::get(*params.context, llvm::APInt(64, 0)); // Initial induction loop index value: Zero
+	loop_index_var->addIncoming(begin_index, PreheaderBB);
 
 	// Create loop body/value variable phi node
 	//llvm::PHINode* loop_value_var = Builder.CreatePHI(loop_value_type, 2, "loop_value_var");
 	//loop_value_var->addIncoming(initial_value, PreheaderBB);
   
-
 	// Emit the body of the loop.
-	llvm::Value* updated_value = create_loop_body_callback->emitLoopBody(params, /*loop_value_var, */loop_index_var);
+	llvm::Value* updated_value = create_loop_body_callback->emitLoopBody(Builder, module, /*loop_value_var, */loop_index_var);
   
 	// Create increment of loop index
-	llvm::Value* step_val = llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1));
+	llvm::Value* step_val = llvm::ConstantInt::get(module->getContext(), llvm::APInt(64, 1));
 	llvm::Value* next_var = Builder.CreateAdd(loop_index_var, step_val, "next_var");
 
 	// Compute the end condition.
-	llvm::Value* end_value = llvm::ConstantInt::get(*params.context, llvm::APInt(32, num_iterations));//TEMP HACK
+	llvm::Value* end_value = end_index; // llvm::ConstantInt::get(*params.context, llvm::APInt(32, num_iterations));//TEMP HACK
   
 	llvm::Value* end_cond = Builder.CreateICmpNE(
 		end_value, 
@@ -103,7 +102,7 @@ static llvm::Value* makeForLoop(EmitLLVMCodeParams& params, int num_iterations, 
   
 	// Create the "after loop" block and insert it.
 	llvm::BasicBlock* LoopEndBB = Builder.GetInsertBlock();
-	llvm::BasicBlock* AfterBB = llvm::BasicBlock::Create(*params.context, "afterloop", TheFunction);
+	llvm::BasicBlock* AfterBB = llvm::BasicBlock::Create(module->getContext(), "afterloop", TheFunction);
   
 	// Insert the conditional branch into the end of LoopEndBB.
 	Builder.CreateCondBr(end_cond, LoopBB, AfterBB);
@@ -498,6 +497,13 @@ llvm::Value* GetVectorElement::emitLLVMCode(EmitLLVMCodeParams& params) const
 //------------------------------------------------------------------------------------
 
 
+
+void ArrayMapBuiltInFunc::specialiseForFunctionArg(FunctionDefinition* f)
+{
+	specialised_f = f;
+}
+
+
 ValueRef ArrayMapBuiltInFunc::invoke(VMState& vmstate)
 {
 	const size_t func_args_start = vmstate.func_args_start.back();
@@ -527,52 +533,110 @@ ValueRef ArrayMapBuiltInFunc::invoke(VMState& vmstate)
 class ArrayMapBuiltInFunc_CreateLoopBodyCallBack : public CreateLoopBodyCallBack
 {
 public:
-	virtual llvm::Value* emitLoopBody(EmitLLVMCodeParams& params, /*llvm::Value* loop_value_var, */llvm::Value* i)
+	virtual llvm::Value* emitLoopBody(llvm::IRBuilder<>& builder, llvm::Module* module, /*llvm::Value* loop_value_var, */llvm::Value* i)
 	{
 		// Load element from input array
 		vector<llvm::Value*> indices(2);
-		indices[0] = llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0)); // get the zero-th array
+		indices[0] = llvm::ConstantInt::get(module->getContext(), llvm::APInt(64, 0)); // get the zero-th array
 		indices[1] = i; // get the indexed element in the array
 
-		// Get pointer to input element
-		llvm::Value* elem_ptr = params.builder->CreateInBoundsGEP(
-			input_array, // ptr
-			indices
-		);
-
-		llvm::Value* elem = params.builder->CreateLoad(
-			elem_ptr
-		);
+		llvm::Value* elem_ptr = builder.CreateInBoundsGEP(input_array, indices);
+		llvm::Value* elem = builder.CreateLoad(elem_ptr);
 
 		// Call function on element
-		vector<llvm::Value*> args;
-		args.push_back(elem);
-		//if(true) // target_takes_voidptr_arg) // params.hidden_voidptr_arg)
-		//	args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));
-
-		llvm::Value* mapped_elem = params.builder->CreateCall(
+		llvm::Value* mapped_elem = builder.CreateCall(
 			function, // Callee
-			args, // Args
+			elem, // Args
 			"map function call" // Name
 		);
 
 		// Get pointer to output element
-		llvm::Value* out_elem_ptr = params.builder->CreateInBoundsGEP(
-			return_ptr, // ptr
-			indices
-		);
-
-		// Store the element in the output array
-		return params.builder->CreateStore(
-			mapped_elem, // value
-			out_elem_ptr // ptr
-		);
+		llvm::Value* out_elem_ptr = builder.CreateInBoundsGEP(return_ptr, indices);
+		return builder.CreateStore(mapped_elem, out_elem_ptr); // Store the element in the output array
 	}
 
 	llvm::Value* return_ptr;
 	llvm::Value* function;
 	llvm::Value* input_array;
 };
+
+
+// This function computes the map on a slice of the array given by [begin, end).
+// typedef void (WINTER_JIT_CALLING_CONV * ARRAY_WORK_FUNCTION) (void* output, void* input, void* map_function, size_t begin, size_t end); // Winter code
+llvm::Value* ArrayMapBuiltInFunc::insertWorkFunction(EmitLLVMCodeParams& params) const
+{
+	llvm::Type* int64_type = llvm::IntegerType::get(*params.context, 64);
+
+	std::vector<llvm::Type*> arg_types(2, LLVMTypeUtils::pointerType(this->from_type->LLVMType(*params.module))); // output, input
+	arg_types.push_back(this->func_type->LLVMType(*params.module)); // map_function
+	arg_types.push_back(int64_type); // size_t begin
+	arg_types.push_back(int64_type); // size_t end
+
+	llvm::FunctionType* functype = llvm::FunctionType::get(
+		llvm::Type::getVoidTy(params.module->getContext()), // return type
+		arg_types,
+		false // varargs
+	);
+
+	llvm::Constant* llvm_func_constant = params.module->getOrInsertFunction(
+		"work_function", // Name
+		functype // Type
+	);
+
+	assert(llvm::isa<llvm::Function>(llvm_func_constant));
+	llvm::Function* llvm_func = static_cast<llvm::Function*>(llvm_func_constant);
+	llvm::BasicBlock* block = llvm::BasicBlock::Create(params.module->getContext(), "entry", llvm_func);
+	llvm::IRBuilder<> builder(block);
+		
+
+	ArrayMapBuiltInFunc_CreateLoopBodyCallBack callback;
+	callback.return_ptr = LLVMTypeUtils::getNthArg(llvm_func, 0);
+
+	// If we have a specialised function to use, insert a call to it directly, else used the function pointer passed in as an argument.
+	if(this->specialised_f)
+		callback.function = this->specialised_f->getOrInsertFunction(params.module, false);
+	else
+		callback.function = LLVMTypeUtils::getNthArg(llvm_func, 2);
+
+	callback.input_array = LLVMTypeUtils::getNthArg(llvm_func, 1);
+
+	//llvm_func->addAttribute(1, llvm::Attribute::getWithAlignment(*params.context, 3));
+	// Set some attributes
+
+	llvm::Function::arg_iterator AI = llvm_func->arg_begin();
+	{
+		llvm::AttrBuilder attr_builder;
+		attr_builder.addAlignmentAttr(32);
+		attr_builder.addAttribute(llvm::Attribute::NoAlias);
+		llvm::AttributeSet set = llvm::AttributeSet::get(*params.context, 1, attr_builder);
+		AI->addAttr(set);
+	}
+
+	AI++;
+
+	{
+		llvm::AttrBuilder attr_builder;
+		attr_builder.addAlignmentAttr(32);
+		attr_builder.addAttribute(llvm::Attribute::NoAlias);
+		llvm::AttributeSet set = llvm::AttributeSet::get(*params.context, 1, attr_builder);
+		AI->addAttr(set);
+	}
+	
+
+	makeForLoop(
+		builder,
+		params.module,
+		llvm::ConstantInt::get(*params.context, llvm::APInt(64, 0)), // TEMP BEGIN=0    LLVMTypeUtils::getNthArg(llvm_func, 3), // begin index
+		LLVMTypeUtils::getNthArg(llvm_func, 4), // end index
+		from_type->elem_type->LLVMType(*params.module), // Loop value type
+		&callback
+	);
+	
+
+	builder.CreateRetVoid();
+
+	return llvm_func;
+}
 
 
 llvm::Value* ArrayMapBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
@@ -608,20 +672,62 @@ llvm::Value* ArrayMapBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 
 	//llvm::Value* initial_value = return_ptr;
-	
-	ArrayMapBuiltInFunc_CreateLoopBodyCallBack callback;
-	callback.return_ptr = return_ptr;
-	callback.function = function;
-	callback.input_array = input_array;
-	
+	const bool do_multithreaded_map = false;
+	if(do_multithreaded_map)
+	{
+		llvm::Value* work_function = insertWorkFunction(params);
 
-	return makeForLoop(
-		params,
-		from_type->num_elems, // num iterations
-		from_type->elem_type->LLVMType(*params.module), // Loop value type
-		//initial_value, // initial val
-		&callback
-	);
+		// Want to call back into function 
+		//
+		// void execArrayMap(void* output, void* input, size_t array_size, void* map_function, ARRAY_WORK_FUNCTION work_function)
+		//
+		// from host code
+
+		llvm::Type* voidptr = LLVMTypeUtils::voidPtrType(*params.context);
+
+		std::vector<llvm::Type*> arg_types(2, LLVMTypeUtils::voidPtrType(*params.context)); // void* output, void* input
+		const TypeRef int64_type = new Int(64);
+		arg_types.push_back(int64_type->LLVMType(*params.module)); // array_size
+		arg_types.push_back(LLVMTypeUtils::voidPtrType(*params.context)); // map_function
+		arg_types.push_back(LLVMTypeUtils::voidPtrType(*params.context)); // work_function
+
+
+		llvm::FunctionType* functype = llvm::FunctionType::get(
+			llvm::Type::getVoidTy(*params.context), // return type
+			arg_types,
+			false // varargs
+		);
+
+		llvm::Constant* llvm_func_constant = params.module->getOrInsertFunction("execArrayMap", functype);
+
+		llvm::Function* llvm_func = static_cast<llvm::Function*>(llvm_func_constant);
+
+		vector<llvm::Value*> args;
+		args.push_back(params.builder->CreatePointerCast(return_ptr, voidptr)); // output
+		args.push_back(params.builder->CreatePointerCast(input_array, voidptr)); // input
+		args.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(64, this->from_type->num_elems))); // array_size
+		args.push_back(params.builder->CreatePointerCast(function, voidptr)); // map_function
+		args.push_back(params.builder->CreatePointerCast(work_function, voidptr)); // work_function
+		params.builder->CreateCall(llvm_func, args);
+
+		return return_ptr;
+	}
+	else
+	{
+		ArrayMapBuiltInFunc_CreateLoopBodyCallBack callback;
+		callback.return_ptr = return_ptr;
+		callback.function = function;
+		callback.input_array = input_array;
+	
+		return makeForLoop(
+			*params.builder,
+			params.module,
+			llvm::ConstantInt::get(*params.context, llvm::APInt(64, 0)), // begin index
+			llvm::ConstantInt::get(*params.context, llvm::APInt(64, from_type->num_elems)), // end index
+			from_type->elem_type->LLVMType(*params.module), // Loop value type
+			&callback
+		);
+	}
 }
 
 
@@ -629,7 +735,7 @@ llvm::Value* ArrayMapBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 
 ArrayFoldBuiltInFunc::ArrayFoldBuiltInFunc(const Reference<Function>& func_type_, const Reference<ArrayType>& array_type_, const TypeRef& state_type_)
-:	func_type(func_type_), array_type(array_type_), state_type(state_type_)
+:	func_type(func_type_), array_type(array_type_), state_type(state_type_), specialised_f(NULL)
 {}
 
 
@@ -1036,7 +1142,7 @@ ValueRef ArraySubscriptBuiltInFunc::invoke(VMState& vmstate)
 	{
 		const IntValue* index = checkedCast<const IntValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
 
-		if(index->value >= 0 && index->value < arr->e.size())
+		if(index->value >= 0 && index->value < (int64)arr->e.size())
 			return arr->e[index->value];
 		else
 			throw BaseException("Array index out of bounds"); // return this->array_type->elem_type->getInvalidValue();
@@ -1051,7 +1157,7 @@ ValueRef ArraySubscriptBuiltInFunc::invoke(VMState& vmstate)
 		{
 			ValueRef index_val = index_vec->e[i];
 			const int64 index = checkedCast<IntValue>(index_val.getPointer())->value;
-			if(index < 0 || index >= arr->e.size())
+			if(index < 0 || index >= (int64)arr->e.size())
 				throw BaseException("Index out of bounds");
 
 			res[i] = arr->e[index];
@@ -1361,7 +1467,7 @@ ValueRef VArraySubscriptBuiltInFunc::invoke(VMState& vmstate)
 	{
 		const IntValue* index = checkedCast<const IntValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
 
-		if(index->value >= 0 && index->value < arr->e.size())
+		if(index->value >= 0 && index->value < (int64)arr->e.size())
 			return arr->e[index->value];
 		else
 			throw BaseException("VArray index out of bounds"); // return this->array_type->elem_type->getInvalidValue();
@@ -1376,7 +1482,7 @@ ValueRef VArraySubscriptBuiltInFunc::invoke(VMState& vmstate)
 		{
 			ValueRef index_val = index_vec->e[i];
 			const int64 index = checkedCast<IntValue>(index_val.getPointer())->value;
-			if(index < 0 || index >= arr->e.size())
+			if(index < 0 || index >= (int64)arr->e.size())
 				throw BaseException("Index out of bounds");
 
 			res[i] = arr->e[index];
@@ -1469,7 +1575,7 @@ ValueRef VectorSubscriptBuiltInFunc::invoke(VMState& vmstate)
 	const VectorValue* vec = checkedCast<const VectorValue>(vmstate.argument_stack[vmstate.func_args_start.back()    ].getPointer());
 	const IntValue* index  = checkedCast<const IntValue>   (vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
 
-	if(index->value >= 0 && index->value < vec->e.size())
+	if(index->value >= 0 && index->value < (int64)vec->e.size())
 		return vec->e[index->value];
 	else
 		throw BaseException("Vector index out of bounds");
@@ -1593,7 +1699,7 @@ ValueRef ArrayInBoundsBuiltInFunc::invoke(VMState& vmstate)
 	const ArrayValue* arr = checkedCast<const ArrayValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 	const IntValue* index = checkedCast<const IntValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
 
-	return new BoolValue(index->value >= 0 && index->value < arr->e.size());
+	return new BoolValue(index->value >= 0 && index->value < (int64)arr->e.size());
 }
 
 
@@ -1630,7 +1736,7 @@ ValueRef VectorInBoundsBuiltInFunc::invoke(VMState& vmstate)
 	const VectorValue* arr = checkedCast<const VectorValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 	const IntValue* index = checkedCast<const IntValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
 
-	return new BoolValue(index->value >= 0 && index->value < arr->e.size());
+	return new BoolValue(index->value >= 0 && index->value < (int64)arr->e.size());
 }
 
 
@@ -1757,7 +1863,7 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 		function = LLVMTypeUtils::getNthArg(params.currently_building_func, 0); // Pointer to function
 		initial_state_ptr_or_value = LLVMTypeUtils::getNthArg(params.currently_building_func, 1); // Pointer to, or value of initial state
 		for(size_t i=0; i<invariant_data_types.size(); ++i)
-			invariant_data_ptr_or_value[i] = LLVMTypeUtils::getNthArg(params.currently_building_func, 2 + i); // Pointer to, or value of invariant_data
+			invariant_data_ptr_or_value[i] = LLVMTypeUtils::getNthArg(params.currently_building_func, 2 + (int)i); // Pointer to, or value of invariant_data
 	}
 	else
 	{
@@ -1765,7 +1871,7 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 		function = LLVMTypeUtils::getNthArg(params.currently_building_func, 1); // Pointer to function
 		initial_state_ptr_or_value = LLVMTypeUtils::getNthArg(params.currently_building_func, 2); // Pointer to, or value of initial state
 		for(size_t i=0; i<invariant_data_types.size(); ++i)
-			invariant_data_ptr_or_value[i] = LLVMTypeUtils::getNthArg(params.currently_building_func, 3 + i); // Pointer to, or value of invariant_data
+			invariant_data_ptr_or_value[i] = LLVMTypeUtils::getNthArg(params.currently_building_func, 3 + (int)i); // Pointer to, or value of invariant_data
 	}
 
 
@@ -2298,7 +2404,7 @@ ValueRef ShuffleBuiltInFunc::invoke(VMState& vmstate)
 	for(unsigned int i=0; i<index_vec->e.size(); ++i)
 	{
 		const int64 index_val = index_vec->e[i].downcast<IntValue>()->value;
-		if(index_val < 0 || index_val >= a->e.size())
+		if(index_val < 0 || index_val >= (int64)a->e.size())
 			throw BaseException("invalid index");
 
 		res_values[i] = a->e[index_val];
@@ -2337,7 +2443,7 @@ llvm::Value* ShuffleBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 		std::vector<llvm::Constant*> elems(shuffle_mask.size());
 		for(size_t i=0; i<shuffle_mask.size(); ++i)
 		{
-			if(shuffle_mask[i] < 0 || shuffle_mask[i] >= vector_type->num)
+			if(shuffle_mask[i] < 0 || shuffle_mask[i] >= (int)vector_type->num)
 				throw BaseException("Shuffle mask index " + toString(shuffle_mask[i]) + " out of bounds: " + errorContext(params.currently_building_func_def));
 
 			elems[i] = llvm::ConstantInt::get(

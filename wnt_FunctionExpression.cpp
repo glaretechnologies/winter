@@ -701,6 +701,32 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 				}
 			}
 		}
+		else if(this->target_function && this->target_function->sig.name == "map")
+		{
+			// TEMP: specialise map for the passed in function now.
+			if(this->binding_type == BoundToGlobalDef)
+			{
+				assert(this->target_function->built_in_func_impl.nonNull());
+				assert(dynamic_cast<ArrayMapBuiltInFunc*>(this->target_function->built_in_func_impl.getPointer()));
+				ArrayMapBuiltInFunc* map_func = static_cast<ArrayMapBuiltInFunc*>(this->target_function->built_in_func_impl.getPointer());
+
+				// Eval first arg (to get function 'f')
+				try
+				{
+					VMState vmstate;
+					vmstate.func_args_start.push_back(0);
+					ValueRef res = this->argument_expressions[0]->exec(vmstate);
+
+					const FunctionValue* res_f = checkedCast<FunctionValue>(res);
+
+					map_func->specialiseForFunctionArg(res_f->func_def);
+				}
+				catch(BaseException& e)
+				{
+					throw BaseException("Failed to eval first arg of map " + e.what());
+				}
+			}
+		}
 
 		if(payload.check_bindings && this->binding_type == Unbound)
 		{

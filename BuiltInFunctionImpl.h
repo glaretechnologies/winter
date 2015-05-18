@@ -121,7 +121,7 @@ private:
 class ArrayMapBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	ArrayMapBuiltInFunc(const Reference<ArrayType>& from_type_, const Reference<Function>& func_type_) : from_type(from_type_), func_type(func_type_) {}
+	ArrayMapBuiltInFunc(const Reference<ArrayType>& from_type_, const Reference<Function>& func_type_) : from_type(from_type_), func_type(func_type_), specialised_f(NULL) {}
 
 	/*
 	map(function<T, R>, array<T, N>) array<R, N>
@@ -129,9 +129,15 @@ public:
 	*/
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+
+	// Specialise for a particular first argument.
+	void specialiseForFunctionArg(FunctionDefinition* f);
 private:
+	llvm::Value* insertWorkFunction(EmitLLVMCodeParams& params) const;
 	Reference<ArrayType> from_type; // from array type
 	Reference<Function> func_type;
+
+	FunctionDefinition* specialised_f;
 };
 
 

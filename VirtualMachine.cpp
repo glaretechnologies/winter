@@ -13,6 +13,7 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "utils/FileUtils.h"
 #include "utils/StringUtils.h"
 #include "utils/ContainerUtils.h"
+#include "utils/TaskManager.h"
 #include "wnt_Lexer.h"
 #include "TokenBase.h"
 #include "wnt_LangParser.h"
@@ -226,6 +227,98 @@ static int freeVArray(uint8* varray)
 
 
 //=====================================================================================
+class ExecArrayMapTask;
+
+static Indigo::TaskManager* winter_global_task_manager = NULL;
+static std::vector<Reference<ExecArrayMapTask> > exec_array_map_tasks;
+
+typedef void (WINTER_JIT_CALLING_CONV * VARRAY_WORK_FUNCTION) (uint64* output, uint64* input, size_t begin, size_t end); // Winter code
+
+class ExecMapTask : public Indigo::Task
+{
+public:
+	virtual void run(size_t thread_index)
+	{
+		// Call back into Winter JITed code to compute the map on this slice.
+		work_function(output, input, begin, end);
+	}
+
+	uint64* output;
+	uint64* input;
+	size_t begin;
+	size_t end;
+	VARRAY_WORK_FUNCTION work_function;
+};
+
+
+void execVArrayMap(uint64* output, uint64* input, VARRAY_WORK_FUNCTION work_function)
+{
+	const size_t input_len = input[1];
+	assert(output[1] == input_len);
+	const size_t num_threads = winter_global_task_manager->getNumThreads();
+	size_t slice_size = input_len / num_threads;
+	if(slice_size * num_threads < input_len) // If slice_size was rounded down:
+		slice_size++;
+
+	for(size_t i=0; i<num_threads; ++i)
+	{
+		Reference<ExecMapTask> t = new ExecMapTask();
+		t->begin = i*slice_size;
+		t->end = myMin(input_len, (i+1)*slice_size);
+		t->work_function = work_function;
+		winter_global_task_manager->addTask(t);
+	}
+
+	winter_global_task_manager->waitForTasksToComplete();
+}
+
+
+typedef void (WINTER_JIT_CALLING_CONV * ARRAY_WORK_FUNCTION) (void* output, void* input, void* map_function, size_t begin, size_t end); // Winter code
+
+class ExecArrayMapTask : public Indigo::Task
+{
+public:
+	virtual void run(size_t thread_index)
+	{
+		// Call back into Winter JITed code to compute the map on this slice.
+		//work_function(output, input, map_function, begin, end);
+		work_function( (float*)output + begin, (float*)input + begin, map_function, 0, end - begin);
+	}
+
+	void* output;
+	void* input;
+	void* map_function;
+	size_t begin;
+	size_t end;
+	ARRAY_WORK_FUNCTION work_function;
+};
+
+
+void execArrayMap(void* output, void* input, size_t array_size, void* map_function, ARRAY_WORK_FUNCTION work_function)
+{
+	const size_t input_len = array_size;
+	const size_t num_threads = winter_global_task_manager->getNumThreads();
+	size_t slice_size = input_len / num_threads;
+	if(slice_size * num_threads < input_len) // If slice_size was rounded down:
+		slice_size++;
+
+	for(size_t i=0; i<num_threads; ++i)
+	{
+		Reference<ExecArrayMapTask> t = exec_array_map_tasks[i]; // new ExecArrayMapTask();
+		t->output = output;
+		t->input = input;
+		t->map_function = map_function;
+		t->begin = i*slice_size;
+		t->end = myMin(input_len, (i+1)*slice_size);
+		t->work_function = work_function;
+		winter_global_task_manager->addTask(t);
+	}
+
+	winter_global_task_manager->waitForTasksToComplete();
+}
+
+
+//=====================================================================================
 
 
 
@@ -259,6 +352,9 @@ public:
 		std::map<std::string, void*>::iterator res = func_map->find(name);
 		if(res != func_map->end())
 			return (uint64_t)res->second;
+
+		if(name == "execArrayMap")
+			return (uint64_t)execArrayMap;
 
 		// For some reason, DynamicLibrary::SearchForAddressOfSymbol() doesn't seem to work on Windows 32-bit.  So just manually resolve these symbols.
 		if(name == "sinf")
@@ -359,6 +455,15 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 	llvm_exec_engine(NULL)
 {
 	assert(string_count == 0 && varray_count == 0);
+	
+	/*if(!winter_global_task_manager)
+	{
+		const size_t num_threads = 8;
+		winter_global_task_manager = new Indigo::TaskManager(num_threads);
+		exec_array_map_tasks.resize(num_threads);
+		for(size_t i=0; i<num_threads; ++i)
+			exec_array_map_tasks[i] = new ExecArrayMapTask();
+	}*/
 
 	try
 	{
@@ -996,14 +1101,14 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 	// Do LLVM optimisations
 	if(optimise)
 	{
-		//this->llvm_module->setDataLayout(
-
 		llvm::FunctionPassManager fpm(this->llvm_module);
 
 		// Set up the optimizer pipeline.  Start with registering info about how the
 		// target lays out data structures.
 #if TARGET_LLVM_VERSION <= 34
 		fpm.add(new llvm::DataLayout(*this->llvm_exec_engine->getDataLayout()));
+#else
+		fpm.add(new llvm::DataLayoutPass());
 #endif
 		//std:: cout << ("Setting triple to " + this->triple) << std::endl;
 		fpm.add(new llvm::TargetLibraryInfo(llvm::Triple(this->triple)));
@@ -1011,8 +1116,15 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 		llvm::PassManager pm;
 #if TARGET_LLVM_VERSION <= 34
 		pm.add(new llvm::DataLayout(*this->llvm_exec_engine->getDataLayout()));
+#else
+		pm.add(new llvm::DataLayoutPass());
 #endif
+
 		pm.add(new llvm::TargetLibraryInfo(llvm::Triple(this->triple)));
+
+		// Required for loop vectorisation to work properly.
+		target_machine->addAnalysisPasses(fpm);
+		target_machine->addAnalysisPasses(pm);
 
 		llvm::PassManagerBuilder builder;
 
