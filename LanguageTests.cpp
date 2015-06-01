@@ -36,6 +36,16 @@ LanguageTests::~LanguageTests()
 {}
 
 
+#define testAssert(expr) (doTestAssert((expr), (#expr), (__LINE__), (__FILE__)))
+void doTestAssert(bool expr, const char* test, long line, const char* file)
+{
+	if(!expr)
+	{
+		std::cerr << std::string("Test assertion failed: " + std::string(file) + ", line " + toString((int)line) + ":\n" + std::string(test)) << std::endl;
+		exit(1);
+	}
+}
+
 /*
 
 def main(int x) int : 
@@ -63,7 +73,7 @@ if next token == ')', then it's if-then-else.
 if next token == ',', then it's if(,,)
 */
 
-
+/*
 static Value* identity(Value* v)
 {
 	return v;
@@ -153,7 +163,7 @@ static int useKnownReturnRefCountOptimsiation(int x)
 	delete v;
 
 	return len + 2;
-}
+}*/
 
 
 void LanguageTests::doLLVMInit()
@@ -169,7 +179,7 @@ void LanguageTests::run()
 {
 	//TEMP///////////////
 	
-	useKnownReturnRefCountOptimsiation(3);
+	//useKnownReturnRefCountOptimsiation(3);
 
 
 	//////////////////
@@ -189,16 +199,152 @@ void LanguageTests::run()
 	type_set.insert(tb);
 	assert(type_set.size() == 1);
 
-
 	//testMainFloatArgInvalidProgram("struct s { s a, s b } def main(float x) float : x");
 	//testMainFloatArgInvalidProgram("def main(float x) float : let varray<T> v = [v]va in x");
-
+	
 	// ===================================================================
 	// 
 	// ===================================================================
 	//testMainFloatArgAllowUnsafe("def main(float x) float : let A = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]a   i = truncateToInt(x) in A[i] + A[i+1]", 2.f, 7.0f);
 	//testMainFloatArgAllowUnsafe("A = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]a       def main(float x) float : let i = truncateToInt(x) in A[i] + A[i+1] + A[i+2]", 2.f, 12.0f);
 
+	// Test map with more elems
+	/*{
+		const size_t N = 1 << 28;
+		js::Vector<float, 32> input(N, 4.0f);
+		js::Vector<float, 32> target_results(N, 16.f);//std::pow(4.0f, 2.2f));//std::sqrt(std::sqrt(std::sqrt(4.0))));
+
+
+		testFloatArray(
+			"def f(float x) float : pow(x, 2.2)			\n\
+			def main(array<float, 268435456> a, array<float, 268435456> b) array<float, 268435456> : map(f, a)",
+			&input[0], &input[0], &target_results[0], N);
+
+		// Reference c++ code:
+		{
+			js::Vector<float, 32> output(N);
+
+			
+
+			// Warm up cache, page table etc..
+			std::memcpy(&output[0], &input[0], N * sizeof(float));
+
+			double sum1 = 0;
+			for(size_t i=0; i<N; ++i)
+				sum1 += output[i];
+
+			Timer timer;
+
+			//float sum = 0;
+			//for(size_t i=0; i<N; ++i)
+			//	sum += input[i];
+			for(size_t i=0; i<N; ++i)
+				output[i] = std::pow(input[i], 2.2f);//std::sqrt(std::sqrt(std::sqrt(input[i])));
+			//std::memcpy(&output[0], &input[0], N * sizeof(float));
+
+			const double elapsed = timer.elapsed();
+
+			double sum = 0;
+			for(size_t i=0; i<N; ++i)
+				sum += output[i];
+
+			std::cout << "C++ ref elapsed: " << (elapsed * 1.0) << " s" << std::endl;
+			const double bandwidth = N * sizeof(float) / elapsed;
+			std::cout << "C++ ref bandwidth: " << (bandwidth * 1.0e-9) << " GiB/s" << std::endl;
+			std::cout << "sum1: " << sum << std::endl;
+			std::cout << "sum: " << sum << std::endl;
+		}
+	}*/
+
+	testMainIntegerArg("def main(int x) int :	 stringLength(\"hello\")", 1, 5, INVALID_OPENCL);
+
+	// ===================================================================
+	// Test optimisation of varray from heap allocated to stack allocated
+	// ===================================================================
+	ProgramStats stats;
+	stats = testMainFloatArgAllowUnsafe("def main(float x) float :	 [3.0, 4.0, 5.0]va[0]", 1.f, 3.f, INVALID_OPENCL);
+	testAssert(stats.num_heap_allocation_calls == 0);
+
+	stats = testMainFloatArgAllowUnsafe("def main(float x) float :	 let v = [3.0, 4.0, 5.0]va in v[0]", 1.f, 3.f, INVALID_OPENCL);
+	testAssert(stats.num_heap_allocation_calls == 0);
+
+	stats = testMainFloatArgAllowUnsafe("def main(float x) float :	 let v = [3.0, 4.0, 5.0]va in v[1]", 1.f, 4.f, INVALID_OPENCL);
+	testAssert(stats.num_heap_allocation_calls == 0);
+
+	stats = testMainFloatArgAllowUnsafe("def main(float x) float :	 let v = [3.0, 4.0, 5.0]va in v[2]", 1.f, 5.f, INVALID_OPENCL);
+	testAssert(stats.num_heap_allocation_calls == 0);
+
+	stats = testMainFloatArgAllowUnsafe("def main(float x) float :	 let v = [x + 3.0, x + 4.0, x + 5.0]va in v[0]", 10.f, 13.f, INVALID_OPENCL);
+	testAssert(stats.num_heap_allocation_calls == 0);
+
+	// Test varray being returned from function, has to be heap allocated.  (Assuming no inlining of f)
+	stats = testMainFloatArgAllowUnsafe("def f(float x) : [x + 3.0, x + 4.0, x + 5.0]va             def main(float x) float :	 let v = f(x) in v[0]", 10.f, 13.f, INVALID_OPENCL);
+	testAssert(stats.num_heap_allocation_calls == 1);
+
+	
+	// ===================================================================
+	// Test destructuring assignment
+	// ===================================================================
+	testMainFloatArg("def main(float x) float :	 let a, b = (x + 1.0, x + 2.0) in a", 4.f, 5.f);
+
+	testMainFloatArg("def main(float x) float :	 let a, b = (3, 4) in a", 1.f, 3.f);
+	testMainFloatArg("def main(float x) float :	 let a, b = (3, 4) in b", 1.f, 4.f);
+
+	// Test on a tuple returned from a function
+	testMainFloatArg("def f(float x) : (x + 1.0, x + 2.0)           def main(float x) float :	 let a, b = f(x) in a", 1.f, 2.f);
+	testMainFloatArg("def f(float x) : (x + 1.0, x + 2.0)           def main(float x) float :	 let a, b = f(x) in b", 1.f, 3.f);
+
+	// Not enough vars
+	testMainFloatArgInvalidProgram("def main(float x) float :	 let a, b = (1, 2, 3) in a");
+	testMainFloatArgInvalidProgram("def main(float x) float :	 let a, b, c = (1, 2, 3, 4) in a");
+
+	// Too many vars
+	testMainFloatArgInvalidProgram("def main(float x) float :	 let a, b = [1]t in a");
+	testMainFloatArgInvalidProgram("def main(float x) float :	 let a, b, c = (1, 2) in a");
+	testMainFloatArgInvalidProgram("def main(float x) float :	 let a, b, c, d = (1, 2, 3) in a");
+
+	// Test type declarations on let vars
+	testMainFloatArg("def main(float x) float :	 let float a, b = (3.0, 4.0) in a", 1.f, 3.f);
+	testMainFloatArg("def main(float x) float :	 let float a, float b = (3.0, 4.0f) in a", 1.f, 3.f);
+	testMainFloatArg("def main(float x) float :	 let a, float b = (3.0, 4.0f) in a", 1.f, 3.f);
+	testMainFloatArg("def main(float x) float :	 let float a, b = (3.0, 4.0) in b", 1.f, 4.f);
+	testMainFloatArg("def main(float x) float :	 let float a, float b = (3.0, 4.0f) in a", 1.f, 3.f);
+	testMainFloatArg("def main(float x) float :	 let a, float b = (3.0, 4.0f) in a", 1.f, 3.f);
+
+	// TODO: test type coercion
+
+	// Test ref-counted types
+	testMainFloatArgAllowUnsafe("def main(float x) float :	 let a, b = ([3.0, 4.0, 5.0]va, 10.0) in a[0]", 1.f, 3.f, INVALID_OPENCL);
+	testMainFloatArgAllowUnsafe("def main(float x) float :	 let a, b = ([3.0, 4.0, 5.0]va, 10.0) in a[1]", 1.f, 4.f, INVALID_OPENCL);
+
+	// Test with structs
+	testMainFloatArg("struct S { float s }     def main(float x) float :	 let a, b = (S(3.0), 10.0) in a.s", 1.f, 3.f);
+
+
+	
+
+
+	// Test on a tuple returned from a function with a struct
+	testMainFloatArg("struct S { float s }     def f(float x) : (S(x + 1.0), x + 2.0)           def main(float x) float :	 let a, b = f(x) in a.s", 1.f, 2.f);
+	
+	// Test on a tuple returned from a function with a varray
+	testMainFloatArgAllowUnsafe("def f(float x) : ([x + 1.0]va, x + 2.0)           def main(float x) float :	 let a, b = f(x) in a[0]", 1.f, 2.f, INVALID_OPENCL);
+
+
+
+	// Test map
+	{
+		const float a[] = {1.0f, 2.0f, 3.0f, 4.0f};
+		const float b[] = {10.0f, 20.0f, 30.0f, 40.0f};
+		float target_results[] = {1.0f, 4.0f, 9.0f, 16.0f};
+
+		testFloatArray(
+			"def square(float x) float : x*x			\n\
+			def main(array<float, 4> a, array<float, 4> b) array<float, 4> : map(square, a)",
+			a, b, target_results, 4);
+	}
+
+	
 
 	testMainFloatArg("struct S { int x }  def f(S s) S : let t = S(1) in s   def main(float x) float : let v = [99]va in x", 1.f, 1.0f, INVALID_OPENCL);
 

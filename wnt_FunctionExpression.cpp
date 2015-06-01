@@ -361,31 +361,34 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 					}
 					else
 					{
-						if(let_block->lets[i]->variable_name == this->function_name && 
-							let_block->lets[i]->type().nonNull() && // Let var might be an unbound function -> no type
-							doesFunctionTypeMatch(let_block->lets[i]->type()))
+						for(size_t v=0; v<let_block->lets[i]->vars.size(); ++v)
 						{
-							this->bound_index = i;
-							this->binding_type = Let;
-							this->bound_let_block = let_block;
-							this->let_frame_offset = use_let_frame_offset;
-							found_binding = true;
-
-							if(!in_current_func_def && payload.func_def_stack.back()->use_captured_vars)
+							if(let_block->lets[i]->vars[v].name == this->function_name && 
+								let_block->lets[i]->type().nonNull() && // Let var might be an unbound function -> no type
+								doesFunctionTypeMatch(let_block->lets[i]->type()))
 							{
-								this->captured_var_index = (int)payload.func_def_stack.back()->captured_vars.size(); // payload.captured_vars.size();
-								this->use_captured_var = true;
+								this->bound_index = i;
+								this->binding_type = Let;
+								this->bound_let_block = let_block;
+								this->let_frame_offset = use_let_frame_offset;
+								this->let_var_index = v;
+								found_binding = true;
 
-								// Add this function argument as a variable that has to be captured for closures.
-								CapturedVar var;
-								var.vartype = CapturedVar::Let;
-								var.bound_let_block = let_block;
-								var.index = i;
-								var.let_frame_offset = use_let_frame_offset;
-								//payload.captured_vars.push_back(var);
-								payload.func_def_stack.back()->captured_vars.push_back(var);
+								if(!in_current_func_def && payload.func_def_stack.back()->use_captured_vars)
+								{
+									this->captured_var_index = (int)payload.func_def_stack.back()->captured_vars.size(); // payload.captured_vars.size();
+									this->use_captured_var = true;
+
+									// Add this function argument as a variable that has to be captured for closures.
+									CapturedVar var;
+									var.vartype = CapturedVar::Let;
+									var.bound_let_block = let_block;
+									var.index = i;
+									var.let_frame_offset = use_let_frame_offset;
+									//payload.captured_vars.push_back(var);
+									payload.func_def_stack.back()->captured_vars.push_back(var);
+								}
 							}
-
 						}
 					}
 				}
@@ -1658,7 +1661,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			// Decrement argument 0 structure ref count
 			//if(!(argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType)) // && argument_expressions[0].downcastToPtr<Variable>()->vartype == Variable::LetVariable)) // Don't decr let var ref counts, the ref block will do that.
 			if(shouldRefCount(params, *argument_expressions[0]))
-				argument_expressions[0]->type()->emitDecrRefCount(params, struct_ptr, "GetField " + get_field_func->struct_type->name + "." + field_name + " struct arg decrement");
+				emitDestructorOrDecrCall(params, *argument_expressions[0], struct_ptr, "GetField " + get_field_func->struct_type->name + "." + field_name + " struct arg decrement/destructor");
 
 			return result;
 		}
@@ -1697,7 +1700,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			// Decrement argument 0 structure ref count
 			//if(!(argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType)) // && argument_expressions[0].downcastToPtr<Variable>()->vartype == Variable::LetVariable)) // Don't decr let var ref counts, the ref block will do that.
 			if(shouldRefCount(params, *argument_expressions[0]))
-				argument_expressions[0]->type()->emitDecrRefCount(params, struct_ptr, "GetTupleElement " + get_field_func->tuple_type->toString() + " " + field_name + " tuple arg decrement");
+				emitDestructorOrDecrCall(params, *argument_expressions[0], struct_ptr, "GetTupleElement " + get_field_func->tuple_type->toString() + "." + field_name + " tuple arg decrement/destructor");
 
 			return result;
 		}
@@ -1817,7 +1820,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 	for(unsigned int i=0; i<argument_expressions.size(); ++i)
 		if(shouldRefCount(params, argument_expressions[i]) && do_ref_counting_for_arg[i])
-			argument_expressions[i]->type()->emitDecrRefCount(params, args[i + num_sret_args], "function expression '" + this->target_function->sig.toString() + "' argument " + toString(i) + " decrement");
+			emitDestructorOrDecrCall(params, *argument_expressions[i], args[i + num_sret_args], "function expression '" + this->target_function->sig.toString() + "' argument " + toString(i) + " decrement");
 
 	return target_ret_type->passByValue() ? call_inst : return_val_addr;
 }

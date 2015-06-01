@@ -15,6 +15,7 @@ File created by ClassTemplate on Wed Jun 11 03:55:25 2008
 #include "wnt_ArrayLiteral.h"
 #include "wnt_VectorLiteral.h"
 #include "wnt_TupleLiteral.h"
+#include "wnt_VArrayLiteral.h"
 #include "wnt_Variable.h"
 #include "VMState.h"
 #include "Value.h"
@@ -651,6 +652,16 @@ bool expressionsHaveSameValue(const ASTNodeRef& a, const ASTNodeRef& b)
 }
 
 
+void emitDestructorOrDecrCall(EmitLLVMCodeParams& params, const ASTNode& e, llvm::Value* value, const std::string& comment)
+{
+	const TypeRef& type = e.type();
+	if(type->isHeapAllocated())
+		e.type()->emitDecrRefCount(params, value, comment);
+	else
+		e.type()->emitDestructorCall(params, value, comment);
+}
+
+
 //----------------------------------------------------------------------------------
 
 
@@ -1183,63 +1194,108 @@ void StringLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 llvm::Value* StringLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
 	// Make a global constant character array for the string data.
-	llvm::Value* string_global = params.builder->CreateGlobalString(
-		this->value
-	);
+	llvm::Value* string_global = params.builder->CreateGlobalString(this->value);
 
 	// Get a pointer to the zeroth elem
 	llvm::Value* elem_0 = params.builder->CreateStructGEP(string_global, 0);
 
-	//elem_0->dump();
 
-	llvm::Value* elem_bitcast = params.builder->CreateBitCast(elem_0, LLVMTypeUtils::voidPtrType(*params.context));
+	const bool may_escape_function = isEqualToOrContains(*params.currently_building_func_def->returnType(), *this->type());
 
-	//elem_bitcast->dump();
+	const bool alloc_on_heap = may_escape_function;
 
-	// Emit a call to allocateString
-	llvm::Function* allocateStringLLVMFunc = params.common_functions.allocateStringFunc->getOrInsertFunction(
-		params.module,
-		false // use_cap_var_struct_ptr: False as global functions don't have captured vars. ?!?!?
-		//true // target_takes_voidptr_arg // params.hidden_voidptr_arg
-	);
+	llvm::Value* string_value;
+	uint64 initial_flags;
+	if(alloc_on_heap)
+	{
+		llvm::Value* elem_bitcast = params.builder->CreateBitCast(elem_0, LLVMTypeUtils::voidPtrType(*params.context));
 
-	vector<llvm::Value*> args(1, elem_bitcast);
+		// Emit a call to allocateString
+		llvm::Function* allocateStringLLVMFunc = params.common_functions.allocateStringFunc->getOrInsertFunction(
+			params.module,
+			false // use_cap_var_struct_ptr: False as global functions don't have captured vars. ?!?!?
+			//true // target_takes_voidptr_arg // params.hidden_voidptr_arg
+		);
 
-	// Set hidden voidptr argument
-	/*const bool target_takes_voidptr_arg = true;
-	if(target_takes_voidptr_arg)
-		args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));*/
+		vector<llvm::Value*> args(1, elem_bitcast);
+		
+		// Set hidden voidptr argument
+		/*const bool target_takes_voidptr_arg = true;
+		if(target_takes_voidptr_arg)
+			args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));*/
 
 
-	//allocateStringLLVMFunc->dump(); // TEMP
+		//allocateStringLLVMFunc->dump(); // TEMP
 
-	//args[0]->dump();
-	//args[1]->dump();
+		//args[0]->dump();
+		//args[1]->dump();
 
-	llvm::CallInst* call_inst = params.builder->CreateCall(allocateStringLLVMFunc, args, "str");
+		llvm::CallInst* call_inst = params.builder->CreateCall(allocateStringLLVMFunc, args, "str");
 
-	// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
-	call_inst->setCallingConv(llvm::CallingConv::C);
+		// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
+		call_inst->setCallingConv(llvm::CallingConv::C);
+		
+		string_value = call_inst;
+		initial_flags = 1;// heap allocated
+	}
+	else
+	{
+		// Allocate space on stack for array.
+		// Allocate as just an array of bytes.
+		// Then cast to the needed type.  We do this because our LLVM Varray type has only zero length for the actual data, so can't be used for the alloca.
+		
+		// Emit the alloca in the entry block for better code-gen.
+		// We will emit the alloca at the start of the block, so that it doesn't go after any terminator instructions already created which have to be at the end of the block.
+		llvm::IRBuilder<> entry_block_builder(&params.currently_building_func->getEntryBlock(), params.currently_building_func->getEntryBlock().getFirstInsertionPt());
+
+		const uint64 total_string_size_B = sizeof(uint64)*3 + value.size();
+
+		//llvm::Value* alloca_ptr = entry_block_builder.CreateAlloca(
+		//	llvm::Type::getInt8Ty(*params.context), // byte
+		//	llvm::ConstantInt::get(*params.context, llvm::APInt(64, total_string_size_B, true)), // number of bytes needed.
+		//	"string_stack_space"
+		//);
+		llvm::Value* alloca_ptr = entry_block_builder.Insert(new llvm::AllocaInst(
+			llvm::Type::getInt8Ty(*params.context), // byte
+			llvm::ConstantInt::get(*params.context, llvm::APInt(64, total_string_size_B, true)), // number of bytes needed.
+			8, // alignment
+			"string_stack_space"
+		));
+
+
+		// Cast resulting allocated uint8* to string type.
+		llvm::Type* string_type = this->type()->LLVMType(*params.module);
+		assert(string_type->isPointerTy());
+		string_value = params.builder->CreatePointerCast(alloca_ptr, string_type);
+
+		// Emit a memcpy from the global data to the string value
+		llvm::Value* data_ptr = params.builder->CreateStructGEP(string_value, 3, "string_literal_data_ptr");
+
+		params.builder->CreateMemCpy(data_ptr, elem_0, value.size(), /*align=*/1);
+
+		initial_flags = 0; // flag = 0 = not heap allocated
+	}
+
 
 	// Set the reference count to 1
-	llvm::Value* ref_ptr = params.builder->CreateStructGEP(call_inst, 0, "string_ref_ptr");
-
-	llvm::Value* one = llvm::ConstantInt::get(
-		*params.context,
-		llvm::APInt(64, 1, 
-			true // signed
-		)
-	);
-
+	llvm::Value* ref_ptr = params.builder->CreateStructGEP(string_value, 0, "string_ref_ptr");
+	llvm::Value* one = llvm::ConstantInt::get(*params.context, llvm::APInt(64, 1, /*signed=*/true));
 	llvm::StoreInst* store_inst = params.builder->CreateStore(one, ref_ptr);
 	addMetaDataCommentToInstruction(params, store_inst, "string literal set intial ref count to 1");
 
-	CleanUpInfo info;
-	info.node = this;
-	info.value = call_inst;
-	params.cleanup_values.push_back(info);
+	// Set the length field
+	llvm::Value* len_ptr = params.builder->CreateStructGEP(string_value, 1, "string_len_ptr");
+	llvm::Value* len_val = llvm::ConstantInt::get(*params.context, llvm::APInt(64, this->value.size(), /*signed=*/true));
+	llvm::StoreInst* len_store_inst = params.builder->CreateStore(len_val, len_ptr);
+	addMetaDataCommentToInstruction(params, len_store_inst, "string literal set intial length to " + toString(this->value.size()));
 
-	return call_inst;
+	// Set the flags
+	llvm::Value* flags_ptr = params.builder->CreateStructGEP(string_value, 2, "string_literal_flags_ptr");
+	llvm::Value* flags_contant_val = llvm::ConstantInt::get(*params.context, llvm::APInt(64, initial_flags));
+	llvm::StoreInst* store_flags_inst = params.builder->CreateStore(flags_contant_val, flags_ptr);
+	addMetaDataCommentToInstruction(params, store_flags_inst, "string literal set intial flags to " + toString(initial_flags));
+
+	return string_value;
 }
 
 
@@ -3323,6 +3379,14 @@ bool LogicalNegationExpr::isConstant() const
 //----------------------------------------------------------------------------------------
 
 
+LetASTNode::LetASTNode(const std::vector<LetNodeVar>& vars_, const SrcLocation& loc)
+:	ASTNode(LetType, loc), 
+	vars(vars_)
+{
+	assert(!vars.empty());
+}
+
+
 ValueRef LetASTNode::exec(VMState& vmstate)
 {
 	return this->expr->exec(vmstate);
@@ -3332,7 +3396,7 @@ ValueRef LetASTNode::exec(VMState& vmstate)
 void LetASTNode::print(int depth, std::ostream& s) const
 {
 	printMargin(depth, s);
-	s << "Let, var_name = '" + this->variable_name + "'\n";
+	//TEMP s << "Let, var_name = '" + this->variable_name + "'\n";
 	this->expr->print(depth+1, s);
 }
 
@@ -3380,25 +3444,51 @@ void LetASTNode::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 	}
 	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
-		if(declared_type.nonNull())
+		if(vars.size() == 1)
 		{
 			// Check that the return type of the body expression is equal to the declared return type
 			// of this function.
-			if(*expr->type() != *this->declared_type)
-				throw BaseException("Type error for let '" + this->variable_name + "': Computed return type '" + this->expr->type()->toString() + 
-					"' is not equal to the declared return type '" + this->declared_type->toString() + "'." + errorContext(*this));
+			if(vars[0].declared_type.nonNull())
+				if(*expr->type() != *vars[0].declared_type)
+					throw BaseException("Type error for let '" + vars[0].name + "': Computed return type '" + this->expr->type()->toString() + 
+						"' is not equal to the declared return type '" + vars[0].declared_type->toString() + "'." + errorContext(*this));
+		}
+		else
+		{
+			assert(vars.size() > 1);
+			if(expr->type()->getType() != Type::TupleTypeType)
+				throw BaseException("Type error for let with destructuring assignment.  Value expression must have tuple type." + errorContext(*this)); 
+
+			const TupleTypeRef tuple_type = expr->type().downcast<TupleType>();
+
+			if(tuple_type->component_types.size() != vars.size())
+				throw BaseException("Number of let vars must equal num elements in tuple." + errorContext(*this)); 
+
+
+			for(size_t i=0; i<vars.size(); ++i)
+			{
+				if(vars[i].declared_type.nonNull())
+				{
+					if(*tuple_type->component_types[i] != *vars[i].declared_type)
+						throw BaseException("Type error for let '" + vars[i].name + "': Computed return type '" + tuple_type->component_types[i]->toString() + 
+							"' is not equal to the declared return type '" + vars[i].declared_type->toString() + "'." + errorContext(*this));
+				}
+			}
 		}
 	}
 	else if(payload.operation == TraversalPayload::TypeCoercion)
 	{
 		// Do int -> float coercion
-		if(expr->nodeType() == ASTNode::IntLiteralType && declared_type.nonNull() && declared_type->getType() == Type::FloatType)
+		for(size_t i=0; i<vars.size(); ++i)
 		{
-			IntLiteral* body_lit = static_cast<IntLiteral*>(expr.getPointer());
-			if(isIntExactlyRepresentableAsFloat(body_lit->value))
+			if(expr->nodeType() == ASTNode::IntLiteralType && vars[i].declared_type.nonNull() && vars[i].declared_type->getType() == Type::FloatType)
 			{
-				expr = new FloatLiteral((float)body_lit->value, body_lit->srcLocation());
-				payload.tree_changed = true;
+				IntLiteral* body_lit = static_cast<IntLiteral*>(expr.getPointer());
+				if(isIntExactlyRepresentableAsFloat(body_lit->value))
+				{
+					expr = new FloatLiteral((float)body_lit->value, body_lit->srcLocation());
+					payload.tree_changed = true;
+				}
 			}
 		}
 	}
@@ -3445,7 +3535,7 @@ llvm::Value* LetASTNode::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* r
 
 Reference<ASTNode> LetASTNode::clone()
 {
-	LetASTNode* e = new LetASTNode(this->variable_name, this->declared_type, this->srcLocation());
+	LetASTNode* e = new LetASTNode(this->vars, this->srcLocation());
 	e->expr = this->expr->clone();
 	return e;
 }
@@ -3823,7 +3913,30 @@ int let_result_xx;
 	
 	let_result_xx = x + y;
 }
+
+
+for destructuring assignment:
+----------------------------
+
+/*
+let
+	x, y = (1, 2)
+in
+	x + y
+
+=>
+
+int let_result_xx;
+{
+	let_var_value_xx = //
+	int x = let_var_value_xx.field_0;
+	int y = let_var_value_xx.field_1;
+	
+	let_result_xx = x + y;
+}
+
 */
+
 std::string LetBlock::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
 	const std::string result_var_name = "let_result_" + toString(params.uid++);
@@ -3839,7 +3952,22 @@ std::string LetBlock::emitOpenCLC(EmitOpenCLCodeParams& params) const
 		StringUtils::appendTabbed(s, params.blocks.back(), 1);
 		params.blocks.pop_back();
 
-		s += "\t" + this->lets[i]->type()->OpenCLCType() + " " + this->lets[i]->variable_name + " = " + let_expression + ";\n";
+		if(this->lets[i]->vars.size() == 1)
+		{
+			s += "\t" + this->lets[i]->type()->OpenCLCType() + " " + this->lets[i]->vars[0].name + " = " + let_expression + ";\n";
+		}
+		else
+		{
+			// Destructing:
+			assert(this->lets[i]->type()->getType() == Type::TupleTypeType);
+			const std::string let_var_value_name = "let_var_value_" + toString(params.uid++);
+			s += "\t" + this->lets[i]->type()->OpenCLCType() + " " + let_var_value_name + " = " + let_expression + ";\n";
+			for(size_t z=0; z<this->lets[i]->vars.size(); ++z)
+			{
+				const TypeRef elem_type = this->lets[i]->type().downcastToPtr<TupleType>()->component_types[z];
+				s += "\t" + elem_type->OpenCLCType() + " " + this->lets[i]->vars[z].name + " = " + let_var_value_name + ".field_" + toString(z) + ";\n";
+			}
+		}
 	}
 
 	// Emit code for let value expression
@@ -3855,7 +3983,6 @@ std::string LetBlock::emitOpenCLC(EmitOpenCLCodeParams& params) const
 	params.blocks.back() += s;
 
 	return result_var_name;
-	//return this->expr->emitOpenCLC(params);
 }
 
 
@@ -3990,11 +4117,8 @@ llvm::Value* LetBlock::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 	// Decrement ref counts on all let blocks
 	for(size_t i=0; i<lets.size(); ++i)
 	{
-		//if(!(this->lets[i]->expr->nodeType() == ASTNode::VariableASTNodeType))
 		if(shouldRefCount(params, this->lets[i]->expr))
-			this->lets[i]->type()->emitDecrRefCount(params, params.let_block_let_values[this][i], "Let block for let var " + this->lets[i]->variable_name + " decrement");
-
-		//this->lets[i]->emitCleanupLLVMCode(params, params.let_block_let_values[this][i]);
+			emitDestructorOrDecrCall(params, *this->lets[i]->expr, params.let_block_let_values[this][i],  "Let block for let var " + this->lets[i]->vars[0].name + " decrement/destructor");
 	}
 
 	return expr_value;

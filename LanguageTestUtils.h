@@ -14,6 +14,7 @@ extern "C"
 #include <fstream>
 #include "utils/FileUtils.h"
 #include "utils/StringUtils.h"
+#include "utils/Timer.h"
 #include "wnt_Lexer.h"
 #include "TokenBase.h"
 #include "wnt_LangParser.h"
@@ -99,7 +100,7 @@ static ValueRef testExternalFuncInterpreted(const std::vector<ValueRef>& arg_val
 typedef float(WINTER_JIT_CALLING_CONV * float_void_func)(void* env);
 
 
-static void testMainFloat(const std::string& src, float target_return_val)
+static ProgramStats testMainFloat(const std::string& src, float target_return_val)
 {
 	std::cout << "===================== Winter testMainFloat() =====================" << std::endl;
 	try
@@ -181,7 +182,7 @@ static void testMainFloat(const std::string& src, float target_return_val)
 		}
 
 	//	delete retval;
-
+		return vm.getProgramStats();
 	}
 	catch(Winter::BaseException& e)
 	{
@@ -233,7 +234,7 @@ static void testMainFloatArgInvalidProgram(const std::string& src)
 }
 
 
-static void doTestMainFloatArg(const std::string& src, float argument, float target_return_val, bool check_constant_folded_to_literal, bool allow_unsafe_operations, uint32 test_flags)
+static ProgramStats doTestMainFloatArg(const std::string& src, float argument, float target_return_val, bool check_constant_folded_to_literal, bool allow_unsafe_operations, uint32 test_flags)
 {
 	std::cout << "===================== Winter testMainFloatArg() =====================" << std::endl;
 	try
@@ -427,6 +428,8 @@ static void doTestMainFloatArg(const std::string& src, float argument, float tar
 			}
 #endif // #if USE_OPENCL
 		}
+
+		return vm.getProgramStats();
 	}
 	catch(Winter::BaseException& e)
 	{
@@ -453,9 +456,9 @@ static void testMainFloatArg(const std::string& src, float argument, float targe
 }
 
 
-static void testMainFloatArgAllowUnsafe(const std::string& src, float argument, float target_return_val, uint32 test_flags = 0)
+static ProgramStats testMainFloatArgAllowUnsafe(const std::string& src, float argument, float target_return_val, uint32 test_flags = 0)
 {
-	doTestMainFloatArg(src, argument, target_return_val,
+	return doTestMainFloatArg(src, argument, target_return_val,
 		false, // check constant-folded to literal
 		true, // allow_unsafe_operations
 		test_flags
@@ -1561,13 +1564,22 @@ static void testFloatArray(const std::string& src, const float* a, const float* 
 			(void (WINTER_JIT_CALLING_CONV *)(float*, const float*, const float*, void*))vm.getJittedFunction(mainsig);
 
 		// Call the JIT'd function
-		std::vector<float> jitted_result(len);
+		js::Vector<float, 32> jitted_result(len);
+		// Clear mem 
+		for(size_t i=0; i<len; ++i)
+			jitted_result[i] = 0.0f;
+
 		float* jitted_result_ptr = &jitted_result[0];
 
 		TestEnv test_env;
 		test_env.val = 10;
 
+		Timer timer;
 		f(jitted_result_ptr, a, b, &test_env);
+		const double elapsed = timer.elapsed();
+		std::cout << "JITed code elapsed: " << elapsed << " s" << std::endl;
+		const double bandwidth = len * sizeof(float) / elapsed;
+		std::cout << "JITed bandwidth: " << (bandwidth * 1.0e-9) << " GiB/s" << std::endl;
 
 		// Check JIT'd result.
 		for(size_t i=0; i<len; ++i)

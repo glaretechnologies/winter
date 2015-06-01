@@ -17,6 +17,7 @@ namespace Winter
 
 
 const std::string makeSafeStringForFunctionName(const std::string& s);
+struct ProgramStats;
 
 
 /*=====================================================================
@@ -100,7 +101,8 @@ public:
 		bool hidden_voidptr_arg, 
 		const llvm::DataLayout/*TargetData*/* target_data,
 		const CommonFunctions& common_functions,
-		std::set<Reference<const Type>, ConstTypeRefLessThan>& destructors_called_types
+		std::set<Reference<const Type>, ConstTypeRefLessThan>& destructors_called_types,
+		ProgramStats& stats
 		//std::map<Lang::FunctionSignature, llvm::Function*>& external_functions
 	);
 

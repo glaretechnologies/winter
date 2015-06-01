@@ -69,6 +69,12 @@ public:
 };
 
 
+struct ProgramStats
+{
+	uint64 num_heap_allocation_calls;
+
+};
+
 
 class VirtualMachine
 {
@@ -89,6 +95,8 @@ public:
 
 	const std::string buildOpenCLCode();
 
+	const ProgramStats& getProgramStats() const { return stats; }
+
 private:
 	void loadSource(const VMConstructionArgs& args, const std::vector<SourceBufferRef>& s, const std::vector<FunctionDefinitionRef>& preconstructed_func_defs);
 	void build(const VMConstructionArgs& args);
@@ -108,6 +116,8 @@ private:
 	std::map<std::string, void*> func_map;
 
 	std::vector<TypeRef> named_types_ordered;
+
+	ProgramStats stats;
 };
 
 

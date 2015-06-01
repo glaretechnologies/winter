@@ -67,6 +67,7 @@ public:
 	// int captured_var_index;
 
 	int uncaptured_bound_index;
+	int let_var_index; // Index of the let variable bound to, for destructing assignment case may be > 0.
 };
 
 

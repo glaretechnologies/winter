@@ -51,6 +51,11 @@ void Type::emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted
 }
 
 
+void Type::emitDestructorCall(EmitLLVMCodeParams& params, llvm::Value* value, const std::string& comment) const
+{
+}
+
+
 //==========================================================================
 
 
@@ -205,7 +210,8 @@ llvm::Type* String::LLVMType(llvm::Module& module) const
 
 	llvm::Type* field_types[] = {
 		llvm::Type::getInt64Ty(module.getContext()), // Reference count field
-		//llvm::Type::getInt64Ty(module.getContext()), // length field (num elements)
+		llvm::Type::getInt64Ty(module.getContext()), // length field (num elements)
+		llvm::Type::getInt64Ty(module.getContext()), // flags
 		llvm::ArrayType::get(  // Variable-size array of element types
 			llvm::Type::getIntNTy(module.getContext(), 8),
 			0 // Num elements
@@ -269,7 +275,7 @@ void String::emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_count
 	// TODO: check cast
 	llvm::Function* destructor_func = static_cast<llvm::Function*>(destructor_func_constant);*/
 
-	llvm::Function* destructor_func = RefCounting::getOrInsertDestructorForType(params.module, this);
+	llvm::Function* destructor_func = RefCounting::getOrInsertDecrementorForType(params.module, this);
 
 	llvm::CallInst* call_inst = params.builder->CreateCall(destructor_func, ref_counted_value);
 
@@ -493,6 +499,12 @@ llvm::Type* ArrayType::LLVMType(llvm::Module& module) const
 }
 
 
+bool ArrayType::containsType(const Type& other_type) const
+{
+	return isEqualToOrContains(*this->elem_type, other_type);
+}
+
+
 //==========================================================================
 
 
@@ -585,6 +597,7 @@ llvm::Type* VArrayType::LLVMType(llvm::Module& module) const
 	llvm::Type* field_types[] = {
 		llvm::Type::getInt64Ty(module.getContext()), // Reference count field
 		llvm::Type::getInt64Ty(module.getContext()), // length field (num elements)
+		llvm::Type::getInt64Ty(module.getContext()), // flags
 		llvm::ArrayType::get(  // Variable-size array of element types
 			this->elem_type->LLVMType(module),
 			0 // Num elements
@@ -650,8 +663,20 @@ void VArrayType::emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_c
 	// TODO: check cast
 	llvm::Function* destructor_func = static_cast<llvm::Function*>(destructor_func_constant);*/
 
-	llvm::Function* destructor_func = RefCounting::getOrInsertDestructorForType(params.module, this);
+	llvm::Function* destructor_func = RefCounting::getOrInsertDecrementorForType(params.module, this);
 	llvm::CallInst* call_inst = params.builder->CreateCall(destructor_func, ref_counted_value);
+
+	addMetaDataCommentToInstruction(params, call_inst, comment);
+
+	params.destructors_called_types->insert(this);
+	this->getContainedTypesWithDestructors(*params.destructors_called_types);
+}
+
+
+void VArrayType::emitDestructorCall(EmitLLVMCodeParams& params, llvm::Value* value, const std::string& comment) const
+{
+	llvm::Function* destructor_func = RefCounting::getOrInsertDestructorForType(params.module, this);
+	llvm::CallInst* call_inst = params.builder->CreateCall(destructor_func, value);
 
 	addMetaDataCommentToInstruction(params, call_inst, comment);
 
@@ -664,6 +689,12 @@ void VArrayType::getContainedTypesWithDestructors(std::set<ConstTypeRef, ConstTy
 {
 	types.insert(elem_type);
 	elem_type->getContainedTypesWithDestructors(types);
+}
+
+
+bool VArrayType::containsType(const Type& other_type) const
+{
+	return isEqualToOrContains(*this->elem_type, other_type);
 }
 
 
@@ -823,7 +854,8 @@ void StructureType::emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* re
 
 void StructureType::emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const
 {
-	if(this->hasDestructor()) // NOTE: might be a bit slow to call this, cache this?
+	// Emit call to destructor
+	/*if(this->hasDestructor()) // NOTE: might be a bit slow to call this, cache this?
 	{
 		llvm::Function* destructor_func = RefCounting::getOrInsertDestructorForType(params.module, this);
 		llvm::CallInst* call_inst = params.builder->CreateCall(destructor_func, ref_counted_value);
@@ -832,7 +864,7 @@ void StructureType::emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* re
 
 		params.destructors_called_types->insert(this);
 		this->getContainedTypesWithDestructors(*params.destructors_called_types);
-	}
+	}*/
 
 #if 0
 	for(size_t i=0; i<component_types.size(); ++i)
@@ -886,6 +918,22 @@ void StructureType::emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* re
 }
 
 
+void StructureType::emitDestructorCall(EmitLLVMCodeParams& params, llvm::Value* value, const std::string& comment) const
+{
+	// Emit call to destructor
+	if(this->hasDestructor()) // NOTE: might be a bit slow to call this, cache this?
+	{
+		llvm::Function* destructor_func = RefCounting::getOrInsertDestructorForType(params.module, this);
+		llvm::CallInst* call_inst = params.builder->CreateCall(destructor_func, value);
+
+		addMetaDataCommentToInstruction(params, call_inst, comment);
+
+		params.destructors_called_types->insert(this);
+		this->getContainedTypesWithDestructors(*params.destructors_called_types);
+	}
+}
+
+
 bool StructureType::hasDestructor() const
 {
 	// A structure needs a destructor iff any of the contained types need a destructor.
@@ -905,6 +953,15 @@ void StructureType::getContainedTypesWithDestructors(std::set<ConstTypeRef, Cons
 
 		component_types[i]->getContainedTypesWithDestructors(types);
 	}
+}
+
+
+bool StructureType::containsType(const Type& other_type) const
+{
+	for(size_t i=0; i<component_types.size(); ++i)
+		if(isEqualToOrContains(*this->component_types[i], other_type))
+			return true;
+	return false;
 }
 
 
@@ -1043,13 +1100,13 @@ void TupleType::emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_co
 
 void TupleType::emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const
 {
-	llvm::Function* destructor_func = RefCounting::getOrInsertDestructorForType(params.module, this);
+	/*llvm::Function* destructor_func = RefCounting::getOrInsertDecrementorForType(params.module, this);
 	llvm::CallInst* call_inst = params.builder->CreateCall(destructor_func, ref_counted_value);
 
 	addMetaDataCommentToInstruction(params, call_inst, comment);
 
 	params.destructors_called_types->insert(this);
-	this->getContainedTypesWithDestructors(*params.destructors_called_types);
+	this->getContainedTypesWithDestructors(*params.destructors_called_types);*/
 
 #if 0
 	for(size_t i=0; i<component_types.size(); ++i)
@@ -1070,6 +1127,22 @@ void TupleType::emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_co
 }
 
 
+void TupleType::emitDestructorCall(EmitLLVMCodeParams& params, llvm::Value* value, const std::string& comment) const
+{
+	// Emit call to destructor
+	if(this->hasDestructor()) // NOTE: might be a bit slow to call this, cache this?
+	{
+		llvm::Function* destructor_func = RefCounting::getOrInsertDestructorForType(params.module, this);
+		llvm::CallInst* call_inst = params.builder->CreateCall(destructor_func, value);
+
+		addMetaDataCommentToInstruction(params, call_inst, comment);
+
+		params.destructors_called_types->insert(this);
+		this->getContainedTypesWithDestructors(*params.destructors_called_types);
+	}
+}
+
+
 void TupleType::getContainedTypesWithDestructors(std::set<ConstTypeRef, ConstTypeRefLessThan>& types) const
 {
 	for(size_t i=0; i<component_types.size(); ++i)
@@ -1079,6 +1152,15 @@ void TupleType::getContainedTypesWithDestructors(std::set<ConstTypeRef, ConstTyp
 
 		component_types[i]->getContainedTypesWithDestructors(types);
 	}
+}
+
+
+bool TupleType::containsType(const Type& other_type) const
+{
+	for(size_t i=0; i<component_types.size(); ++i)
+		if(isEqualToOrContains(*this->component_types[i], other_type))
+			return true;
+	return false;
 }
 
 

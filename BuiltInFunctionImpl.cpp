@@ -1516,7 +1516,7 @@ llvm::Value* VArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 
 			//llvm::Value* data_ptr_ptr = params.builder->CreateStructGEP(varray_ptr, 1, "data ptr ptr");
 			//llvm::Value* data_ptr = params.builder->CreateLoad(data_ptr_ptr);
-			llvm::Value* data_ptr = params.builder->CreateStructGEP(varray_ptr, 2, "data_ptr"); // [0 x T]*
+			llvm::Value* data_ptr = params.builder->CreateStructGEP(varray_ptr, 3, "data_ptr"); // [0 x T]*
 
 			llvm::Value* indices[] = { llvm::ConstantInt::get(*params.context, llvm::APInt(64, 0)), index };
 			llvm::Value* elem_ptr = params.builder->CreateInBoundsGEP(data_ptr, llvm::makeArrayRef(indices));

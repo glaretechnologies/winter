@@ -94,11 +94,14 @@ static const bool USE_MCJIT = true;
 //=====================================================================================
 
 
+// In-memory string representation for a Winter string
 class StringRep
 {
 public:
 	uint64 refcount;
-	std::string string; // UTF-8 encoding
+	uint64 len;
+	uint64 flags;
+	// Data follows..
 };
 
 
@@ -124,10 +127,8 @@ static StringRep* allocateString(const char* initial_string_val/*, void* env*/)
 {
 	string_count++;//TEMP
 
-	StringRep* r = new StringRep();
-	//r->refcount = 1;
-	r->string = std::string(initial_string_val);
-	return r;
+	StringRep* string_val = (StringRep*)malloc(sizeof(StringRep) + strlen(initial_string_val));
+	return string_val;
 }
 
 
@@ -143,14 +144,14 @@ static int freeString(StringRep* str/*, void* env*/)
 	string_count--;//TEMP
 
 	assert(str->refcount == 1);
-	delete str;
+	free(str);
 	return 0;
 }
 
 
 static int stringLength(StringRep* str)
 {
-	return (int)str->string.size();
+	return (int)str->len;
 }
 
 
@@ -160,15 +161,18 @@ static ValueRef stringLengthInterpreted(const vector<ValueRef>& args)
 }
 
 
-
 static StringRep* concatStrings(StringRep* a, StringRep* b, void* env)
 {
 	string_count++;//TEMP
 
-	StringRep* s = new StringRep();
-	s->refcount = 1;
-	s->string = a->string + b->string;
-	return s;
+	const uint64 new_len = a->len + b->len;
+	StringRep* new_s = (StringRep*)malloc(sizeof(StringRep) + new_len);
+	new_s->refcount = 1;
+	new_s->len = new_len;
+	new_s->flags = 1; // heap allocated
+	std::memcpy((uint8*)new_s + sizeof(StringRep), (uint8*)a + sizeof(StringRep), a->len);
+	std::memcpy((uint8*)new_s + sizeof(StringRep) + a->len, (uint8*)b + sizeof(StringRep), b->len);
+	return new_s;
 }
 
 
@@ -181,25 +185,23 @@ static ValueRef concatStringsInterpreted(const vector<ValueRef>& args)
 //=====================================================================================
 
 
-//class VArrayRep
-//{
-//public:
-//	uint64 refcount;
-//	//uint8* data;
-//};
+// In-memory string representation for a Winter VArray
+class VArrayRep
+{
+public:
+	uint64 refcount;
+	uint64 len;
+	uint64 flags;
+	// Data follows..
+};
 
 
-static uint8* allocateVArray(const int elem_size_B, const int num_elems)
+static VArrayRep* allocateVArray(const int elem_size_B, const int num_elems)
 {
 	varray_count++;//TEMP
 
-	/*VArrayRep* r = new VArrayRep();
-	//r->refcount = 1;
-	r->data = new uint8[sizeof(uint64) + elem_size_B * num_elems];
-	return r;*/
-
-	// Allocate space for the reference count, length, and data.
-	uint8* varray = new uint8[sizeof(uint64)*2 + elem_size_B * num_elems];
+	// Allocate space for the reference count, length, flags, and data.
+	VArrayRep* varray = (VArrayRep*)malloc(sizeof(VArrayRep) + elem_size_B * num_elems);
 	return varray;
 }
 
@@ -212,16 +214,12 @@ static ValueRef allocateVArrayInterpreted(const vector<ValueRef>& args)
 
 
 // NOTE: just return an int here as all external funcs need to return something (non-void).
-static int freeVArray(uint8* varray)
+static int freeVArray(VArrayRep* varray)
 {
 	varray_count--;//TEMP
 
-	/*assert(varray->refcount == 1);
-	delete[] varray->data;
-	delete varray;
-	return 0;*/
-	assert(*((uint64*)varray) == 1);
-	delete[] varray;
+	assert(varray->refcount == 1);
+	free(varray);
 	return 0;
 }
 
@@ -455,6 +453,8 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 	llvm_exec_engine(NULL)
 {
 	assert(string_count == 0 && varray_count == 0);
+
+	stats.num_heap_allocation_calls = 0;
 	
 	/*if(!winter_global_task_manager)
 	{
@@ -1022,7 +1022,8 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 	linker.buildLLVMCode(
 		this->llvm_module,
 		this->llvm_exec_engine->getDataLayout(),
-		common_functions
+		common_functions,
+		this->stats
 	);
 	
 	// Dump unoptimised module bitcode to 'unoptimised_module.txt'

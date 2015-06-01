@@ -44,7 +44,7 @@ public:
 
 	void getFuncsWithMatchingName(const std::string& name, std::vector<FunctionDefinitionRef>& funcs_out);
 
-	void buildLLVMCode(llvm::Module* module, const llvm::DataLayout/*TargetData*/* target_data, const CommonFunctions& common_functions);
+	void buildLLVMCode(llvm::Module* module, const llvm::DataLayout/*TargetData*/* target_data, const CommonFunctions& common_functions, ProgramStats& stats);
 
 	const std::string buildOpenCLCode();
 

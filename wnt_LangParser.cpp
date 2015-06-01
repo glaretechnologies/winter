@@ -21,6 +21,7 @@ File created by ClassTemplate on Wed Jun 11 02:56:20 2008
 #include "indigo/TestUtils.h"
 #include "indigo/globals.h"
 #include "utils/StringUtils.h"
+#include "utils/ContainerUtils.h"
 #include "utils/Parser.h"
 #include <assert.h>
 #include <map>
@@ -717,8 +718,10 @@ Reference<ASTNode> LangParser::parseLetBlock(ParseInfo& p)
 
 			// Before we add it, go back over the other lets in the let block to make sure this name is unique.
 			for(size_t z=0; z<lets.size(); ++z)
-				if(lets[z]->variable_name == let->variable_name)
-					throw LangParserExcep("Let with this name already defined in let block." + errorPosition(*p.text_buffer, p.tokens[let_position]->char_index));
+				for(size_t w=0; w<let->vars.size(); ++w)
+					for(size_t t=0; t<lets[z]->vars.size(); ++t)
+						if(lets[z]->vars[t].name == let->vars[w].name)
+							throw LangParserExcep("Let with this name already defined in let block." + errorPosition(*p.text_buffer, p.tokens[let_position]->char_index));
 
 			lets.push_back(let);
 		}
@@ -1527,28 +1530,51 @@ ASTNodeRef LangParser::parseArrayOrVectorOrTupleLiteral(ParseInfo& p)
 	return main_expr;
 }*/
 
+/*
 
+[type] identifier ("," [type] identifier)* "="
+
+
+*/
 Reference<LetASTNode> LangParser::parseLet(ParseInfo& p)
 {
 	const SrcLocation loc = locationForParseInfo(p);
 
-	const unsigned int initial_pos = p.i;
+	vector<LetNodeVar> vars;
 
-	std::string var_name = parseIdentifier("variable name", p);
-	TypeRef declared_type;
-
-	if(!isTokenCurrent(EQUALS_TOKEN, p))
+	while(1)
 	{
-		// Then assume what we parsed was the optional type.  So backtrack and re-parse
-		p.i = initial_pos; // backtrack
-		declared_type = parseType(p);
+		const unsigned int initial_pos = p.i;
 
-		var_name = parseIdentifier("variable name", p);
+		// Parse variable name or type
+		std::string var_name = parseIdentifier("variable name", p);
+		TypeRef declared_type;
+
+		if(!(isTokenCurrent(EQUALS_TOKEN, p) || isTokenCurrent(COMMA_TOKEN, p)))
+		{
+			// Then assume what we parsed was the optional type.  So backtrack and re-parse.
+			p.i = initial_pos; // backtrack
+			declared_type = parseType(p);
+
+			var_name = parseIdentifier("variable name", p);
+		}
+
+		LetNodeVar v;
+		v.name = var_name;
+		v.declared_type = declared_type;
+		vars.push_back(v);
+
+		if(isTokenCurrent(COMMA_TOKEN, p))
+			p.i++; // Consume comma then loop
+		else if(isTokenCurrent(EQUALS_TOKEN, p))
+			break;
+		else
+			throw LangParserExcep("Expected ',' or '=' while parsing let." + errorPosition(p));
 	}
 
 	parseToken(EQUALS_TOKEN, p);
 
-	Reference<LetASTNode> letnode = new LetASTNode(var_name, declared_type, loc);
+	Reference<LetASTNode> letnode = new LetASTNode(vars, loc);
 
 	ASTNodeRef expr = parseExpression(p);
 

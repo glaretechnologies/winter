@@ -18,29 +18,42 @@ namespace Winter
 RefCounting
 -------------------
 
+
+procedure destructor:
+---------------------
+	for each field/element:
+		calls decrementor
+
+
+
+procedure decrementor:
+----------------------
+entry:
+	if ref count == 1:
+then:
+		call destructor
+		if heap allocated:
+heap_allocated_then_BB:
+			call free
+else:
+	else
+		decrement ref count
+merge:
+	ret void
+
+
 =====================================================================*/
 namespace RefCounting
 {
 
-// Emit LLVM code for decrStringRefCount(), incrStringRefCount() etc.. to the current LLVM module, store pointers to them in common_functions.
+// Emit LLVM code for incrStringRefCount(), incrVArrayRefCount() etc.. to the current LLVM module, store pointers to them in common_functions.
 void emitRefCountingFunctions(llvm::Module* module, const llvm::DataLayout* target_data, CommonFunctions& common_functions);
 
-void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_data, const CommonFunctions& common_functions, const ConstTypeRef& refcounted_type);
+void emitDecrementorForType(llvm::Module* module, const llvm::DataLayout* target_data, const CommonFunctions& common_functions, const ConstTypeRef& refcounted_type);
+void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_data, const CommonFunctions& common_functions, const ConstTypeRef& type);
 
+llvm::Function* getOrInsertDecrementorForType(llvm::Module* module, const ConstTypeRef& type);
 llvm::Function* getOrInsertDestructorForType(llvm::Module* module, const ConstTypeRef& type);
-
-//void emitCleanupLLVMCode(EmitLLVMCodeParams& params, const TypeRef& type, llvm::Value* val);
-
-// Emit a call to incrStringRefCount(string_val)
-//void emitIncrementStringRefCount(EmitLLVMCodeParams& params, llvm::Value* string_val);
-
-// Emit a call to decrStringRefCount(string_val)
-//void emitStringCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* string_val);
-
-
-//void emitIncrementVArrayRefCount(EmitLLVMCodeParams& params, llvm::Value* varray_val);
-//void emitVArrayCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* varray_val);
-
 
 } // end namespace RefCounting
 

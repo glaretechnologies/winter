@@ -115,7 +115,7 @@ void Linker::addExternalFunctions(vector<ExternalFunctionRef>& funcs)
 }
 
 
-void Linker::buildLLVMCode(llvm::Module* module, const llvm::DataLayout/*TargetData*/* target_data, const CommonFunctions& common_functions)
+void Linker::buildLLVMCode(llvm::Module* module, const llvm::DataLayout/*TargetData*/* target_data, const CommonFunctions& common_functions, ProgramStats& stats)
 {
 	PlatformUtils::CPUInfo cpu_info;
 	PlatformUtils::getCPUInfo(cpu_info);
@@ -128,7 +128,7 @@ void Linker::buildLLVMCode(llvm::Module* module, const llvm::DataLayout/*TargetD
 
 		if(!f.isGenericFunction() && !f.isExternalFunction())
 		{
-			f.buildLLVMFunction(module, cpu_info, hidden_voidptr_arg, target_data, common_functions, destructors_called_types);
+			f.buildLLVMFunction(module, cpu_info, hidden_voidptr_arg, target_data, common_functions, destructors_called_types, stats);
 		}
 	}
 
@@ -143,7 +143,7 @@ void Linker::buildLLVMCode(llvm::Module* module, const llvm::DataLayout/*TargetD
 	// Build 'unique' functions (like shuffle())
 	for(unsigned int i=0; i<unique_functions.size(); ++i)
 	{
-		unique_functions[i]->buildLLVMFunction(module, cpu_info, hidden_voidptr_arg, target_data, common_functions, destructors_called_types);
+		unique_functions[i]->buildLLVMFunction(module, cpu_info, hidden_voidptr_arg, target_data, common_functions, destructors_called_types, stats);
 	}
 
 
@@ -151,7 +151,10 @@ void Linker::buildLLVMCode(llvm::Module* module, const llvm::DataLayout/*TargetD
 	for(auto i = destructors_called_types.begin(); i != destructors_called_types.end(); ++i)
 	{
 		if((*i)->hasDestructor())
+		{
+			RefCounting::emitDecrementorForType(module, target_data, common_functions, *i);
 			RefCounting::emitDestructorForType(module, target_data, common_functions, *i);
+		}
 	}
 }
 

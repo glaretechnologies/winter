@@ -52,6 +52,7 @@ class ASTNode;
 class SourceBuffer;
 class ComparisonExpression;
 class TraversalPayload;
+struct ProgramStats;
 
 
 class CapturedVar
@@ -156,7 +157,7 @@ bool expressionIsWellTyped(ASTNode& e, TraversalPayload& payload_);
 bool shouldRefCount(EmitLLVMCodeParams& params, const Reference<ASTNode>& expr);
 bool shouldRefCount(EmitLLVMCodeParams& params, const ASTNode& expr);
 void addMetaDataCommentToInstruction(EmitLLVMCodeParams& params, llvm::Instruction* instr, const std::string& s);
-
+void emitDestructorOrDecrCall(EmitLLVMCodeParams& params, const ASTNode& e, llvm::Value* value, const std::string& comment);
 
 class CleanUpInfo
 {
@@ -177,10 +178,7 @@ public:
 	FunctionDefinition* allocateVArrayFunc;
 	FunctionDefinition* freeVArrayFunc;
 
-	llvm::Function* decrStringRefCountLLVMFunc;
 	llvm::Function* incrStringRefCountLLVMFunc;
-
-	llvm::Function* decrVArrayRefCountLLVMFunc;
 	llvm::Function* incrVArrayRefCountLLVMFunc;
 };
 
@@ -212,6 +210,8 @@ public:
 	std::set<Reference<const Type>, ConstTypeRefLessThan>* destructors_called_types;
 
 	bool emit_refcounting_code;
+
+	ProgramStats* stats;
 };
 
 
@@ -267,6 +267,7 @@ public:
 		CharLiteralType,
 		MapLiteralType,
 		ArrayLiteralType,
+		VArrayLiteralType,
 		VectorLiteralType,
 		TupleLiteralType,
 		AdditionExpressionType,
@@ -679,11 +680,18 @@ public:
 };
 
 
+class LetNodeVar
+{
+public:
+	std::string name;
+	TypeRef declared_type; // may be NULL
+};
+
+
 class LetASTNode : public ASTNode
 {
 public:
-	LetASTNode(const std::string& var_name, const TypeRef& declared_type_, const SrcLocation& loc) : 
-	  ASTNode(LetType, loc), variable_name(var_name), declared_type(declared_type_) {}
+	LetASTNode(const std::vector<LetNodeVar>& vars, const SrcLocation& loc);
 
 	virtual ValueRef exec(VMState& vmstate);
 	virtual TypeRef type() const { return expr->type(); }
@@ -698,9 +706,8 @@ public:
 	virtual Reference<ASTNode> clone();
 	virtual bool isConstant() const;
 
-	std::string variable_name;
 	ASTNodeRef expr;
-	TypeRef declared_type;
+	std::vector<LetNodeVar> vars; // One or more variable names (And possible associated declared types).  Will be more than one in the case of destructuring assignment.
 	//mutable llvm::Value* llvm_value;
 };
 

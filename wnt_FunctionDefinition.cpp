@@ -718,7 +718,7 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 	{
 		bool has_ptr_arg = false;
 		for(unsigned int i=0; i<arg_types.size(); ++i)
-			if(!arg_types[i]->passByValue())
+			if(!arg_types[i]->passByValue() || arg_types[i]->isHeapAllocated())
 				has_ptr_arg = true;
 
 		if(external_function.nonNull() && external_function->has_side_effects)
@@ -838,7 +838,8 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	bool hidden_voidptr_arg, 
 	const llvm::DataLayout/*TargetData*/* target_data,
 	const CommonFunctions& common_functions,
-	std::set<Reference<const Type>, ConstTypeRefLessThan>& destructors_called_types
+	std::set<Reference<const Type>, ConstTypeRefLessThan>& destructors_called_types,
+	ProgramStats& stats
 	//std::map<Lang::FunctionSignature, llvm::Function*>& external_functions
 	)
 {
@@ -886,6 +887,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	params.common_functions = common_functions;
 	params.destructors_called_types = &destructors_called_types;
 	params.emit_refcounting_code = true;
+	params.stats = &stats;
 
 	//llvm::Value* body_code = NULL;
 	if(this->built_in_func_impl.nonNull())
@@ -909,12 +911,14 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 			llvm::Value* body_code = this->body->emitLLVMCode(params);
 
 			// Emit cleanup code for reference-counted values.
-			/*for(size_t z=0; z<params.cleanup_values.size(); ++z)
+			for(size_t z=0; z<params.cleanup_values.size(); ++z)
 			{
 				// Don't want to clean up (decr ref) the return value.
 				//if(params.cleanup_values[z].node != this->body.getPointer())
-					params.cleanup_values[z].node->emitCleanupLLVMCode(params, params.cleanup_values[z].value);
-			}*/
+				//	params.cleanup_values[z].node->emitCleanupLLVMCode(params, params.cleanup_values[z].value);
+			//	CleanUpInfo& cleanup_info = params.cleanup_values[z];
+			//	cleanup_info.node->type()->emitDestructorCall(params, cleanup_info.value, "stack allocated cleanup");
+			}
 
 			// Decrement ref counts on all (ref counted) arguments:
 //			for(size_t i=0; i<this->sig.param_types.size(); ++i)

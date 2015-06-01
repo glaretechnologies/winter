@@ -52,7 +52,8 @@ Variable::Variable(const std::string& name_, const SrcLocation& loc)
 	bound_index(-1),
 	bound_function(NULL),
 	bound_let_block(NULL),
-	bound_named_constant(NULL)
+	bound_named_constant(NULL),
+	let_var_index(-1)
 	//use_captured_var(false),
 	//captured_var_index(0)
 {
@@ -135,37 +136,42 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 				}
 				else
 				{
-					if(let_block->lets[i]->variable_name == this->name)
+					for(size_t v=0; v<let_block->lets[i]->vars.size(); ++v)
 					{
-						if(!in_current_func_def && payload.func_def_stack.back()->use_captured_vars)
+						if(let_block->lets[i]->vars[v].name == this->name)
 						{
-							//this->captured_var_index = payload.captured_vars.size();
-							//this->use_captured_var = true;
-							this->vartype = CapturedVariable;
-							this->bound_index = (int)payload.func_def_stack.back()->captured_vars.size(); // payload.captured_vars.size();
+							if(!in_current_func_def && payload.func_def_stack.back()->use_captured_vars)
+							{
+								//this->captured_var_index = payload.captured_vars.size();
+								//this->use_captured_var = true;
+								this->vartype = CapturedVariable;
+								this->bound_index = (int)payload.func_def_stack.back()->captured_vars.size(); // payload.captured_vars.size();
 
-							// Save info to get bound let, so we can query it for the type of the captured var.
-							this->bound_let_block = let_block;
-							this->uncaptured_bound_index = i;
+								// Save info to get bound let, so we can query it for the type of the captured var.
+								this->bound_let_block = let_block;
+								this->uncaptured_bound_index = i;
+								this->let_var_index = (int)v;
 
-							// Add this function argument as a variable that has to be captured for closures.
-							CapturedVar var;
-							var.vartype = CapturedVar::Let;
-							var.bound_let_block = let_block;
-							var.index = i;
-							var.let_frame_offset = use_let_frame_offset;
-							//payload.captured_vars.push_back(var);
-							payload.func_def_stack.back()->captured_vars.push_back(var);
-						}
-						else
-						{
-							this->vartype = LetVariable;
-							this->bound_let_block = let_block;
-							this->bound_index = i;
-							this->let_frame_offset = use_let_frame_offset;
-						}
+								// Add this function argument as a variable that has to be captured for closures.
+								CapturedVar var;
+								var.vartype = CapturedVar::Let;
+								var.bound_let_block = let_block;
+								var.index = i;
+								var.let_frame_offset = use_let_frame_offset;
+								//payload.captured_vars.push_back(var);
+								payload.func_def_stack.back()->captured_vars.push_back(var);
+							}
+							else
+							{
+								this->vartype = LetVariable;
+								this->bound_let_block = let_block;
+								this->bound_index = i;
+								this->let_frame_offset = use_let_frame_offset;
+								this->let_var_index = (int)v;
+							}
 		
-						return;
+							return;
+						}
 					}
 				}
 			}
@@ -318,8 +324,16 @@ ValueRef Variable::exec(VMState& vmstate)
 
 		//const int let_stack_start = (int)vmstate.let_stack_start[vmstate.let_stack_start.size() - 1 - this->let_frame_offset];
 		//return vmstate.let_stack[let_stack_start + this->bound_index];
-
-		return this->bound_let_block->lets[this->bound_index]->exec(vmstate);
+		LetASTNode* let_node = this->bound_let_block->lets[this->bound_index].getPointer();
+		ValueRef val = let_node->exec(vmstate);
+		if(let_node->vars.size() == 1)
+			return val;
+		else
+		{
+			// Destructuring assignment, return the particular element from the tuple.
+			const TupleValue* t = checkedCast<TupleValue>(val.getPointer());
+			return t->e[this->let_var_index];
+		}
 	}
 	else if(this->vartype == BoundToGlobalDefVariable)
 	{
@@ -350,7 +364,17 @@ ValueRef Variable::exec(VMState& vmstate)
 TypeRef Variable::type() const
 {
 	if(this->vartype == LetVariable)
-		return this->bound_let_block->lets[this->bound_index]->type();
+	{
+		const TypeRef let_var_type = this->bound_let_block->lets[this->bound_index]->type();
+		if(this->bound_let_block->lets[this->bound_index]->vars.size() == 1)
+			return let_var_type;
+		else
+		{
+			if(let_var_type->getType() != Type::TupleTypeType)
+				return NULL;
+			return let_var_type.downcastToPtr<TupleType>()->component_types[this->let_var_index];
+		}
+	}
 	else if(this->vartype == ArgumentVariable)
 		return this->bound_function->args[this->bound_index].type;
 	else if(this->vartype == BoundToGlobalDefVariable)
@@ -423,12 +447,43 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 		assert(params.let_block_let_values.find(this->bound_let_block) != params.let_block_let_values.end());
 
 		llvm::Value* value = params.let_block_let_values[this->bound_let_block][this->bound_index];
-		
-		// Increment reference count
-		if(params.emit_refcounting_code)
-			this->type()->emitIncrRefCount(params, value, "Variable::emitLLVMCode for let var " + this->name);
 
-		return value;
+		LetASTNode* let_node = this->bound_let_block->lets[this->bound_index].getPointer();
+		if(let_node->vars.size() == 1)
+		{
+			// Increment reference count
+			if(params.emit_refcounting_code)
+				this->type()->emitIncrRefCount(params, value, "Variable::emitLLVMCode for let var " + this->name);
+
+			return value;
+		}
+		else
+		{
+			// destructuring assignment, we just want to return the individual tuple element.
+			// Value should be a pointer to a tuple struct.
+			if(type()->passByValue())
+			{
+				llvm::Value* tuple_elem = params.builder->CreateLoad(params.builder->CreateStructGEP(value, this->let_var_index, "tuple_elem_ptr"));
+
+				// Increment reference count
+				if(params.emit_refcounting_code)
+					this->type()->emitIncrRefCount(params, tuple_elem, "Variable::emitLLVMCode for let var " + this->name);
+
+				return tuple_elem;
+			}
+			else
+			{
+				llvm::Value* tuple_elem = params.builder->CreateStructGEP(value, this->let_var_index, "tuple_elem_ptr");
+				//tuple_elem->dump();
+				//tuple_elem->getType()->dump();
+
+				// Increment reference count
+				if(params.emit_refcounting_code)
+					this->type()->emitIncrRefCount(params, tuple_elem, "Variable::emitLLVMCode for let var " + this->name);
+
+				return tuple_elem;
+			}
+		}
 	}
 	else if(vartype == ArgumentVariable)
 	{
@@ -557,6 +612,7 @@ Reference<ASTNode> Variable::clone()
 	v->bound_index = bound_index;
 	v->let_frame_offset = let_frame_offset;
 	v->uncaptured_bound_index = uncaptured_bound_index;
+	v->let_var_index = let_var_index;
 	return v;
 }
 

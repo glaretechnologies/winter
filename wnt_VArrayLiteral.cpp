@@ -10,6 +10,7 @@ Copyright Glare Technologies Limited 2015 -
 #include "wnt_SourceBuffer.h"
 #include "wnt_RefCounting.h"
 #include "VMState.h"
+#include "VirtualMachine.h"
 #include "Value.h"
 #include "Linker.h"
 #include "BuiltInFunctionImpl.h"
@@ -46,7 +47,7 @@ namespace Winter
 
 
 VArrayLiteral::VArrayLiteral(const std::vector<ASTNodeRef>& elems, const SrcLocation& loc, bool has_int_suffix_, int int_suffix_)
-:	ASTNode(ArrayLiteralType, loc),
+:	ASTNode(VArrayLiteralType, loc),
 	elements(elems),
 	has_int_suffix(has_int_suffix_),
 	int_suffix(int_suffix_)
@@ -189,68 +190,83 @@ bool VArrayLiteral::areAllElementsConstant() const
 
 llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
-	// Emit a call to allocateVArray:
-	// allocateVArray(const int elem_size_B, const int num_elems)
-	llvm::Function* allocateVArrayLLVMFunc = params.common_functions.allocateVArrayFunc->getOrInsertFunction(
-		params.module,
-		false // use_cap_var_struct_ptr
-	);
+	const bool same_as_or_contained_by_ret_type = isEqualToOrContains(*params.currently_building_func_def->returnType(), *this->type());
 
-	const TypeRef elem_type = elements[0]->type();
+	const bool alloc_on_heap = same_as_or_contained_by_ret_type;
 
-	const uint64_t size_B = params.target_data->getTypeAllocSize(elem_type->LLVMType(*params.module)); // Get size of element
-	llvm::Value* size_B_constant = llvm::ConstantInt::get(*params.context, llvm::APInt(32, size_B, /*signed=*/false));
+	llvm::Value* varray_ptr;
+	uint64 initial_flags;
 
-	llvm::Value* num_elems = llvm::ConstantInt::get(
-		*params.context,
-		llvm::APInt(32, //TEMP
-			this->elements.size(),
-			true // signed
-		)
-	);
+	if(alloc_on_heap)
+	{
+		params.stats->num_heap_allocation_calls++;
 
-	llvm::CallInst* call_inst = params.builder->CreateCall2(allocateVArrayLLVMFunc, size_B_constant, num_elems, "varray_literal");
+		// Emit a call to allocateVArray:
+		// allocateVArray(const int elem_size_B, const int num_elems)
+		llvm::Function* allocateVArrayLLVMFunc = params.common_functions.allocateVArrayFunc->getOrInsertFunction(
+			params.module,
+			false // use_cap_var_struct_ptr
+		);
 
-	// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
-	call_inst->setCallingConv(llvm::CallingConv::C);
+		const TypeRef elem_type = elements[0]->type();
 
-	// Cast resulting allocated void* down to VArrayRep for the right type, e.g. varray<T>
-	llvm::Type* varray_T_type = this->type()->LLVMType(*params.module);
-	assert(varray_T_type->isPointerTy());
+		const uint64_t size_B = params.target_data->getTypeAllocSize(elem_type->LLVMType(*params.module)); // Get size of element
+		llvm::Value* size_B_constant = llvm::ConstantInt::get(*params.context, llvm::APInt(32, size_B, /*signed=*/false));
 
-	llvm::Value* cast_result = params.builder->CreatePointerCast(call_inst, varray_T_type);
+		llvm::Value* num_elems = llvm::ConstantInt::get(
+			*params.context,
+			llvm::APInt(32, //TEMP
+				this->elements.size(),
+				true // signed
+			)
+		);
 
-	//////////////////////////////////
-	// Allocate space for a pointer on the stack, at the entry block of the function
+		llvm::CallInst* call_inst = params.builder->CreateCall2(allocateVArrayLLVMFunc, size_B_constant, num_elems, "varray_literal");
 
-	/*llvm::IRBuilder<> entry_block_builder(&params.currently_building_func->getEntryBlock(), params.currently_building_func->getEntryBlock().getFirstInsertionPt());
+		// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
+		call_inst->setCallingConv(llvm::CallingConv::C);
 
-	this->ptr_alloca = entry_block_builder.CreateAlloca(
-		type()->LLVMType(*params.module), // type
-		llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1, true)), // num elems
-		"varray_ptr"
-	);
-	// Store a null pointer there
-	assert(varray_T_type->isPointerTy());
+		// Cast resulting allocated void* down to VArrayRep for the right type, e.g. varray<T>
+		llvm::Type* varray_T_type = this->type()->LLVMType(*params.module);
+		assert(varray_T_type->isPointerTy());
 
-	llvm::Type* varray_val_type = ((llvm::PointerType*)varray_T_type)->getElementType();
-
-	llvm::PointerType* varray_T_type_ptr = static_cast<llvm::PointerType*>(varray_T_type);
-
-	entry_block_builder.CreateStore( llvm::ConstantPointerNull::get(varray_T_type_ptr), this->ptr_alloca);
-
-
-	// Emit some code to save to the entry block ptr
-	params.builder->CreateStore(cast_result, ptr_alloca);*/
-
-	////////////////////////////
+		varray_ptr = params.builder->CreatePointerCast(call_inst, varray_T_type);
+		initial_flags = 1; // flag = 1 = heap allocated
+	}
+	else
+	{
+		// Allocate space on stack for array.
+		// Allocate as just an array of bytes.
+		// Then cast to the needed type.  We do this because our LLVM Varray type has only zero length for the actual data, so can't be used for the alloca.
+		
+		// Emit the alloca in the entry block for better code-gen.
+		// We will emit the alloca at the start of the block, so that it doesn't go after any terminator instructions already created which have to be at the end of the block.
+		llvm::IRBuilder<> entry_block_builder(&params.currently_building_func->getEntryBlock(), params.currently_building_func->getEntryBlock().getFirstInsertionPt());
 
 
+		const TypeRef elem_type = elements[0]->type();
+		const uint64 elem_size_B = params.target_data->getTypeAllocSize(elem_type->LLVMType(*params.module)); // Get size of element
+		const uint64 total_varray_size_B = sizeof(uint64)*3 + elem_size_B * elements.size();
+
+		llvm::Value* alloca_ptr = entry_block_builder.CreateAlloca(
+			llvm::Type::getInt8Ty(*params.context), // byte
+			llvm::ConstantInt::get(*params.context, llvm::APInt(64, total_varray_size_B, true)), // number of bytes needed.
+			this->type()->toString() + " stack space"
+		);
+
+		// Cast resulting allocated uint8* down to VArrayRep for the right type, e.g. varray<T>
+		llvm::Type* varray_T_type = this->type()->LLVMType(*params.module);
+		assert(varray_T_type->isPointerTy());
+
+		varray_ptr = params.builder->CreatePointerCast(alloca_ptr, varray_T_type);
+		initial_flags = 0; // flag = 0 = not heap allocated
+
+		params.cleanup_values.push_back(CleanUpInfo(this, varray_ptr));
+	}
 
 
 	// Set the reference count to 1
-	llvm::Value* ref_ptr = params.builder->CreateStructGEP(cast_result, 0, "varray_literal_ref_ptr");
-
+	llvm::Value* ref_ptr = params.builder->CreateStructGEP(varray_ptr, 0, "varray_literal_ref_ptr");
 	llvm::Value* one = llvm::ConstantInt::get(
 		*params.context,
 		llvm::APInt(64, 1, 
@@ -261,7 +277,7 @@ llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 	addMetaDataCommentToInstruction(params, store_inst, "VArray literal set intial ref count to 1");
 
 	// Set VArray length
-	llvm::Value* length_ptr = params.builder->CreateStructGEP(cast_result, 1, "varray_literal_length_ptr");
+	llvm::Value* length_ptr = params.builder->CreateStructGEP(varray_ptr, 1, "varray_literal_length_ptr");
 	llvm::Value* length_constant_int = llvm::ConstantInt::get(
 		*params.context,
 		llvm::APInt(64, this->elements.size(), 
@@ -271,9 +287,14 @@ llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 	llvm::StoreInst* store_length_inst = params.builder->CreateStore(length_constant_int, length_ptr);
 	addMetaDataCommentToInstruction(params, store_length_inst, "VArray literal set intial length count to " + ::toString(this->elements.size()));
 
-	//llvm::Value* data_ptr_ptr = params.builder->CreateStructGEP(cast_result, 1, "data_ptr_ptr");
-	//llvm::Value* data_ptr = params.builder->CreateLoad(data_ptr_ptr);
-	llvm::Value* data_ptr = params.builder->CreateStructGEP(cast_result, 2, "varray_literal_data_ptr");
+	// Set the flags
+	llvm::Value* flags_ptr = params.builder->CreateStructGEP(varray_ptr, 2, "varray_literal_flags_ptr");
+	llvm::Value* flags_contant_val = llvm::ConstantInt::get(*params.context, llvm::APInt(64, initial_flags));
+	llvm::StoreInst* store_flags_inst = params.builder->CreateStore(flags_contant_val, flags_ptr);
+	addMetaDataCommentToInstruction(params, store_flags_inst, "VArray literal set intial flags to " + toString(initial_flags));
+
+
+	llvm::Value* data_ptr = params.builder->CreateStructGEP(varray_ptr, 3, "varray_literal_data_ptr");
 
 	//data_ptr->dump();
 	//data_ptr->getType()->dump();
@@ -332,12 +353,12 @@ llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 		}
 	}
 
-	CleanUpInfo info;
+	/*CleanUpInfo info;
 	info.node = this;
-	info.value = cast_result;
-	params.cleanup_values.push_back(info);
+	info.value = varray_ptr;
+	params.cleanup_values.push_back(info);*/
 
-	return cast_result;
+	return varray_ptr;
 }
 
 
