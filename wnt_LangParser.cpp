@@ -864,6 +864,21 @@ TypeRef LangParser::parseElementaryType(ParseInfo& p)
 		return new CharType();
 	else if(t == "opaque" || t == "voidptr")
 		return new OpaqueType();
+	else if(t == "constant" || t == "global")
+	{
+		// Then t is the address space for an opaque (void*) type.
+		
+		// Parse the actual type.
+		const std::string t2 = parseIdentifier("type", p);
+		if(t2 == "opaque" || t2 == "voidptr")
+		{
+			Reference<OpaqueType> type = new OpaqueType();
+			type->address_space = t;
+			return type;
+		}
+		else
+			throw LangParserExcep("Expected opaque or voidptr after address space." + errorPositionPrevToken(p));
+	}
 	else if(t == "bool")
 		return new Bool();
 	//else if(t == "error")

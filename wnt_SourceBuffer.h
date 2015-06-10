@@ -10,6 +10,7 @@ Generated at 2011-06-11 19:19:16 +0100
 #include <utils/Reference.h>
 #include <utils/RefCounted.h>
 #include <string>
+#include <map>
 
 
 namespace Winter
@@ -31,6 +32,8 @@ public:
 
 	std::string name;
 	std::string source;
+
+	std::map<std::string, std::string> user_data; // Stringly-typed user data.
 private:
 
 };

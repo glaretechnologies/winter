@@ -1220,6 +1220,8 @@ std::string FunctionExpression::sourceString() const
 
 // From https://www.khronos.org/registry/cl/sdk/1.0/docs/man/xhtml/mathFunctions.html
 static const char* opencl_built_in_func_names[] = { 
+	"sign",
+
 	"acos", "acosh", "acospi", "asin",
 	"asinh", "asinpi", "atan", "atan2",
 	"atanh", "atanpi", "atan2pi", "cbrt",
@@ -1326,7 +1328,10 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 			const int64 index = static_cast<const IntLiteral*>(argument_expressions[1].getPointer())->value;
 
-			return argument_expressions[0]->emitOpenCLC(params) + ".field_" + ::toString(index);
+			if(argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType && argument_expressions[0].downcastToPtr<Variable>()->vartype == Variable::ArgumentVariable)
+				return argument_expressions[0]->emitOpenCLC(params) + "->field_" + ::toString(index);
+			else
+				return argument_expressions[0]->emitOpenCLC(params) + ".field_" + ::toString(index);
 		}
 		else
 			throw BaseException("Error while emitting OpenCL C: elem() function first arg has unsupported type " + argument_expressions[0]->type()->toString() );
@@ -1401,12 +1406,16 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 		// Transform get field built-in functions like so:
 		// struct s { int x; }
 		// 
-		// x(s)			=>		s.x
+		// x(s)			=>		s->x
 
 		if(argument_expressions.size() != 1)
 			throw BaseException("Error while emitting OpenCL C: get field function with != 1 args.");
 
-		return argument_expressions[0]->emitOpenCLC(params) + "." +  function_name;
+		//if(argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType && argument_expressions[0].downcastToPtr<Variable>()->vartype == Variable::LetVariable)
+		if(argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType && argument_expressions[0].downcastToPtr<Variable>()->vartype == Variable::ArgumentVariable)
+			return argument_expressions[0]->emitOpenCLC(params) + "->" + function_name;
+		else
+			return argument_expressions[0]->emitOpenCLC(params) + "." + function_name;
 	}
 	else if(function_name == "inBounds")
 	{
@@ -1481,16 +1490,53 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 		//if(target_function && target_function->built_in_func_impl.nonNull() && dynamic_cast<Constructor*>(target_function->built_in_func_impl.getPointer()))
 		//	use_func_name += "_cnstr";
 
+
+
+
+		/*
+			f(s1, s2, x)
+
+			=>
+			S arg_1 = ...;
+			S arg_2 = ...;
+			f(&arg1, &arg2, x)
+		*/
+
+		std::string arg_eval_s = "";
+
 		std::string use_func_name = (/*this->target_function->isExternalFunction() ||*/ isCallToBuiltInOpenCLFunction(this->target_function)) ? 
 			this->target_function->sig.name : this->target_function->sig.typeMangledName();
 
 		std::string s = use_func_name + "(";
 		for(unsigned int i=0; i<argument_expressions.size(); ++i)
 		{
-			s += argument_expressions[i]->emitOpenCLC(params);
+			if(!argument_expressions[i]->type()->OpenCLPassByPointer())
+				s += argument_expressions[i]->emitOpenCLC(params);
+			else
+			{
+				// Emit something like
+				// "SomeStruct arg_xx = g();"
+
+				// If the argument expression is itself an argument to the current function, then it is already a pointer, so just use as-is.
+				if(argument_expressions[i]->nodeType() == ASTNode::VariableASTNodeType && argument_expressions[i].downcastToPtr<Variable>()->vartype == Variable::ArgumentVariable)
+				{
+					s += argument_expressions[i]->emitOpenCLC(params);
+				}
+				else
+				{
+					const std::string arg_name = "arg_" + toString(params.uid++);
+					arg_eval_s += argument_expressions[i]->type()->OpenCLCType() + " " + arg_name + " = " + argument_expressions[i]->emitOpenCLC(params) + ";\n";
+
+					s += "&" + arg_name;
+				}
+			}
+
 			if(i + 1 < argument_expressions.size())
 				s += ", ";
 		}
+
+		params.blocks.back() += arg_eval_s;
+
 		return s + ")";
 	}
 }

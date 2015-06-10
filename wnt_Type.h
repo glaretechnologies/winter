@@ -57,6 +57,7 @@ public:
 	virtual bool matchTypes(const Type& b, std::vector<Reference<Type> >& type_mapping) const = 0;
 	virtual llvm::Type* LLVMType(llvm::Module& module) const = 0;
 	virtual const std::string OpenCLCType() const = 0;
+	virtual bool OpenCLPassByPointer() const { return false; }
 	virtual bool passByValue() const { return true; }
 	virtual Reference<Value> getInvalidValue() const; // For array out-of-bounds
 	virtual llvm::Value* getInvalidLLVMValue(llvm::Module& module) const; // For array out-of-bounds
@@ -404,6 +405,7 @@ public:
 
 	virtual llvm::Type* LLVMType(llvm::Module& module) const;
 	virtual const std::string OpenCLCType() const { return name; }
+	virtual bool OpenCLPassByPointer() const { return true; }
 	virtual bool passByValue() const { return false; }
 
 	virtual void emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const;
@@ -463,6 +465,7 @@ public:
 
 	virtual llvm::Type* LLVMType(llvm::Module& module) const;
 	virtual const std::string OpenCLCType() const;
+	virtual bool OpenCLPassByPointer() const { return true; }
 	virtual bool passByValue() const { return false; }
 
 	const std::string getOpenCLCDefinition() const; // Get full definition string, e.g. struct a { float b; };
@@ -537,7 +540,9 @@ public:
 	}
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 	virtual llvm::Type* LLVMType(llvm::Module& module) const;
-	virtual const std::string OpenCLCType() const { return "void*"; }
+	virtual const std::string OpenCLCType() const;
+
+	std::string address_space;
 };
 
 
@@ -611,6 +616,34 @@ public:
 
 
 // Some utility methods:
+
+inline std::vector<TypeRef> typeSinglet(const TypeRef& a)
+{
+	std::vector<TypeRef> v(1);
+	v[0] = a;
+	return v;
+}
+
+
+inline std::vector<TypeRef> typePair(const TypeRef& a, const TypeRef& b)
+{
+	std::vector<TypeRef> v(2);
+	v[0] = a;
+	v[1] = b;
+	return v;
+}
+
+
+inline std::vector<TypeRef> typeTriplet(const TypeRef& a, const TypeRef& b, const TypeRef& c)
+{
+	std::vector<TypeRef> v(3);
+	v[0] = a;
+	v[1] = b;
+	v[2] = c;
+	return v;
+}
+
+
 TypeRef errorTypeSum(const TypeRef& t);
 
 

@@ -338,6 +338,12 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 				this->sig_to_function_map.insert(std::make_pair(sig, def));
 				return def;
 			}
+			else if(sig.name == "sign")
+			{
+				FunctionDefinitionRef def = makeBuiltInFuncDef<SignBuiltInFunc>(sig.name, sig.param_types[0], sig.param_types[0]);
+				this->sig_to_function_map.insert(std::make_pair(sig, def));
+				return def;
+			}
 		}
 		else if(
 			(sig.param_types[0]->getType() == Type::IntType || // If Int

@@ -9,6 +9,7 @@ Copyright Glare Technologies Limited 2014 -
 #include "wnt_ASTNode.h"
 #include "wnt_SourceBuffer.h"
 #include "wnt_RefCounting.h"
+#include "wnt_Variable.h"
 #include "VMState.h"
 #include "Value.h"
 #include "Linker.h"
@@ -192,9 +193,13 @@ std::string IfExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 	// Emit 'then' code
 	params.blocks.push_back("");
-	const std::string then_code = then_expr->emitOpenCLC(params);
+	std::string then_code = then_expr->emitOpenCLC(params);
 	StringUtils::appendTabbed(s, params.blocks.back(), 1); // (int)params.blocks.size());
 	params.blocks.pop_back();
+
+	// If then expression is a pass-by-pointer argument, need to dereference it.
+	if(then_expr->type()->OpenCLPassByPointer() && (then_expr->nodeType() == ASTNode::VariableASTNodeType) && (then_expr.downcastToPtr<Variable>()->vartype == Variable::ArgumentVariable))
+		then_code = "*" + then_code;
 
 	s += "\t" + result_var_name + " = " + then_code + ";\n";
 
@@ -202,9 +207,13 @@ std::string IfExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 	// Emit 'else' code
 	params.blocks.push_back("");
-	const std::string else_code = else_expr->emitOpenCLC(params);
+	std::string else_code = else_expr->emitOpenCLC(params);
 	StringUtils::appendTabbed(s, params.blocks.back(), 1); // (int)params.blocks.size());
 	params.blocks.pop_back();
+
+	// If else expression is a pass-by-pointer argument, need to dereference it.
+	if(else_expr->type()->OpenCLPassByPointer() && (else_expr->nodeType() == ASTNode::VariableASTNodeType) && (else_expr.downcastToPtr<Variable>()->vartype == Variable::ArgumentVariable))
+		else_code = "*" + else_code;
 
 	s += "\t" + result_var_name + " = " + else_code + ";\n";
 

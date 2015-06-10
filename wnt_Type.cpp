@@ -819,7 +819,9 @@ const std::string StructureType::getOpenCLCDefinition() // Get full definition s
 
 	for(size_t i=0; i<component_types.size(); ++i)
 	{
-		s += component_types[i]->OpenCLCType() + " " + component_names[i];
+		// Non pass-by-value types are passed with a const C pointer.
+		const std::string use_type = !component_types[i]->OpenCLPassByPointer() ? component_types[i]->OpenCLCType() : ("const " + component_types[i]->OpenCLCType() + "* const ");
+		s += use_type + " " + component_names[i];
 		if(i + 1 < component_types.size())
 			s += ", ";
 	}
@@ -827,7 +829,7 @@ const std::string StructureType::getOpenCLCDefinition() // Get full definition s
 	s += ") { " + name + " s_; ";
 
 	for(size_t i=0; i<component_types.size(); ++i)
-		s += "s_." + component_names[i] + " = " + component_names[i] + "; ";
+		s += "s_." + component_names[i] + " = " + (!component_types[i]->OpenCLPassByPointer() ? "" : "*") + component_names[i] + "; ";
 
 	s += "return s_; }\n\n";
 
@@ -1068,6 +1070,10 @@ const std::string TupleType::getOpenCLCDefinition() const // Get full definition
 	// Make constructor.
 	// for struct tuple_float__float_ { float a, float b }, will look like    
 	// tuple_float__float_ tuple_float__float_cnstr(float a, float b) { tuple_float__float_ s;  s.a = a; s.b = b; return s; }
+	//
+	// for struct tuple_S_ { S s }, will look like    
+	// tuple_S_ tuple_S_cnstr(const S* const s) { tuple_S_ res;  res.s = *s; return s; }
+
 
 	const std::string constructor_name = makeSafeStringForFunctionName(this->toString()) + "_cnstr";
 
@@ -1076,7 +1082,9 @@ const std::string TupleType::getOpenCLCDefinition() const // Get full definition
 
 	for(size_t i=0; i<component_types.size(); ++i)
 	{
-		s += component_types[i]->OpenCLCType() + " field_" + ::toString(i);
+		// Non pass-by-value types are passed with a const C pointer.
+		const std::string use_type = !component_types[i]->OpenCLPassByPointer() ? component_types[i]->OpenCLCType() : ("const " + component_types[i]->OpenCLCType() + "* const ");
+		s += use_type + " field_" + ::toString(i);
 		if(i + 1 < component_types.size())
 			s += ", ";
 	}
@@ -1084,7 +1092,7 @@ const std::string TupleType::getOpenCLCDefinition() const // Get full definition
 	s += ") { " + tuple_typename + " s_; ";
 
 	for(size_t i=0; i<component_types.size(); ++i)
-		s += "s_.field_" + ::toString(i) + " = field_" + ::toString(i) + "; ";
+		s += "s_.field_" + ::toString(i) + " = " + (!component_types[i]->OpenCLPassByPointer() ? "" : "*") + "field_" + ::toString(i) + "; ";
 
 	s += "return s_; }\n\n";
 
@@ -1220,6 +1228,15 @@ bool OpaqueType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) c
 llvm::Type* OpaqueType::LLVMType(llvm::Module& module) const
 {
 	return LLVMTypeUtils::voidPtrType(module.getContext());
+}
+
+
+const std::string OpaqueType::OpenCLCType() const
+{ 
+	if(address_space.empty())
+		return "void*";
+	else
+		return address_space + " void*";
 }
 
 

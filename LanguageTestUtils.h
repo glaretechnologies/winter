@@ -40,6 +40,7 @@ namespace Winter
 
 
 const uint32 INVALID_OPENCL = 1; // Flag value
+const uint32 ALLOW_UNSAFE = 2; // Flag value
 
 
 static bool epsEqual(float x, float y)
@@ -323,10 +324,12 @@ static ProgramStats doTestMainFloatArg(const std::string& src, float argument, f
 #if USE_OPENCL
 			OpenCL* opencl = getGlobalOpenCL();
 
+			const gpuDeviceInfo& gpu_device = opencl->getDeviceInfo()[0];
+
 			cl_context context;
 			cl_command_queue command_queue;
 			opencl->deviceInit(
-				opencl->getDeviceInfo()[0],
+				gpu_device,
 				context,
 				command_queue
 			);
@@ -340,11 +343,11 @@ static ProgramStats doTestMainFloatArg(const std::string& src, float argument, f
 				"	output_buffer[0] = main_float_(x);		\n" + 
 				" }";
 
-			/*std::cout << extended_source << std::endl;
+			//std::cout << extended_source << std::endl;
 			{
 				std::ofstream f("opencl_source.c");
 				f << extended_source;
-			}*/
+			}
 
 			OpenCLBuffer output_buffer(context, sizeof(float), CL_MEM_READ_WRITE);
 
@@ -352,7 +355,9 @@ static ProgramStats doTestMainFloatArg(const std::string& src, float argument, f
 			for(size_t i=0; i<program_lines.size(); ++i)
 				program_lines[i].push_back('\n');
 
-			std::string options = "-save-temps";
+			std::string options;
+			//std::string options = "-save-temps";
+			//options += " -fbin-llvmir";//TEMP
 
 			StandardPrintOutput print_output;
 
@@ -360,7 +365,7 @@ static ProgramStats doTestMainFloatArg(const std::string& src, float argument, f
 			cl_program program = opencl->buildProgram(
 				program_lines,
 				context,
-				opencl->getDeviceInfo()[0].opencl_device,
+				gpu_device.opencl_device,
 				options,
 				print_output
 			);
@@ -422,7 +427,7 @@ static ProgramStats doTestMainFloatArg(const std::string& src, float argument, f
 
 			if(!epsEqual(opencl_result, target_return_val))
 			{
-				std::cerr << "Test failed: OpenCL returned " << val->value << ", target was " << target_return_val << std::endl;
+				std::cerr << "Test failed: OpenCL returned " << opencl_result << ", target was " << target_return_val << std::endl;
 				assert(0);
 				exit(1);
 			}
@@ -543,13 +548,13 @@ static void testMainInteger(const std::string& src, int target_return_val)
 }
 
 
-static void testMainIntegerArg(const std::string& src, int x, int target_return_val, bool allow_unsafe_operations = false)
+static void testMainIntegerArg(const std::string& src, int x, int target_return_val, uint32 test_flags = 0)
 {
 	std::cout << "===================== Winter testMainIntegerArg() =====================" << std::endl;
 	try
 	{
 		VMConstructionArgs vm_args;
-		vm_args.allow_unsafe_operations = allow_unsafe_operations;
+		vm_args.allow_unsafe_operations = (test_flags & ALLOW_UNSAFE) != 0;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
 
 		const FunctionSignature mainsig("main", std::vector<TypeRef>(1, new Int()));
@@ -603,7 +608,7 @@ static void testMainIntegerArg(const std::string& src, int x, int target_return_
 
 		//============================= New: test with OpenCL ==============================
 		const bool TEST_OPENCL = false;
-		if(TEST_OPENCL)
+		if(!(test_flags & INVALID_OPENCL) && TEST_OPENCL)
 		{
 #if USE_OPENCL
 			OpenCL* opencl = getGlobalOpenCL();
@@ -735,7 +740,7 @@ static void testMainIntegerArg(const std::string& src, int x, int target_return_
 
 
 
-static void testMainInt64Arg(const std::string& src, int64 x, int64 target_return_val, bool allow_unsafe_operations = false)
+static void testMainInt64Arg(const std::string& src, int64 x, int64 target_return_val, bool allow_unsafe_operations = false, uint32 test_flags = 0)
 {
 	std::cout << "===================== Winter testMainInt64Arg() =====================" << std::endl;
 	try

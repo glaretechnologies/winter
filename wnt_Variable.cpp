@@ -370,7 +370,7 @@ TypeRef Variable::type() const
 			return let_var_type;
 		else
 		{
-			if(let_var_type->getType() != Type::TupleTypeType)
+			if(let_var_type.isNull() || (let_var_type->getType() != Type::TupleTypeType))
 				return NULL;
 			return let_var_type.downcastToPtr<TupleType>()->component_types[this->let_var_index];
 		}

@@ -1240,11 +1240,12 @@ const std::string VirtualMachine::buildOpenCLCode()
 
 	// Add some Winter built-in functions
 	s +=
-"float toFloat_int_(int x) { return (float)x; } \n\
+"// Winter built-in functions \n\
+float toFloat_int_(int x) { return (float)x; } \n\
 int truncateToInt_float_(float x) { return (int)x; } \n\
 int8 truncateToInt_vector_float__8__(float8 v) { return convert_int8(v); }  \n\
 long toInt_opaque_(void* p) { return (long)p; }  \n\
-float print_float_(float x) { printf(\"%f\", x); return x; }    \n\
+float print_float_(float x) { printf((__constant char *)\"%f\\n\", x); return x; }    \n\
 \n";
 
 

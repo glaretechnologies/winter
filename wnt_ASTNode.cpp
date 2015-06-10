@@ -3948,17 +3948,21 @@ std::string LetBlock::emitOpenCLC(EmitOpenCLCodeParams& params) const
 	{
 		// Emit code for let variable
 		params.blocks.push_back("");
-		const std::string let_expression = this->lets[i]->emitOpenCLC(params);
+		std::string let_expression = this->lets[i]->emitOpenCLC(params);
 		StringUtils::appendTabbed(s, params.blocks.back(), 1);
 		params.blocks.pop_back();
 
 		if(this->lets[i]->vars.size() == 1)
 		{
+			// If let expression is a pass-by-pointer argument, need to dereference it.
+			if(this->lets[i]->expr->type()->OpenCLPassByPointer() && (this->lets[i]->expr->nodeType() == ASTNode::VariableASTNodeType) && (this->lets[i]->expr.downcastToPtr<Variable>()->vartype == Variable::ArgumentVariable))
+				let_expression = "*" + let_expression;
+
 			s += "\t" + this->lets[i]->type()->OpenCLCType() + " " + this->lets[i]->vars[0].name + " = " + let_expression + ";\n";
 		}
 		else
 		{
-			// Destructing:
+			// Destructuring:
 			assert(this->lets[i]->type()->getType() == Type::TupleTypeType);
 			const std::string let_var_value_name = "let_var_value_" + toString(params.uid++);
 			s += "\t" + this->lets[i]->type()->OpenCLCType() + " " + let_var_value_name + " = " + let_expression + ";\n";

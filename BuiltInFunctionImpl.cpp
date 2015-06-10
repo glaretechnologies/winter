@@ -2760,6 +2760,67 @@ llvm::Value* CeilBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 //----------------------------------------------------------------------------------------------
 
 
+SignBuiltInFunc::SignBuiltInFunc(const TypeRef& type_)
+:	type(type_)
+{}
+
+
+ValueRef SignBuiltInFunc::invoke(VMState& vmstate)
+{
+	if(type->getType() == Type::FloatType)
+	{
+		const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+		return new FloatValue(a->value >= 0 ? 1.0f : -1.0f);
+	}
+	else
+	{
+		assert(0);
+	}
+	/*else
+	{
+		assert(type->getType() == Type::VectorTypeType);
+
+		const VectorType* vector_type = static_cast<const VectorType*>(type.getPointer());
+
+		const VectorValue* a = checkedCast<const VectorValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+
+		vector<ValueRef> res_values(vector_type->num);
+		for(unsigned int i=0; i<vector_type->num; ++i)
+		{
+			const float x = checkedCast<const FloatValue>(a->e[i].getPointer())->value;
+			res_values[i] = new FloatValue(std::ceil(x));
+		}
+
+		return new VectorValue(res_values);
+
+	}
+	*/
+}
+
+
+llvm::Value* SignBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	vector<llvm::Type*> types(1, this->type->LLVMType(*params.module));
+
+	llvm::Function* func = llvm::Intrinsic::getDeclaration(params.module, llvm::Intrinsic::copysign, types);
+
+	assert(func);
+	assert(func->isIntrinsic());
+
+	llvm::Value* one = llvm::ConstantFP::get(*params.context, llvm::APFloat(1.f));
+
+	// "The ‘llvm.copysign.*‘ intrinsics return a value with the magnitude of the first operand and the sign of the second operand."
+	return params.builder->CreateCall2(
+		func,
+		one,
+		LLVMTypeUtils::getNthArg(params.currently_building_func, 0)
+	);
+}
+
+
+//----------------------------------------------------------------------------------------------
+
+
 TruncateToIntBuiltInFunc::TruncateToIntBuiltInFunc(const TypeRef& type_)
 :	type(type_)
 {}

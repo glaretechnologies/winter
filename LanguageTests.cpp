@@ -256,6 +256,20 @@ void LanguageTests::run()
 		}
 	}*/
 
+
+	// ===================================================================
+	// Test sign()
+	// ===================================================================
+	testMainFloatArg("def main(float x) float :	sign(x)", 4.f, 1.f);
+	testMainFloatArg("def main(float x) float :	sign(x)", -4.f, -1.f);
+	//NOTE: a bit of a problem wtih sign(0).  sign(0) is plus/minus zero in OpenCL.
+	// but copysign(1.0, 0.f) is one.
+	//testMainFloatArg("def main(float x) float :	sign(x)", 0.f, 1.f);
+
+
+	testMainFloatArgAllowUnsafe("struct S { float x }   def f(S s) float : s.x   def main(float x) float :	f(S(x))", 1.f, 1.f);
+
+
 	testMainIntegerArg("def main(int x) int :	 stringLength(\"hello\")", 1, 5, INVALID_OPENCL);
 
 	// ===================================================================
@@ -579,7 +593,7 @@ void LanguageTests::run()
 				[current_state, false]t # break										\n\
 			else																	\n\
 				[s(current_state.x*current_state.x, current_state.y), true]t					\n\
-		def main(int x) int :  iterate(f, s(x, x)).x", 3, 6561);
+		def main(int x) int :  iterate(f, s(x, x)).x", 3, 6561, INVALID_OPENCL);
 	
 
 	// This test triggers a problem with __chkstk when >= 4K is allocated on stack
@@ -1104,12 +1118,11 @@ void LanguageTests::run()
 	testMainIntegerArg("def f(int x) tuple<int, int> : if x < 0 [1, 2]t else [3, 4]t			\n\
 					   def main(int x) int : f(x)[0]", 10, 3);
 
-	if(!DO_OPENCL_TESTS) // OpenCL doesn't support new array values at runtime, nor fold() currently.
-	{
-
-	testMainIntegerArg("def main(int x) int : [x]a[0]", 10, 10);
-	testMainIntegerArg("def main(int x) int : [x, x + 1, x + 2]a[1]", 10, 11);
-	testMainIntegerArg("def main(int x) int : [x, x + 1, x + 2]a[1 + 1]", 10, 12);
+	// OpenCL doesn't support new array values at runtime, nor fold() currently.
+	
+	testMainIntegerArg("def main(int x) int : [x]a[0]", 10, 10, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int : [x, x + 1, x + 2]a[1]", 10, 11, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int : [x, x + 1, x + 2]a[1 + 1]", 10, 12, INVALID_OPENCL);
 
 	// Test index out of bounds
 	testMainIntegerArgInvalidProgram("def main(int x) int :  [x, x + 1, x + 2]a[-1])");
@@ -1120,12 +1133,12 @@ void LanguageTests::run()
 	// update(CollectionType c, int index, T newval) CollectionType
 	// ===================================================================
 
-	testMainIntegerArg("def main(int x) int :  elem(update([0]a, 0, x), 0)", 10, 10);
+	testMainIntegerArg("def main(int x) int :  elem(update([0]a, 0, x), 0)", 10, 10, INVALID_OPENCL);
 
-	testMainIntegerArg("def main(int x) int :  elem(update([0, 0]a, 0, x), 0)", 10, 10);
-	testMainIntegerArg("def main(int x) int :  elem(update([0, 0]a, 0, x), 1)", 10, 0);
-	testMainIntegerArg("def main(int x) int :  elem(update([0, 0]a, 1, x), 0)", 10, 0);
-	testMainIntegerArg("def main(int x) int :  elem(update([0, 0]a, 1, x), 1)", 10, 10);
+	testMainIntegerArg("def main(int x) int :  elem(update([0, 0]a, 0, x), 0)", 10, 10, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int :  elem(update([0, 0]a, 0, x), 1)", 10, 0, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int :  elem(update([0, 0]a, 1, x), 0)", 10, 0, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int :  elem(update([0, 0]a, 1, x), 1)", 10, 10, INVALID_OPENCL);
 
 	// Test update arg out of bounds
 	testMainIntegerArgInvalidProgram("def main(int x) int :  elem(update([]a, 0, x), 0)");
@@ -1144,7 +1157,7 @@ void LanguageTests::run()
 	testMainIntegerArg("															\n\
 		def f(int current_state, int elem) int :									\n\
 			current_state + elem													\n\
-		def main(int x) int :  fold(f, [0, 1, 2, 3, 4, 5]a, x)", 10, 25);
+		def main(int x) int :  fold(f, [0, 1, 2, 3, 4, 5]a, x)", 10, 25, INVALID_OPENCL);
 		
 
 	// Test fold built-in function with update
@@ -1156,7 +1169,7 @@ void LanguageTests::run()
 			in																		\n\
 				update(current_state, elem, new_count)								\n\
 		def main(int x) int :  elem(fold(f, [0, 0, 1, 2]a, [0]a16), 1)", 10, 1,
-		true // allow_unsafe_operations
+		ALLOW_UNSAFE | INVALID_OPENCL // allow_unsafe_operations
 	);
 
 
@@ -1176,7 +1189,7 @@ void LanguageTests::run()
 				update(counts, x, elem(counts, x) + 1)			\n\
 		def main(array<int, 256> vals, array<int, 256> initial_counts) array<int, 256>:  fold(f, vals, initial_counts)",
 			&vals[0], &b[0], &target_results[0], vals.size(),
-			true // allow_unsafe_operations
+			ALLOW_UNSAFE | INVALID_OPENCL // allow_unsafe_operations
 		);
 	}
 
@@ -1198,11 +1211,9 @@ void LanguageTests::run()
 				update(current_state, elem, new_count)								\n\
 		def main(array<int, 256> vals, array<int, 256> b) array<int, 256>:  fold(f, vals, b)",
 			&vals[0], &b[0], &target_results[0], vals.size(),
-			true // allow_unsafe_operations
+			ALLOW_UNSAFE | INVALID_OPENCL // allow_unsafe_operations
 		);
 	}
-
-	} // DO_OPENCL_TESTS
 
 	// ===================================================================
 	// Test iterate built-in function
@@ -1214,7 +1225,7 @@ void LanguageTests::run()
 				[current_state, false]t # break										\n\
 			else																	\n\
 				[current_state + 1, true]t											\n\
-		def main(int x) int :  iterate(f, 0)", 17, 100);
+		def main(int x) int :  iterate(f, 0)", 17, 100, INVALID_OPENCL);
 
 	testMainIntegerArg("struct State { int bound, int i }							\n\
 		def f(State current_state, int iteration) tuple<State, bool> :				\n\
@@ -1222,7 +1233,7 @@ void LanguageTests::run()
 				[State(current_state.bound, current_state.i), false]t # break		\n\
 			else																	\n\
 				[State(current_state.bound, current_state.i + 1), true]t			\n\
-		def main(int x) int :  iterate(f, State(x, 0)).i", 17, 17);
+		def main(int x) int :  iterate(f, State(x, 0)).i", 17, 17, INVALID_OPENCL);
 
 	testMainFloatArg("struct State { float i }					\n\
 		def f(State current_state, int iteration) tuple<State, bool> :	\n\
@@ -1230,7 +1241,7 @@ void LanguageTests::run()
 				[State(current_state.i), false]t # break		\n\
 			else												\n\
 				[State(current_state.i + 1.0), true]t			\n\
-		def main(float x) float :  iterate(f, State(0.0)).i", 1.0f, 100.0f);
+		def main(float x) float :  iterate(f, State(0.0)).i", 1.0f, 100.0f, INVALID_OPENCL);// NOTE: this was actually working with OpenCL until struct pass by ptr.
 
 	// Test iterate with optional invariant data:
 
@@ -1241,7 +1252,7 @@ void LanguageTests::run()
 				[current_state, false]t # break										\n\
 			else																	\n\
 				[current_state + invariant_data, true]t											\n\
-		def main(int x) int :  iterate(f, 0, 2)", 17, 200);
+		def main(int x) int :  iterate(f, 0, 2)", 17, 200, INVALID_OPENCL);
 
 	// Test with pass-by-reference data (struct)
 	testMainIntegerArg("															\n\
@@ -1251,7 +1262,7 @@ void LanguageTests::run()
 				[current_state, false]t # break										\n\
 			else																	\n\
 				[current_state + invariant_data.x, true]t											\n\
-		def main(int x) int :  iterate(f, 0, s(3, 4))", 17, 300);
+		def main(int x) int :  iterate(f, 0, s(3, 4))", 17, 300, INVALID_OPENCL);
 
 	// Test with two invariant data args pass-by-reference data (struct)
 	testMainIntegerArg("															\n\
@@ -1261,8 +1272,7 @@ void LanguageTests::run()
 				[current_state, false]t # break										\n\
 			else																	\n\
 				[current_state + invariant_data.x, true]t											\n\
-		def main(int x) int :  iterate(f, 0, s(3, 4), x)", 17, 3 * 17);
-
+		def main(int x) int :  iterate(f, 0, s(3, 4), x)", 17, 3 * 17, INVALID_OPENCL);
 
 
 	// ===================================================================
@@ -1295,6 +1305,7 @@ void LanguageTests::run()
 	// Test tuples being passed as a function argument
 	testMainFloatArg("def f(tuple<float, float> t) float : elem(t, 1)   \n\
 		def main(float x) float :  f([x + 1.0, x + 2.0]t)", 1.0f, 3.0f);
+
 
 	// Test tuples being passed as a function argument and returned
 	testMainFloatArg("def f(tuple<float, float> t) tuple<float, float> : t   \n\
@@ -1974,44 +1985,47 @@ void LanguageTests::run()
 	testMainIntegerArg("def main(int x) int : if x < 5 then (if x < 2 then 1 else 2) else 5 ", 2, 2);
 	testMainIntegerArg("def main(int x) int : if x < 5 then (if x < 2 then 1 else 2) else 5 ", 10, 5);
 
+
+
+	// Test if expression with a structure
+	testMainIntegerArg("struct S { int a }     def main(int x) int : (if x < 4 then S(x + 1) else S(x + 2)).a ", 10, 12);
+
+	// Test if expression with a structure passed as an argument
+	testMainIntegerArg("struct S { int a }     def f(int x, S a, S b) S : if x < 4 then a else b      def main(int x) int : f(x, S(x + 1), S(x + 2)).a ", 10, 12);
+
+
 	// ===================================================================
 	// Ref counting tests
 	// ===================================================================
-	if(!DO_OPENCL_TESTS)
-	{
-
 	// Test putting a string in a structure, then returning it.
 	testMainIntegerArg(
 		"struct teststruct { string str }										\n\
 		def f() teststruct : teststruct(\"hello world\")						\n\
 		def main(int x) int : stringLength(str(f())) ",
-		2, 11);
+		2, 11, INVALID_OPENCL);
 
 	// Test a string in a structure
 	testMainIntegerArg(
 		"struct teststruct { string str }										\n\
 		def main(int x) int : stringLength(teststruct(\"hello world\").str) ",
-		2, 11);
-	} // DO_OPENCL_TESTS
+		2, 11, INVALID_OPENCL);
 
 	
 	// ===================================================================
 	// String tests
 	// ===================================================================
-	if(!DO_OPENCL_TESTS)
-	{
 
 	// String test - string literal in let statement, with assignment.
 	testMainIntegerArg(
 		"def main(int x) int : stringLength(concatStrings(\"hello\", \"world\"))",
-		2, 10);
+		2, 10, INVALID_OPENCL);
 
 	// Double return of a string
 	testMainIntegerArg(
 		"def f() string : \"hello world\"	\n\
 		def g() string : f()				\n\
 		def main(int x) int : stringLength(g())",
-		2, 11);
+		2, 11, INVALID_OPENCL);
 	
 
 	
@@ -2024,7 +2038,7 @@ void LanguageTests::run()
 				s2 = s						\n\
 			in								\n\
 				stringLength(s) + stringLength(s2)",
-		2, 22);
+		2, 22, INVALID_OPENCL);
 
 	// String test - string literal in let statement, with assignment.
 	testMainIntegerArg(
@@ -2034,13 +2048,13 @@ void LanguageTests::run()
 				s2 = \"hallo thar\"			\n\
 			in								\n\
 				stringLength(s) + stringLength(s2)",
-		2, 21);
+		2, 21, INVALID_OPENCL);
 
 	// a function returning a string
 	testMainIntegerArg(
 		"def f() string : \"hello world\"	\n\
 		def main(int x) int : stringLength(f())",
-		2, 11);
+		2, 11, INVALID_OPENCL);
 
 	// a function returning a string in a let block
 	testMainIntegerArg(
@@ -2050,7 +2064,7 @@ void LanguageTests::run()
 				s = f()						\n\
 			in								\n\
 				stringLength(s)",
-		2, 11);
+		2, 11, INVALID_OPENCL);
 
 	// String test - string literal in let statement
 	testMainIntegerArg(
@@ -2059,13 +2073,13 @@ void LanguageTests::run()
 				s = \"hello world\"			\n\
 			in								\n\
 				stringLength(s)",
-		2, 11);
+		2, 11, INVALID_OPENCL);
 
 	// String test - string literal as argument
 	testMainIntegerArg(
 		"def main(int x) int :				\n\
 				stringLength(\"hello world\")",
-		2, 11);
+		2, 11, INVALID_OPENCL);
 
 	// String test - string literal in let statement, with assignment.
 	testMainIntegerArg(
@@ -2075,9 +2089,7 @@ void LanguageTests::run()
 				s2 = s						\n\
 			in								\n\
 				stringLength(s2)",
-		2, 11);
-
-	}
+		2, 11, INVALID_OPENCL);
 
 	// Char test
 	/*testMainIntegerArg(
@@ -2410,7 +2422,6 @@ TEMP OPENCL
 	// Test Array Literal of integers
 	testMainIntegerArg("def main(int x) int : elem([1, 2, 3, 4]a, 1) + x", 10, 12);
 
-	
 
 	// Test array with let statement
 	testMainFloatArg(
@@ -3249,7 +3260,9 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 				  def f<T>(T x) float: overloadedFunc(x)\
 				  def main() float : f(1.0)", 5.0f);
 
-	// Test let
+	// ===================================================================
+	// Test let blocks
+	// ===================================================================
 	testMainFloat("def f(float x) float : \
 				  let z = 2.0 \
 				  in \
@@ -3518,6 +3531,26 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 			  def main(float x) float : f(x)");
 
 
+	// Test a let var with structure type.
+	testMainFloatArg("struct S { float a }							\n\
+				def f(float x) float :			\n\
+					let							\n\
+						z = S(x)				\n\
+					in								\n\
+						z.a + 1.0						\n\
+				def main(float x) float : f(x)", 4.0, 5.0);
+
+
+	// Test a let var set to a structure passed as an argument.
+	testMainFloatArg("struct S { float a }							\n\
+				def f(float x, S s) float :			\n\
+					let							\n\
+						z = s				\n\
+					in								\n\
+						z.a + 1.0						\n\
+				def main(float x) float : f(x, S(x))", 4.0, 5.0);
+
+
 
 	// Test creation of struct
 	{
@@ -3632,13 +3665,10 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 					 let v = [x, x, x, x]v in\
 					 dot(v, v)", 2.0f, 16.0f);
 
-	// OpenCl dot not supported for > 4 elems in vecttor
-	if(!DO_OPENCL_TESTS)
-	{
-		testMainFloatArg("	def main(float x) float : \
-						 let v = [x, x, x, x, x, x, x, x]v in\
-						 dot(v, v)", 4.0f, 128.0f);
-	}
+	// OpenCl dot not supported for > 4 elems in vector
+	testMainFloatArg("	def main(float x) float : \
+					 let v = [x, x, x, x, x, x, x, x]v in\
+					 dot(v, v)", 4.0f, 128.0f, INVALID_OPENCL);
 					 
 
 	// Test vector min

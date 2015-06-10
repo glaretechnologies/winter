@@ -11,6 +11,7 @@ Generated at 2011-04-25 19:15:40 +0100
 #include "wnt_ASTNode.h"
 #include "wnt_SourceBuffer.h"
 #include "wnt_RefCounting.h"
+#include "wnt_Variable.h"
 #include "VMState.h"
 #include "Value.h"
 #include "Linker.h"
@@ -449,7 +450,11 @@ std::string FunctionDefinition::emitOpenCLC(EmitOpenCLCodeParams& params) const
 	opencl_sig += sig.typeMangledName() + "(";
 	for(unsigned int i=0; i<args.size(); ++i)
 	{
-		opencl_sig += args[i].type->OpenCLCType() + " " + args[i].name;
+		if(args[i].type->OpenCLPassByPointer())
+			opencl_sig += "const " + args[i].type->OpenCLCType() + "* const " + args[i].name;
+		else
+			opencl_sig += "const " + args[i].type->OpenCLCType() + " " + args[i].name;
+			
 		if(i + 1 < args.size())
 			opencl_sig += ", ";
 	}
@@ -465,8 +470,12 @@ std::string FunctionDefinition::emitOpenCLC(EmitOpenCLCodeParams& params) const
 	const std::string body_expr = body->emitOpenCLC(params);
 	StringUtils::appendTabbed(s, params.blocks.back(), (int)params.blocks.size());
 	params.blocks.pop_back();
-	
-	s += "\treturn " + body_expr + ";\n";
+
+	// If the body expression is just an argument, and it is pass by pointer, then it will need to be dereferenced.
+	if((body->nodeType() == ASTNode::VariableASTNodeType) && (body.downcastToPtr<Variable>()->vartype == Variable::ArgumentVariable) && body->type()->OpenCLPassByPointer())
+		s += "\treturn *" + body_expr + ";\n";// Deref
+	else
+		s += "\treturn " + body_expr + ";\n";
 
 	s += "}\n";
 

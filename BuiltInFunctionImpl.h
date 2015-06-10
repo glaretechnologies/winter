@@ -471,6 +471,18 @@ private:
 };
 
 
+class SignBuiltInFunc : public BuiltInFunctionImpl
+{
+public:
+	SignBuiltInFunc(const TypeRef& type);
+
+	virtual ValueRef invoke(VMState& vmstate);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+private:
+	TypeRef type;
+};
+
+
 class TruncateToIntBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
