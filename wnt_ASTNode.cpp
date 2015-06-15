@@ -3381,7 +3381,8 @@ bool LogicalNegationExpr::isConstant() const
 
 LetASTNode::LetASTNode(const std::vector<LetNodeVar>& vars_, const SrcLocation& loc)
 :	ASTNode(LetType, loc), 
-	vars(vars_)
+	vars(vars_),
+	traced(false)
 {
 	assert(!vars.empty());
 }
@@ -3389,7 +3390,15 @@ LetASTNode::LetASTNode(const std::vector<LetNodeVar>& vars_, const SrcLocation& 
 
 ValueRef LetASTNode::exec(VMState& vmstate)
 {
-	return this->expr->exec(vmstate);
+	ValueRef res = this->expr->exec(vmstate);
+
+	if(vmstate.trace && !traced)
+	{
+		*vmstate.ostream << vmstate.indent() << "    " << this->vars[0].name << " = " << res->toString() << std::endl;
+		traced = true;
+	}
+
+	return res;
 }
 
 
@@ -4090,6 +4099,44 @@ void addMetaDataCommentToInstruction(EmitLLVMCodeParams& params, llvm::Instructi
 }
 
 
+static llvm::Function* getOrInsertTracePrintFloatCall(llvm::Module* module)
+{
+	// void tracePrintFloat(const char* var_name, float val)
+
+	llvm::Type* arg_types[2] = { 
+		llvm::Type::getInt8PtrTy(module->getContext()), 
+		llvm::Type::getFloatTy(module->getContext())
+	};
+
+	llvm::FunctionType* functype = llvm::FunctionType::get(
+		llvm::Type::getVoidTy(module->getContext()), // return type
+		arg_types,
+		false // varargs
+	);
+
+	llvm::Constant* llvm_func_constant = module->getOrInsertFunction(
+		"tracePrintFloat", // Name
+		functype // Type
+	);
+
+	assert(llvm::isa<llvm::Function>(llvm_func_constant));
+	return static_cast<llvm::Function*>(llvm_func_constant);
+}
+
+
+static void emitTracePrintCall(EmitLLVMCodeParams& params, const string& var_name, llvm::Value* float_value)
+{
+	// Make a global constant character array for the string data.
+	llvm::Value* string_global = params.builder->CreateGlobalString(var_name);
+
+	// Get a pointer to the zeroth elem
+	llvm::Value* elem_0 = params.builder->CreateStructGEP(string_global, 0);
+
+	llvm::Function* f = getOrInsertTracePrintFloatCall(params.module);
+	params.builder->CreateCall2(f, elem_0, float_value);
+}
+
+
 llvm::Value* LetBlock::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
 	// NEW: Emit code for the let statements now.
@@ -4105,6 +4152,9 @@ llvm::Value* LetBlock::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 	for(size_t i=0; i<lets.size(); ++i)
 	{
 		llvm::Value* let_value = this->lets[i]->emitLLVMCode(params, ret_space_ptr);
+
+		if(params.emit_trace_code && this->lets[i]->type()->getType() == Type::FloatType)
+			emitTracePrintCall(params, this->lets[i]->vars[0].name, let_value);
 
 		params.let_block_let_values[this].push_back(let_value);
 	}

@@ -39,7 +39,7 @@ llvm::Constant* IntValue::getConstantLLVMValue(EmitLLVMCodeParams& params, const
 
 const std::string FloatValue::toString() const
 {
-	return ::toString(this->value);
+	return ::floatLiteralString(this->value);
 }
 
 
@@ -132,6 +132,15 @@ llvm::Constant* StructureValue::getConstantLLVMValue(EmitLLVMCodeParams& params,
 		(llvm::StructType*)type->LLVMType(*params.module),
 		llvm_fields
 	);
+}
+
+
+const std::string StructureValue::toString() const
+{
+	std::string s = "{";
+	for(size_t i=0; i<fields.size(); ++i)
+		s += fields[i]->toString() + ((i + 1 < fields.size()) ? ", " : "");
+	return s + "}";
 }
 
 

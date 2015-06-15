@@ -149,7 +149,7 @@ FunctionDefinition* FunctionExpression::runtimeBind(VMState& vmstate, const Func
 
 ValueRef FunctionExpression::exec(VMState& vmstate)
 {
-	if(VERBOSE_EXEC) std::cout << indent(vmstate) << "FunctionExpression, target_name=" << this->function_name << "\n";
+	if(VERBOSE_EXEC) std::cout << vmstate.indent() << "FunctionExpression, target_name=" << this->function_name << "\n";
 
 	if(vmstate.func_args_start.size() > 1000)
 		throw BaseException("Function call level too deep, aborting.");
@@ -206,7 +206,7 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 	vmstate.func_args_start.push_back(initial_arg_stack_size);
 
 	if(VERBOSE_EXEC)
-		std::cout << indent(vmstate) << "Calling " << this->function_name << ", func_args_start: " << vmstate.func_args_start.back() << "\n";
+		std::cout << vmstate.indent() << "Calling " << this->function_name << ", func_args_start: " << vmstate.func_args_start.back() << "\n";
 
 	ValueRef ret = use_target_func->invoke(vmstate);
 	vmstate.func_args_start.pop_back();
@@ -1522,9 +1522,14 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 				{
 					s += argument_expressions[i]->emitOpenCLC(params);
 				}
+				else if(argument_expressions[i]->nodeType() == ASTNode::VariableASTNodeType && argument_expressions[i].downcastToPtr<Variable>()->vartype == Variable::LetVariable)
+				{
+					// If the variable is bound to a let variable, then it is on the stack of the C function.  So it is not a pointer
+					s += "&" + argument_expressions[i]->emitOpenCLC(params);
+				}
 				else
 				{
-					const std::string arg_name = "arg_" + toString(params.uid++);
+					const std::string arg_name = this->target_function->args[i].name + "_arg_" + toString(params.uid++);
 					arg_eval_s += argument_expressions[i]->type()->OpenCLCType() + " " + arg_name + " = " + argument_expressions[i]->emitOpenCLC(params) + ";\n";
 
 					s += "&" + arg_name;
@@ -1535,7 +1540,8 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 				s += ", ";
 		}
 
-		params.blocks.back() += arg_eval_s;
+		if(!arg_eval_s.empty())
+			params.blocks.back() += "// args for " + this->target_function->sig.toString() + ":\n" + arg_eval_s;
 
 		return s + ")";
 	}

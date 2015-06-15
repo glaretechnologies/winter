@@ -56,7 +56,7 @@ public:
 class VMConstructionArgs
 {
 public:
-	VMConstructionArgs() : env(NULL), allow_unsafe_operations(false)/*, add_opaque_env_arg(false)*/ {}
+	VMConstructionArgs() : env(NULL), allow_unsafe_operations(false), emit_trace_code(false) /*, add_opaque_env_arg(false)*/ {}
 	std::vector<ExternalFunctionRef> external_functions;
 	std::vector<SourceBufferRef> source_buffers;
 	std::vector<FunctionSignature> entry_point_sigs;
@@ -64,7 +64,7 @@ public:
 	std::vector<FunctionDefinitionRef> preconstructed_func_defs;//TEMP
 	void* env;
 	bool allow_unsafe_operations; // If this is true, in-bounds proof requirements of elem() etc.. are disabled.
-
+	bool emit_trace_code; // If this is true, information is printed out to std out as the program executes.
 	std::vector<Reference<FunctionRewriter> > function_rewriters;
 };
 

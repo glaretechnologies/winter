@@ -102,7 +102,8 @@ public:
 		const llvm::DataLayout/*TargetData*/* target_data,
 		const CommonFunctions& common_functions,
 		std::set<Reference<const Type>, ConstTypeRefLessThan>& destructors_called_types,
-		ProgramStats& stats
+		ProgramStats& stats,
+		bool emit_trace_code
 		//std::map<Lang::FunctionSignature, llvm::Function*>& external_functions
 	);
 

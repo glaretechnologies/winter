@@ -141,7 +141,6 @@ public:
 };
 
 
-const std::string indent(VMState& vmstate);
 void printMargin(int depth, std::ostream& s);
 bool isIntExactlyRepresentableAsFloat(int64 x);
 bool checkFoldExpression(Reference<ASTNode>& e, TraversalPayload& payload); // Returns true if folding took place or e is already a literal.
@@ -210,6 +209,8 @@ public:
 	std::set<Reference<const Type>, ConstTypeRefLessThan>* destructors_called_types;
 
 	bool emit_refcounting_code;
+
+	bool emit_trace_code;
 
 	ProgramStats* stats;
 };
@@ -709,6 +710,7 @@ public:
 	ASTNodeRef expr;
 	std::vector<LetNodeVar> vars; // One or more variable names (And possible associated declared types).  Will be more than one in the case of destructuring assignment.
 	//mutable llvm::Value* llvm_value;
+	bool traced;
 };
 
 

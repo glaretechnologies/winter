@@ -107,7 +107,7 @@ public:
 	StructureValue(const std::vector<ValueRef>& fields_) : fields(fields_) {}
 	~StructureValue();
 	virtual Value* clone() const;
-	virtual const std::string toString() const { return "struct"; }
+	virtual const std::string toString() const;
 	virtual llvm::Constant* getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const;
 
 	std::vector<ValueRef> fields;

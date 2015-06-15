@@ -48,9 +48,6 @@ namespace Winter
 {
 
 
-static const bool VERBOSE_EXEC = false;
-
-
 FunctionDefinition::FunctionDefinition(const SrcLocation& src_loc, int order_num_, const std::string& name, const std::vector<FunctionArg>& args_, 
 									   const ASTNodeRef& body_, const TypeRef& declared_rettype, 
 									   const BuiltInFunctionImplRef& impl
@@ -146,15 +143,6 @@ ValueRef FunctionDefinition::exec(VMState& vmstate)
 }
 
 
-const std::string indent(VMState& vmstate)
-{
-	std::string s;
-	for(unsigned int i=0; i<vmstate.func_args_start.size(); ++i)
-		s += "  ";
-	return s;
-}
-
-
 //static void printStack(VMState& vmstate)
 //{
 //	std::cout << indent(vmstate) << "arg Stack: [";
@@ -167,9 +155,9 @@ const std::string indent(VMState& vmstate)
 
 ValueRef FunctionDefinition::invoke(VMState& vmstate)
 {
-	if(VERBOSE_EXEC) 
+	if(vmstate.trace) 
 	{
-		std::cout << indent(vmstate) << "FunctionDefinition, name=" << this->sig.name << "\n";
+		//*vmstate.ostream << vmstate.indent() << "" << this->sig.name << "()\n";
 		//printStack(vmstate);
 	}
 
@@ -178,9 +166,9 @@ ValueRef FunctionDefinition::invoke(VMState& vmstate)
 	{
 		ValueRef arg_val = vmstate.argument_stack[vmstate.func_args_start.back() + i];
 
-		if(VERBOSE_EXEC)
+		if(vmstate.trace)
 		{
-			std::cout << "Arg " << i << ": " << arg_val->toString() << std::endl;
+			//*vmstate.ostream << "Arg " << i << ": " << arg_val->toString() << std::endl;
 		}
 	}
 
@@ -848,7 +836,8 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	const llvm::DataLayout/*TargetData*/* target_data,
 	const CommonFunctions& common_functions,
 	std::set<Reference<const Type>, ConstTypeRefLessThan>& destructors_called_types,
-	ProgramStats& stats
+	ProgramStats& stats,
+	bool emit_trace_code
 	//std::map<Lang::FunctionSignature, llvm::Function*>& external_functions
 	)
 {
@@ -897,6 +886,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	params.destructors_called_types = &destructors_called_types;
 	params.emit_refcounting_code = true;
 	params.stats = &stats;
+	params.emit_trace_code = emit_trace_code;
 
 	//llvm::Value* body_code = NULL;
 	if(this->built_in_func_impl.nonNull())

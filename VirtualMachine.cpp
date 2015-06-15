@@ -74,6 +74,7 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #ifdef _MSC_VER
 #pragma warning(pop) // Re-enable warnings
 #endif
+#include <iostream>
 
 
 using std::vector;
@@ -319,6 +320,11 @@ void execArrayMap(void* output, void* input, size_t array_size, void* map_functi
 //=====================================================================================
 
 
+static void tracePrintFloat(const char* var_name, float x)
+{
+	std::cout << std::string(var_name) << " = " << toString(x) << std::endl;
+}
+
 
 #if TARGET_LLVM_VERSION >= 34
 #else
@@ -353,6 +359,8 @@ public:
 
 		if(name == "execArrayMap")
 			return (uint64_t)execArrayMap;
+		if(name == "tracePrintFloat")
+			return (uint64_t)tracePrintFloat;
 
 		// For some reason, DynamicLibrary::SearchForAddressOfSymbol() doesn't seem to work on Windows 32-bit.  So just manually resolve these symbols.
 		if(name == "sinf")
@@ -1023,8 +1031,43 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 		this->llvm_module,
 		this->llvm_exec_engine->getDataLayout(),
 		common_functions,
-		this->stats
+		this->stats,
+		args.emit_trace_code
 	);
+
+	
+	// rename / obfuscate pass (with interalize + global DCE to remove unused code)
+	/*{
+		llvm::PassManager pm;
+		//pm.add(llvm::createMetaRenamerPass());
+
+		// Do internalize pass.  This pass has to be added before the other optimisation passes or it won't do anything.
+		{
+			// Build list of functions with external linkage (entry points)
+			
+			std::vector<std::string> export_list_strings;
+			for(unsigned int i=0; i<args.entry_point_sigs.size(); ++i)
+			{
+				FunctionDefinitionRef func = linker.findMatchingFunctionSimple(args.entry_point_sigs[i]);
+
+				if(func.nonNull() && func->built_llvm_function)
+					export_list_strings.push_back(func->built_llvm_function->getName()); // NOTE: is LLVM func built yet?
+			}
+
+			std::vector<const char*> export_list;
+			for(unsigned int i=0; i<export_list_strings.size(); ++i)
+				export_list.push_back(export_list_strings[i].c_str());
+
+
+			export_list.push_back("pluto323");
+
+			pm.add(llvm::createInternalizePass(export_list));
+		}
+
+		pm.add(llvm::createGlobalDCEPass());
+		pm.run(*this->llvm_module);
+	}*/
+	
 	
 	// Dump unoptimised module bitcode to 'unoptimised_module.txt'
 	if(DUMP_MODULE_IR)
@@ -1130,7 +1173,7 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 		llvm::PassManagerBuilder builder;
 
 		// Turn on vectorisation!
-		builder.BBVectorize = true;
+		builder.BBVectorize = false; // Disabled due to being buggy: https://llvm.org/bugs/show_bug.cgi?id=23845
 		builder.SLPVectorize = true;
 		builder.LoopVectorize = true;
 
