@@ -51,6 +51,7 @@ parseLetBLock
 ----------------------------------------	    
 |                                      |
 |                                    parseLet
+parseTernaryConditionalExpression
 parseBinaryLogicalExpression       
 parseComparisonExpression        
 parseAddSubExpression

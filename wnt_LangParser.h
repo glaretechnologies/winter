@@ -94,6 +94,7 @@ private:
 	//void parseToken(const std::vector<Reference<TokenBase> >& tokens, const char* text_buffer, unsigned int token_type, const std::string& type_name, unsigned int& i);
 	void parseToken(unsigned int token_type, ParseInfo& parseinfo);
 	bool isTokenCurrent(unsigned int token_type, ParseInfo& parseinfo);
+	void advance(ParseInfo& parseinfo);
 
 	//ASTNodeRef parseFieldExpression(ParseInfo& parseinfo);
 	ASTNodeRef parseVariableExpression(ParseInfo& parseinfo);
@@ -118,6 +119,7 @@ private:
 	ASTNodeRef parseAddSubExpression(ParseInfo& parseinfo);
 	ASTNodeRef parseMulDivExpression(ParseInfo& parseinfo);
 	ASTNodeRef parseBinaryLogicalExpression(ParseInfo& parseinfo);
+	ASTNodeRef parseTernaryConditionalExpression(ParseInfo& parseinfo);
 	//ASTNodeRef parseParenExpression(ParseInfo& parseinfo);
 	ASTNodeRef parseMapLiteralExpression(ParseInfo& parseinfo);
 	ASTNodeRef parseArrayOrVectorOrTupleLiteral(ParseInfo& parseinfo);

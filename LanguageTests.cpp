@@ -258,6 +258,25 @@ void LanguageTests::run()
 
 
 	// ===================================================================
+	// Test ternary conditional operator (?:)
+	// ===================================================================
+	testMainIntegerArg("def main(int x) int : x < 5 ? 10 : 5 ", 2, 10);
+	testMainIntegerArg("def main(int x) int : x < 5 ? 10 : 5 ", 6, 5);
+
+	testMainIntegerArg("def main(int x) int : (x < 5) ? 10 : 5 ", 6, 5);
+	testMainIntegerArg("def main(int x) int : (x * 2) < 5 ? 10 : 5 ", 6, 5);
+
+	// Test nested ?:
+	testMainIntegerArg("def main(int x) int : x < 5 ? (x < 2 ? 1 : 2) : 5 ", 1, 1);
+	testMainIntegerArg("def main(int x) int : x < 5 ? x < 2 ? 1 : 2 : 5 ", 1, 1);
+
+	testMainIntegerArg("def main(int x) int : x < 5 ? x < 2 ? 1 : 2 : 5 ", 2, 2);
+	testMainIntegerArg("def main(int x) int : x < 5 ? x < 2 ? 1 : 2 : 5 ", 10, 5);
+	testMainIntegerArg("def main(int x) int : (x < 5) ? x < 2 ? 1 : 2 : 5 ", 10, 5); // Test with parens
+	testMainIntegerArg("def main(int x) int : x < 5 ? (x < 2) ? 1 : 2 : 5 ", 10, 5); // Test with parens
+
+
+	// ===================================================================
 	// Test sign()
 	// ===================================================================
 	testMainFloatArg("def main(float x) float :	sign(x)", 4.f, 1.f);

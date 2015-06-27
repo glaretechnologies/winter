@@ -380,6 +380,11 @@ void Lexer::process(const SourceBufferRef& src, std::vector<Reference<TokenBase>
 				parser.advance();
 			}
 		}
+		else if(parser.current() == '?')
+		{
+			tokens_out.push_back(Reference<TokenBase>(new QUESTION_MARK_Token(parser.currentPos())));
+			parser.advance();
+		}
 		else
 		{
 			throw LexerExcep("Invalid character '" + std::string(1, parser.current()) + "'." + errorPosition(src, parser.currentPos()));

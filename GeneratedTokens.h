@@ -276,6 +276,18 @@ public:
 };
 
 
+// Added manually:
+const unsigned int QUESTION_MARK_TOKEN = 35;
+class QUESTION_MARK_Token : public TokenBase
+{
+public:
+ QUESTION_MARK_Token(unsigned int char_index) : TokenBase(char_index, QUESTION_MARK_TOKEN) {}
+ virtual bool isLiteral() const { return false; }
+ virtual bool isParanthesis() const { return false; }
+ virtual bool isBinaryInfixOp() const { return false; }
+};
+
+
 inline const std::string tokenName(unsigned int t)
 {
 	switch(t) {
@@ -304,6 +316,7 @@ inline const std::string tokenName(unsigned int t)
 		case 32: return "OR";
 		case 33: return "EXCLAMATION_MARK";
 		case 34: return "DOT";
+		case 35: return "QUESTION_MARK_TOKEN";
 		default: return "[Unknown]";
 	}
 }
@@ -337,6 +350,7 @@ inline Reference<TokenBase> makeTokenObject(unsigned int token_type, unsigned in
 		case 32: return Reference<TokenBase>(new OR_Token(char_index));
 		case 33: return Reference<TokenBase>(new EXCLAMATION_MARK_Token(char_index));
 		case 34: return Reference<TokenBase>(new DOT_Token(char_index));
+		case 35: return Reference<TokenBase>(new QUESTION_MARK_Token(char_index));
 		default: return  Reference<TokenBase>();
 	}
 }

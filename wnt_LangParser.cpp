@@ -240,6 +240,12 @@ bool LangParser::isTokenCurrent(unsigned int token_type, ParseInfo& p)
 }
 
 
+void LangParser::advance(ParseInfo& p)
+{
+	p.i++;
+}
+
+
 /*ASTNodeRef LangParser::parseFieldExpression(ParseInfo& p)
 {
 	ASTNodeRef left = parseArraySubscriptExpression(p);
@@ -734,7 +740,7 @@ Reference<ASTNode> LangParser::parseLetBlock(ParseInfo& p)
 	}
 
 
-	return parseBinaryLogicalExpression(p);
+	return parseTernaryConditionalExpression(p);
 }
 
 
@@ -1166,6 +1172,31 @@ ASTNodeRef LangParser::parseBinaryLogicalExpression(ParseInfo& p)
 		else
 			return left;
 	}
+}
+
+
+ASTNodeRef LangParser::parseTernaryConditionalExpression(ParseInfo& p)
+{
+	ASTNodeRef left = parseBinaryLogicalExpression(p);
+
+	if(isTokenCurrent(QUESTION_MARK_TOKEN, p))
+	{
+		advance(p);
+
+		ASTNodeRef then_expr = parseTernaryConditionalExpression(p);
+
+		parseToken(COLON_TOKEN, p); // Parse ':'.
+
+		ASTNodeRef else_expr = parseTernaryConditionalExpression(p);
+
+		return new IfExpression(left->srcLocation(),
+			left,
+			then_expr,
+			else_expr
+		);
+	}
+	else
+		return left;
 }
 
 
