@@ -368,11 +368,15 @@ TypeRef Variable::type() const
 		const TypeRef let_var_type = this->bound_let_block->lets[this->bound_index]->type();
 		if(this->bound_let_block->lets[this->bound_index]->vars.size() == 1)
 			return let_var_type;
-		else
+		else // Else if destructuring assignment:
 		{
 			if(let_var_type.isNull() || (let_var_type->getType() != Type::TupleTypeType))
 				return NULL;
-			return let_var_type.downcastToPtr<TupleType>()->component_types[this->let_var_index];
+			const TupleType* tuple_type = let_var_type.downcastToPtr<TupleType>();
+			if(this->let_var_index >= 0 && this->let_var_index < (int)tuple_type->component_types.size()) // If in bounds:
+				return tuple_type->component_types[this->let_var_index];
+			else
+				return NULL;
 		}
 	}
 	else if(this->vartype == ArgumentVariable)

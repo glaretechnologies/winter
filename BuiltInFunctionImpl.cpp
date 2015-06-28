@@ -2774,10 +2774,6 @@ ValueRef SignBuiltInFunc::invoke(VMState& vmstate)
 	}
 	else
 	{
-		assert(0);
-	}
-	/*else
-	{
 		assert(type->getType() == Type::VectorTypeType);
 
 		const VectorType* vector_type = static_cast<const VectorType*>(type.getPointer());
@@ -2788,13 +2784,11 @@ ValueRef SignBuiltInFunc::invoke(VMState& vmstate)
 		for(unsigned int i=0; i<vector_type->num; ++i)
 		{
 			const float x = checkedCast<const FloatValue>(a->e[i].getPointer())->value;
-			res_values[i] = new FloatValue(std::ceil(x));
+			res_values[i] = new FloatValue(x >= 0 ? 1.0f : -1.0f);
 		}
 
 		return new VectorValue(res_values);
-
 	}
-	*/
 }
 
 
@@ -2807,7 +2801,18 @@ llvm::Value* SignBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	assert(func);
 	assert(func->isIntrinsic());
 
-	llvm::Value* one = llvm::ConstantFP::get(*params.context, llvm::APFloat(1.f));
+	llvm::Value* scalar_one = llvm::ConstantFP::get(*params.context, llvm::APFloat(1.f));
+
+	llvm::Value* one;
+	if(type->getType() == Type::VectorTypeType)
+	{
+		one = params.builder->CreateVectorSplat(
+			this->type.downcastToPtr<VectorType>()->num, // num elements
+			scalar_one // value
+		);
+	}
+	else
+		one = scalar_one;
 
 	// "The ‘llvm.copysign.*‘ intrinsics return a value with the magnitude of the first operand and the sign of the second operand."
 	return params.builder->CreateCall2(

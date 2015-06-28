@@ -182,6 +182,7 @@ void LanguageTests::run()
 	//useKnownReturnRefCountOptimsiation(3);
 
 
+	//fuzzTests();
 	//////////////////
 
 
@@ -285,6 +286,19 @@ void LanguageTests::run()
 	// but copysign(1.0, 0.f) is one.
 	//testMainFloatArg("def main(float x) float :	sign(x)", 0.f, 1.f);
 
+	// sign() on vectors:
+	testMainFloatArg("def main(float x) float :	sign([x, x, x, x]v)[0]", -4.f, -1.f);
+	testMainFloatArg("def main(float x) float :	sign([x, x, x, x]v)[3]", -4.f, -1.f);
+	testMainFloatArg("def main(float x) float :	sign([4.0, 4.0, 4.0, 4.0]v)[3]", -4.f, 1.f);
+
+	// with vector of length 3:
+	testMainFloatArg("def main(float x) float :	sign([x, x, x]v)[0]", -4.f, -1.f);
+	testMainFloatArg("def main(float x) float :	sign([x, x, x]v)[2]", -4.f, -1.f);
+	testMainFloatArg("def main(float x) float :	sign([4.0, 4.0, 4.0]v)[2]", -4.f, 1.f);
+
+
+	// Caused a crash earlier:
+	testMainFloatArgInvalidProgram("struct Float4Struct { vector<float, 4> v }   def sin(Float4Struct f) : Float4Struct(sign(f.v))		def main(Float4Struct a, Float4Struct b) Float4Struct : sin(a)");
 
 	testMainFloatArgAllowUnsafe("struct S { float x }   def f(S s) float : s.x   def main(float x) float :	f(S(x))", 1.f, 1.f);
 
@@ -363,6 +377,8 @@ void LanguageTests::run()
 	// Test on a tuple returned from a function with a varray
 	testMainFloatArgAllowUnsafe("def f(float x) : ([x + 1.0]va, x + 2.0)           def main(float x) float :	 let a, b = f(x) in a[0]", 1.f, 2.f, INVALID_OPENCL);
 
+	// Test with an incorrect number of variable names (caused a crash at some point)
+	testMainIntegerArgInvalidProgram("def main(float x) float :	 let float, a, b = (3.0, 4.0) in b");
 
 
 	// Test map
@@ -2111,6 +2127,8 @@ void LanguageTests::run()
 		2, 11, INVALID_OPENCL);
 
 	// Char test
+	// Disabled for now.
+	testMainIntegerArgInvalidProgram("def main(int x) int : let c = 'a' in 10"); 
 	/*testMainIntegerArg(
 		"def main(int x) int :				\n\
 			let								\n\

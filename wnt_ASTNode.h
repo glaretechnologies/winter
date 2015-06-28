@@ -453,7 +453,7 @@ public:
 	CharLiteral(const std::string& v, const SrcLocation& loc);
 
 	virtual ValueRef exec(VMState& vmstate);
-	virtual TypeRef type() const { return TypeRef(new String()); }
+	virtual TypeRef type() const { return new CharType(); }
 	virtual void print(int depth, std::ostream& s) const;
 	virtual std::string sourceString() const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;

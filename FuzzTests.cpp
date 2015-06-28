@@ -949,6 +949,8 @@ void fuzzTests()
 		choices.push_back(Choice(Choice::Action_Insert, " + ", 1.0f));
 		choices.push_back(Choice(Choice::Action_Insert, " * ", 1.0f));
 		choices.push_back(Choice(Choice::Action_Insert, " < ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " ? ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " : ", 1.0f));
 		choices.push_back(Choice(Choice::Action_Insert, " true ", 1.0f));
 		choices.push_back(Choice(Choice::Action_Insert, " < ", " > ", 1.0f));
 		choices.push_back(Choice(Choice::Action_Insert, " [ ", " ]t ", 1.0f));
@@ -990,7 +992,7 @@ void fuzzTests()
 
 
 		// Each stage has different random number seeds, and after each stage tested_programs will be cleared, otherwise it gets too large and uses up too much RAM.
-		int rng_seed = 270;
+		int rng_seed = 280;
 		for(int stage=0; stage<1000000; ++stage)
 		{
 			std::cout << "=========================== Stage " << stage << "===========================================" << std::endl;

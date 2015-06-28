@@ -184,10 +184,11 @@ void Lexer::process(const SourceBufferRef& src, std::vector<Reference<TokenBase>
 		{
 			parseStringLiteral(src, parser, tokens_out);
 		}
-		else if(parser.current() == '\'')
+		// Disabled until we have proper character support:
+		/*else if(parser.current() == '\'')
 		{
 			parseCharLiteral(src, parser, tokens_out);
-		}
+		}*/
 		else if(parser.current() == '-' /*|| parser.current() == '+'*/ /*|| parser.current() == '.'*/ || ::isNumeric(parser.current()))
 		{
 			if(parser.parseString("->"))

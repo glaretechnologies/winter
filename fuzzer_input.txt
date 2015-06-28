@@ -1,3 +1,70 @@
+def main(int x) int : x < 5 ? 10 : 5 
+
+def main(int x) int : x < 5 ? 10 : 5 
+
+def main(int x) int : (x < 5) ? 10 : 5
+
+def main(int x) int : (x * 2) < 5 ? 10 : 5
+
+
+def main(int x) int : x < 5 ? (x < 2 ? 1 : 2) : 5
+
+def main(int x) int : x < 5 ? x < 2 ? 1 : 2 : 5 
+
+def main(int x) int : x < 5 ? x < 2 ? 1 : 2 : 5 
+
+def main(int x) int : x < 5 ? x < 2 ? 1 : 2 : 5 
+
+def main(int x) int : (x < 5) ? x < 2 ? 1 : 2 : 5
+
+def main(int x) int : x < 5 ? (x < 2) ? 1 : 2 : 5
+
+//=================== Test destructuring assignment ===========================
+
+def main(float x) float :	 let a, b = (x + 1.0, x + 2.0) in a
+
+def main(float x) float :	 let a, b = (3, 4) in a
+
+def main(float x) float :	 let a, b = (3, 4) in b
+
+def f(float x) : (x + 1.0, x + 2.0)           def main(float x) float :	 let a, b = f(x) in a
+
+def f(float x) : (x + 1.0, x + 2.0)           def main(float x) float :	 let a, b = f(x) in b
+
+def main(float x) float :	 let a, b = (1, 2, 3) in a
+
+def main(float x) float :	 let a, b, c = (1, 2, 3, 4) in a
+
+def main(float x) float :	 let a, b = [1]t in a
+
+def main(float x) float :	 let a, b, c = (1, 2) in a
+
+def main(float x) float :	 let a, b, c, d = (1, 2, 3) in a
+
+def main(float x) float :	 let float a, b = (3.0, 4.0) in a
+
+def main(float x) float :	 let float a, float b = (3.0, 4.0f) in a
+
+def main(float x) float :	 let a, float b = (3.0, 4.0f) in a
+
+def main(float x) float :	 let float a, b = (3.0, 4.0) in b
+
+def main(float x) float :	 let float a, float b = (3.0, 4.0f) in a
+
+def main(float x) float :	 let a, float b = (3.0, 4.0f) in a
+
+def main(float x) float :	 let a, b = ([3.0, 4.0, 5.0]va, 10.0) in a[0]
+
+def main(float x) float :	 let a, b = ([3.0, 4.0, 5.0]va, 10.0) in a[1]
+
+struct S { float s }     def main(float x) float :	 let a, b = (S(3.0), 10.0) in a.s
+	
+struct S { float s }     def f(float x) : (S(x + 1.0), x + 2.0)           def main(float x) float :	 let a, b = f(x) in a.s
+	
+def f(float x) : ([x + 1.0]va, x + 2.0)           def main(float x) float :	 let a, b = f(x) in a[0]
+
+//=========================================
+
 	def main(int x) int : elem( [1, 1, 1, 1]v + [x, x, x, x]v, 2)
 
 	def main(int x) int : elem( [1, 1, 1, 1]v - [x, x, x, x]v, 2)	def main(int x) int : elem( [1, 1, 1, 1]v * [x, x, x, x]v, 2)
