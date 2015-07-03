@@ -258,6 +258,121 @@ void LanguageTests::run()
 	}*/
 
 
+	testMainStringArg("def main(string s) string : s", "hello", "hello");
+	testMainStringArg("def main(string s) string : \"hello\"", "bleh", "hello");
+
+	// ===================================================================
+	// Test Escaped characters in string literals
+	// ===================================================================
+	const std::string SINGLE_QUOTE = "'";
+	const std::string DBL_QUOTE = "\"";
+	const std::string NEWLINE = "\n";
+	const std::string CRG_RTN = "\r";
+	const std::string TAB = "\t";
+	const std::string BACKSLASH = "\\";
+	testMainStringArg("def main(string s) string : " + DBL_QUOTE + NEWLINE + DBL_QUOTE, "hello", "\n"); // \n
+	testMainStringArg("def main(string s) string : " + DBL_QUOTE + CRG_RTN + DBL_QUOTE, "hello", "\r"); // \r
+	testMainStringArg("def main(string s) string : " + DBL_QUOTE + TAB + DBL_QUOTE, "hello", "\t"); // \t
+	testMainStringArg("def main(string s) string : " + DBL_QUOTE + BACKSLASH + BACKSLASH + DBL_QUOTE, "hello", "\\"); // test backslash escape
+	testMainStringArg("def main(string s) string : " + DBL_QUOTE + BACKSLASH + DBL_QUOTE + DBL_QUOTE, "hello", "\""); // test double quote escape
+
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + BACKSLASH + "a" + DBL_QUOTE + ")");
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + BACKSLASH + "a"); // EOF in middle of literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + BACKSLASH + "n"); // EOF in middle of literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + BACKSLASH); // EOF in middle of literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE); // EOF in middle of literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{0}"); // EOF immediately after literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{0"); // EOF in middle of literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{"); // EOF in middle of literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u"); // EOF in middle of literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\"); // EOF in middle of literal
+
+	// Test Unicode code-point escape sequence
+	testMainIntegerArg("def main(int x) int : length(" + DBL_QUOTE + "\\u{0}" + DBL_QUOTE + ")", 2, 1);
+	testMainIntegerArg("def main(int x) int : length(" + DBL_QUOTE + "\\u{7FFF}" + DBL_QUOTE + ")", 2, 1);
+	testMainIntegerArg("def main(int x) int : length(" + DBL_QUOTE + "\\u{10FFFF}" + DBL_QUOTE + ")", 2, 1);
+
+	testMainStringArg("def main(string s) string : " + DBL_QUOTE + "\\u{393}" + DBL_QUOTE, "hello", "\xCE\x93"); // Greek capital letter gamma, U+393, http://unicodelookup.com/#gamma/1, 
+	testMainStringArg("def main(string s) string : " + DBL_QUOTE + "\\u{20AC}" + DBL_QUOTE, "hello", "\xE2\x82\xAC"); // Euro sign, U+20AC
+	testMainStringArg("def main(string s) string : " + DBL_QUOTE + "\\u{2005A}" + DBL_QUOTE, "hello", "\xF0\xA0\x81\x9A"); // A vietnamese character: U+2005A  http://www.isthisthingon.org/unicode/index.php?page=20&subpage=0&glyph=2005A
+
+
+	// Test some invalid Unicode code-point escape sequences
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{-0}" + DBL_QUOTE + ")");
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{q}" + DBL_QUOTE + ")");
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{7Fq}" + DBL_QUOTE + ")");
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{11FFFF}" + DBL_QUOTE + ")");
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{11FFFF" + DBL_QUOTE + ")");
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{" + DBL_QUOTE + ")");
+
+
+	// ===================================================================
+	// Test Escaped characters in char literals
+	// ===================================================================
+	testMainStringArg("def main(string s) string : toString('" + NEWLINE + "')", "hello", "\n"); // \n
+	testMainStringArg("def main(string s) string : toString('" + CRG_RTN + "')", "hello", "\r"); // \r
+	testMainStringArg("def main(string s) string : toString('" + TAB + "')", "hello", "\t"); // \t
+	testMainStringArg("def main(string s) string : toString('" + BACKSLASH + BACKSLASH + "')", "hello", "\\"); // test backslash escape
+	testMainStringArg("def main(string s) string : toString('" + BACKSLASH + SINGLE_QUOTE + "')", "hello", "'"); // test single quote escape
+
+
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\a'))");
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\a"); // EOF in middle of literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\"); // EOF in middle of literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('"); // EOF in middle of literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('"); // EOF in middle of literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{0}"); // EOF immediately after literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{0"); // EOF in middle of literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{"); // EOF in middle of literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u"); // EOF in middle of literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\"); // EOF in middle of literal
+
+	// Test Unicode code-point escape sequence
+	testMainIntegerArg("def main(int x) int : length(toString('\\u{0}'))", 2, 1);
+	testMainIntegerArg("def main(int x) int : length(toString('\\u{7FFF}'))", 2, 1);
+	testMainIntegerArg("def main(int x) int : length(toString('\\u{10FFFF}'))", 2, 1);
+
+	testMainStringArg("def main(string s) string : toString('\\u{393}')", "hello", "\xCE\x93"); // Greek capital letter gamma, U+393, http://unicodelookup.com/#gamma/1, 
+	testMainStringArg("def main(string s) string : toString('\\u{20AC}')", "hello", "\xE2\x82\xAC"); // Euro sign, U+20AC
+	testMainStringArg("def main(string s) string : toString('\\u{2005A}')", "hello", "\xF0\xA0\x81\x9A"); // A vietnamese character: U+2005A  http://www.isthisthingon.org/unicode/index.php?page=20&subpage=0&glyph=2005A
+
+
+	// Test some invalid Unicode code-point escape sequences
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{-0}'))");
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{q}'))");
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{7Fq}'))");
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{11FFFF}'))");
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{11FFFF'))"); // EOF in middle of literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{'))"); // EOF in middle of literal
+
+
+
+	// ===================================================================
+	// Test character literals
+	// ===================================================================
+	testMainIntegerArg("def main(int x) int : let c = 'a' in 10 ", 2, 10);
+
+
+	// Return a character from a function
+	testMainIntegerArg("def f() char : 'a'    def main(int x) int : let c = f() in 10 ", 2, 10);
+
+
+	// ===================================================================
+	// Test toString(char)
+	// ===================================================================
+	testMainStringArg("def main(string s) string : toString('a')", "", "a");
+
+	testMainStringArg("def main(string s) string : toString(length(s) < 2 ? 'a' : 'b')", "", "a"); // Test with runtime character choice
+	testMainStringArg("def main(string s) string : toString(length(s) < 2 ? 'a' : 'b')", "hello", "b"); // Test with runtime character choice
+
+	testMainIntegerArg("def main(int x) int : length(toString('a'))", 2, 1);
+
+	testMainIntegerArg("def main(int x) int : length(toString(x < 5 ? 'a' : 'b'))", 2, 1); // Test with runtime character
+
+
+	testMainStringArg("def main(string s) string : concatStrings(toString('a'), toString('b'))", "", "ab");
+
+
 	// ===================================================================
 	// Test ternary conditional operator (?:)
 	// ===================================================================
@@ -303,7 +418,7 @@ void LanguageTests::run()
 	testMainFloatArgAllowUnsafe("struct S { float x }   def f(S s) float : s.x   def main(float x) float :	f(S(x))", 1.f, 1.f);
 
 
-	testMainIntegerArg("def main(int x) int :	 stringLength(\"hello\")", 1, 5, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int :	 length(\"hello\")", 1, 5, INVALID_OPENCL);
 
 	// ===================================================================
 	// Test optimisation of varray from heap allocated to stack allocated
@@ -402,21 +517,21 @@ void LanguageTests::run()
 	// Test Refcounting optimisations: test that a let variable used as a function argument is not incremented and decremented
 	// ===================================================================
 
-	testMainIntegerArg("def f(string s, int x) int : stringLength(s) + x       def main(int x) int : let s = \"hello\" in f(s, x)", 1, 6, INVALID_OPENCL);
+	testMainIntegerArg("def f(string s, int x) int : length(s) + x       def main(int x) int : let s = \"hello\" in f(s, x)", 1, 6, INVALID_OPENCL);
 
 
 	// ===================================================================
 	// Test Refcounting optimisations: test that a argument variable used as a function argument is not incremented and decremented
 	// ===================================================================
 
-	testMainIntegerArg("def f(string s, int x) int : stringLength(s) + x     def g(string s, int x) int : f(s, x)      def main(int x) int : g(\"hello\", x)", 1, 6, INVALID_OPENCL);
+	testMainIntegerArg("def f(string s, int x) int : length(s) + x     def g(string s, int x) int : f(s, x)      def main(int x) int : g(\"hello\", x)", 1, 6, INVALID_OPENCL);
 
 	// test that a argument variable used as a function argument is not incremented and decremented, even when the argument may be stored and returned in the result.
-	testMainIntegerArg("struct S { string str }      def f(string str) S : S(str)     def g(string s) S : f(s)      def main(int x) int : stringLength(g(\"hello\").str)", 1, 5, INVALID_OPENCL);
+	testMainIntegerArg("struct S { string str }      def f(string str) S : S(str)     def g(string s) S : f(s)      def main(int x) int : length(g(\"hello\").str)", 1, 5, INVALID_OPENCL);
 
 
 
-	testMainIntegerArg("def f(string s, int x) int : stringLength(s) + x       def main(int x) int : f(\"hello\", x)", 1, 6, INVALID_OPENCL);
+	testMainIntegerArg("def f(string s, int x) int : length(s) + x       def main(int x) int : f(\"hello\", x)", 1, 6, INVALID_OPENCL);
 
 
 	// ===================================================================
@@ -2036,13 +2151,13 @@ void LanguageTests::run()
 	testMainIntegerArg(
 		"struct teststruct { string str }										\n\
 		def f() teststruct : teststruct(\"hello world\")						\n\
-		def main(int x) int : stringLength(str(f())) ",
+		def main(int x) int : length(str(f())) ",
 		2, 11, INVALID_OPENCL);
 
 	// Test a string in a structure
 	testMainIntegerArg(
 		"struct teststruct { string str }										\n\
-		def main(int x) int : stringLength(teststruct(\"hello world\").str) ",
+		def main(int x) int : length(teststruct(\"hello world\").str) ",
 		2, 11, INVALID_OPENCL);
 
 	
@@ -2052,14 +2167,14 @@ void LanguageTests::run()
 
 	// String test - string literal in let statement, with assignment.
 	testMainIntegerArg(
-		"def main(int x) int : stringLength(concatStrings(\"hello\", \"world\"))",
+		"def main(int x) int : length(concatStrings(\"hello\", \"world\"))",
 		2, 10, INVALID_OPENCL);
 
 	// Double return of a string
 	testMainIntegerArg(
 		"def f() string : \"hello world\"	\n\
 		def g() string : f()				\n\
-		def main(int x) int : stringLength(g())",
+		def main(int x) int : length(g())",
 		2, 11, INVALID_OPENCL);
 	
 
@@ -2072,7 +2187,7 @@ void LanguageTests::run()
 				s = \"hello world\"			\n\
 				s2 = s						\n\
 			in								\n\
-				stringLength(s) + stringLength(s2)",
+				length(s) + length(s2)",
 		2, 22, INVALID_OPENCL);
 
 	// String test - string literal in let statement, with assignment.
@@ -2082,13 +2197,13 @@ void LanguageTests::run()
 				s = \"hello world\"			\n\
 				s2 = \"hallo thar\"			\n\
 			in								\n\
-				stringLength(s) + stringLength(s2)",
+				length(s) + length(s2)",
 		2, 21, INVALID_OPENCL);
 
 	// a function returning a string
 	testMainIntegerArg(
 		"def f() string : \"hello world\"	\n\
-		def main(int x) int : stringLength(f())",
+		def main(int x) int : length(f())",
 		2, 11, INVALID_OPENCL);
 
 	// a function returning a string in a let block
@@ -2098,7 +2213,7 @@ void LanguageTests::run()
 			let								\n\
 				s = f()						\n\
 			in								\n\
-				stringLength(s)",
+				length(s)",
 		2, 11, INVALID_OPENCL);
 
 	// String test - string literal in let statement
@@ -2107,13 +2222,13 @@ void LanguageTests::run()
 			let								\n\
 				s = \"hello world\"			\n\
 			in								\n\
-				stringLength(s)",
+				length(s)",
 		2, 11, INVALID_OPENCL);
 
 	// String test - string literal as argument
 	testMainIntegerArg(
 		"def main(int x) int :				\n\
-				stringLength(\"hello world\")",
+				length(\"hello world\")",
 		2, 11, INVALID_OPENCL);
 
 	// String test - string literal in let statement, with assignment.
@@ -2123,19 +2238,17 @@ void LanguageTests::run()
 				s = \"hello world\"			\n\
 				s2 = s						\n\
 			in								\n\
-				stringLength(s2)",
+				length(s2)",
 		2, 11, INVALID_OPENCL);
 
 	// Char test
-	// Disabled for now.
-	testMainIntegerArgInvalidProgram("def main(int x) int : let c = 'a' in 10"); 
-	/*testMainIntegerArg(
+	testMainIntegerArg(
 		"def main(int x) int :				\n\
 			let								\n\
 				c = 'a'						\n\
 			in								\n\
 				10",
-		2, 10);*/
+		2, 10);
 
 
 	// test type coercion on vectors: vector<float> initialisation with some int elems

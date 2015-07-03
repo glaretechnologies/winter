@@ -463,7 +463,7 @@ public:
 	virtual Reference<ASTNode> clone();
 	virtual bool isConstant() const { return true; }
 
-	std::string value;
+	std::string value; // utf-8 encoded char.
 };
 
 

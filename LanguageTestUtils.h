@@ -548,6 +548,116 @@ static void testMainInteger(const std::string& src, int target_return_val)
 }
 
 
+static void testMainStringArg(const std::string& src, const std::string& arg, const std::string& target_return_val, uint32 test_flags = 0)
+{
+	std::cout << "===================== Winter testMainStringArg() =====================" << std::endl;
+	try
+	{
+		VMConstructionArgs vm_args;
+		vm_args.allow_unsafe_operations = (test_flags & ALLOW_UNSAFE) != 0;
+		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
+
+		const FunctionSignature mainsig("main", std::vector<TypeRef>(1, new String()));
+
+		vm_args.entry_point_sigs.push_back(mainsig);
+
+		VirtualMachine vm(vm_args);
+
+		// Get main function
+		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
+
+		StringRep* (WINTER_JIT_CALLING_CONV *f)(const StringRep*, void*) = (StringRep* (WINTER_JIT_CALLING_CONV *)(const StringRep*, void*)) vm.getJittedFunction(mainsig);
+
+		TestEnv test_env;
+		test_env.val = 10;
+
+
+		StringRep* arg_string_rep = (StringRep*)malloc(sizeof(StringRep) + arg.size());
+		arg_string_rep->refcount = 1;
+		arg_string_rep->len = arg.size();
+		arg_string_rep->flags = 1; // heap allocated
+		if(!arg.empty())
+			std::memcpy((uint8*)arg_string_rep + sizeof(StringRep), &arg[0], arg.size()); // Copy data
+
+		debugIncrStringCount();
+
+		// Call the JIT'd function
+		StringRep* jitted_result = f(arg_string_rep, &test_env);
+
+		
+
+		if(jitted_result->len != target_return_val.size())
+		{
+			std::cerr << "Test failed: JIT'd main returned string with length " << jitted_result->len << ", target was " << target_return_val.size() << std::endl;
+			assert(0);
+			exit(1);
+		}
+
+		std::string result_str;
+		result_str.resize(jitted_result->len);
+		std::memcpy(&result_str[0], (uint8*)jitted_result + sizeof(StringRep), jitted_result->len);
+
+
+		// Check JIT'd result.
+		if(result_str != target_return_val)
+		{
+			std::cerr << "Test failed: JIT'd main returned " << result_str << ", target was " << target_return_val << std::endl;
+			assert(0);
+			exit(1);
+		}
+
+		arg_string_rep->refcount--;
+		if(arg_string_rep->refcount == 0)
+		{
+			debugDecrStringCount();
+			free(arg_string_rep);
+		}
+
+		jitted_result->refcount--;
+		if(jitted_result->refcount == 0)
+		{
+			debugDecrStringCount();
+			free(jitted_result);
+		}
+
+		VMState vmstate;
+		vmstate.func_args_start.push_back(0);
+		vmstate.argument_stack.push_back(new StringValue(arg));
+		//vmstate.argument_stack.push_back(new VoidPtrValue(&test_env));
+
+		ValueRef retval = maindef->invoke(vmstate);
+
+		vmstate.func_args_start.pop_back();
+		StringValue* val = dynamic_cast<StringValue*>(retval.getPointer());
+		if(!val)
+		{
+			std::cerr << "main() Return value was of unexpected type." << std::endl;
+			assert(0);
+			exit(1);
+		}
+
+		if(val->value != target_return_val)
+		{
+			std::cerr << "Test failed: main returned " << val->value << ", target was " << target_return_val << std::endl;
+			assert(0);
+			exit(1);
+		}
+	}
+	catch(Winter::BaseException& e)
+	{
+		std::cerr << e.what() << std::endl;
+		assert(0);
+		exit(1);
+	}
+	catch(Indigo::Exception& e)
+	{
+		std::cerr << e.what() << std::endl;
+		assert(0);
+		exit(1);
+	}
+}
+
+
 static void testMainIntegerArg(const std::string& src, int x, int target_return_val, uint32 test_flags = 0)
 {
 	std::cout << "===================== Winter testMainIntegerArg() =====================" << std::endl;
@@ -1487,13 +1597,13 @@ static void testFloat8Struct(const std::string& src, const Float8Struct& a, cons
 }
 
 
-static void testIntArray(const std::string& src, const int* a, const int* b, const int* target_return_val, size_t len, bool allow_unsafe_operations = false)
+static void testIntArray(const std::string& src, const int* a, const int* b, const int* target_return_val, size_t len, uint32 test_flags = 0)
 {
 	std::cout << "===================== Winter testIntArray() =====================" << std::endl;
 	try
 	{
 		VMConstructionArgs vm_args;
-		vm_args.allow_unsafe_operations = allow_unsafe_operations;
+		vm_args.allow_unsafe_operations = (test_flags & ALLOW_UNSAFE) != 0;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
 
 		// Get main function

@@ -12,6 +12,7 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include <fstream>
 #include "utils/FileUtils.h"
 #include "utils/StringUtils.h"
+#include "utils/UTF8Utils.h"
 #include "utils/ContainerUtils.h"
 #include "utils/TaskManager.h"
 #include "wnt_Lexer.h"
@@ -95,17 +96,6 @@ static const bool USE_MCJIT = true;
 //=====================================================================================
 
 
-// In-memory string representation for a Winter string
-class StringRep
-{
-public:
-	uint64 refcount;
-	uint64 len;
-	uint64 flags;
-	// Data follows..
-};
-
-
 static void* getVoidPtrArg(const vector<ValueRef>& arg_values, int i)
 {
 	assert(dynamic_cast<const VoidPtrValue*>(arg_values[i].getPointer()) != NULL);
@@ -120,15 +110,37 @@ static const std::string& getStringArg(const vector<ValueRef>& arg_values, int i
 }
 
 
+static const std::string& getCharArg(const vector<ValueRef>& arg_values, int i)
+{
+	assert(dynamic_cast<const CharValue*>(arg_values[i].getPointer()) != NULL);
+	return static_cast<const CharValue*>(arg_values[i].getPointer())->value;
+}
+
+
 static int64 string_count = 0;//TEMP
 static int64 varray_count = 0;//TEMP
+
+
+
+void debugIncrStringCount()
+{
+	string_count++;
+}
+
+
+void debugDecrStringCount()
+{
+	string_count--;
+}
 
 
 static StringRep* allocateString(const char* initial_string_val/*, void* env*/)
 {
 	string_count++;//TEMP
 
-	StringRep* string_val = (StringRep*)malloc(sizeof(StringRep) + strlen(initial_string_val));
+	const size_t string_len = strlen(initial_string_val);
+	StringRep* string_val = (StringRep*)malloc(sizeof(StringRep) + string_len);
+	std::memcpy((char*)string_val + sizeof(StringRep), initial_string_val, string_len);
 	return string_val;
 }
 
@@ -150,15 +162,18 @@ static int freeString(StringRep* str/*, void* env*/)
 }
 
 
+// Returns number of unicode chars in the string.
 static int stringLength(StringRep* str)
 {
-	return (int)str->len;
+	const uint64 num_bytes = str->len;
+	const char* const data = (const char*)str + sizeof(StringRep);
+	return (int)UTF8Utils::numCodePointsInString(data, num_bytes);
 }
 
 
 static ValueRef stringLengthInterpreted(const vector<ValueRef>& args)
 {
-	return new IntValue( (int)getStringArg(args, 0).size() );
+	return new IntValue( (int)UTF8Utils::numCodePointsInString(getStringArg(args, 0)) );
 }
 
 
@@ -180,6 +195,46 @@ static StringRep* concatStrings(StringRep* a, StringRep* b, void* env)
 static ValueRef concatStringsInterpreted(const vector<ValueRef>& args)
 {
 	return new StringValue( getStringArg(args, 0) + getStringArg(args, 1) );
+}
+
+
+// For a given UTF8 character stored in a uint32, how many bytes are actually used?
+static int numBytesInUTF8Rep(uint32 c)
+{
+	/*if((c & 0x80) == 0) // If left bit of byte 0 is 0:
+		return 1;
+	else if((c & 0xE0) == 0xC0) // If left 3 bits of byte 0 are 110:
+		return 2;
+	else if((c & 0xF0) == 0xE0) // If left 4 bits of byte 0 are 1110:
+		return 3;
+	else
+	{
+		assert((c & 0xF8) == 0x1E); // left 5 bits of byte 0 should be 11110.
+		return 4;
+	}*/
+	return (int)UTF8Utils::numBytesForChar((uint8)(c & 0xFF));
+}
+
+
+static StringRep* charToString(uint32 c, void* env)
+{
+	string_count++;//TEMP
+
+	// Work out number of bytes used
+	const int num_bytes = numBytesInUTF8Rep(c);
+
+	StringRep* new_s = (StringRep*)malloc(sizeof(StringRep) + num_bytes);
+	new_s->refcount = 1;
+	new_s->len = num_bytes;
+	new_s->flags = 1; // heap allocated
+	std::memcpy((uint8*)new_s + sizeof(StringRep), &c, num_bytes); // Copy data
+	return new_s;
+}
+
+
+static ValueRef charToStringInterpreted(const vector<ValueRef>& args)
+{
+	return new StringValue(getCharArg(args, 0));
 }
 
 
@@ -505,11 +560,11 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			external_functions.back()->has_side_effects = true;
 		}
 
-		// Add stringLength
+		// Add length (stringLength)
 		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
 			(void*)stringLength,
 			stringLengthInterpreted, // interpreted func
-			FunctionSignature("stringLength", vector<TypeRef>(1, new String())),
+			FunctionSignature("length", vector<TypeRef>(1, new String())),
 			new Int() // return type
 		)));
 
@@ -518,6 +573,14 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			(void*)concatStrings,
 			concatStringsInterpreted, // interpreted func
 			FunctionSignature("concatStrings", vector<TypeRef>(2, new String())),
+			new String() // return type
+		)));
+
+		// Add toString(char)
+		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
+			(void*)charToString,
+			charToStringInterpreted, // interpreted func
+			FunctionSignature("toString", vector<TypeRef>(1, new CharType())),
 			new String() // return type
 		)));
 

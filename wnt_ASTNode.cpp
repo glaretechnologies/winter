@@ -1336,15 +1336,13 @@ void CharLiteral::print(int depth, std::ostream& s) const
 
 std::string CharLiteral::sourceString() const
 {
-	assert(0);
-	return "";
+	return "'" + this->value + "'";
 }
 
 
 std::string CharLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
-	assert(0);
-	return "";
+	return "'" + this->value + "'";
 }
 
 
@@ -1355,7 +1353,19 @@ void CharLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& sta
 
 llvm::Value* CharLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
-	return NULL;
+	assert(this->value.size() >= 1 && this->value.size() <= 4);
+
+	uint64 val = 0;
+	std::memcpy(&val, &this->value[0], this->value.size());
+
+	return llvm::ConstantInt::get(
+		*params.context, 
+		llvm::APInt(
+			32, // num bits
+			val, // value
+			false // signed
+		)
+	);
 }
 
 
@@ -1369,6 +1379,7 @@ Reference<ASTNode> CharLiteral::clone()
 {
 	return new CharLiteral(value, srcLocation());
 }
+
 
 //-----------------------------------------------------------------------------------------------
 

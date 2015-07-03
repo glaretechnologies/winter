@@ -60,6 +60,7 @@ private:
 	static void parseNumericLiteral(const SourceBufferRef& buffer, Parser& parser, std::vector<Reference<TokenBase> >& tokens_out);
 	static void parseIdentifier(const SourceBufferRef& buffer, Parser& parser, std::vector<Reference<TokenBase> >& tokens_out);
 	static void parseComment(const SourceBufferRef& buffer, Parser& parser);
+	static void parseUnicodeEscapedChar(const SourceBufferRef& buffer, Parser& parser, std::string& s);
 };
 
 

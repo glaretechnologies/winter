@@ -1,3 +1,80 @@
+Examples in this file should be separated by an empty line.
+==========================================================-
+
+def main(int x) int : length("\n")
+
+def main(int x) int : length("\t")
+
+def main(int x) int : length("\r")
+
+def main(int x) int : length("\\")
+
+def main(int x) int : length("\a")
+
+def main(int x) int : length("\a"
+
+def main(int x) int : length("\
+
+def main(int x) int : length("
+
+
+def main(int x) int : length("\u{0}")
+
+def main(int x) int : length("\u{7FFF}")
+
+def main(int x) int : length("\u{10FFFF}")
+
+def main(int x) int : length("\u{-0}")
+
+def main(int x) int : length("\u{q}")
+
+def main(int x) int : length("\u{7Fq}")
+
+def main(int x) int : length("\u{11FFFF}")
+
+def main(int x) int : length("\u{11FFFF")
+
+def main(int x) int : length("\u{")
+
+
+def main(int x) int : length('\n')
+
+def main(int x) int : length('\t')
+
+def main(int x) int : length('\r')
+
+def main(int x) int : length('\\')
+
+def main(int x) int : length('\a")
+
+def main(int x) int : length('\a'
+
+def main(int x) int : length('\
+
+def main(int x) int : length('
+
+
+def main(int x) int : length('\u{0}')
+
+def main(int x) int : length('\u{7FFF}')
+
+def main(int x) int : length('\u{10FFFF}')
+
+def main(int x) int : length('\u{-0}')
+
+def main(int x) int : length('\u{q}')
+
+def main(int x) int : length('\u{7Fq}')
+
+def main(int x) int : length('\u{11FFFF}')
+
+def main(int x) int : length('\u{11FFFF')
+
+def main(int x) int : length('\u{')
+
+	
+	
+	
 def main(int x) int : x < 5 ? 10 : 5 
 
 def main(int x) int : x < 5 ? 10 : 5 

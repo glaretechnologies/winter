@@ -959,6 +959,9 @@ void fuzzTests()
 		choices.push_back(Choice(Choice::Action_Insert, " struct ", 1.0f));
 		choices.push_back(Choice(Choice::Action_Insert, ",", 1.0f));
 		choices.push_back(Choice(Choice::Action_Insert, ".", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, "'", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, "\"", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, "\\", 1.0f));
 		choices.push_back(Choice(Choice::Action_Insert, " let ", " in ", 1.0f));
 		choices.push_back(Choice(Choice::Action_Insert, " = ", 1.0f));
 		choices.push_back(Choice(Choice::Action_Insert, " def ", 1.0f));

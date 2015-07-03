@@ -11,6 +11,7 @@ Copyright 2009 Nicholas Chapman
 
 #include "wnt_Diagnostics.h"
 #include "utils/Parser.h"
+#include "utils/UTF8Utils.h"
 #include "indigo/TestUtils.h"
 #include "maths/mathstypes.h"
 
@@ -29,6 +30,56 @@ Lexer::~Lexer()
 }
 
 
+// Parse a single escaped character, append UTF-8 representation to s.
+void Lexer::parseUnicodeEscapedChar(const SourceBufferRef& buffer, Parser& parser, std::string& s)
+{
+	assert(parser.current() == 'u');
+
+	parser.advance(); // Consume 'u'
+
+	if(parser.eof() || parser.current() != '{')
+		throw LexerExcep("Error while parsing character literal, was expecting a '{'." + errorPosition(buffer, parser.currentPos()));
+
+	// Parse Unicode code point literal (like \u{7FFF})
+	parser.advance(); // Consume '{'
+
+	std::string code_point_s;
+	while(1)
+	{
+		if(parser.eof())
+			throw LexerExcep("End of input while parsing char literal." + errorPosition(buffer, parser.currentPos()));
+				
+		if(parser.current() == '}')
+		{
+			parser.advance(); // Consume '}'
+			break;
+		}
+
+		if(::isNumeric(parser.current()) || (parser.current() >= 'a' && parser.current() <= 'f') || (parser.current() >= 'A' && parser.current() <= 'F'))
+		{
+			code_point_s.push_back(parser.current());
+			parser.advance();
+		}
+		else
+			throw LexerExcep("Error while parsing escape sequence in character literal: invalid character '" + std::string(1, parser.current()) + "'." + errorPosition(buffer, parser.currentPos()));
+	}
+
+	try
+	{
+		const uint32 code_point = hexStringToUInt32(code_point_s);
+		if(code_point > 0x10FFFF)
+			throw LexerExcep("Invalid code point '" + code_point_s + "'." + errorPosition(buffer, parser.currentPos()));
+
+		// Convert code point to UTF-8
+		s += UTF8Utils::encodeCodePoint(code_point);
+	}
+	catch(StringUtilsExcep& e)
+	{
+		throw LexerExcep("Error while parsing escape sequence: " + e.what() + " " + errorPosition(buffer, parser.currentPos()));
+	}
+}
+
+
 void Lexer::parseStringLiteral(const SourceBufferRef& buffer, Parser& parser, std::vector<Reference<TokenBase> >& tokens_out)
 {
 	assert(parser.notEOF());
@@ -44,17 +95,57 @@ void Lexer::parseStringLiteral(const SourceBufferRef& buffer, Parser& parser, st
 		if(parser.eof())
 			throw LexerExcep("End of input while parsing string literal." + errorPosition(buffer, parser.currentPos() - 1));
 
-		if(parser.current() == '"')
+		if(parser.current() == '\\') // If char is backslash, parse escape sequence:
 		{
-			parser.advance();
+			parser.advance(); // Consume '\'
+			if(parser.eof())
+				throw LexerExcep("End of input while parsing string literal." + errorPosition(buffer, parser.currentPos()));
+
+			if(parser.current() == '"')
+			{
+				s.push_back('"');
+				parser.advance();
+			}
+			else if(parser.current() == 'n')
+			{
+				s.push_back('\n');
+				parser.advance();
+			}
+			else if(parser.current() == 'r')
+			{
+				s.push_back('\r');
+				parser.advance();
+			}
+			else if(parser.current() == 't')
+			{
+				s.push_back('\t');
+				parser.advance();
+			}
+			else if(parser.current() == '\\')
+			{
+				s.push_back('\\');
+				parser.advance();
+			}
+			else if(parser.current() == 'u')
+			{
+				parseUnicodeEscapedChar(buffer, parser, s);
+			}
+			else
+				throw LexerExcep("Invalid escape character." + errorPosition(buffer, parser.currentPos()));
+		}
+		else if(parser.current() == '"') // If got to end of string literal:
+		{
+			parser.advance(); // Consume '"'
 			break;
 		}
-
-		s.push_back(parser.current());
-		parser.advance();
+		else
+		{
+			s.push_back(parser.current());
+			parser.advance();
+		}
 	}
 
-	tokens_out.push_back(Reference<TokenBase>(new StringLiteralToken(s, char_index)));
+	tokens_out.push_back(new StringLiteralToken(s, char_index));
 }
 
 
@@ -65,25 +156,62 @@ void Lexer::parseCharLiteral(const SourceBufferRef& buffer, Parser& parser, std:
 	
 	const unsigned int char_index = parser.currentPos();
 
-	parser.advance();
+	parser.advance(); // Consume '
 
-	std::string s = "";
-	while(1)
+	std::string s;
+	if(parser.eof())
+		throw LexerExcep("End of input while parsing char literal." + errorPosition(buffer, parser.currentPos()));
+
+	if(parser.current() == '\\') // If char is backslash, parse escape sequence:
 	{
+		parser.advance(); // Consume '\'
 		if(parser.eof())
 			throw LexerExcep("End of input while parsing char literal." + errorPosition(buffer, parser.currentPos()));
 
 		if(parser.current() == '\'')
 		{
+			s.push_back('\'');
 			parser.advance();
-			break;
 		}
-
-		s.push_back(parser.current());
+		else if(parser.current() == 'n')
+		{
+			s.push_back('\n');
+			parser.advance();
+		}
+		else if(parser.current() == 'r')
+		{
+			s.push_back('\r');
+			parser.advance();
+		}
+		else if(parser.current() == 't')
+		{
+			s.push_back('\t');
+			parser.advance();
+		}
+		else if(parser.current() == '\\')
+		{
+			s.push_back('\\');
+			parser.advance();
+		}
+		else if(parser.current() == 'u')
+		{
+			parseUnicodeEscapedChar(buffer, parser, s);
+		}
+		else
+			throw LexerExcep("Invalid escape character." + errorPosition(buffer, parser.currentPos()));
+	}
+	else
+	{
+		s += parser.current();
 		parser.advance();
 	}
 
-	tokens_out.push_back(Reference<TokenBase>(new CharLiteralToken(s, char_index)));
+	// Parse trailing single-quote
+	if(parser.eof() || (parser.current() != '\''))
+		throw LexerExcep("Error while parsing character literal, was expecting a single quote." + errorPosition(buffer, parser.currentPos()));
+	parser.advance(); // Consume '
+
+	tokens_out.push_back(new CharLiteralToken(s, char_index));
 }
 
 
@@ -184,11 +312,10 @@ void Lexer::process(const SourceBufferRef& src, std::vector<Reference<TokenBase>
 		{
 			parseStringLiteral(src, parser, tokens_out);
 		}
-		// Disabled until we have proper character support:
-		/*else if(parser.current() == '\'')
+		else if(parser.current() == '\'')
 		{
 			parseCharLiteral(src, parser, tokens_out);
-		}*/
+		}
 		else if(parser.current() == '-' /*|| parser.current() == '+'*/ /*|| parser.current() == '.'*/ || ::isNumeric(parser.current()))
 		{
 			if(parser.parseString("->"))

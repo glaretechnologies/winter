@@ -121,4 +121,19 @@ private:
 };
 
 
+// In-memory string representation for a Winter string
+class StringRep
+{
+public:
+	uint64 refcount;
+	uint64 len;
+	uint64 flags;
+	// Data follows..
+};
+
+
+void debugIncrStringCount();
+void debugDecrStringCount();
+
+
 } // end namespace Winter
