@@ -1317,7 +1317,7 @@ Reference<ASTNode> StringLiteral::clone()
 CharLiteral::CharLiteral(const std::string& v, const SrcLocation& loc) 
 :	ASTNode(CharLiteralType, loc), value(v)
 {
-
+	this->can_maybe_constant_fold = true;
 }
 
 

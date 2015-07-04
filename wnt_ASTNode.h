@@ -287,7 +287,7 @@ public:
 		LogicalNegationExprType
 	};
 
-	ASTNode(ASTNodeType node_type_, const SrcLocation& loc_) : node_type(node_type_), location(loc_) {}
+	ASTNode(ASTNodeType node_type_, const SrcLocation& loc_) : node_type(node_type_), location(loc_), can_maybe_constant_fold(false) {}
 	virtual ~ASTNode() {}
 
 	virtual ValueRef exec(VMState& vmstate) = 0;
