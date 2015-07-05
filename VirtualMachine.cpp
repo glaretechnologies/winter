@@ -238,6 +238,20 @@ static ValueRef charToStringInterpreted(const vector<ValueRef>& args)
 }
 
 
+// codePoint(char c) int
+static int codePoint(uint32 c, void* env)
+{
+	// Work out number of bytes used
+	return (int)UTF8Utils::codePointForUTF8Char(c);
+}
+
+
+static ValueRef codePointInterpreted(const vector<ValueRef>& args)
+{
+	return new IntValue(UTF8Utils::codePointForUTF8CharString(getCharArg(args, 0)));
+}
+
+
 //=====================================================================================
 
 
@@ -582,6 +596,14 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			charToStringInterpreted, // interpreted func
 			FunctionSignature("toString", vector<TypeRef>(1, new CharType())),
 			new String() // return type
+		)));
+
+		// Add codePoint(char c) int
+		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
+			(void*)codePoint,
+			codePointInterpreted, // interpreted func
+			FunctionSignature("codePoint", vector<TypeRef>(1, new CharType())),
+			new Int() // return type
 		)));
 
 

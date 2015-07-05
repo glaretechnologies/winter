@@ -346,6 +346,14 @@ void LanguageTests::run()
 	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{'))"); // EOF in middle of literal
 
 
+	// ===================================================================
+	// Test codePoint()
+	// ===================================================================
+	testMainIntegerArg("def main(int x) int : codePoint('\\u{0}')", 2, 0);
+	testMainIntegerArg("def main(int x) int : codePoint('a')", 2, 0x61);
+	testMainIntegerArg("def main(int x) int : codePoint('\\u{393}')", 2, 0x393);
+	testMainIntegerArg("def main(int x) int : codePoint('\\u{20AC}')", 2, 0x20AC);
+	testMainIntegerArg("def main(int x) int : codePoint('\\u{2005A}')", 2, 0x2005A);
 
 	// ===================================================================
 	// Test character literals
