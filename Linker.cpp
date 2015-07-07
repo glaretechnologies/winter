@@ -355,6 +355,20 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 				this->sig_to_function_map.insert(std::make_pair(sig, def));
 				return def;
 			}
+
+			if(sig.param_types[0]->getType() == Type::IntType && sig.param_types[0].downcastToPtr<Int>()->numBits() == 32 && sig.name == "toInt64")
+			{
+				FunctionDefinitionRef def = makeBuiltInFuncDef<ToInt64BuiltInFunc>(sig.name, sig.param_types[0], new Int(64));
+				this->sig_to_function_map.insert(std::make_pair(sig, def));
+				return def;
+			}
+
+			if(sig.param_types[0]->getType() == Type::IntType && sig.param_types[0].downcastToPtr<Int>()->numBits() == 64 && sig.name == "toInt32")
+			{
+				FunctionDefinitionRef def = makeBuiltInFuncDef<ToInt32BuiltInFunc>(sig.name, sig.param_types[0], new Int(32));
+				this->sig_to_function_map.insert(std::make_pair(sig, def));
+				return def;
+			}
 		}
 		else if(sig.param_types[0]->getType() == Type::OpaqueTypeType)
 		{

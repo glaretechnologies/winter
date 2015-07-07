@@ -645,7 +645,7 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 			if(!this->argument_expressions[1]->isConstant())
 				throw BaseException("Second arg to elem(tuple, i) must be constant");
 
-			int index;
+			int64 index;
 			try
 			{
 				VMState vmstate;
@@ -668,7 +668,7 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 				
 
 			// bounds check index.
-			if(index < 0 || index >= tuple_elem_func->tuple_type->component_types.size())
+			if(index < 0 || index >= (int64)tuple_elem_func->tuple_type->component_types.size())
 				throw BaseException("Second argument to tuple elem() function is out of range." + errorContext(*this));
 
 
@@ -854,16 +854,16 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 
 				assert(dynamic_cast<IntValue*>(retval.getPointer()));
 
-				const int index_val = static_cast<IntValue*>(retval.getPointer())->value;
+				const int64 index_val = static_cast<IntValue*>(retval.getPointer())->value;
 
-				if(index_val >= 0 && index_val < array_type->num_elems)
+				if(index_val >= 0 && index_val < (int64)array_type->num_elems)
 				{
 					// Array index is in-bounds!
 					return;
 				}
 				else
 				{
-					throw BaseException("Constant index with value " + toString(index_val) + " was out of bounds of array type " + array_type->toString());
+					throw BaseException("Constant index with value " + toString(index_val) + " was out of bounds of array type " + array_type->toString() + errorContext(*this));
 				}
 			}
 			else
@@ -874,12 +874,12 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 				//int i_upper = std::numeric_limits<int32>::max();
 				//Vec2<int> i_bounds(std::numeric_limits<int32>::min(), std::numeric_limits<int32>::max());
 
-				const IntervalSetInt i_bounds = ProofUtils::getIntegerRange(payload, stack, 
+				const IntervalSetInt64 i_bounds = ProofUtils::getInt64Range(payload, stack, 
 					this->argument_expressions[1] // integer value
 				);
 
 				// Now check our bounds against the array
-				if(i_bounds.lower() >= 0 && i_bounds.upper() < array_type->num_elems)
+				if(i_bounds.lower() >= 0 && i_bounds.upper() < (int64)array_type->num_elems)
 				{
 					// Array index is proven to be in-bounds.
 					return;
@@ -977,7 +977,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 					if(vec_literal->getElements()[i]->nodeType() == ASTNode::IntLiteralType)
 					{
 						const Reference<IntLiteral> int_lit = vec_literal->getElements()[i].downcast<IntLiteral>();
-						if(int_lit->value >= 0 && int_lit->value < array_type->num_elems) // if in-bounds
+						if(int_lit->value >= 0 && int_lit->value < (int64)array_type->num_elems) // if in-bounds
 							elem_valid = true;
 					}
 
@@ -1005,23 +1005,23 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 
 				assert(dynamic_cast<IntValue*>(retval.getPointer()));
 
-				const int index_val = static_cast<IntValue*>(retval.getPointer())->value;
+				const int64 index_val = static_cast<IntValue*>(retval.getPointer())->value;
 
-				if(index_val >= 0 && index_val < (int)vector_type->num)
+				if(index_val >= 0 && index_val < (int64)vector_type->num)
 				{
 					// Vector index is in-bounds!
 					return;
 				}
 				else
 				{
-					throw BaseException("Constant index with value " + toString(index_val) + " was out of bounds of vector type " + vector_type->toString());
+					throw BaseException("Constant index with value " + toString(index_val) + " was out of bounds of vector type " + vector_type->toString() + errorContext(*this));
 				}
 			}
 			else
 			{
 				// Else index is not known at compile time.
 
-				const IntervalSetInt i_bounds = ProofUtils::getIntegerRange(payload, stack, 
+				const IntervalSetInt64 i_bounds = ProofUtils::getInt64Range(payload, stack, 
 					this->argument_expressions[1] // integer value
 				);
 
@@ -1155,28 +1155,28 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 
 				assert(dynamic_cast<IntValue*>(retval.getPointer()));
 
-				const int index_val = static_cast<IntValue*>(retval.getPointer())->value;
+				const int64 index_val = static_cast<IntValue*>(retval.getPointer())->value;
 
-				if(index_val >= 0 && index_val < array_type->num_elems)
+				if(index_val >= 0 && index_val < (int64)array_type->num_elems)
 				{
 					// Array index is in-bounds!
 					return;
 				}
 				else
 				{
-					throw BaseException("Constant index with value " + toString(index_val) + " was out of bounds of array type " + array_type->toString());
+					throw BaseException("Constant index with value " + toString(index_val) + " was out of bounds of array type " + array_type->toString() + errorContext(*this));
 				}
 			}
 			else
 			{
 				// Else index is not known at compile time.
 				
-				const IntervalSetInt i_bounds = ProofUtils::getIntegerRange(payload, stack, 
+				const IntervalSetInt64 i_bounds = ProofUtils::getInt64Range(payload, stack, 
 					this->argument_expressions[1] // integer value
 				);
 
 				// Now check our bounds against the array
-				if(i_bounds.lower() >= 0 && i_bounds.upper() < array_type->num_elems)
+				if(i_bounds.lower() >= 0 && i_bounds.upper() < (int64)array_type->num_elems)
 				{
 					// Array index is proven to be in-bounds.
 					return;
@@ -1185,6 +1185,38 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 		}
 
 		throw BaseException("Failed to prove update() index argument is in-bounds." + errorContext(*this));
+	}
+	else if(this->target_function && this->target_function->sig.name == "toInt32" && this->argument_expressions.size() == 1)
+	{
+		// If the argument is constant:
+		if(this->argument_expressions[0]->isConstant())
+		{
+			// Evaluate the index expression
+			VMState vmstate;
+			vmstate.func_args_start.push_back(0);
+			ValueRef retval = this->argument_expressions[0]->exec(vmstate);
+			assert(dynamic_cast<IntValue*>(retval.getPointer()));
+			const int64 val = static_cast<IntValue*>(retval.getPointer())->value;
+
+			if(val >= -2147483648LL && val <= 2147483647LL)
+				return; // argument is in-bounds!
+			else
+				throw BaseException("Value " + toString(val) + " was out of domain of toInt32()." + errorContext(*this));
+		}
+		else
+		{
+			// Else index is not known at compile time.
+			
+			const IntervalSetInt64 i_bounds = ProofUtils::getInt64Range(payload, stack, 
+				this->argument_expressions[0] // integer value
+			);
+
+			// Now check our bounds against the array
+			if(i_bounds.lower() >= -2147483648LL && i_bounds.upper() <= 2147483647LL)
+				return; // Argument is proven to be in-bounds.
+		}
+
+		throw BaseException("Failed to prove toInt32() argument is in-bounds." + errorContext(*this));
 	}
 }
 

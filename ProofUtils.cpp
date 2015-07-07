@@ -11,7 +11,7 @@ namespace Winter
 {
 
 
-static const IntervalSetInt updateIndexBounds(TraversalPayload& payload, const ComparisonExpression& comp_expr, const ASTNodeRef& index, const IntervalSetInt& bounds)
+static const IntervalSetInt64 updateIndexBounds(TraversalPayload& payload, const ComparisonExpression& comp_expr, const ASTNodeRef& index, const IntervalSetInt64& bounds)
 {
 	// We know comp_expr is of type 'i T x' where T is some comparison token
 
@@ -28,43 +28,25 @@ static const IntervalSetInt updateIndexBounds(TraversalPayload& payload, const C
 
 			assert(dynamic_cast<IntValue*>(retval.getPointer()));
 
-			const int x_val = static_cast<IntValue*>(retval.getPointer())->value;
+			const int64 x_val = static_cast<IntValue*>(retval.getPointer())->value;
 										
 			switch(comp_expr.token->getType())
 			{
 			case LEFT_ANGLE_BRACKET_TOKEN: // i < x
-				return intervalSetIntersection(bounds, IntervalSetInt(std::numeric_limits<int>::min(), x_val - 1));
+				return intervalSetIntersection(bounds, IntervalSetInt64(std::numeric_limits<int64>::min(), x_val - 1));
 			case RIGHT_ANGLE_BRACKET_TOKEN: // i > x
-				return intervalSetIntersection(bounds, IntervalSetInt(x_val + 1, std::numeric_limits<int>::max()));
+				return intervalSetIntersection(bounds, IntervalSetInt64(x_val + 1, std::numeric_limits<int64>::max()));
 			case DOUBLE_EQUALS_TOKEN: // i == x
-				return IntervalSetInt(x_val, x_val);
+				return IntervalSetInt64(x_val, x_val);
 			case NOT_EQUALS_TOKEN: // i != x
 				return intervalSetIntersection(bounds, intervalWithHole(x_val));
 			case LESS_EQUAL_TOKEN: // i <= x
-				return intervalSetIntersection(bounds, IntervalSetInt(std::numeric_limits<int>::min(), x_val));
+				return intervalSetIntersection(bounds, IntervalSetInt64(std::numeric_limits<int64>::min(), x_val));
 			case GREATER_EQUAL_TOKEN: // i >= x
-				return intervalSetIntersection(bounds, IntervalSetInt(x_val, std::numeric_limits<int>::max()));
+				return intervalSetIntersection(bounds, IntervalSetInt64(x_val, std::numeric_limits<int64>::max()));
 			default:
 				return bounds;
 			}
-
-			/*switch(comp_expr.token->getType())
-			{
-			case LEFT_ANGLE_BRACKET_TOKEN: // i < x
-				return Vec2<int>(bounds.x, myMin(bounds.y, x_val - 1));
-			case RIGHT_ANGLE_BRACKET_TOKEN: // i > x
-				return Vec2<int>(myMax(bounds.x, x_val + 1), bounds.y);
-			case DOUBLE_EQUALS_TOKEN: // i == x
-				return Vec2<int>(x_val, x_val);
-			case NOT_EQUALS_TOKEN: // i != x
-				return bounds;
-			case LESS_EQUAL_TOKEN: // i <= x
-				return Vec2<int>(bounds.x, myMin(bounds.y, x_val));
-			case GREATER_EQUAL_TOKEN: // i >= x
-				return Vec2<int>(myMax(bounds.x, x_val), bounds.y);
-			default:
-				return bounds;
-			}*/
 		}
 	}
 
@@ -149,10 +131,24 @@ static const IntervalSetFloat updateBounds(TraversalPayload& payload, const Comp
 }
 
 
-IntervalSetInt ProofUtils::getIntegerRange(TraversalPayload& payload, std::vector<ASTNode*>& stack, const ASTNodeRef& integer_value)
+IntervalSetInt64 ProofUtils::getInt64Range(TraversalPayload& payload, std::vector<ASTNode*>& stack, const ASTNodeRef& integer_value)
 {
 	// Lower and upper inclusive bounds
-	IntervalSetInt bounds(std::numeric_limits<int32>::min(), std::numeric_limits<int32>::max());
+	IntervalSetInt64 bounds;
+
+	const TypeRef type = integer_value->type();
+
+	// Get initial bounds based on type
+	assert(type->getType() == Type::IntType);
+	if(type.downcastToPtr<Int>()->numBits() == 32)
+		bounds = IntervalSetInt64(std::numeric_limits<int32>::min(), std::numeric_limits<int32>::max());
+	else if(type.downcastToPtr<Int>()->numBits() == 64)
+		bounds = IntervalSetInt64(std::numeric_limits<int64>::min(), std::numeric_limits<int64>::max());
+	else
+	{
+		assert(0);
+		throw BaseException("invalid num bits");
+	}
 
 	for(int z=(int)stack.size()-1; z >= 0; --z)
 	{
@@ -191,13 +187,13 @@ IntervalSetInt ProofUtils::getIntegerRange(TraversalPayload& payload, std::vecto
 							{
 								const ArrayType* array_type = static_cast<const ArrayType*>(container_type.getPointer());
 								//bounds = Vec2<int>(myMax(bounds.x, 0), myMin(bounds.y, (int)array_type->num_elems - 1));
-								bounds = intervalSetIntersection(bounds, IntervalSetInt(0, (int)array_type->num_elems - 1));
+								bounds = intervalSetIntersection(bounds, IntervalSetInt64(0, (int64)array_type->num_elems - 1));
 							}
 							if(container_type->getType() == Type::VectorTypeType)
 							{
 								const VectorType* vector_type = static_cast<const VectorType*>(container_type.getPointer());
 								//bounds = Vec2<int>(myMax(bounds.x, 0), myMin(bounds.y, (int)vector_type->num- 1));
-								bounds = intervalSetIntersection(bounds, IntervalSetInt(0, (int)vector_type->num - 1));
+								bounds = intervalSetIntersection(bounds, IntervalSetInt64(0, (int64)vector_type->num - 1));
 							}
 						}
 

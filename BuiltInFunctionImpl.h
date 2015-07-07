@@ -512,6 +512,32 @@ private:
 };
 
 
+// int32 -> int64 conversion
+class ToInt64BuiltInFunc : public BuiltInFunctionImpl
+{
+public:
+	ToInt64BuiltInFunc(const TypeRef& type);
+
+	virtual ValueRef invoke(VMState& vmstate);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+private:
+	TypeRef type;
+};
+
+
+// int64 -> int32 conversion
+class ToInt32BuiltInFunc : public BuiltInFunctionImpl
+{
+public:
+	ToInt32BuiltInFunc(const TypeRef& type);
+
+	virtual ValueRef invoke(VMState& vmstate);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+private:
+	TypeRef type;
+};
+
+
 // Opaque/voidptr to int64 conversion
 class VoidPtrToInt64BuiltInFunc : public BuiltInFunctionImpl
 {

@@ -15,6 +15,7 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "utils/UTF8Utils.h"
 #include "utils/ContainerUtils.h"
 #include "utils/TaskManager.h"
+#include "utils/Exception.h"
 #include "wnt_Lexer.h"
 #include "TokenBase.h"
 #include "wnt_LangParser.h"
@@ -110,6 +111,13 @@ static const std::string& getStringArg(const vector<ValueRef>& arg_values, int i
 }
 
 
+static int64 getInt64Arg(const vector<ValueRef>& arg_values, int i)
+{
+	assert(dynamic_cast<const IntValue*>(arg_values[i].getPointer()) != NULL);
+	return static_cast<const IntValue*>(arg_values[i].getPointer())->value;
+}
+
+
 static const std::string& getCharArg(const vector<ValueRef>& arg_values, int i)
 {
 	assert(dynamic_cast<const CharValue*>(arg_values[i].getPointer()) != NULL);
@@ -198,30 +206,12 @@ static ValueRef concatStringsInterpreted(const vector<ValueRef>& args)
 }
 
 
-// For a given UTF8 character stored in a uint32, how many bytes are actually used?
-static int numBytesInUTF8Rep(uint32 c)
-{
-	/*if((c & 0x80) == 0) // If left bit of byte 0 is 0:
-		return 1;
-	else if((c & 0xE0) == 0xC0) // If left 3 bits of byte 0 are 110:
-		return 2;
-	else if((c & 0xF0) == 0xE0) // If left 4 bits of byte 0 are 1110:
-		return 3;
-	else
-	{
-		assert((c & 0xF8) == 0x1E); // left 5 bits of byte 0 should be 11110.
-		return 4;
-	}*/
-	return (int)UTF8Utils::numBytesForChar((uint8)(c & 0xFF));
-}
-
-
 static StringRep* charToString(uint32 c, void* env)
 {
 	string_count++;//TEMP
 
 	// Work out number of bytes used
-	const int num_bytes = numBytesInUTF8Rep(c);
+	const int num_bytes = (int)UTF8Utils::numBytesForChar((uint8)(c & 0xFF));
 
 	StringRep* new_s = (StringRep*)malloc(sizeof(StringRep) + num_bytes);
 	new_s->refcount = 1;
@@ -241,7 +231,6 @@ static ValueRef charToStringInterpreted(const vector<ValueRef>& args)
 // codePoint(char c) int
 static int codePoint(uint32 c, void* env)
 {
-	// Work out number of bytes used
 	return (int)UTF8Utils::codePointForUTF8Char(c);
 }
 
@@ -249,6 +238,38 @@ static int codePoint(uint32 c, void* env)
 static ValueRef codePointInterpreted(const vector<ValueRef>& args)
 {
 	return new IntValue(UTF8Utils::codePointForUTF8CharString(getCharArg(args, 0)));
+}
+
+
+static int stringElem(StringRep* s, uint64 index)
+{
+	try
+	{
+		const uint8* data = (const uint8*)s + sizeof(StringRep);
+		return (int)UTF8Utils::charAt(data, s->len, index);
+	}
+	catch(Indigo::Exception&)
+	{
+		assert(0); // Out of bounds read
+		return 0;
+	}
+}
+
+
+static ValueRef stringElemInterpreted(const vector<ValueRef>& args)
+{
+	try
+	{
+		const std::string& s = getStringArg(args, 0);
+		const int64 index = getInt64Arg(args, 1);
+		const uint32 c = UTF8Utils::charAt((const uint8*)s.c_str(), s.size(), index);
+		return new CharValue(UTF8Utils::charString(c));
+	}
+	catch(Indigo::Exception& e)
+	{
+		// Out of bounds read.
+		throw BaseException(e.what());
+	}
 }
 
 
@@ -606,6 +627,13 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			new Int() // return type
 		)));
 
+		// Add elem(string s, uint64 index) char
+		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
+			(void*)stringElem,
+			stringElemInterpreted, // interpreted func
+			FunctionSignature("elem", typePair(new String(), new Int(64))),
+			new CharType() // return type
+		)));
 
 		
 		// Add allocateVArray

@@ -2916,6 +2916,66 @@ llvm::Value* ToFloatBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 //----------------------------------------------------------------------------------------------
 
 
+ToInt64BuiltInFunc::ToInt64BuiltInFunc(const TypeRef& type_)
+:	type(type_)
+{}
+
+
+ValueRef ToInt64BuiltInFunc::invoke(VMState& vmstate)
+{
+	return vmstate.argument_stack[vmstate.func_args_start.back()];
+}
+
+
+llvm::Value* ToInt64BuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	TypeRef dest_type = new Int(64);
+
+	// Get destination LLVM type
+	llvm::Type* dest_llvm_type = dest_type->LLVMType(*params.module);
+
+	return params.builder->CreateSExt(
+		LLVMTypeUtils::getNthArg(params.currently_building_func, 0), 
+		dest_llvm_type // dest type
+	);
+}
+
+
+//----------------------------------------------------------------------------------------------
+
+
+ToInt32BuiltInFunc::ToInt32BuiltInFunc(const TypeRef& type_)
+:	type(type_)
+{}
+
+
+ValueRef ToInt32BuiltInFunc::invoke(VMState& vmstate)
+{
+	const IntValue* a = checkedCast<const IntValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+	if(a->value >= -2147483648LL && a->value <= 2147483647LL)
+		return new IntValue(a->value);
+	else
+		throw BaseException("argument for toInt32 is out of domain.");
+}
+
+
+llvm::Value* ToInt32BuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	TypeRef dest_type = new Int(32);
+
+	// Get destination LLVM type
+	llvm::Type* dest_llvm_type = dest_type->LLVMType(*params.module);
+
+	return params.builder->CreateTrunc(
+		LLVMTypeUtils::getNthArg(params.currently_building_func, 0), 
+		dest_llvm_type // dest type
+	);
+}
+
+
+//----------------------------------------------------------------------------------------------
+
+
 VoidPtrToInt64BuiltInFunc::VoidPtrToInt64BuiltInFunc(const TypeRef& type)
 {}
 

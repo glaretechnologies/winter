@@ -257,9 +257,73 @@ void LanguageTests::run()
 		}
 	}*/
 
+	//testMainStringArg("def main(string s) string : s", "hello", "hello");
+	//testMainStringArg("def main(string s) string : \"hello\"", "bleh", "hello");
 
-	testMainStringArg("def main(string s) string : s", "hello", "hello");
-	testMainStringArg("def main(string s) string : \"hello\"", "bleh", "hello");
+	// ===================================================================
+	// Test toInt32
+	// ===================================================================
+	testMainIntegerArg("def main(int x) int : toInt32(0i64)", 0, 0);
+	testMainIntegerArg("def main(int x) int : toInt32(1i64)", 0, 1);
+	testMainIntegerArg("def main(int x) int : toInt32(-1i64)", 0, -1);
+	testMainIntegerArg("def main(int x) int : toInt32(12345i64)", 0, 12345);
+	testMainIntegerArg("def main(int x) int : toInt32(-12345i64)", 0, -12345);
+	testMainIntegerArg("def main(int x) int : toInt32(-2147483648i64)", 0, -2147483647 - 1);
+	testMainIntegerArg("def main(int x) int : toInt32(2147483647i64)", 0, 2147483647);
+
+	// Test some out-of domain values
+	testMainIntegerArgInvalidProgram("def main(int x) int : toInt32(-2147483649i64)");
+	testMainIntegerArgInvalidProgram("def main(int x) int : toInt32(-2147483650i64)");
+	testMainIntegerArgInvalidProgram("def main(int x) int : toInt32(-300147483650i64)");
+	testMainIntegerArgInvalidProgram("def main(int x) int : toInt32(-9223372036854775808i64)"); // -2^63
+	testMainIntegerArgInvalidProgram("def main(int x) int : toInt32(2147483648i64)");
+	testMainIntegerArgInvalidProgram("def main(int x) int : toInt32(2147483649i64)");
+	testMainIntegerArgInvalidProgram("def main(int x) int : toInt32(300147483650i64)");
+	testMainIntegerArgInvalidProgram("def main(int x) int : toInt32(9223372036854775807i64)"); // 2^63-1
+
+	// TODO: should be able to remove ALLOW_UNSAFE at some point.
+	testMainIntegerArg("def main(int x) int : toInt32(toInt64(x))", 0, 0, ALLOW_UNSAFE);
+	testMainIntegerArg("def main(int x) int : toInt32(toInt64(x))", 1, 1, ALLOW_UNSAFE);
+	testMainIntegerArg("def main(int x) int : toInt32(toInt64(x))", -1, -1, ALLOW_UNSAFE);
+	testMainIntegerArg("def main(int x) int : toInt32(toInt64(x))", -2147483647 - 1, -2147483647 - 1, ALLOW_UNSAFE);
+	testMainIntegerArg("def main(int x) int : toInt32(toInt64(x))", 2147483647, 2147483647, ALLOW_UNSAFE);
+
+	// ===================================================================
+	// Test toInt64
+	// ===================================================================
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(0)", 0, 0);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(1)", 0, 1);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(-1)", 0, -1);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(-2147483648)", 0, -2147483648LL);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(2147483647)", 0, 2147483647);
+
+	
+	// ===================================================================
+	// Test string elem function (elem(string s, uint64 index) char)
+	// ===================================================================
+	// TODO: should be able to remove ALLOW_UNSAFE at some point.
+	testMainIntegerArg("def main(int x) int : codePoint(elem(\"a\", 0i64))", 0, (int)'a', ALLOW_UNSAFE);
+	testMainIntegerArg("def main(int x) int : codePoint(elem(\"hello\", 0i64))", 0, (int)'h', ALLOW_UNSAFE);
+	testMainIntegerArg("def main(int x) int : codePoint(elem(\"hello\", 1i64))", 0, (int)'e', ALLOW_UNSAFE);
+	testMainIntegerArg("def main(int x) int : codePoint(elem(\"hello\", 4i64))", 0, (int)'o', ALLOW_UNSAFE);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"abc\", x)))", 0, (int)'a', ALLOW_UNSAFE);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"abc\", x)))", 1, (int)'b', ALLOW_UNSAFE);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"abc\", x)))", 2, (int)'c', ALLOW_UNSAFE);
+
+	// with multi-byte chars:
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"\\u{393}\", x)))", 0, 0x393, ALLOW_UNSAFE);
+
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"\\u{393}bc\", x)))", 0, 0x393, ALLOW_UNSAFE);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"\\u{393}bc\", x)))", 1, (int)'b', ALLOW_UNSAFE);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"\\u{393}bc\", x)))", 2, (int)'c', ALLOW_UNSAFE);
+
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"a\\u{393}c\", x)))", 0, (int)'a', ALLOW_UNSAFE);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"a\\u{393}c\", x)))", 1, 0x393, ALLOW_UNSAFE);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"a\\u{393}c\", x)))", 2, (int)'c', ALLOW_UNSAFE);
+
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"ab\\u{393}\", x)))", 0, (int)'a', ALLOW_UNSAFE);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"ab\\u{393}\", x)))", 1, (int)'b', ALLOW_UNSAFE);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"ab\\u{393}\", x)))", 2, 0x393, ALLOW_UNSAFE);
 
 	// ===================================================================
 	// Test Escaped characters in string literals

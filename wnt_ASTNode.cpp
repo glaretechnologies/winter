@@ -2684,7 +2684,7 @@ void DivExpression::checkNoOverflow(TraversalPayload& payload, std::vector<ASTNo
 		}
 
 		// See if we can bound the numerator or denominator ranges
-		const IntervalSetInt a_bounds = ProofUtils::getIntegerRange(payload, stack, 
+		const IntervalSetInt64 a_bounds = ProofUtils::getInt64Range(payload, stack, 
 			a // integer value
 		);
 
@@ -2694,7 +2694,7 @@ void DivExpression::checkNoOverflow(TraversalPayload& payload, std::vector<ASTNo
 			return;
 		}
 
-		const IntervalSetInt b_bounds = ProofUtils::getIntegerRange(payload, stack, 
+		const IntervalSetInt64 b_bounds = ProofUtils::getInt64Range(payload, stack, 
 			b // integer value
 		);
 
@@ -2796,7 +2796,7 @@ void DivExpression::checkNoZeroDivide(TraversalPayload& payload, std::vector<AST
 		{
 			// b is not constant.
 
-			const IntervalSetInt b_bounds = ProofUtils::getIntegerRange(payload, stack, 
+			const IntervalSetInt64 b_bounds = ProofUtils::getInt64Range(payload, stack, 
 				b // integer value
 			);
 
