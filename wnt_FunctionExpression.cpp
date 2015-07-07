@@ -12,6 +12,7 @@ Generated at 2011-04-30 18:53:38 +0100
 #include "wnt_RefCounting.h"
 #include "wnt_VectorLiteral.h"
 #include "wnt_FunctionDefinition.h"
+#include "wnt_VArrayLiteral.h"
 #include "wnt_Variable.h"
 #include "VMState.h"
 #include "Value.h"
@@ -1107,6 +1108,71 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 		{
 			// Second arg must be constant, and is (or should be) checked during binding that it is in range.
 			return;
+		}
+		if(this->argument_expressions[0]->type()->getType() == Type::VArrayTypeType &&
+			this->argument_expressions[1]->type()->getType() == Type::IntType)
+		{
+			// Is argument_expressions[0] a varray literal?  In that case we know its size.
+			// Or is a let variable bound to a varry literal?
+
+			const VArrayLiteral* varray_literal = NULL;
+			if(argument_expressions[0]->nodeType() == ASTNode::VArrayLiteralType)
+			{
+				varray_literal = argument_expressions[0].downcastToPtr<VArrayLiteral>();
+			}
+			else if(argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType)
+			{
+				const Variable* var =  argument_expressions[0].downcastToPtr<Variable>();
+				if(var->vartype == Variable::LetVariable)
+				{
+					ASTNode* target_let_node = var->bound_let_block->lets[var->let_var_index]->expr.getPointer();
+					if(target_let_node->nodeType() == ASTNode::VArrayLiteralType)
+					{
+						varray_literal = static_cast<const VArrayLiteral*>(target_let_node);
+					}
+				}
+				else if(var->vartype == Variable::BoundToNamedConstant)
+				{
+					ASTNode* target_named_constant_val = var->bound_named_constant->value_expr.getPointer();
+					if(target_named_constant_val->nodeType() == ASTNode::VArrayLiteralType)
+					{
+						varray_literal = static_cast<const VArrayLiteral*>(target_named_constant_val);
+					}
+				}
+			}
+
+
+			if(varray_literal != NULL) // argument_expressions[0]->nodeType() == ASTNode::VArrayLiteralType)
+			{
+				//const VArrayLiteral* varray_literal = argument_expressions[0].downcastToPtr<VArrayLiteral>();
+
+				// If the index is constant, into a fixed length array, we can prove whether the index is in-bounds
+				if(this->argument_expressions[1]->isConstant())
+				{
+					// Evaluate the index expression
+					VMState vmstate;
+					vmstate.func_args_start.push_back(0);
+					ValueRef retval = this->argument_expressions[1]->exec(vmstate);
+					assert(dynamic_cast<IntValue*>(retval.getPointer()));
+					const int64 index_val = static_cast<IntValue*>(retval.getPointer())->value;
+					if(index_val >= 0 && index_val < (int64)varray_literal->numElementsInValue())
+						return; // Array index is in-bounds!
+					else
+						throw BaseException("Constant index with value " + toString(index_val) + " was out of bounds of varray" + errorContext(*this));
+				}
+				else
+				{
+					// Else index is not known at compile time.
+				
+					const IntervalSetInt64 i_bounds = ProofUtils::getInt64Range(payload, stack, 
+						this->argument_expressions[1] // integer value
+					);
+
+					// Now check our bounds against the array
+					if(i_bounds.lower() >= 0 && i_bounds.upper() < (int64)varray_literal->numElementsInValue())
+						return; // Array index is proven to be in-bounds.
+				}
+			}
 		}
 
 		throw BaseException("Failed to prove elem() argument is in-bounds." + errorContext(*this));

@@ -397,4 +397,10 @@ bool VArrayLiteral::isConstant() const
 }
 
 
+size_t VArrayLiteral::numElementsInValue() const
+{
+	return has_int_suffix ? int_suffix : elements.size();
+}
+
+
 } // end namespace Winter

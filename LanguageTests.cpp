@@ -260,6 +260,42 @@ void LanguageTests::run()
 	//testMainStringArg("def main(string s) string : s", "hello", "hello");
 	//testMainStringArg("def main(string s) string : \"hello\"", "bleh", "hello");
 
+
+	
+	// ===================================================================
+	// Test constant indices into varray literals.
+	// ===================================================================
+
+	// Test with literal indices
+	testMainIntegerArg("def main(int x) int : [10, 11, 12, 13]va[0]", 0, 10);
+	testMainIntegerArg("def main(int x) int : [10, 11, 12, 13]va[1]", 0, 11);
+	testMainIntegerArg("def main(int x) int : [10, 11, 12, 13]va[2]", 0, 12);
+	testMainIntegerArg("def main(int x) int : [10, 11, 12, 13]va[3]", 0, 13);
+
+	// Test with a let variable that refers to a literal
+	testMainIntegerArg("def main(int x) int : let v = [10, 11, 12, 13]va in v[0]", 0, 10);
+
+	// Test with a let variable that refers to a named constant
+	testMainIntegerArg("V = [10, 11, 13, 13]va    def main(int x) int : V[0]", 0, 10);
+
+	testMainIntegerArgInvalidProgram("def main(int x) int : [10, 11, 12, 13]va[-1]");
+	testMainIntegerArgInvalidProgram("def main(int x) int : [10, 11, 12, 13]va[-10]");
+	testMainIntegerArgInvalidProgram("def main(int x) int : [10, 11, 12, 13]va[4]");
+	testMainIntegerArgInvalidProgram("def main(int x) int : [10, 11, 12, 13]va[10]");
+
+	// Test with runtime indices
+	testMainIntegerArg("def main(int x) int : if x >= 0 && x < 4 then [10, 11, 12, 13]va[x] else 0", 0, 10);
+	//testMainIntegerArg("def main(int x) int : [10, 11, 12, 13]va[if x >= 0 && x < 4 then x else 0]", 0, 10);
+	testMainIntegerArg("def main(int x) int : if x >= 0 && x < 4 then [10, 11, 12, 13]va[x] else 0", 2, 12);
+	testMainIntegerArg("def main(int x) int : [10, 11, 12, 13]va[2]", 2, 12);
+	testMainIntegerArg("def main(int x) int : [10, 11, 12, 13]va[3]", 3, 13);
+
+	testMainIntegerArgInvalidProgram("def main(int x) int : [10, 11, 12, 13]va[x]");
+	testMainIntegerArgInvalidProgram("def main(int x) int : if x >= -1 && x < 4 then [10, 11, 12, 13]va[x] else 0"); // Test with some incorrect bounding expressions.
+	testMainIntegerArgInvalidProgram("def main(int x) int : if x >= 0 && x <= 4 then [10, 11, 12, 13]va[x] else 0"); // Test with some incorrect bounding expressions.
+	testMainIntegerArgInvalidProgram("def main(int x) int : if x >= 0 && x < 5 then [10, 11, 12, 13]va[x] else 0"); // Test with some incorrect bounding expressions.
+
+
 	// ===================================================================
 	// Test toInt32
 	// ===================================================================
@@ -496,19 +532,19 @@ void LanguageTests::run()
 	// Test optimisation of varray from heap allocated to stack allocated
 	// ===================================================================
 	ProgramStats stats;
-	stats = testMainFloatArgAllowUnsafe("def main(float x) float :	 [3.0, 4.0, 5.0]va[0]", 1.f, 3.f, INVALID_OPENCL);
+	stats = testMainFloatArg("def main(float x) float :	 [3.0, 4.0, 5.0]va[0]", 1.f, 3.f, INVALID_OPENCL);
 	testAssert(stats.num_heap_allocation_calls == 0);
 
-	stats = testMainFloatArgAllowUnsafe("def main(float x) float :	 let v = [3.0, 4.0, 5.0]va in v[0]", 1.f, 3.f, INVALID_OPENCL);
+	stats = testMainFloatArg("def main(float x) float :	 let v = [3.0, 4.0, 5.0]va in v[0]", 1.f, 3.f, INVALID_OPENCL);
 	testAssert(stats.num_heap_allocation_calls == 0);
 
-	stats = testMainFloatArgAllowUnsafe("def main(float x) float :	 let v = [3.0, 4.0, 5.0]va in v[1]", 1.f, 4.f, INVALID_OPENCL);
+	stats = testMainFloatArg("def main(float x) float :	 let v = [3.0, 4.0, 5.0]va in v[1]", 1.f, 4.f, INVALID_OPENCL);
 	testAssert(stats.num_heap_allocation_calls == 0);
 
-	stats = testMainFloatArgAllowUnsafe("def main(float x) float :	 let v = [3.0, 4.0, 5.0]va in v[2]", 1.f, 5.f, INVALID_OPENCL);
+	stats = testMainFloatArg("def main(float x) float :	 let v = [3.0, 4.0, 5.0]va in v[2]", 1.f, 5.f, INVALID_OPENCL);
 	testAssert(stats.num_heap_allocation_calls == 0);
 
-	stats = testMainFloatArgAllowUnsafe("def main(float x) float :	 let v = [x + 3.0, x + 4.0, x + 5.0]va in v[0]", 10.f, 13.f, INVALID_OPENCL);
+	stats = testMainFloatArg("def main(float x) float :	 let v = [x + 3.0, x + 4.0, x + 5.0]va in v[0]", 10.f, 13.f, INVALID_OPENCL);
 	testAssert(stats.num_heap_allocation_calls == 0);
 
 	// Test varray being returned from function, has to be heap allocated.  (Assuming no inlining of f)
@@ -737,47 +773,47 @@ void LanguageTests::run()
 
 
 	//------------------------ Test a VArray in a VArray --------------------------
-	testMainFloatArgAllowUnsafe("def main(float x) float : let a = [[99]va]va in x", 10.f, 10.0f, INVALID_OPENCL);
+	testMainFloatArg("def main(float x) float : let a = [[99]va]va in x", 10.f, 10.0f, INVALID_OPENCL);
 
 	
 	//------------------------ Test a string in a VArray --------------------------
-	testMainFloatArgAllowUnsafe("def main(float x) float : let a = [\"hello\"]va in x", 10.f, 10.0f, INVALID_OPENCL);
+	testMainFloatArg("def main(float x) float : let a = [\"hello\"]va in x", 10.f, 10.0f, INVALID_OPENCL);
 
-	testMainFloatArgAllowUnsafe("def main(float x) float : let a = [[\"hello\"]va]va in x", 10.f, 10.0f, INVALID_OPENCL);
+	testMainFloatArg("def main(float x) float : let a = [[\"hello\"]va]va in x", 10.f, 10.0f, INVALID_OPENCL);
 	
 	//------------------------ Test a struct, with a ref counted field, in a VArray --------------------------
-	testMainFloatArgAllowUnsafe("struct S { string str }      def main(float x) float : let a = S(\"hello\") in x", 10.f, 10.0f, INVALID_OPENCL);
+	testMainFloatArg("struct S { string str }      def main(float x) float : let a = S(\"hello\") in x", 10.f, 10.0f, INVALID_OPENCL);
 
-	testMainFloatArgAllowUnsafe("struct S { string str }      def main(float x) float : let a = [S(\"hello\")]va in x", 10.f, 10.0f, INVALID_OPENCL);
+	testMainFloatArg("struct S { string str }      def main(float x) float : let a = [S(\"hello\")]va in x", 10.f, 10.0f, INVALID_OPENCL);
 
-	testMainFloatArgAllowUnsafe("struct S { string str }      def main(float x) float : let a = [S(\"hello\"), S(\"world\")]va in x", 10.f, 10.0f, INVALID_OPENCL);
+	testMainFloatArg("struct S { string str }      def main(float x) float : let a = [S(\"hello\"), S(\"world\")]va in x", 10.f, 10.0f, INVALID_OPENCL);
 
 	// Test a struct with two ref counted fields
-	testMainFloatArgAllowUnsafe("struct S { string s_a, string s_b }      def main(float x) float : let a = S(\"hello\", \"world\") in x", 10.f, 10.0f, INVALID_OPENCL);
+	testMainFloatArg("struct S { string s_a, string s_b }      def main(float x) float : let a = S(\"hello\", \"world\") in x", 10.f, 10.0f, INVALID_OPENCL);
 
-	testMainFloatArgAllowUnsafe("struct S { string s_a, string s_b }      def main(float x) float : let a = [S(\"hello\", \"world\")]va in x", 10.f, 10.0f, INVALID_OPENCL);
+	testMainFloatArg("struct S { string s_a, string s_b }      def main(float x) float : let a = [S(\"hello\", \"world\")]va in x", 10.f, 10.0f, INVALID_OPENCL);
 	
 
 
 	//------------------------ Test a tuple, with a ref counted field, in a VArray --------------------------
-	testMainFloatArgAllowUnsafe("struct S { string str }      def main(float x) float : let a = S(\"hello\") in x", 10.f, 10.0f, INVALID_OPENCL);
-	testMainFloatArgAllowUnsafe("def main(float x) float : let a = [\"hello\"]t in x", 10.f, 10.0f, INVALID_OPENCL);
+	testMainFloatArg("struct S { string str }      def main(float x) float : let a = S(\"hello\") in x", 10.f, 10.0f, INVALID_OPENCL);
+	testMainFloatArg("def main(float x) float : let a = [\"hello\"]t in x", 10.f, 10.0f, INVALID_OPENCL);
 
-	testMainFloatArgAllowUnsafe("def main(float x) float : let a = [[\"hello\"]t]va in x", 10.f, 10.0f, INVALID_OPENCL);
+	testMainFloatArg("def main(float x) float : let a = [[\"hello\"]t]va in x", 10.f, 10.0f, INVALID_OPENCL);
 
-	testMainFloatArgAllowUnsafe("def main(float x) float : let a = [[\"hello\"]t, [\"world\"]t]va in x", 10.f, 10.0f, INVALID_OPENCL);
+	testMainFloatArg("def main(float x) float : let a = [[\"hello\"]t, [\"world\"]t]va in x", 10.f, 10.0f, INVALID_OPENCL);
 
 	// Test a tuple with two ref counted fields
-	testMainFloatArgAllowUnsafe("def main(float x) float : let a = (\"hello\", \"world\") in x", 10.f, 10.0f, INVALID_OPENCL);
+	testMainFloatArg("def main(float x) float : let a = (\"hello\", \"world\") in x", 10.f, 10.0f, INVALID_OPENCL);
 
-	testMainFloatArgAllowUnsafe("def main(float x) float : let a = [(\"hello\", \"world\")]va in x", 10.f, 10.0f, INVALID_OPENCL);
+	testMainFloatArg("def main(float x) float : let a = [(\"hello\", \"world\")]va in x", 10.f, 10.0f, INVALID_OPENCL);
 
 	
 	//------------------------ Test a VArray in a named constant --------------------------
-	testMainFloatArgAllowUnsafe("TEST = [99.0]va     def main(float x) float : TEST[0]", 10.f, 99.0f, INVALID_OPENCL);
-	testMainFloatArgAllowUnsafe("TEST = [99.0]va     def main(float x) float : TEST[0] + TEST[0]", 10.f, 198.0f, INVALID_OPENCL);
+	testMainFloatArg("TEST = [99.0]va     def main(float x) float : TEST[0]", 10.f, 99.0f, INVALID_OPENCL);
+	testMainFloatArg("TEST = [99.0]va     def main(float x) float : TEST[0] + TEST[0]", 10.f, 198.0f, INVALID_OPENCL);
 
-	testMainFloatArgAllowUnsafe("TEST = [1.0 + 2.0]va     def main(float x) float : TEST[0] + TEST[0]", 10.f, 6.0f, INVALID_OPENCL);
+	testMainFloatArg("TEST = [1.0 + 2.0]va     def main(float x) float : TEST[0] + TEST[0]", 10.f, 6.0f, INVALID_OPENCL);
 
 	testMainFloatArgAllowUnsafe("def f(varray<float> v) : v     TEST = f([3.0]va)     def main(float x) float : TEST[0]", 10.f, 3.0f, INVALID_OPENCL);
 	testMainFloatArgAllowUnsafe("def f(varray<float> v) : v     TEST = f([3.0]va)     def main(float x) float : TEST[0] + TEST[0]", 10.f, 6.0f, INVALID_OPENCL);

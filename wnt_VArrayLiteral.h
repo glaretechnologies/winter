@@ -37,6 +37,8 @@ public:
 	virtual Reference<ASTNode> clone();
 	virtual bool isConstant() const;
 
+
+	size_t numElementsInValue() const;
 private:
 	bool areAllElementsConstant() const;
 	

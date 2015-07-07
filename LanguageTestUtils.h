@@ -451,9 +451,9 @@ static ProgramStats doTestMainFloatArg(const std::string& src, float argument, f
 }
 
 
-static void testMainFloatArg(const std::string& src, float argument, float target_return_val, uint32 test_flags = 0)
+static ProgramStats testMainFloatArg(const std::string& src, float argument, float target_return_val, uint32 test_flags = 0)
 {
-	doTestMainFloatArg(src, argument, target_return_val,
+	return doTestMainFloatArg(src, argument, target_return_val,
 		false, // check constant-folded to literal
 		false, // allow_unsafe_operations
 		test_flags
