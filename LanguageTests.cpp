@@ -261,22 +261,114 @@ void LanguageTests::run()
 	//testMainStringArg("def main(string s) string : \"hello\"", "bleh", "hello");
 
 
+	/*
+
+	want to prove:
+	T: index >= 0 && index < len(f(x))
+
+	substitute
+	index <- 0
+
+	get T_1:
+	T_1: 0 >= 0 && 0 < len(f(x))
+	=  true && 0 < len(f(x))
+	=  0 < len(f(x))
+
+	Use postcondition of f:  len(res) = 1
+
+	T' becomes
+	0 < 1
+	true
+
+
+	{ len(res) = 1 }
+
+	----------------------------
+	valid = 
+	0 >= 0 && 0 < len(f(x))
+	true && 0 < len(f(x))
+	0 < len(f(x))
+
+	[use len(f(x)) = 1]
+	0 < 1
+	true
+
+
+
+	----------------------------------
+	From "def f(int i) varray<float> : [i, i, i, i]va			def main(int x) int : if i > 0 && i < 4 then f(x)[i] else 0", 4, 4);:
+
+	Want to prove:
+
+	i >= 0 && i < len(f(x))
+
+	[since in true branch, we know i > 0 && i < 3, in other words i e [0, 3]]
+
+	true && i < len(f(x))
+	i < len(f(x))
+
+	[use len(f(x)) = 4]
+
+	i < 4
+
+	true
+
+	--------------------------------------------------
+	*/
+
+	testMainFloatArg("def main(float x) float : let a = [1.0, 2.0, 3.0, 4.0]a in a[truncateToInt(x)]", 2.1f, 3.0f, ALLOW_UNSAFE);
+
+
+	// ===================================================================
+	// Test makeVArray(elem, count) varray<T>
+	// ===================================================================
+	testMainInt64Arg("def main(int64 x) int64 : length(makeVArray(1, x))", 1, 1);
+	testMainInt64Arg("def main(int64 x) int64 : length(makeVArray(1, x))", 4, 4);
+	testMainInt64Arg("def main(int64 x) int64 : length(makeVArray(1, x))", 0, 0);
+
+	testMainInt64Arg("def main(int64 x) int64 : makeVArray(x, x)[0]", 1, 1, ALLOW_UNSAFE);
+	testMainInt64Arg("def main(int64 x) int64 : makeVArray(x, x)[0]", 2, 2, ALLOW_UNSAFE);
+	testMainInt64Arg("def main(int64 x) int64 : makeVArray(x, x)[1]", 2, 2, ALLOW_UNSAFE);
+
+
+
+//	testMainIntegerArg("def f(int i) varray<float> : [10]va			def main(int x) int : if i > 0 && i < 4 then f(x)[i] else 0", 4, 4);
+
+//	testMainIntegerArg("def f(int i) varray<float> : [i, i, i, i]va			def main(int x) int : if i > 0 && i < 4 then f(x)[i] else 0", 4, 4);
+
+//	testMainFloatArg("def f(float x) varray<float> : [x]va			def main(float x) float : f(x)[0]", 4.0f, 4.0f);
+
+
+	// Test varrays with pass-by-value elements (e.g. structures)
+	testMainFloatArg("struct s { float x }		def main(float x) float : [s(4.0)]va[0].x", 0, 4.0f, INVALID_OPENCL);
+	testMainFloatArg("struct s { float x }		def main(float x) float : [s(10.0), s(11.0), s(12.0), s(13.0)]va[2].x", 0, 12.0f, INVALID_OPENCL);
+
+	// Test varrays with heap-allocated/ref counted elements
+	//testMainIntegerArg("struct s { float x }		def main(float x) float : [\"abc\"]va[0].x", 0, 4.0f);
+
+
+	// In VArray literal
+	testMainFloatArgAllowUnsafe("struct s { float x }									\n\
+				  def op_add(s a, s b) : s(a.x + b.x)					\n\
+				  def main(float x) float : [s(1) + s(3)]va[0].x", 1.0f, 4.0f, INVALID_OPENCL);
+	
+
 	
 	// ===================================================================
 	// Test constant indices into varray literals.
 	// ===================================================================
 
 	// Test with literal indices
-	testMainIntegerArg("def main(int x) int : [10, 11, 12, 13]va[0]", 0, 10);
-	testMainIntegerArg("def main(int x) int : [10, 11, 12, 13]va[1]", 0, 11);
-	testMainIntegerArg("def main(int x) int : [10, 11, 12, 13]va[2]", 0, 12);
-	testMainIntegerArg("def main(int x) int : [10, 11, 12, 13]va[3]", 0, 13);
+	testMainIntegerArg("def main(int x) int : [10, 11, 12, 13]va[0]", 0, 10, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int : [10, 11, 12, 13]va[1]", 0, 11, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int : [10, 11, 12, 13]va[2]", 0, 12, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int : [10, 11, 12, 13]va[3]", 0, 13, INVALID_OPENCL);
 
 	// Test with a let variable that refers to a literal
-	testMainIntegerArg("def main(int x) int : let v = [10, 11, 12, 13]va in v[0]", 0, 10);
+	testMainIntegerArg("def main(int x) int : let v = [10, 11, 12, 13]va in v[0]", 0, 10, INVALID_OPENCL);
 
 	// Test with a let variable that refers to a named constant
-	testMainIntegerArg("V = [10, 11, 13, 13]va    def main(int x) int : V[0]", 0, 10);
+	testMainIntegerArg("V = [10, 11, 13, 13]va    def main(int x) int : V[0]", 0, 10, INVALID_OPENCL);
 
 	testMainIntegerArgInvalidProgram("def main(int x) int : [10, 11, 12, 13]va[-1]");
 	testMainIntegerArgInvalidProgram("def main(int x) int : [10, 11, 12, 13]va[-10]");
@@ -284,11 +376,11 @@ void LanguageTests::run()
 	testMainIntegerArgInvalidProgram("def main(int x) int : [10, 11, 12, 13]va[10]");
 
 	// Test with runtime indices
-	testMainIntegerArg("def main(int x) int : if x >= 0 && x < 4 then [10, 11, 12, 13]va[x] else 0", 0, 10);
+	testMainIntegerArg("def main(int x) int : if x >= 0 && x < 4 then [10, 11, 12, 13]va[x] else 0", 0, 10, INVALID_OPENCL);
 	//testMainIntegerArg("def main(int x) int : [10, 11, 12, 13]va[if x >= 0 && x < 4 then x else 0]", 0, 10);
-	testMainIntegerArg("def main(int x) int : if x >= 0 && x < 4 then [10, 11, 12, 13]va[x] else 0", 2, 12);
-	testMainIntegerArg("def main(int x) int : [10, 11, 12, 13]va[2]", 2, 12);
-	testMainIntegerArg("def main(int x) int : [10, 11, 12, 13]va[3]", 3, 13);
+	testMainIntegerArg("def main(int x) int : if x >= 0 && x < 4 then [10, 11, 12, 13]va[x] else 0", 2, 12, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int : [10, 11, 12, 13]va[2]", 2, 12, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int : [10, 11, 12, 13]va[3]", 3, 13, INVALID_OPENCL);
 
 	testMainIntegerArgInvalidProgram("def main(int x) int : [10, 11, 12, 13]va[x]");
 	testMainIntegerArgInvalidProgram("def main(int x) int : if x >= -1 && x < 4 then [10, 11, 12, 13]va[x] else 0"); // Test with some incorrect bounding expressions.
@@ -780,6 +872,12 @@ void LanguageTests::run()
 	testMainFloatArg("def main(float x) float : let a = [\"hello\"]va in x", 10.f, 10.0f, INVALID_OPENCL);
 
 	testMainFloatArg("def main(float x) float : let a = [[\"hello\"]va]va in x", 10.f, 10.0f, INVALID_OPENCL);
+
+	testMainIntegerArg("def main(int x) int : let a = [\"hello\"]va in length(a[0])", 0, 5, INVALID_OPENCL);
+
+	//------------------------ Test a struct in a VArray, with access --------------------------
+	testMainFloatArg("struct s { float x }		def main(float x) float : [s(4.0)]va[0].x", 0, 4.0f, INVALID_OPENCL);
+	testMainFloatArg("struct s { float x }		def main(float x) float : [s(10.0), s(11.0), s(12.0), s(13.0)]va[2].x", 0, 12.0f, INVALID_OPENCL);
 	
 	//------------------------ Test a struct, with a ref counted field, in a VArray --------------------------
 	testMainFloatArg("struct S { string str }      def main(float x) float : let a = S(\"hello\") in x", 10.f, 10.0f, INVALID_OPENCL);
@@ -3201,9 +3299,9 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 				  def main() float : [s(1) + s(3)]a[0].x", 4.0f);
 
 	// In VArray literal
-	//TEMP CRASHES testMainFloatArgAllowUnsafe("struct s { float x }									\n\
-	//			  def op_add(s a, s b) : s(a.x + b.x)					\n\
-	//			  def main(float x) float : [s(1) + s(3)]va[0].x", 1.0f, 4.0f);
+	testMainFloatArgAllowUnsafe("struct s { float x }									\n\
+				  def op_add(s a, s b) : s(a.x + b.x)					\n\
+				  def main(float x) float : [s(1) + s(3)]va[0].x", 1.0f, 4.0f, INVALID_OPENCL);
 
 	// In Vector literal
 	testMainFloat("struct s { float x }									\n\

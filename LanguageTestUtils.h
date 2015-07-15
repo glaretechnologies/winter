@@ -235,7 +235,7 @@ static void testMainFloatArgInvalidProgram(const std::string& src)
 }
 
 
-static ProgramStats doTestMainFloatArg(const std::string& src, float argument, float target_return_val, bool check_constant_folded_to_literal, bool allow_unsafe_operations, uint32 test_flags)
+static ProgramStats doTestMainFloatArg(const std::string& src, float argument, float target_return_val, bool check_constant_folded_to_literal, uint32 test_flags)
 {
 	std::cout << "===================== Winter testMainFloatArg() =====================" << std::endl;
 	try
@@ -246,7 +246,7 @@ static ProgramStats doTestMainFloatArg(const std::string& src, float argument, f
 		VMConstructionArgs vm_args;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
 		vm_args.env = &test_env;
-		vm_args.allow_unsafe_operations = allow_unsafe_operations;
+		vm_args.allow_unsafe_operations = (test_flags & ALLOW_UNSAFE) != 0;
 
 		{
 			ExternalFunctionRef f(new ExternalFunction());
@@ -318,7 +318,7 @@ static ProgramStats doTestMainFloatArg(const std::string& src, float argument, f
 
 
 		//============================= New: test with OpenCL ==============================
-		const bool TEST_OPENCL = false;
+		const bool TEST_OPENCL = true;
 		if(!(test_flags & INVALID_OPENCL) && TEST_OPENCL)
 		{
 #if USE_OPENCL
@@ -455,7 +455,6 @@ static ProgramStats testMainFloatArg(const std::string& src, float argument, flo
 {
 	return doTestMainFloatArg(src, argument, target_return_val,
 		false, // check constant-folded to literal
-		false, // allow_unsafe_operations
 		test_flags
 	);
 }
@@ -465,8 +464,7 @@ static ProgramStats testMainFloatArgAllowUnsafe(const std::string& src, float ar
 {
 	return doTestMainFloatArg(src, argument, target_return_val,
 		false, // check constant-folded to literal
-		true, // allow_unsafe_operations
-		test_flags
+		test_flags | ALLOW_UNSAFE
 	);
 }
 
@@ -475,7 +473,6 @@ static void testMainFloatArgCheckConstantFolded(const std::string& src, float ar
 {
 	doTestMainFloatArg(src, argument, target_return_val,
 		true, // check constant-folded to literal
-		false, // allow_unsafe_operations
 		test_flags
 	);
 }

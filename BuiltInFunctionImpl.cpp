@@ -59,8 +59,87 @@ public:
 };
 
 
-// Make a for loop.  Adapted from http://llvm.org/docs/tutorial/LangImpl5.html#for-loop-expression
-static llvm::Value* makeForLoop(llvm::IRBuilder<>& Builder, llvm::Module* module, llvm::Value* begin_index, llvm::Value* end_index, llvm::Type* loop_value_type, /*llvm::Value* initial_value, */CreateLoopBodyCallBack* create_loop_body_callback)
+
+/*
+
+Make a for loop.
+
+PreheaderBB
+--------------
+jump to condition_BB
+
+
+condition_BB
+------------
+cond = compute condition
+
+cond branch(cond, loop_body_BB, after_BB)
+
+
+loop_body_BB
+-------------
+do loop body
+
+increment loop index var
+
+jump to condition BB
+
+
+after_BB
+---------
+*/
+
+
+static void makeForLoop(llvm::IRBuilder<>& builder, llvm::Module* module, llvm::Value* begin_index, llvm::Value* end_index, CreateLoopBodyCallBack* create_loop_body_callback)
+{
+	// Make the new basic block for the loop header, inserting after current block.
+	llvm::Function* current_func = builder.GetInsertBlock()->getParent();
+	llvm::BasicBlock* preheader_BB = builder.GetInsertBlock();
+	llvm::BasicBlock* condition_BB = llvm::BasicBlock::Create(module->getContext(), "condition", current_func);
+	llvm::BasicBlock* loop_body_BB = llvm::BasicBlock::Create(module->getContext(), "loop_body", current_func);
+	llvm::BasicBlock* after_BB = llvm::BasicBlock::Create(module->getContext(), "after_loop", current_func);
+
+	builder.SetInsertPoint(preheader_BB);
+	// Insert an explicit fall through from the current block to the condition_BB.
+	builder.CreateBr(condition_BB);
+
+	//============================= condition_BB ================================
+	builder.SetInsertPoint(condition_BB);
+
+	// Create loop index (i) variable phi node
+	llvm::PHINode* loop_index_var = builder.CreatePHI(llvm::Type::getInt64Ty(module->getContext()), 2, "loop_index_var");
+	loop_index_var->addIncoming(begin_index, preheader_BB);
+
+	// Compute the end condition.
+	llvm::Value* end_cond = builder.CreateICmpNE(end_index, loop_index_var, "loopcond");
+
+	// Insert the conditional branch
+	builder.CreateCondBr(end_cond, loop_body_BB, after_BB);
+
+
+	//============================= loop_body_BB ================================
+	builder.SetInsertPoint(loop_body_BB);
+
+	// TODO: deal with result?
+	create_loop_body_callback->emitLoopBody(builder, module, loop_index_var);
+
+	llvm::Value* one = llvm::ConstantInt::get(module->getContext(), llvm::APInt(64, 1));
+	llvm::Value* next_var = builder.CreateAdd(loop_index_var, one, "next_var");
+
+	// Add a new entry to the PHI node for the backedge.
+	loop_index_var->addIncoming(next_var, loop_body_BB);
+
+	// Do jump back to condition basic block
+	builder.CreateBr(condition_BB);
+	
+	//============================= after_BB ================================
+	builder.SetInsertPoint(after_BB);
+}
+
+
+#if 0
+static llvm::Value* makeForLoop(llvm::IRBuilder<>& builder, llvm::Module* module, llvm::Value* begin_index, llvm::Value* end_index, llvm::Type* loop_value_type, /*llvm::Value* initial_value, */
+								CreateLoopBodyCallBack* create_loop_body_callback)
 {
 	// Make the new basic block for the loop header, inserting after current
 	// block.
@@ -116,8 +195,10 @@ static llvm::Value* makeForLoop(llvm::IRBuilder<>& Builder, llvm::Module* module
 	//loop_value_var->addIncoming(updated_value, LoopEndBB);
   
 	return updated_value;
-}
 
+
+}
+#endif
 
 //----------------------------------------------------------------------------------------------
 
@@ -628,7 +709,7 @@ llvm::Value* ArrayMapBuiltInFunc::insertWorkFunction(EmitLLVMCodeParams& params)
 		params.module,
 		llvm::ConstantInt::get(*params.context, llvm::APInt(64, 0)), // TEMP BEGIN=0    LLVMTypeUtils::getNthArg(llvm_func, 3), // begin index
 		LLVMTypeUtils::getNthArg(llvm_func, 4), // end index
-		from_type->elem_type->LLVMType(*params.module), // Loop value type
+		//from_type->elem_type->LLVMType(*params.module), // Loop value type
 		&callback
 	);
 	
@@ -719,14 +800,16 @@ llvm::Value* ArrayMapBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 		callback.function = function;
 		callback.input_array = input_array;
 	
-		return makeForLoop(
+		makeForLoop(
 			*params.builder,
 			params.module,
 			llvm::ConstantInt::get(*params.context, llvm::APInt(64, 0)), // begin index
 			llvm::ConstantInt::get(*params.context, llvm::APInt(64, from_type->num_elems)), // end index
-			from_type->elem_type->LLVMType(*params.module), // Loop value type
+			//from_type->elem_type->LLVMType(*params.module), // Loop value type
 			&callback
 		);
+
+		return return_ptr;
 	}
 }
 
@@ -1509,7 +1592,7 @@ llvm::Value* VArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 
 		if(field_type->passByValue())
 		{
-			llvm::Value* varray_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, arg_offset + 0); // Type: { i64, [0 x float] }*
+			llvm::Value* varray_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, arg_offset + 0);
 			
 			//varray_ptr->dump();
 			//varray_ptr->getType()->dump();
@@ -1526,16 +1609,15 @@ llvm::Value* VArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 		}
 		else // Else if element type is pass-by-pointer
 		{
-			assert(0);
-			//TODO
-
 			// Pointer to memory for return value will be 0th argument.
 			llvm::Value* return_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
 
-			llvm::Value* elem_val = loadElement(
-				params, 
-				1 // arg offset - we have an sret arg.
-			);
+			llvm::Value* varray_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, arg_offset + 0);
+			llvm::Value* data_ptr = params.builder->CreateStructGEP(varray_ptr, 3, "data_ptr"); // [0 x T]*
+
+			llvm::Value* indices[] = { llvm::ConstantInt::get(*params.context, llvm::APInt(64, 0)), index };
+			llvm::Value* elem_ptr = params.builder->CreateInBoundsGEP(data_ptr, llvm::makeArrayRef(indices));
+			llvm::Value* elem_val = params.builder->CreateLoad(elem_ptr);
 
 			// Store the element
 			params.builder->CreateStore(
@@ -1543,21 +1625,164 @@ llvm::Value* VArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 				return_ptr // ptr
 			);
 
-			return NULL;
+			return return_ptr;
 		}
 	}
 	else if(index_type->getType() == Type::VectorTypeType)
 	{
 		//TODO
 		assert(0);
-		return NULL;
+		//return NULL;
+		throw BaseException("not implemented 1553");
 	}
 	else
 	{
 		assert(0);
-		return NULL;
+		//return NULL;
+		throw BaseException("internal error 1559");
 	}
 }
+
+
+//------------------------------------------------------------------------------------
+
+
+MakeVArrayBuiltInFunc::MakeVArrayBuiltInFunc(const Reference<VArrayType>& array_type_)
+:	array_type(array_type_)
+{
+}
+
+
+ValueRef MakeVArrayBuiltInFunc::invoke(VMState& vmstate)
+{
+	const ValueRef elem_value = vmstate.argument_stack[vmstate.func_args_start.back()    ];
+	const IntValue* count_value  = checkedCast<const IntValue>   (vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
+
+	// TODO: max value check?
+	if(count_value->value < 0)
+		throw BaseException("Count value is invalid.");
+
+	return new VArrayValue(vector<ValueRef>(count_value->value, elem_value));
+}
+
+
+class MakeVArrayBuiltInFunc_CreateLoopBodyCallBack : public CreateLoopBodyCallBack
+{
+public:
+	virtual llvm::Value* emitLoopBody(llvm::IRBuilder<>& builder, llvm::Module* module, /*llvm::Value* loop_value_var, */llvm::Value* i)
+	{
+		llvm::Value* indices[2] = {llvm::ConstantInt::get(module->getContext(), llvm::APInt(32, 0)), i };
+		llvm::Value* element_ptr = builder.CreateInBoundsGEP(data_ptr, indices);
+
+		if(array_type->elem_type->passByValue())
+		{
+			// Store the element in the array
+			builder.CreateStore(
+				element_value, // value
+				element_ptr // ptr
+			);
+		}
+		else
+		{
+			// Element is pass-by-pointer, for example a structure.
+			// So just emit code that will store it directly in the array.
+			//this->element_value->emitLLVMCode(params, element_ptr);
+
+			//TEMP:
+			assert(0);
+			throw BaseException("not implemented");
+		}
+
+		return NULL;
+	}
+
+	llvm::Value* element_value;
+	llvm::Value* data_ptr;
+	Reference<VArrayType> array_type;
+};
+
+
+llvm::Value* MakeVArrayBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	llvm::Value* elem_val  = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+	llvm::Value* count_val = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
+
+	// Make call to allocateVArray
+
+	// NOTE: this code take from VArrayLiteral.cpp.  TODO: Deduplicate.
+
+	params.stats->num_heap_allocation_calls++;
+
+	// Emit a call to allocateVArray:
+	// allocateVArray(const int elem_size_B, const int num_elems)
+	llvm::Function* allocateVArrayLLVMFunc = params.common_functions.allocateVArrayFunc->getOrInsertFunction(
+		params.module,
+		false // use_cap_var_struct_ptr
+	);
+
+	const TypeRef elem_type = array_type->elem_type;
+
+	const uint64_t size_B = params.target_data->getTypeAllocSize(elem_type->LLVMType(*params.module)); // Get size of element
+	llvm::Value* size_B_constant = llvm::ConstantInt::get(*params.context, llvm::APInt(64, size_B, /*signed=*/false));
+
+	llvm::CallInst* call_inst = params.builder->CreateCall2(allocateVArrayLLVMFunc, size_B_constant, count_val, "varray");
+
+	// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
+	call_inst->setCallingConv(llvm::CallingConv::C);
+
+	// Cast resulting allocated void* down to VArrayRep for the right type, e.g. varray<T>
+	llvm::Type* varray_T_type = this->array_type->LLVMType(*params.module);
+	assert(varray_T_type->isPointerTy());
+
+	llvm::Value* varray_ptr = params.builder->CreatePointerCast(call_inst, varray_T_type);
+	uint64 initial_flags = 1; // flag = 1 = heap allocated
+
+
+	// Set the reference count to 1
+	llvm::Value* ref_ptr = params.builder->CreateStructGEP(varray_ptr, 0, "varray_literal_ref_ptr");
+	llvm::Value* one = llvm::ConstantInt::get(*params.context, llvm::APInt(64, 1, /*signed=*/true));
+	llvm::StoreInst* store_inst = params.builder->CreateStore(one, ref_ptr);
+	addMetaDataCommentToInstruction(params, store_inst, "makeVArray result set initial ref count to 1");
+
+	// Set VArray length
+	llvm::Value* length_ptr = params.builder->CreateStructGEP(varray_ptr, 1, "varray_literal_length_ptr");
+	llvm::StoreInst* store_length_inst = params.builder->CreateStore(count_val, length_ptr);
+	addMetaDataCommentToInstruction(params, store_length_inst, "makeVArray result set initial length count.");
+
+	// Set the flags
+	llvm::Value* flags_ptr = params.builder->CreateStructGEP(varray_ptr, 2, "varray_literal_flags_ptr");
+	llvm::Value* flags_contant_val = llvm::ConstantInt::get(*params.context, llvm::APInt(64, initial_flags));
+	llvm::StoreInst* store_flags_inst = params.builder->CreateStore(flags_contant_val, flags_ptr);
+	addMetaDataCommentToInstruction(params, store_flags_inst, "makeVArray result set initial flags to " + toString(initial_flags));
+
+
+	llvm::Value* data_ptr = params.builder->CreateStructGEP(varray_ptr, 3, "varray_literal_data_ptr");
+
+
+	// Emit for loop to write count copies of the element to the varray.
+
+	MakeVArrayBuiltInFunc_CreateLoopBodyCallBack callback;
+	callback.array_type = this->array_type;
+	callback.data_ptr = data_ptr;
+	callback.element_value = elem_val;
+
+	makeForLoop(
+		*params.builder,
+		params.module,
+		llvm::ConstantInt::get(*params.context, llvm::APInt(64, 0)), // begin index
+		count_val, // end index
+		//array_type->elem_type->LLVMType(*params.module), // Loop value type. TODO: remove
+		&callback
+	);
+
+	return varray_ptr;
+}
+
+
+
+
+
+
 
 
 //------------------------------------------------------------------------------------

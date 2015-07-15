@@ -211,11 +211,11 @@ llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 		const TypeRef elem_type = elements[0]->type();
 
 		const uint64_t size_B = params.target_data->getTypeAllocSize(elem_type->LLVMType(*params.module)); // Get size of element
-		llvm::Value* size_B_constant = llvm::ConstantInt::get(*params.context, llvm::APInt(32, size_B, /*signed=*/false));
+		llvm::Value* size_B_constant = llvm::ConstantInt::get(*params.context, llvm::APInt(64, size_B, /*signed=*/false));
 
 		llvm::Value* num_elems = llvm::ConstantInt::get(
 			*params.context,
-			llvm::APInt(32, //TEMP
+			llvm::APInt(64, //TEMP
 				this->elements.size(),
 				true // signed
 			)
@@ -274,7 +274,7 @@ llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 		)
 	);
 	llvm::StoreInst* store_inst = params.builder->CreateStore(one, ref_ptr);
-	addMetaDataCommentToInstruction(params, store_inst, "VArray literal set intial ref count to 1");
+	addMetaDataCommentToInstruction(params, store_inst, "VArray literal set initial ref count to 1");
 
 	// Set VArray length
 	llvm::Value* length_ptr = params.builder->CreateStructGEP(varray_ptr, 1, "varray_literal_length_ptr");
@@ -285,13 +285,13 @@ llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 		)
 	);
 	llvm::StoreInst* store_length_inst = params.builder->CreateStore(length_constant_int, length_ptr);
-	addMetaDataCommentToInstruction(params, store_length_inst, "VArray literal set intial length count to " + ::toString(this->elements.size()));
+	addMetaDataCommentToInstruction(params, store_length_inst, "VArray literal set initial length count to " + ::toString(this->elements.size()));
 
 	// Set the flags
 	llvm::Value* flags_ptr = params.builder->CreateStructGEP(varray_ptr, 2, "varray_literal_flags_ptr");
 	llvm::Value* flags_contant_val = llvm::ConstantInt::get(*params.context, llvm::APInt(64, initial_flags));
 	llvm::StoreInst* store_flags_inst = params.builder->CreateStore(flags_contant_val, flags_ptr);
-	addMetaDataCommentToInstruction(params, store_flags_inst, "VArray literal set intial flags to " + toString(initial_flags));
+	addMetaDataCommentToInstruction(params, store_flags_inst, "VArray literal set initial flags to " + toString(initial_flags));
 
 
 	llvm::Value* data_ptr = params.builder->CreateStructGEP(varray_ptr, 3, "varray_literal_data_ptr");

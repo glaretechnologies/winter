@@ -75,6 +75,8 @@ public:
 	virtual bool isHeapAllocated() const { return false; } // same as 'is refcounted'.
 
 	inline TypeType getType() const { return type; }
+
+	std::string address_space; // For OpenCL code output
 private:
 	TypeType type;
 };
@@ -98,7 +100,7 @@ public:
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 	virtual llvm::Type* LLVMType(llvm::Module& module) const;
-	virtual const std::string OpenCLCType() const { return "float"; }
+	virtual const std::string OpenCLCType() const;
 	virtual llvm::Value* getInvalidLLVMValue(llvm::Module& module) const; // For array out-of-bounds
 	virtual Reference<Value> getInvalidValue() const; // For array out-of-bounds
 };
@@ -541,8 +543,6 @@ public:
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 	virtual llvm::Type* LLVMType(llvm::Module& module) const;
 	virtual const std::string OpenCLCType() const;
-
-	std::string address_space;
 };
 
 

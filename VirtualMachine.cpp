@@ -287,7 +287,7 @@ public:
 };
 
 
-static VArrayRep* allocateVArray(const int elem_size_B, const int num_elems)
+static VArrayRep* allocateVArray(uint64 elem_size_B, uint64 num_elems)
 {
 	varray_count++;//TEMP
 
@@ -641,7 +641,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
 				(void*)allocateVArray,
 				allocateVArrayInterpreted, // interpreted func
-				FunctionSignature("allocateVArray", vector<TypeRef>(2, new Int())),
+				FunctionSignature("allocateVArray", vector<TypeRef>(2, new Int(64))),
 				new VArrayType(new Int()) //new OpaqueType() // return type.  Just make this a void*, will cast return value to correct type
 			)));
 			external_functions.back()->has_side_effects = true;
@@ -1116,7 +1116,7 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 		common_functions.freeStringFunc = findMatchingFunction(freeStringSig).getPointer();
 		assert(common_functions.freeStringFunc);
 
-		common_functions.allocateVArrayFunc = findMatchingFunction(FunctionSignature("allocateVArray", vector<TypeRef>(2, new Int()))).getPointer();
+		common_functions.allocateVArrayFunc = findMatchingFunction(FunctionSignature("allocateVArray", vector<TypeRef>(2, new Int(64)))).getPointer();
 		assert(common_functions.allocateVArrayFunc);
 
 		common_functions.freeVArrayFunc = findMatchingFunction(FunctionSignature("freeVArray", vector<TypeRef>(1, new VArrayType(new Int()))))./*new OpaqueType*/getPointer();

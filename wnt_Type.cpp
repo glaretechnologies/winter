@@ -71,6 +71,15 @@ llvm::Type* Float::LLVMType(llvm::Module& module) const
 }
 
 
+const std::string Float::OpenCLCType() const
+{ 
+	if(address_space.empty())
+		return "float";
+	else
+		return address_space + " float";
+}
+
+
 Reference<Value> Float::getInvalidValue() const // For array out-of-bounds
 {
 	return new FloatValue(std::numeric_limits<float>::quiet_NaN());
@@ -472,7 +481,7 @@ const std::string ArrayType::toString() const
 const std::string ArrayType::OpenCLCType() const
 {
 	// For e.g. an array of floats, use type 'float*'.
-	return elem_type->OpenCLCType() + "*";
+	return "__constant " + elem_type->OpenCLCType() + "*";
 }
 
 

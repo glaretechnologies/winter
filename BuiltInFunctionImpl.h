@@ -209,6 +209,19 @@ private:
 };
 
 
+// Make a varray of count elements.
+class MakeVArrayBuiltInFunc : public BuiltInFunctionImpl
+{
+public:
+	MakeVArrayBuiltInFunc(const Reference<VArrayType>& array_type);
+
+	virtual ValueRef invoke(VMState& vmstate);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+private:
+	Reference<VArrayType> array_type;
+};
+
+
 // Get the i-th element from a vector.
 class VectorSubscriptBuiltInFunc : public BuiltInFunctionImpl
 {

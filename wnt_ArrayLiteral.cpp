@@ -67,10 +67,14 @@ TypeRef ArrayLiteral::type() const
 	const TypeRef e0_type = elements[0]->type();
 	if(e0_type.isNull()) return NULL;
 
+	TypeRef array_type;
 	if(has_int_suffix)
-		return new ArrayType(elements[0]->type(), this->int_suffix);
+		array_type = new ArrayType(e0_type, this->int_suffix);
 	else
-		return new ArrayType(elements[0]->type(), elements.size());
+		array_type = new ArrayType(e0_type, elements.size());
+
+	array_type->address_space = "__constant";
+	return array_type;
 }
 
 

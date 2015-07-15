@@ -796,6 +796,35 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 				}
 			} // End if (vector of floats, vector of floats)
 		} // End if (vector, vector) params
+
+		if(sig.name == "makeVArray" && sig.param_types[1]->getType() == Type::IntType)
+		{
+			if(sig.param_types[1].downcastToPtr<Int>()->numBits() != 64)
+				throw BaseException("second argument to makeVArray() must have type int64.");
+
+			vector<FunctionDefinition::FunctionArg> args(2);
+			args[0].name = "element";
+			args[0].type = sig.param_types[0];
+			args[1].name = "count";
+			args[1].type = sig.param_types[1];
+
+			Reference<VArrayType> ret_type = new VArrayType(args[0].type);
+
+			FunctionDefinitionRef def = new FunctionDefinition(
+				SrcLocation::invalidLocation(),
+				-1, // order number
+				"makeVArray", // name
+				args, // args
+				NULL, // body expr
+				ret_type, // return type
+				new MakeVArrayBuiltInFunc(ret_type) // built in impl.
+			);
+
+			assert(this->sig_to_function_map.find(sig) == this->sig_to_function_map.end()); // Check not already inserted
+			this->sig_to_function_map.insert(std::make_pair(sig, def));
+			return def;
+		}
+
 	} // End if two params
 	else if(sig.param_types.size() == 3)
 	{
