@@ -372,7 +372,7 @@ void Lexer::process(const SourceBufferRef& src, std::vector<Reference<TokenBase>
 		{
 			parseWhiteSpace(src, parser, tokens_out);
 		}
-		else if(::isAlphabetic(parser.current()))
+		else if(::isAlphabetic(parser.current()) || parser.current() == '_')
 		{
 			parseIdentifier(src, parser, tokens_out);
 		}
