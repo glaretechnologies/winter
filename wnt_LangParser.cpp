@@ -857,7 +857,14 @@ TypeRef LangParser::parseType(ParseInfo& p)
 
 TypeRef LangParser::parseElementaryType(ParseInfo& p)
 {
-	const std::string t = parseIdentifier("type", p);
+	std::string t = parseIdentifier("type", p);
+	std::string address_space;
+	if(t == "constant" || t == "global" || t == "__constant" || t == "__global")
+	{
+		address_space = t;
+		t = parseIdentifier("type", p);
+	}
+
 	if(t == "float" || t == "real")
 		return new Float();
 	else if(t == "int")
@@ -869,21 +876,10 @@ TypeRef LangParser::parseElementaryType(ParseInfo& p)
 	else if(t == "char")
 		return new CharType();
 	else if(t == "opaque" || t == "voidptr")
-		return new OpaqueType();
-	else if(t == "constant" || t == "global")
 	{
-		// Then t is the address space for an opaque (void*) type.
-		
-		// Parse the actual type.
-		const std::string t2 = parseIdentifier("type", p);
-		if(t2 == "opaque" || t2 == "voidptr")
-		{
-			Reference<OpaqueType> type = new OpaqueType();
-			type->address_space = t;
-			return type;
-		}
-		else
-			throw LangParserExcep("Expected opaque or voidptr after address space." + errorPositionPrevToken(p));
+		TypeRef the_type = new OpaqueType();
+		the_type->address_space = address_space;
+		return the_type;
 	}
 	else if(t == "bool")
 		return new Bool();
@@ -892,7 +888,11 @@ TypeRef LangParser::parseElementaryType(ParseInfo& p)
 	else if(t == "map")
 		return parseMapType(p);
 	else if(t == "array")
-		return parseArrayType(p);
+	{
+		TypeRef the_type = parseArrayType(p);
+		the_type->address_space = address_space;
+		return the_type;
+	}
 	else if(t == "varray")
 		return parseVArrayType(p);
 	else if(t == "function")

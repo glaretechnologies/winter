@@ -3046,7 +3046,7 @@ std::string BinaryBooleanExpr::sourceString() const
 
 std::string BinaryBooleanExpr::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
-	return a->emitOpenCLC(params) + (this->t == OR ? " || " : " && ") + b->emitOpenCLC(params);
+	return "(" + a->emitOpenCLC(params) + (this->t == OR ? " || " : " && ") + b->emitOpenCLC(params) + ")";
 }
 
 

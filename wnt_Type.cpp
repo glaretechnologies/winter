@@ -481,7 +481,10 @@ const std::string ArrayType::toString() const
 const std::string ArrayType::OpenCLCType() const
 {
 	// For e.g. an array of floats, use type 'float*'.
-	return "__constant " + elem_type->OpenCLCType() + "*";
+	if(this->address_space.empty())
+		return "__constant " + elem_type->OpenCLCType() + "*";
+	else
+		return address_space + " " + elem_type->OpenCLCType() + "*";
 }
 
 

@@ -644,6 +644,17 @@ inline std::vector<TypeRef> typeTriplet(const TypeRef& a, const TypeRef& b, cons
 }
 
 
+inline std::vector<TypeRef> typeQuad(const TypeRef& a, const TypeRef& b, const TypeRef& c, const TypeRef& d)
+{
+	std::vector<TypeRef> v(4);
+	v[0] = a;
+	v[1] = b;
+	v[2] = c;
+	v[3] = d;
+	return v;
+}
+
+
 TypeRef errorTypeSum(const TypeRef& t);
 
 
