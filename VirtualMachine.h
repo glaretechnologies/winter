@@ -93,7 +93,13 @@ public:
 
 	bool isFunctionCalled(const std::string& name);
 
-	const std::string buildOpenCLCode();
+	struct OpenCLCCode
+	{
+		std::string struct_def_code;
+		std::string function_code;
+	};
+	OpenCLCCode buildOpenCLCode() const;
+	std::string buildOpenCLCodeCombined() const;
 
 	const ProgramStats& getProgramStats() const { return stats; }
 

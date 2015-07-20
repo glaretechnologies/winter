@@ -273,7 +273,7 @@ void Lexer::parseNumericLiteral(const SourceBufferRef& buffer, Parser& parser, s
 void Lexer::parseIdentifier(const SourceBufferRef& buffer, Parser& parser, std::vector<Reference<TokenBase> >& tokens_out)
 {
 	assert(parser.notEOF());
-	assert(::isAlphabetic(parser.current()));
+	assert(::isAlphabetic(parser.current()) || parser.current() == '_');
 
 	const unsigned int char_index = parser.currentPos();
 

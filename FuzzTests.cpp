@@ -126,7 +126,7 @@ bool testFuzzProgram(const std::string& src)
 				command_queue
 			);
 
-			std::string opencl_code = vm.buildOpenCLCode();
+			std::string opencl_code = vm.buildOpenCLCodeCombined();
 
 			// OpenCL keeps complaining about 'main must return type int', so rename main to main_.
 			//opencl_code = StringUtils::replaceAll(opencl_code, "main", "main_"); // NOTE: slightly dodgy string-based renaming.
@@ -319,7 +319,7 @@ static bool testFuzzASTProgram(const FunctionDefinitionRef& func)
 				command_queue
 			);
 
-			std::string opencl_code = vm.buildOpenCLCode();
+			std::string opencl_code = vm.buildOpenCLCodeCombined();
 
 			// OpenCL keeps complaining about 'main must return type int', so rename main to main_.
 			//opencl_code = StringUtils::replaceAll(opencl_code, "main", "main_"); // NOTE: slightly dodgy string-based renaming.

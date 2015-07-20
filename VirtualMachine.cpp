@@ -1390,22 +1390,9 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 }
 
 
-const std::string VirtualMachine::buildOpenCLCode()
+VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode() const
 {
-	std::string s;
-
-	// Add some Winter built-in functions
-	s +=
-"// Winter built-in functions \n\
-float toFloat_int_(int x) { return (float)x; } \n\
-int truncateToInt_float_(float x) { return (int)x; } \n\
-int8 truncateToInt_vector_float__8__(float8 v) { return convert_int8(v); }  \n\
-long toInt_opaque_(void* p) { return (long)p; }  \n\
-float print_float_(float x) { printf((__constant char *)\"%f\\n\", x); return x; }    \n\
-\n";
-
-
-
+	OpenCLCCode res;
 
 	EmitOpenCLCodeParams params;
 	params.uid = 0;
@@ -1425,14 +1412,13 @@ float print_float_(float x) { printf((__constant char *)\"%f\\n\", x); return x;
 		}
 	}
 
-	// Emit tuple struct definitions and constructors
-	//for(std::set<TupleTypeRef>::iterator i = params.tuple_types_used.begin(); i != params.tuple_types_used.end(); ++i)
-	//	s += (*i)->getOpenCLCDefinition();
-
+	
 
 	// TODO: Will need to handle dependecies between tuples here as well.
 
 	std::set<TupleTypeRef, TypeRefLessThan> emitted_tuples;
+	std::string struct_def_code = "// OpenCL structure definitions for Winter structs and tuples, from VirtualMachine::buildOpenCLCode()\n";
+	std::string constructor_code;
 
 	// Spit out structure definitions and constructors
 	for(auto i = 0; i != named_types_ordered.size(); ++i)
@@ -1446,23 +1432,43 @@ float print_float_(float x) { printf((__constant char *)\"%f\\n\", x); return x;
 			{
 				if(!ContainerUtils::contains(emitted_tuples, used_tuples[z])) // If not emitted yet:
 				{
-					s += used_tuples[z]->getOpenCLCDefinition();
+					struct_def_code += used_tuples[z]->getOpenCLCDefinition();
 					emitted_tuples.insert(used_tuples[z]); // Add to set of emitted tuples
 				}
 			}
 
-			s += struct_type->getOpenCLCDefinition(); // Emit structure definition
+			struct_def_code += struct_type->getOpenCLCDefinition(); // Emit structure definition
+			constructor_code += struct_type->getOpenCLCConstructor();
 		}
 
 	// Spit out any remaining tuple definitions
 	for(auto i = params.tuple_types_used.begin(); i != params.tuple_types_used.end(); ++i)
 		if(!ContainerUtils::contains(emitted_tuples, *i)) // If not emitted yet:
-			s += (*i)->getOpenCLCDefinition();
+		{
+			struct_def_code += (*i)->getOpenCLCDefinition();
+			constructor_code += (*i)->getOpenCLCConstructor();
+		}
+
+		// Add some Winter built-in functions
+	const std::string built_in_func_code = 
+"// Winter built-in functions \n\
+float toFloat_int_(int x) { return (float)x; } \n\
+int truncateToInt_float_(float x) { return (int)x; } \n\
+int8 truncateToInt_vector_float__8__(float8 v) { return convert_int8(v); }  \n\
+long toInt_opaque_(void* p) { return (long)p; }  \n\
+float print_float_(float x) { printf((__constant char *)\"%f\\n\", x); return x; }    \n\
+\n";
+
+	res.struct_def_code = struct_def_code;
+	res.function_code = constructor_code + "\n\n" + built_in_func_code + "\n\n" + params.file_scope_code + "\n\n" + top_level_def_src;
+	return res;
+}
 
 
-	// Spit out function definitions
-	//s += linker.buildOpenCLCode();
-	return s + "\n\n" + params.file_scope_code + "\n\n" + top_level_def_src;
+std::string VirtualMachine::buildOpenCLCodeCombined() const
+{
+	OpenCLCCode opencl_code = buildOpenCLCode();
+	return opencl_code.struct_def_code + opencl_code.struct_def_code;
 }
 
 
