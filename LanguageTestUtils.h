@@ -318,7 +318,7 @@ static ProgramStats doTestMainFloatArg(const std::string& src, float argument, f
 
 
 		//============================= New: test with OpenCL ==============================
-		const bool TEST_OPENCL = true;
+		const bool TEST_OPENCL = false;
 		if(!(test_flags & INVALID_OPENCL) && TEST_OPENCL)
 		{
 #if USE_OPENCL
