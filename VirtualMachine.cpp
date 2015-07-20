@@ -481,7 +481,7 @@ public:
 			return (uint64_t)memcpy;
 #if defined(OSX)
 		else if(name == "_memset_pattern16")
-			return (uint64_t)_memset_pattern16;
+			return (uint64_t)memset_pattern16;
 		else if(name == "_exp2f")
 			return (uint64_t)exp2f;
 #endif
