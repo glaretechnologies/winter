@@ -919,6 +919,7 @@ TypeRef LangParser::parseElementaryType(ParseInfo& p)
 		else
 		{
 			// Type found, return it
+			(*res).second->address_space = address_space; // TEMP HACK
 			return (*res).second;
 		}
 	}
