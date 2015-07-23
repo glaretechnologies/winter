@@ -174,12 +174,12 @@ IntervalSetInt64 ProofUtils::getInt64Range(TraversalPayload& payload, std::vecto
 				{
 					FunctionExpression* condition_func_express = static_cast<FunctionExpression*>(if_node->condition.getPointer());
 					
-					if(condition_func_express->target_function->sig.name == "inBounds")
+					if(condition_func_express->static_target_function && condition_func_express->static_target_function->sig.name == "inBounds")
 					{
 						// Is the index the same?
 						if(expressionsHaveSameValue(condition_func_express->argument_expressions[1], integer_value))
 						{
-							const TypeRef container_type = condition_func_express->target_function->sig.param_types[0];
+							const TypeRef container_type = condition_func_express->static_target_function->sig.param_types[0];
 
 							// Update bounds to reflect that we are in bounds of the container - 
 							// We know that the lower bound is >= 0 and the upper bound is < container size.

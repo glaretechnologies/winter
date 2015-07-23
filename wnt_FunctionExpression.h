@@ -14,6 +14,7 @@ Generated at 2011-04-30 18:53:38 +0100
 #include "wnt_FunctionSignature.h"
 #include "wnt_ExternalFunction.h"
 #include "wnt_Frame.h"
+#include "wnt_Variable.h"
 #include "BaseException.h"
 #include "TokenBase.h"
 #include "Value.h"
@@ -40,7 +41,23 @@ namespace Winter
 /*=====================================================================
 FunctionExpression
 -------------------
+Function application.
 e.g.   f(a, 1)
+
+There are two main types of function application:
+
+Application of a globally defined, statically determined function., such as
+square(x)
+where square is defined with "def square" etc..
+
+The other kind of function application is where there is an arbitrary expression returning the actual function value,
+e.g. 
+
+func_arg(x), where func_arg is a variable, or e..g
+
+getFunc()(x), where getFunc() returns a function.
+
+
 =====================================================================*/
 class FunctionExpression : public ASTNode
 {
@@ -54,8 +71,7 @@ public:
 	virtual ValueRef exec(VMState& vmstate);
 	virtual TypeRef type() const;
 
-	virtual void linkFunctions(Linker& linker, TraversalPayload& payload, std::vector<ASTNode*>& stack);
-	//virtual void bindVariables(const std::vector<ASTNode*>& stack);
+	
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual void print(int depth, std::ostream& s) const;
 	virtual std::string sourceString() const;
@@ -70,36 +86,21 @@ public:
 
 	///////
 
+	const std::string functionName() const;
+
+	bool isBoundToGlobalDef() const; // Is this function bound to a single global definition.  This should be the case for most normal function expressions like f(x)
+
 private:
 	void checkInDomain(TraversalPayload& payload, std::vector<ASTNode*>& stack);
+	void bindFunction(Linker& linker, TraversalPayload& payload, std::vector<ASTNode*>& stack);
 public:
 
-	std::string function_name;
-	//ASTNodeRef function_expr;
+	ASTNodeRef get_func_expr; // Expression that returns the function being called.
+
 	std::vector<ASTNodeRef> argument_expressions;
 
-	//Reference<ASTNode> target_function;
-	//ASTNode* target_function;
-	FunctionDefinition* target_function; // May be NULL
-	//Reference<ExternalFunction> target_external_function; // May be NULL
-	int bound_index;
-	FunctionDefinition* bound_function; // Function for which the variable is an argument of,
-	LetBlock* bound_let_block;
-	//int argument_offset; // Currently, a variable must be an argument to the enclosing function
-	enum BindingType
-	{
-		Unbound,
-		Let,
-		Arg,
-		BoundToGlobalDef
-	};
-	BindingType binding_type;
-
-	//TypeRef target_function_return_type;
-	bool use_captured_var;
-	int captured_var_index;
-	int let_frame_offset;
-	int let_var_index; // Index of the let variable bound to, for destructing assignment case may be > 0.
+	std::string static_function_name;
+	FunctionDefinition* static_target_function; // May be NULL.  For statically bound function applucation
 
 private:
 	bool proven_defined;

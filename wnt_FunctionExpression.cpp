@@ -56,13 +56,7 @@ static const bool VERBOSE_EXEC = false;
 
 FunctionExpression::FunctionExpression(const SrcLocation& src_loc) 
 :	ASTNode(FunctionExpressionType, src_loc),
-	target_function(NULL),
-	bound_index(-1),
-	binding_type(Unbound),
-	bound_let_block(NULL),
-	bound_function(NULL),
-	use_captured_var(false),
-	captured_var_index(0),
+	static_target_function(NULL),
 	proven_defined(false)
 {
 }
@@ -70,112 +64,62 @@ FunctionExpression::FunctionExpression(const SrcLocation& src_loc)
 
 FunctionExpression::FunctionExpression(const SrcLocation& src_loc, const std::string& func_name, const ASTNodeRef& arg0) // 1-arg function
 :	ASTNode(FunctionExpressionType, src_loc),
-	target_function(NULL),
-	bound_index(-1),
-	binding_type(Unbound),
-	bound_let_block(NULL),
-	bound_function(NULL),
-	use_captured_var(false),
-	captured_var_index(0),
+	static_target_function(NULL),
 	proven_defined(false)
 {
-	function_name = func_name;
+	static_function_name = func_name;
+
 	argument_expressions.push_back(arg0);
 }
 
 
 FunctionExpression::FunctionExpression(const SrcLocation& src_loc, const std::string& func_name, const ASTNodeRef& arg0, const ASTNodeRef& arg1) // 2-arg function
 :	ASTNode(FunctionExpressionType, src_loc),
-	target_function(NULL),
-	bound_index(-1),
-	binding_type(Unbound),
-	bound_let_block(NULL),
-	bound_function(NULL),
-	use_captured_var(false),
-	captured_var_index(0),
+	static_target_function(NULL),
 	proven_defined(false)
 {
-	function_name = func_name;
+	static_function_name = func_name;
+
 	argument_expressions.push_back(arg0);
 	argument_expressions.push_back(arg1);
 }
 
 
-FunctionDefinition* FunctionExpression::runtimeBind(VMState& vmstate, const FunctionValue*& function_value_out)
-{
-	if(use_captured_var)
-	{
-		// Get ref to capturedVars structure of values, will be passed in as last arg to function
-		ValueRef captured_struct = vmstate.argument_stack.back();
-		const StructureValue* s = checkedCast<StructureValue>(captured_struct);
-
-		ValueRef func_val = s->fields[this->captured_var_index];
-
-		const FunctionValue* function_val = checkedCast<FunctionValue>(func_val);
-
-		function_value_out = function_val;
-
-		return function_val->func_def;
-	}
-
-
-	if(target_function)
-	{
-		function_value_out = NULL;
-		return target_function;
-	}
-	else if(this->binding_type == Arg)
-	{
-		ValueRef arg = vmstate.argument_stack[vmstate.func_args_start.back() + this->bound_index];
-		const FunctionValue* function_value = checkedCast<FunctionValue>(arg);
-		function_value_out = function_value;
-		return function_value->func_def;
-	}
-	else
-	{
-		assert(this->binding_type == Let);
-
-		//const int let_stack_start = (int)vmstate.let_stack_start[vmstate.let_stack_start.size() - 1 - this->let_frame_offset];
-		//ValueRef arg = vmstate.let_stack[let_stack_start + this->bound_index];
-
-		ValueRef arg = this->bound_let_block->lets[this->bound_index]->exec(vmstate);
-
-		//ValueRef arg = vmstate.let_stack[vmstate.let_stack_start.back() + this->bound_index];
-		const FunctionValue* function_value = checkedCast<FunctionValue>(arg);
-		function_value_out = function_value;
-		return function_value->func_def;
-	}
-}
-
-
 ValueRef FunctionExpression::exec(VMState& vmstate)
 {
-	if(VERBOSE_EXEC) std::cout << vmstate.indent() << "FunctionExpression, target_name=" << this->function_name << "\n";
+	if(VERBOSE_EXEC) std::cout << vmstate.indent() << "FunctionExpression, target_name=" << this->functionName() << "\n";
 
 	if(vmstate.func_args_start.size() > 1000)
 		throw BaseException("Function call level too deep, aborting.");
 
 
-	if(this->binding_type == Unbound)
-		throw BaseException("Function is not bound.");
-	
-
-	//assert(target_function);
-	if(this->target_function != NULL && this->target_function->external_function.nonNull())
+	if(this->static_target_function != NULL && this->static_target_function->external_function.nonNull())
 	{
 		vector<ValueRef> args;
 		for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
 			args.push_back(this->argument_expressions[i]->exec(vmstate));
 
-		ValueRef result = this->target_function->external_function->interpreted_func(args);
+		ValueRef result = this->static_target_function->external_function->interpreted_func(args);
 
 		return result;
 	}
+	
+	// Get target function from the expression that returns the function
+	const FunctionValue* target_func_val = NULL;
+	FunctionDefinition* use_target_func;
+	if(static_target_function)
+	{
+		use_target_func = static_target_function;
+	}
+	else
+	{
+		if(this->get_func_expr.isNull())
+			throw BaseException("Function is not bound.");
 
-	// Get target function.  The target function is resolved at runtime, because it may be a function 
-	// passed in as a variable to this function.
-	const FunctionValue* function_value = NULL;
-	FunctionDefinition* use_target_func = runtimeBind(vmstate, function_value);
+		ValueRef use_target_func_ = this->get_func_expr->exec(vmstate);
+		target_func_val = checkedCast<FunctionValue>(use_target_func_);
+		use_target_func = target_func_val->func_def;
+	}
 
 
 
@@ -195,8 +139,8 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 	// If the target function is an anon function and has captured values, push that onto the stack
 	if(use_target_func->use_captured_vars)
 	{
-		assert(function_value);
-		vmstate.argument_stack.push_back(function_value->captured_vars.getPointer());
+		assert(target_func_val);
+		vmstate.argument_stack.push_back(target_func_val->captured_vars.getPointer());
 	}
 
 
@@ -207,17 +151,14 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 	vmstate.func_args_start.push_back(initial_arg_stack_size);
 
 	if(VERBOSE_EXEC)
-		std::cout << vmstate.indent() << "Calling " << this->function_name << ", func_args_start: " << vmstate.func_args_start.back() << "\n";
+		std::cout << vmstate.indent() << "Calling " << use_target_func->sig.toString() << ", func_args_start: " << vmstate.func_args_start.back() << "\n";
 
 	ValueRef ret = use_target_func->invoke(vmstate);
 	vmstate.func_args_start.pop_back();
 
 	// Remove arguments from stack
-	while(vmstate.argument_stack.size() > initial_arg_stack_size) //for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
-	{
-		//delete vmstate.argument_stack.back();
+	while(vmstate.argument_stack.size() > initial_arg_stack_size)
 		vmstate.argument_stack.pop_back();
-	}
 	assert(vmstate.argument_stack.size() == initial_arg_stack_size);
 
 	return ret;
@@ -286,128 +227,15 @@ bool FunctionExpression::doesFunctionTypeMatch(const TypeRef& type)
 }*/
 
 
-void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload, std::vector<ASTNode*>& stack)
+// Statically bind to global function definition.
+void FunctionExpression::bindFunction(Linker& linker, TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
 	// Return if we have already bound this function in an earlier pass.
-	if(this->binding_type != Unbound)
+	if(static_target_function != NULL)
 		return;
-
-	bool found_binding = false;
-	bool in_current_func_def = true;
-	int use_let_frame_offset = 0;
-
 
 	// We want to find a function that matches our argument expression types, and the function name
 
-
-
-	// First, walk up tree, and see if such a target function has been given a name with a let.
-	for(int s = (int)stack.size() - 1; s >= 0 && !found_binding; --s)
-	{
-		{
-			if(stack[s]->nodeType() == ASTNode::FunctionDefinitionType) // If node is a function definition
-			{
-				FunctionDefinition* def = static_cast<FunctionDefinition*>(stack[s]);
-
-				for(unsigned int i=0; i<def->args.size(); ++i)
-				{
-					// If the argument is a function, and its name and sig matches our function expression...
-					if(def->args[i].name == this->function_name && doesFunctionTypeMatch(def->args[i].type))
-					{
-						// Then bind this function call to this argument
-						this->bound_function = def;
-						this->bound_index = i;
-						this->binding_type = Arg;
-						found_binding = true;
-
-						if(!in_current_func_def)//  && payload.func_def_stack.back()->use_captured_vars)
-						{
-							this->captured_var_index = (int)payload.func_def_stack.back()->captured_vars.size(); //payload.captured_vars.size();
-							this->use_captured_var = true;
-
-							// Add this function argument as a variable that has to be captured for closures.
-							CapturedVar var;
-							var.vartype = CapturedVar::Arg;
-							var.bound_function = def;
-							var.index = i;
-
-							//payload.captured_vars.push_back(var);
-							payload.func_def_stack.back()->captured_vars.push_back(var);
-						}
-					}
-				}
-				in_current_func_def = false;
-			}
-			else if(stack[s]->nodeType() == ASTNode::LetBlockType)
-			{
-				LetBlock* let_block = static_cast<LetBlock*>(stack[s]);
-
-				for(unsigned int i=0; i<let_block->lets.size(); ++i)
-				{
-					// If the function we are tring to bind is in a let expression for the current Let Block, then
-					// we only want to bind to let functions from let expressions that are *before* the current let expression.
-					// In cases like
-					// let
-					//   x = x
-					// This avoids the x expression on the right binding to the x Let node on the left.
-					// In cases like this:
-					// let
-					//	z = y
-					//	y = x
-					// it also prevent y from binding to the y from the line below. (which could cause a cycle of references)
-					if((s + 1 < stack.size()) && (stack[s+1]->nodeType() == ASTNode::LetType) && (let_block->lets[i].getPointer() == stack[s+1]))
-					{
-						// We have reached the let expression for the current variable we are tring to bind, so don't try and bind with let variables equal to or past this one.
-						break;
-					}
-					else
-					{
-						for(size_t v=0; v<let_block->lets[i]->vars.size(); ++v)
-						{
-							if(let_block->lets[i]->vars[v].name == this->function_name && 
-								let_block->lets[i]->type().nonNull() && // Let var might be an unbound function -> no type
-								doesFunctionTypeMatch(let_block->lets[i]->type()))
-							{
-								this->bound_index = i;
-								this->binding_type = Let;
-								this->bound_let_block = let_block;
-								this->let_frame_offset = use_let_frame_offset;
-								this->let_var_index = v;
-								found_binding = true;
-
-								if(!in_current_func_def && payload.func_def_stack.back()->use_captured_vars)
-								{
-									this->captured_var_index = (int)payload.func_def_stack.back()->captured_vars.size(); // payload.captured_vars.size();
-									this->use_captured_var = true;
-
-									// Add this function argument as a variable that has to be captured for closures.
-									CapturedVar var;
-									var.vartype = CapturedVar::Let;
-									var.bound_let_block = let_block;
-									var.index = i;
-									var.let_frame_offset = use_let_frame_offset;
-									//payload.captured_vars.push_back(var);
-									payload.func_def_stack.back()->captured_vars.push_back(var);
-								}
-							}
-						}
-					}
-				}
-
-				// We only want to count an ancestor let block as an offsetting block if we are not currently in a let clause of it.
-				// TODO: remove this stuff
-				//bool is_this_let_clause = false;
-				//if(s + 1 < (int)stack.size())
-				//	for(size_t z=0; z<let_block->lets.size(); ++z)
-				//		if(let_block->lets[z].getPointer() == stack[s+1])
-				//			is_this_let_clause = true;
-				//if(!is_this_let_clause)
-					use_let_frame_offset++;
-			}
-		}
-	}
-
-	if(!found_binding)
 	{
 		vector<TypeRef> argtypes;
 		bool all_argtypes_nonnull = true;
@@ -420,7 +248,7 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 
 		if(all_argtypes_nonnull) // Don't try and bind if we have a null type
 		{
-			const FunctionSignature sig(this->function_name, argtypes);
+			const FunctionSignature sig(this->static_function_name, argtypes);
 
 			// Work out effective call site position.
 			int effective_callsite_order_num = 1000000000;
@@ -430,10 +258,9 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 				effective_callsite_order_num = myMin(effective_callsite_order_num, payload.func_def_stack[z]->order_num);
 
 			// Try and resolve to internal function.
-			this->target_function = linker.findMatchingFunction(sig, this->srcLocation(), effective_callsite_order_num/*&payload.func_def_stack*/).getPointer();
-			if(this->target_function/* && isTargetDefinedBeforeAllInStack(payload.func_def_stack, target_function)*/) // Disallow recursion for now: Check the linked function is not the current function.
+			this->static_target_function = linker.findMatchingFunction(sig, this->srcLocation(), effective_callsite_order_num/*&payload.func_def_stack*/).getPointer();
+			if(this->static_target_function/* && isTargetDefinedBeforeAllInStack(payload.func_def_stack, target_function)*/) // Disallow recursion for now: Check the linked function is not the current function.
 			{
-				this->binding_type = BoundToGlobalDef;
 			}
 			else
 			{
@@ -453,13 +280,11 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 				}
 
 				// Try again with our coerced arguments
-				const FunctionSignature coerced_sig(this->function_name, coerced_argtypes);
+				const FunctionSignature coerced_sig(this->static_function_name, coerced_argtypes);
 
-				this->target_function = linker.findMatchingFunction(coerced_sig, this->srcLocation(), effective_callsite_order_num/*&payload.func_def_stack*/).getPointer();
-				if(this->target_function/* && isTargetDefinedBeforeAllInStack(payload.func_def_stack, target_function)*/) // Disallow recursion for now: Check the linked function is not the current function.
+				this->static_target_function = linker.findMatchingFunction(coerced_sig, this->srcLocation(), effective_callsite_order_num/*&payload.func_def_stack*/).getPointer();
+				if(this->static_target_function/* && isTargetDefinedBeforeAllInStack(payload.func_def_stack, target_function)*/) // Disallow recursion for now: Check the linked function is not the current function.
 				{
-					this->binding_type = BoundToGlobalDef;
-
 					// Success!  We need to actually change the argument expressions now
 					for(size_t i=0; i<argument_expressions.size(); ++i)
 					{
@@ -514,8 +339,8 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 				}*/
 			}
 
-			if(this->target_function)
-				this->target_function->num_uses++;
+			if(this->static_target_function)
+				this->static_target_function->num_uses++;
 
 			//TEMP: don't fail now, maybe we can bind later.
 			//if(this->binding_type == Unbound)
@@ -525,14 +350,65 @@ void FunctionExpression::linkFunctions(Linker& linker, TraversalPayload& payload
 }
 
 
-/*void FunctionExpression::bindVariables(const std::vector<ASTNode*>& stack)
+static bool varWithNameIsInScope(const std::string& name, TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
-	std::vector<ASTNode*> s(stack);
-	s.push_back(this);
+	for(int s = (int)stack.size() - 1; s >= 0; --s) // Walk up the stack of ancestor nodes
+	{
+		if(stack[s]->nodeType() == ASTNode::FunctionDefinitionType) // If node is a function definition:
+		{
+			FunctionDefinition* def = static_cast<FunctionDefinition*>(stack[s]);
 
-	for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
-		this->argument_expressions[i]->bindVariables(s);
-}*/
+			for(unsigned int i=0; i<def->args.size(); ++i) // For each argument to the function:
+				if(def->args[i].name == name) // If the argument name matches this variable name:
+					if(def->args[i].type->getType() == Type::FunctionType) // Since this is a function argument, we can tell its scope.  Only consider it if it has function type.
+						return true;
+		}
+		else if(stack[s]->nodeType() == ASTNode::LetBlockType)
+		{
+			LetBlock* let_block = static_cast<LetBlock*>(stack[s]);
+			
+			for(unsigned int i=0; i<let_block->lets.size(); ++i)
+			{
+				// If the variable we are tring to bind is in a let expression for the current Let Block, then
+				// we only want to bind to let variables from let expressions that are *before* the current let expression.
+				// In cases like
+				// let
+				//   x = x
+				// This avoids the x expression on the right binding to the x Let node on the left.
+				// In cases like this:
+				// let
+				//	z = y
+				//	y = x
+				// it also prevent y from binding to the y from the line below. (which could cause a cycle of references)
+				if((s + 1 < stack.size()) && (stack[s+1]->nodeType() == ASTNode::LetType) && (let_block->lets[i].getPointer() == stack[s+1]))
+				{
+					// We have reached the let expression for the current variable we are tring to bind, so don't try and bind with let variables equal to or past this one.
+					break;
+				}
+				else
+				{
+					for(size_t v=0; v<let_block->lets[i]->vars.size(); ++v)
+						if(let_block->lets[i]->vars[v].name == name)
+							return true;
+				}
+			}
+		}
+	}
+
+	// Consider named constants
+	Frame::NamedConstantMap::iterator name_res = payload.linker->named_constant_map.find(name);
+	if(name_res != payload.linker->named_constant_map.end())
+	{
+		const NamedConstant* target_named_constant = name_res->second.getPointer();
+
+		// Only bind to a named constant defined earlier, and only bind to a named constant earlier than all functions we are defining.
+		if((!payload.current_named_constant || target_named_constant->order_num < payload.current_named_constant->order_num) &&
+			isTargetDefinedBeforeAllInStack(payload.func_def_stack, target_named_constant->order_num))
+			return true;
+	}
+
+	return false;
+}
 
 
 void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
@@ -574,7 +450,27 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 	// NOTE: we want to do a post-order traversal here.
 	// This is because we want our argument expressions to be linked first.
 
+
+	// If we have a get_func_expr, and it is a variable, and if there are no such names in scope to bind to, 
+	// then convert to a 'static' function binding, so we can do stuff like function overloading.
+	if(payload.operation == TraversalPayload::BindVariables)
+	{
+		if(get_func_expr.nonNull() && (get_func_expr->nodeType() == ASTNode::VariableASTNodeType))
+		{
+			if(!varWithNameIsInScope(get_func_expr.downcastToPtr<Variable>()->name, payload, stack))
+			{
+				// Convert to static function
+				this->static_function_name = get_func_expr.downcastToPtr<Variable>()->name;
+				get_func_expr = NULL;
+			}
+		}
+	}
+
+
 	stack.push_back(this);
+
+	if(get_func_expr.nonNull())
+		this->get_func_expr->traverse(payload, stack);
 
 	for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
 		this->argument_expressions[i]->traverse(payload, stack);
@@ -602,10 +498,10 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 		// until we know the concrete type.
 
 		if(payload.func_def_stack.empty() || !payload.func_def_stack.back()->isGenericFunction())
-			linkFunctions(*payload.linker, payload, stack);
+			bindFunction(*payload.linker, payload, stack);
 
 		// Set shuffle mask now
-		if(this->target_function && ::hasPrefix(this->target_function->sig.name, "shuffle"))
+		if(this->static_target_function && ::hasPrefix(this->static_target_function->sig.name, "shuffle"))
 		{
 			assert(this->argument_expressions.size() == 2);
 			if(!this->argument_expressions[1]->isConstant())
@@ -626,13 +522,13 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 					if(!(dynamic_cast<IntValue*>(res_v->e[i].getPointer())))
 						throw BaseException("Element in shuffle mask was not an integer.");
 
-					const int index = static_cast<IntValue*>(res_v->e[i].getPointer())->value;
-					mask[i] = index;
+					const int64 index = static_cast<IntValue*>(res_v->e[i].getPointer())->value;
+					mask[i] = (int)index;
 				}
 
-				assert(this->target_function->built_in_func_impl.nonNull());
-				assert(dynamic_cast<ShuffleBuiltInFunc*>(this->target_function->built_in_func_impl.getPointer()));
-				static_cast<ShuffleBuiltInFunc*>(this->target_function->built_in_func_impl.getPointer())->setShuffleMask(mask);
+				assert(this->static_target_function->built_in_func_impl.nonNull());
+				assert(dynamic_cast<ShuffleBuiltInFunc*>(this->static_target_function->built_in_func_impl.getPointer()));
+				static_cast<ShuffleBuiltInFunc*>(this->static_target_function->built_in_func_impl.getPointer())->setShuffleMask(mask);
 			}
 			catch(BaseException& e)
 			{
@@ -640,7 +536,7 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 			}
 		}
 		// Set second arg now for elem(tuple, i)
-		else if(this->target_function && this->target_function->sig.name == "elem" && target_function->sig.param_types[0]->getType() == Type::TupleTypeType)
+		else if(this->static_target_function && this->static_target_function->sig.name == "elem" && static_target_function->sig.param_types[0]->getType() == Type::TupleTypeType)
 		{
 			assert(this->argument_expressions.size() == 2);
 			if(!this->argument_expressions[1]->isConstant())
@@ -663,9 +559,9 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 				throw BaseException("Failed to eval second arg of elem(tuple, i): " + e.what());
 			}	
 
-			assert(this->target_function->built_in_func_impl.nonNull());
-			assert(dynamic_cast<GetTupleElementBuiltInFunc*>(this->target_function->built_in_func_impl.getPointer()));
-			GetTupleElementBuiltInFunc* tuple_elem_func = static_cast<GetTupleElementBuiltInFunc*>(this->target_function->built_in_func_impl.getPointer());
+			assert(this->static_target_function->built_in_func_impl.nonNull());
+			assert(dynamic_cast<GetTupleElementBuiltInFunc*>(this->static_target_function->built_in_func_impl.getPointer()));
+			GetTupleElementBuiltInFunc* tuple_elem_func = static_cast<GetTupleElementBuiltInFunc*>(this->static_target_function->built_in_func_impl.getPointer());
 				
 
 			// bounds check index.
@@ -673,20 +569,20 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 				throw BaseException("Second argument to tuple elem() function is out of range." + errorContext(*this));
 
 
-			tuple_elem_func->setIndex(index);
+			tuple_elem_func->setIndex((int)index);//TODO: remove cast
 
 			// Set proper return type for function definition.
-			this->target_function->declared_return_type = tuple_elem_func->tuple_type->component_types[index];
+			this->static_target_function->declared_return_type = tuple_elem_func->tuple_type->component_types[index];
 			
 		}
-		else if(this->target_function && this->target_function->sig.name == "fold")
+		else if(this->static_target_function && this->static_target_function->sig.name == "fold")
 		{
 			// TEMP: specialise fold for the passed in function now.
-			if(this->binding_type == BoundToGlobalDef)
-			{
-				assert(this->target_function->built_in_func_impl.nonNull());
-				assert(dynamic_cast<ArrayFoldBuiltInFunc*>(this->target_function->built_in_func_impl.getPointer()));
-				ArrayFoldBuiltInFunc* fold_func = static_cast<ArrayFoldBuiltInFunc*>(this->target_function->built_in_func_impl.getPointer());
+			//if(this->binding_type == BoundToGlobalDef)
+			//{
+				assert(this->static_target_function->built_in_func_impl.nonNull());
+				assert(dynamic_cast<ArrayFoldBuiltInFunc*>(this->static_target_function->built_in_func_impl.getPointer()));
+				ArrayFoldBuiltInFunc* fold_func = static_cast<ArrayFoldBuiltInFunc*>(this->static_target_function->built_in_func_impl.getPointer());
 
 				// Eval first arg (to get function 'f')
 				try
@@ -703,16 +599,16 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 				{
 					throw BaseException("Failed to eval first arg of fold " + e.what());
 				}
-			}
+			//}
 		}
-		else if(this->target_function && this->target_function->sig.name == "map")
+		else if(this->static_target_function && this->static_target_function->sig.name == "map")
 		{
 			// TEMP: specialise map for the passed in function now.
-			if(this->binding_type == BoundToGlobalDef)
-			{
-				assert(this->target_function->built_in_func_impl.nonNull());
-				assert(dynamic_cast<ArrayMapBuiltInFunc*>(this->target_function->built_in_func_impl.getPointer()));
-				ArrayMapBuiltInFunc* map_func = static_cast<ArrayMapBuiltInFunc*>(this->target_function->built_in_func_impl.getPointer());
+			//if(this->binding_type == BoundToGlobalDef)
+			//{
+				assert(this->static_target_function->built_in_func_impl.nonNull());
+				assert(dynamic_cast<ArrayMapBuiltInFunc*>(this->static_target_function->built_in_func_impl.getPointer()));
+				ArrayMapBuiltInFunc* map_func = static_cast<ArrayMapBuiltInFunc*>(this->static_target_function->built_in_func_impl.getPointer());
 
 				// Eval first arg (to get function 'f')
 				try
@@ -729,10 +625,10 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 				{
 					throw BaseException("Failed to eval first arg of map " + e.what());
 				}
-			}
+			//}
 		}
 
-		if(payload.check_bindings && this->binding_type == Unbound)
+		if(payload.check_bindings && get_func_expr.isNull() && (static_target_function == NULL)) //this->binding_type == Unbound)
 		{
 			//throw BaseException("Failed to find function '" + this->function_name + "' for the given argument types." + errorContext(*this));
 
@@ -740,7 +636,7 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 			for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
 				argtypes.push_back(this->argument_expressions[i]->type()); // may be NULL
 
-			const FunctionSignature sig(this->function_name, argtypes);
+			const FunctionSignature sig(this->static_function_name, argtypes);
 		
 			throw BaseException("Failed to find function '" + sig.toString() + "'." + errorContext(*this));
 		}
@@ -752,8 +648,6 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 	}
 	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
-		assert(this->binding_type != Unbound);
-
 		// Check the argument expression types still match the function argument types.
 		// They may have changed due to e.g. type coercion from int->float, in which case they won't be valid any more.
 		/*vector<TypeRef> argtypes(argument_expressions.size());
@@ -791,10 +685,10 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 		//		throw BaseException("Failed to find function '" + sig.toString() + "'." + errorContext(*this));
 		//	}
 		//}
-		if(this->binding_type == BoundToGlobalDef)
+		if(this->static_target_function)//this->binding_type == BoundToGlobalDef)
 		{
 			// Check shuffle mask (arg 1) is a vector of ints
-			if(::hasPrefix(this->target_function->sig.name, "shuffle"))
+			if(::hasPrefix(this->static_target_function->sig.name, "shuffle"))
 			{
 				// TODO
 			}
@@ -803,7 +697,7 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
 		// TODO: check function is bound etc..?
-		if(this->binding_type == BoundToGlobalDef)
+		if(this->static_target_function)
 		{
 			/*this->can_constant_fold = true;
 			for(size_t i=0; i<argument_expressions.size(); ++i)
@@ -827,8 +721,10 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 bool FunctionExpression::provenDefined() const
 {
 	//return proven_defined;
-	if(this->target_function->sig.name == "elem")
+	if(this->static_target_function && this->static_target_function->sig.name == "elem")
 		return proven_defined;
+
+	// TODO: tricky issues here on how to prove valid for dynamically bound functions.
 
 	return true;
 }
@@ -836,7 +732,7 @@ bool FunctionExpression::provenDefined() const
 
 void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
-	if(this->target_function && this->target_function->sig.name == "elem" && this->argument_expressions.size() == 2)
+	if(this->static_target_function && this->static_target_function->sig.name == "elem" && this->argument_expressions.size() == 2)
 	{
 		if(this->argument_expressions[0]->type()->getType() == Type::ArrayTypeType &&
 			this->argument_expressions[1]->type()->getType() == Type::IntType)
@@ -1053,7 +949,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 						if(if_node->condition->nodeType() == ASTNode::FunctionExpressionType)
 						{
 							FunctionExpression* condition_func_express = static_cast<FunctionExpression*>(if_node->condition.getPointer());
-							if(condition_func_express->target_function->sig.name == "inBounds")
+							if(condition_func_express->static_target_function->sig.name == "inBounds")
 							{
 								// Is the array the same? 
 								if(expressionsHaveSameValue(condition_func_express->argument_expressions[0], this->argument_expressions[0]))
@@ -1178,7 +1074,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 		throw BaseException("Failed to prove elem() argument is in-bounds." + errorContext(*this));
 	}
 	// truncateToInt
-	else if(this->target_function && this->target_function->sig.name == "truncateToInt" && this->argument_expressions.size() == 1)
+	else if(this->static_target_function && this->static_target_function->sig.name == "truncateToInt" && this->argument_expressions.size() == 1)
 	{
 		//TEMP: allow truncateToInt to be unsafe to allow ISL_stdlib.txt to compile
 
@@ -1199,7 +1095,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 
 		throw BaseException("Failed to prove truncateToInt() argument is in-bounds." + errorContext(*this));*/
 	}
-	else if(this->target_function && this->target_function->sig.name == "update" && this->argument_expressions.size() == 3)
+	else if(this->static_target_function && this->static_target_function->sig.name == "update" && this->argument_expressions.size() == 3)
 	{
 		// def update(CollectionType c, int index, T newval) CollectionType
 
@@ -1252,7 +1148,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 
 		throw BaseException("Failed to prove update() index argument is in-bounds." + errorContext(*this));
 	}
-	else if(this->target_function && this->target_function->sig.name == "toInt32" && this->argument_expressions.size() == 1)
+	else if(this->static_target_function && this->static_target_function->sig.name == "toInt32" && this->argument_expressions.size() == 1)
 	{
 		// If the argument is constant:
 		if(this->argument_expressions[0]->isConstant())
@@ -1290,13 +1186,13 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 void FunctionExpression::print(int depth, std::ostream& s) const
 {
 	printMargin(depth, s);
-	s << "FunctionExpr (" << this->function_name << ")";
-	if(this->target_function)
-		s << "; target: " << this->target_function->sig.toString();
-	else if(this->binding_type == Arg)
+	s << "FunctionExpr (" << this->functionName() << ")";//TODO: fix
+	if(this->static_target_function)
+		s << "; target: " << this->static_target_function->sig.toString();
+	/*else if(this->binding_type == Arg)
 		s << "; runtime bound to arg index " << this->bound_index;
 	else if(this->binding_type == Let)
-		s << "; runtime bound to let index " << this->bound_index;
+		s << "; runtime bound to let index " << this->bound_index;*/
 	s << "\n";
 	for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
 		this->argument_expressions[i]->print(depth + 1, s);
@@ -1305,7 +1201,7 @@ void FunctionExpression::print(int depth, std::ostream& s) const
 
 std::string FunctionExpression::sourceString() const
 {
-	std::string s = this->function_name + "(";
+	std::string s = this->functionName() + "("; // TODO: fix
 	for(unsigned int i=0; i<argument_expressions.size(); ++i)
 	{
 		s += argument_expressions[i]->sourceString();
@@ -1374,7 +1270,7 @@ static bool isENFunctionName(const std::string& name)
 
 std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
-	if(this->function_name == "elem")
+	if(this->static_function_name == "elem")
 	{
 		if(argument_expressions.size() != 2)
 			throw BaseException("Error while emitting OpenCL C: elem() function with != 2 args.");
@@ -1434,7 +1330,7 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 		else
 			throw BaseException("Error while emitting OpenCL C: elem() function first arg has unsupported type " + argument_expressions[0]->type()->toString() );
 	}
-	else if(this->function_name == "shuffle")
+	else if(this->static_function_name == "shuffle")
 	{
 		if(argument_expressions.size() != 2)
 			throw BaseException("Error while emitting OpenCL C: shuffle() function with != 2 args.");
@@ -1458,14 +1354,14 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 		return s;
 	}
-	else if(isENFunctionName(function_name) && 
+	else if(isENFunctionName(static_function_name) && 
 		(this->argument_expressions[0]->type()->getType() == Type::VectorTypeType ||
 		this->argument_expressions[0]->type()->getType() == Type::ArrayTypeType))
 	{
 		try
 		{
 			// eN() function
-			const int index = stringToInt(function_name.substr(1, function_name.size() - 1));
+			const int index = stringToInt(static_function_name.substr(1, static_function_name.size() - 1));
 
 			if(this->argument_expressions[0]->type()->getType() == Type::VectorTypeType)
 			{
@@ -1496,10 +1392,10 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 		}
 		catch(StringUtilsExcep&)
 		{
-			throw BaseException("Error while emitting OpenCL C: invalid eN() function '" + function_name + "'.");
+			throw BaseException("Error while emitting OpenCL C: invalid eN() function '" + static_function_name + "'.");
 		}
 	}
-	else if(target_function && target_function->built_in_func_impl.nonNull() && dynamic_cast<GetField*>(target_function->built_in_func_impl.getPointer()))
+	else if(static_target_function && static_target_function->built_in_func_impl.nonNull() && dynamic_cast<GetField*>(static_target_function->built_in_func_impl.getPointer()))
 	{
 		// Transform get field built-in functions like so:
 		// struct s { int x; }
@@ -1511,11 +1407,11 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 		//if(argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType && argument_expressions[0].downcastToPtr<Variable>()->vartype == Variable::LetVariable)
 		if(argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType && argument_expressions[0].downcastToPtr<Variable>()->vartype == Variable::ArgumentVariable)
-			return argument_expressions[0]->emitOpenCLC(params) + "->" + function_name;
+			return argument_expressions[0]->emitOpenCLC(params) + "->" + static_function_name;
 		else
-			return argument_expressions[0]->emitOpenCLC(params) + "." + function_name;
+			return argument_expressions[0]->emitOpenCLC(params) + "." + static_function_name;
 	}
-	else if(function_name == "inBounds")
+	else if(static_function_name == "inBounds")
 	{
 		// inBounds(a, i)			=>		i >= 0 && i < N
 
@@ -1536,25 +1432,25 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 		return "((" + argument_expressions[1]->emitOpenCLC(params) + " >= 0) && (" + argument_expressions[1]->emitOpenCLC(params) + " < " + toString(N) + "))";
 	}
-	else if(function_name == "abs" && (argument_expressions.size() == 1) && 
+	else if(static_function_name == "abs" && (argument_expressions.size() == 1) && 
 		(argument_expressions[0]->type()->getType() == Type::FloatType || 
 		(argument_expressions[0]->type()->getType() == Type::VectorTypeType && argument_expressions[0]->type().downcastToPtr<VectorType>()->elem_type->getType() == Type::FloatType)))
 	{
 		return "fabs(" + argument_expressions[0]->emitOpenCLC(params) + ")";
 	}
-	else if(function_name == "min" && (argument_expressions.size() == 2) && 
+	else if(static_function_name == "min" && (argument_expressions.size() == 2) && 
 		(argument_expressions[0]->type()->getType() == Type::FloatType || 
 		(argument_expressions[0]->type()->getType() == Type::VectorTypeType && argument_expressions[0]->type().downcastToPtr<VectorType>()->elem_type->getType() == Type::FloatType)))
 	{
 		return "fmin(" + argument_expressions[0]->emitOpenCLC(params) + ", " + argument_expressions[1]->emitOpenCLC(params) + ")";
 	}
-	else if(function_name == "max" && (argument_expressions.size() == 2) && 
+	else if(static_function_name == "max" && (argument_expressions.size() == 2) && 
 		(argument_expressions[0]->type()->getType() == Type::FloatType || 
 		(argument_expressions[0]->type()->getType() == Type::VectorTypeType && argument_expressions[0]->type().downcastToPtr<VectorType>()->elem_type->getType() == Type::FloatType)))
 	{
 		return "fmax(" + argument_expressions[0]->emitOpenCLC(params) + ", " + argument_expressions[1]->emitOpenCLC(params) + ")";
 	}
-	else if(function_name == "iterate")
+	else if(static_function_name == "iterate")
 	{
 		//TODO: check arg 0 is constant.
 		if(!(this->argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType && this->argument_expressions[0].downcastToPtr<Variable>()->vartype == Variable::BoundToGlobalDefVariable))
@@ -1563,7 +1459,7 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 		
 
-		return this->target_function->built_in_func_impl.downcastToPtr<IterateBuiltInFunc>()->emitOpenCLForFunctionArg(
+		return this->static_target_function->built_in_func_impl.downcastToPtr<IterateBuiltInFunc>()->emitOpenCLForFunctionArg(
 			params,
 			this->argument_expressions[0].downcastToPtr<Variable>()->bound_function,
 			this->argument_expressions
@@ -1602,8 +1498,8 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 		std::string arg_eval_s = "";
 
-		std::string use_func_name = (/*this->target_function->isExternalFunction() ||*/ isCallToBuiltInOpenCLFunction(this->target_function)) ? 
-			this->target_function->sig.name : this->target_function->sig.typeMangledName();
+		std::string use_func_name = (/*this->target_function->isExternalFunction() ||*/ isCallToBuiltInOpenCLFunction(this->static_target_function)) ? 
+			this->static_target_function->sig.name : this->static_target_function->sig.typeMangledName();
 
 		std::string s = use_func_name + "(";
 		for(unsigned int i=0; i<argument_expressions.size(); ++i)
@@ -1627,7 +1523,7 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 				}
 				else
 				{
-					const std::string arg_name = this->target_function->args[i].name + "_arg_" + toString(params.uid++);
+					const std::string arg_name = this->static_target_function->args[i].name + "_arg_" + toString(params.uid++);
 					arg_eval_s += argument_expressions[i]->type()->OpenCLCType() + " " + arg_name + " = " + argument_expressions[i]->emitOpenCLC(params) + ";\n";
 
 					s += "&" + arg_name;
@@ -1639,7 +1535,7 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 		}
 
 		if(!arg_eval_s.empty())
-			params.blocks.back() += "// args for " + this->target_function->sig.toString() + ":\n" + arg_eval_s;
+			params.blocks.back() += "// args for " + this->static_target_function->sig.toString() + ":\n" + arg_eval_s;
 
 		return s + ")";
 	}
@@ -1648,12 +1544,15 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 TypeRef FunctionExpression::type() const
 {
-	if(this->binding_type == BoundToGlobalDef)
+	if(this->static_target_function) //this->binding_type == BoundToGlobalDef)
 	{
-		assert(this->target_function);
-		return this->target_function->returnType();
+		return this->static_target_function->returnType();
 	}
-	else if(this->binding_type == Let)
+	else if(this->get_func_expr.nonNull())
+	{
+		return this->get_func_expr->type();
+	}
+	/*else if(this->binding_type == Let)
 	{
 		TypeRef t = this->bound_let_block->lets[this->bound_index]->type();
 		Function* func_type = static_cast<Function*>(t.getPointer());
@@ -1667,10 +1566,10 @@ TypeRef FunctionExpression::type() const
 	else if(this->binding_type == Unbound)
 	{
 		return TypeRef(NULL);
-	}
+	}*/
 	else
 	{
-		assert(0);
+		//assert(0);
 		return TypeRef(NULL);
 	}
 }
@@ -1683,6 +1582,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 	llvm::Value* captured_var_struct_ptr = NULL;
 
+#if 0
 	if(binding_type == Let)
 	{
 		//target_llvm_func = this->bound_let_block->getLetExpressionLLVMValue(params, bound_index);
@@ -1728,7 +1628,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			2); // field index
 
 	}
-	else if(binding_type == Arg)
+	else if(binding_type == Arg) // If function is bound to an argument, i.e. we are calling a first class function passed as an argument to the current function:
 	{
 		// If the current function returns its result via pointer, then all args are offset by one.
 		//if(params.currently_building_func_def->returnType()->passByValue())
@@ -1761,25 +1661,30 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		}*/
 		//closure_pointer->dump();
 
-		throw BaseException("Support for first class functions passed as arguments disabled.");//TEMP
+		llvm::Value* target_llvm_func_ptr = params.builder->CreateStructGEP(closure_pointer, 0, "function_ptr_ptr");
+		llvm::Value* target_llvm_func = params.builder->CreateLoad(target_llvm_func_ptr, "function_ptr");
 
-		target_llvm_func = LLVMTypeUtils::createFieldLoad(
+		//throw BaseException("Support for first class functions passed as arguments disabled.");//TEMP
+
+		/*target_llvm_func = LLVMTypeUtils::createFieldLoad(
 			closure_pointer,
 			1, // field index
 			params.builder,
 			"target_llvm_func"
-		);
+		);*/
 
 		// NOTE: index 2 should hold the captured vars struct.
 		captured_var_struct_ptr = params.builder->CreateStructGEP(closure_pointer, 
 			2); // field index
 	}
-	else if(binding_type == BoundToGlobalDef)
+#endif
+
+	if(this->static_target_function)
 	{
 		// For structure field access functions, instead of emitting an actual function call, just emit the LLVM code to access the field.
-		if(dynamic_cast<GetField*>(this->target_function->built_in_func_impl.getPointer()))
+		if(dynamic_cast<GetField*>(this->static_target_function->built_in_func_impl.getPointer()))
 		{
-			const GetField* get_field_func = static_cast<const GetField*>(this->target_function->built_in_func_impl.getPointer());
+			const GetField* get_field_func = static_cast<const GetField*>(this->static_target_function->built_in_func_impl.getPointer());
 
 			const int field_index = get_field_func->index;
 
@@ -1816,9 +1721,9 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			return result;
 		}
 		// For tuple field access functions, instead of emitting an actual function call, just emit the LLVM code to access the field.
-		else if(dynamic_cast<GetTupleElementBuiltInFunc*>(this->target_function->built_in_func_impl.getPointer()))
+		else if(dynamic_cast<GetTupleElementBuiltInFunc*>(this->static_target_function->built_in_func_impl.getPointer()))
 		{
-			const GetTupleElementBuiltInFunc* get_field_func = static_cast<const GetTupleElementBuiltInFunc*>(this->target_function->built_in_func_impl.getPointer());
+			const GetTupleElementBuiltInFunc* get_field_func = static_cast<const GetTupleElementBuiltInFunc*>(this->static_target_function->built_in_func_impl.getPointer());
 
 			const int field_index = get_field_func->index;
 
@@ -1878,7 +1783,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			target_func_type // Type
 		);*/
 
-		target_llvm_func = this->target_function->getOrInsertFunction(
+		target_llvm_func = this->static_target_function->getOrInsertFunction(
 			params.module,
 			false // use_cap_var_struct_ptr: False as global functions don't have captured vars. ?!?!?
 		);
@@ -1888,7 +1793,8 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 	}
 	else
 	{
-		assert(0);
+		std::string msg = "Support for first class functions disabled." + errorContext(*this);
+		throw BaseException(msg);
 	}
 
 	//assert(closure_pointer);
@@ -1919,7 +1825,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			return_val_addr = entry_block_builder.CreateAlloca(
 				target_ret_type->LLVMType(*params.module), // type
 				llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1, true)), // num elems
-				this->target_function->sig.name + "() ret"
+				this->static_target_function->sig.name + "() ret"
 			);
 		}
 
@@ -1970,7 +1876,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 	for(unsigned int i=0; i<argument_expressions.size(); ++i)
 		if(shouldRefCount(params, argument_expressions[i]) && do_ref_counting_for_arg[i])
-			emitDestructorOrDecrCall(params, *argument_expressions[i], args[i + num_sret_args], "function expression '" + this->target_function->sig.toString() + "' argument " + toString(i) + " decrement");
+			emitDestructorOrDecrCall(params, *argument_expressions[i], args[i + num_sret_args], "function expression '" + this->static_target_function->sig.toString() + "' argument " + toString(i) + " decrement");
 
 	return target_ret_type->passByValue() ? call_inst : return_val_addr;
 }
@@ -1984,32 +1890,47 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 llvm::Value* FunctionExpression::getConstantLLVMValue(EmitLLVMCodeParams& params) const
 {
-	return this->target_function->getConstantLLVMValue(params);
+	return this->static_target_function->getConstantLLVMValue(params);
 }
 
 
 Reference<ASTNode> FunctionExpression::clone()
 {
 	FunctionExpression* e = new FunctionExpression(srcLocation());
-	e->function_name = this->function_name;
+	
+	e->get_func_expr = this->get_func_expr->clone();
 
 	for(size_t i=0; i<argument_expressions.size(); ++i)
 		e->argument_expressions.push_back(argument_expressions[i]->clone());
 	
-	e->target_function = this->target_function;
-	e->bound_index = this->bound_index;
-	e->bound_function = this->bound_function;
-	e->bound_let_block = this->bound_let_block;
-	e->binding_type = this->binding_type;
+	e->static_function_name = this->static_function_name;
+	e->static_target_function = this->static_target_function;
 
 	return e;
 }
 
 
+const std::string FunctionExpression::functionName() const
+{
+	if(get_func_expr.nonNull() && get_func_expr.isType<Variable>())
+		return get_func_expr.downcastToPtr<Variable>()->name;
+
+	return static_function_name;
+}
+
+
+bool FunctionExpression::isBoundToGlobalDef() const // Is this function bound to a single global definition.  This should be the case for most normal function expressions like f(x)
+{
+	//return func->nodeType() == ASTNode::VariableASTNodeType && 
+	//	func.downcastToPtr<Variable>()->vartype == Variable::BoundToGlobalDefVariable;
+	return static_target_function != NULL;
+}
+
+
 bool FunctionExpression::isConstant() const
 {
-	// For now, we'll say a function expression bound to an argument of let var is not constant.
-	if(this->binding_type != BoundToGlobalDef)
+	// For now, we'll say a function expression bound to an argument or let var is not constant.
+	if(!static_target_function)
 		return false;
 
 	for(unsigned int i=0; i<argument_expressions.size(); ++i)

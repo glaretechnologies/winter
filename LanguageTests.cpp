@@ -316,7 +316,16 @@ void LanguageTests::run()
 	--------------------------------------------------
 	*/
 
-	testMainFloatArg("def main(float x) float : let a = [1.0, 2.0, 3.0, 4.0]a in a[truncateToInt(x)]", 2.1f, 3.0f, ALLOW_UNSAFE);
+	//testMainFloatArg("def g(function<float> f) float : f()       def main(float x) float : g(\\() float : x)",  4.0f, 4.0f, ALLOW_UNSAFE);
+
+	// Test first class function with OpenCL code-gen
+	//testMainFloatArg("def f(array<float, 16> a, int i) float : a[i]    def g(function<array<float, 16>, int, float>      def main(float x) float : g(f, [truncateToInt(x)]", 2.1f, 3.0f, ALLOW_UNSAFE);
+
+
+
+
+
+	//testMainFloatArg("def main(float x) float : let a = [1.0, 2.0, 3.0, 4.0]a in a[truncateToInt(x)]", 2.1f, 3.0f, ALLOW_UNSAFE);
 
 
 	// ===================================================================
@@ -330,7 +339,7 @@ void LanguageTests::run()
 	testMainInt64Arg("def main(int64 x) int64 : makeVArray(x, x)[0]", 2, 2, ALLOW_UNSAFE);
 	testMainInt64Arg("def main(int64 x) int64 : makeVArray(x, x)[1]", 2, 2, ALLOW_UNSAFE);
 
-
+	
 
 //	testMainIntegerArg("def f(int i) varray<float> : [10]va			def main(int x) int : if i > 0 && i < 4 then f(x)[i] else 0", 4, 4);
 
@@ -338,6 +347,7 @@ void LanguageTests::run()
 
 //	testMainFloatArg("def f(float x) varray<float> : [x]va			def main(float x) float : f(x)[0]", 4.0f, 4.0f);
 
+	testMainFloatArg("def main(float x) float : [4.0]va[0]", 0, 4.0f, INVALID_OPENCL);
 
 	// Test varrays with pass-by-value elements (e.g. structures)
 	testMainFloatArg("struct s { float x }		def main(float x) float : [s(4.0)]va[0].x", 0, 4.0f, INVALID_OPENCL);

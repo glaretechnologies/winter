@@ -891,7 +891,7 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 
 	// TODO: check args to update as well to make sure it is bound to correct update etc..
 	// Also check first arg of update is bound to first arg to specialised_f.
-	if(specialised_f && specialised_f->body->nodeType() == ASTNode::FunctionExpressionType && specialised_f->body.downcast<FunctionExpression>()->function_name == "update")
+	if(specialised_f && specialised_f->body->nodeType() == ASTNode::FunctionExpressionType && specialised_f->body.downcast<FunctionExpression>()->static_function_name == "update")
 	{
 		llvm::Value* running_state_alloca = entry_block_builder.CreateAlloca(
 			state_type->LLVMType(*params.module), // State

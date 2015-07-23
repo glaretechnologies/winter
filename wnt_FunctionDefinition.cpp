@@ -133,6 +133,7 @@ ValueRef FunctionDefinition::exec(VMState& vmstate)
 		else
 		{
 			assert(0);
+			throw BaseException("internal error 136");
 		}
 	}
 
@@ -192,7 +193,8 @@ ValueRef FunctionDefinition::invoke(VMState& vmstate)
 
 void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
-	if(is_anon_func)
+	// Don't traverse function defn from top level directly, wait until it is traversed as the child of the enclosing function
+	if(is_anon_func && stack.empty())
 		return;
 
 	if(this->isGenericFunction())
@@ -439,7 +441,7 @@ std::string FunctionDefinition::emitOpenCLC(EmitOpenCLCodeParams& params) const
 	for(unsigned int i=0; i<args.size(); ++i)
 	{
 		if(args[i].type->OpenCLPassByPointer())
-			opencl_sig += "const " + args[i].type->OpenCLCType() + "* const " + args[i].name;
+			opencl_sig += "const " + args[i].type->address_space + " " + args[i].type->OpenCLCType() + "* const " + args[i].name;
 		else
 			opencl_sig += "const " + args[i].type->OpenCLCType() + " " + args[i].name;
 			

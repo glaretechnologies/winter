@@ -301,7 +301,7 @@ void checkInlineExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector
 	{
 		FunctionExpressionRef func_expr = e.downcast<FunctionExpression>();
 
-		if(func_expr->binding_type == FunctionExpression::BoundToGlobalDef && !func_expr->target_function->isExternalFunction() && func_expr->target_function->body.nonNull())
+		if(func_expr->static_target_function &&/*func_expr->isBoundToGlobalDef() && *//*func_expr->binding_type == FunctionExpression::BoundToGlobalDef && */!func_expr->static_target_function->isExternalFunction() && func_expr->static_target_function->body.nonNull())
 		{
 		
 			//std::cout << "------------original expr: " << std::endl;
@@ -309,7 +309,7 @@ void checkInlineExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector
 
 			// Replace e with a copy of the target function body.
 
-			e = func_expr->target_function->body->clone();
+			e = func_expr->static_target_function->body->clone();
 
 			//std::cout << "------------new expr: " << std::endl;
 			//e->print(0, std::cout);

@@ -1292,17 +1292,7 @@ ASTNodeRef LangParser::parseHighPrecedenceExpression(ParseInfo& p)
 
 			parseToken(CLOSE_PARENTHESIS_TOKEN, p);
 
-			//TEMP HACK: if left is a variable expression, just extract the name of the variable and use as function name.
-			// TODO: do this properly - let the variable be an arbitrary expression.
-			if(left->nodeType() == ASTNode::VariableASTNodeType)
-			{
-				func_expr->function_name = left.downcastToPtr<Variable>()->name;
-			}
-			else
-			{
-				//func_expr->function_expr = left;
-				throw LangParserExcep("only fixed function calls allowed currently." + errorPosition(p));
-			}
+			func_expr->get_func_expr = left;
 			func_expr->argument_expressions = arg_expressions;
 			left = func_expr;
 		}
@@ -1330,11 +1320,7 @@ ASTNodeRef LangParser::parseHighPrecedenceExpression(ParseInfo& p)
 				}
 
 				// Could either return a FunctionExpression for 'elem', or a ArraySubscript ASTNode.
-				FunctionExpressionRef func_expr = new FunctionExpression(loc);
-				func_expr->function_name = "elem";
-				func_expr->argument_expressions.push_back(left);
-				func_expr->argument_expressions.push_back(index_expr);
-				left = func_expr;
+				left = new FunctionExpression(loc, "elem", left, index_expr);
 			}
 			else if(isTokenCurrent(COMMA_TOKEN, p)) // Then this was actually a collection literal after another expression, e.g. : " x < y [a, b, c]a" etc..
 			{
@@ -1353,10 +1339,7 @@ ASTNodeRef LangParser::parseHighPrecedenceExpression(ParseInfo& p)
 
 			const std::string field_name = parseIdentifier("field name", p);
 
-			FunctionExpressionRef func_expr = new FunctionExpression(loc);
-			func_expr->function_name = field_name;
-			func_expr->argument_expressions.push_back(left);
-			left = func_expr;
+			left = new FunctionExpression(loc, field_name, left);
 		}
 		else
 		{
