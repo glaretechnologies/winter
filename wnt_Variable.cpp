@@ -443,7 +443,6 @@ std::string Variable::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
-#if USE_LLVM
 	if(vartype == LetVariable)
 	{
 		//return this->bound_let_block->getLetExpressionLLVMValue(params, this->bound_index, ret_space_ptr);
@@ -600,9 +599,6 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 		assert(!"invalid vartype");
 		return NULL;
 	}
-#else
-	return NULL;
-#endif
 }
 
 

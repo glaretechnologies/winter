@@ -1,9 +1,10 @@
-// Copyright 2009 Nicholas Chapman
+/*=====================================================================
+winter.cpp
+----------
+Copyright Glare Technologies Limited 2015 -
+=====================================================================*/
 
-#include <iostream>
-#include <cassert>
-#include <fstream>
-#include "utils/FileUtils.h"
+
 #include "wnt_Lexer.h"
 #include "TokenBase.h"
 #include "wnt_LangParser.h"
@@ -13,17 +14,28 @@
 #include "Value.h"
 #include "LanguageTests.h"
 #include "VirtualMachine.h"
+#include "utils/FileUtils.h"
+#include "utils/Clock.h"
+#include <iostream>
+#include <cassert>
+#include <fstream>
 using namespace Winter;
+
 
 typedef float(*float_void_func)();
 
+
 int main(int argc, char** argv)
 {
+	Clock::init();
+
 	if(argc < 2)
 	{
 		std::cerr << "Usage: winter program.win" << std::endl;
 		return 1;
 	}
+
+	VirtualMachine::init();
 
 	if(std::string(argv[1]) == "--test")
 	{
@@ -59,7 +71,7 @@ int main(int argc, char** argv)
 		std::cout << "JIT'd function returned " << result << std::endl;
 
 
-		VMState vmstate(true);
+		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
 
 		assert(maindef->built_llvm_function);
@@ -83,9 +95,9 @@ int main(int argc, char** argv)
 		//TEMPdelete retval;
 
 		assert(vmstate.argument_stack.empty());
-		assert(vmstate.let_stack.empty());
+		//assert(vmstate.let_stack.empty());
 		assert(vmstate.func_args_start.empty());
-		assert(vmstate.let_stack_start.empty());
+		//assert(vmstate.let_stack_start.empty());
 		//assert(vmstate.working_stack.empty());
 		
 
@@ -126,18 +138,18 @@ int main(int argc, char** argv)
 }
 
 
-void doTestAssert(bool expr, const char* test, long line, const char* file)
-{
-	if(!expr)
-	{
-		std::cerr << "Test Assertion Failed: " << file << ", line " << line << ":\n" << test << std::endl;
-		assert(0);
-		exit(0);
-	}
-}
+//void doTestAssert(bool expr, const char* test, long line, const char* file)
+//{
+//	if(!expr)
+//	{
+//		std::cerr << "Test Assertion Failed: " << file << ", line " << line << ":\n" << test << std::endl;
+//		assert(0);
+//		exit(0);
+//	}
+//}
 
 
-void conPrint(const std::string& s)
-{
-	std::cout << s << std::endl;
-}
+//void conPrint(const std::string& s)
+//{
+//	std::cout << s << std::endl;
+//}

@@ -119,7 +119,7 @@ bool expressionIsWellTyped(ASTNode& e, TraversalPayload& payload_)
 }
 
 
-static bool isLiteral(const ASTNode& e)
+/*static bool isLiteral(const ASTNode& e)
 {
 	return e.nodeType() == ASTNode::FloatLiteralType ||
 		e.nodeType() == ASTNode::BoolLiteralType ||
@@ -136,7 +136,7 @@ static bool isReferenceToArray(const ASTNodeRef& e)
 		e->type()->getType() == Type::ArrayTypeType)
 		return true;
 	return false;
-}
+}*/
 
 
 bool shouldFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
@@ -904,14 +904,10 @@ std::string FloatLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 llvm::Value* FloatLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
-#if USE_LLVM
 	return llvm::ConstantFP::get(
 		*params.context, 
 		llvm::APFloat(this->value)
 	);
-#else
-	return NULL;
-#endif
 }
 
 
@@ -951,7 +947,6 @@ std::string IntLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 llvm::Value* IntLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
-#if USE_LLVM
 	return llvm::ConstantInt::get(
 		*params.context, 
 		llvm::APInt(
@@ -960,9 +955,6 @@ llvm::Value* IntLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* r
 			true // signed
 		)
 	);
-#else
-	return NULL;
-#endif
 }
 
 
@@ -1744,7 +1736,6 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 
 llvm::Value* AdditionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
-#if USE_LLVM
 	if(this->type()->getType() == Type::VectorTypeType)
 	{
 		const TypeRef elem_type = this->type().downcast<VectorType>()->elem_type;
@@ -1786,9 +1777,6 @@ llvm::Value* AdditionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 	{
 		throw BaseException("Unknown type for AdditionExpression code emission");
 	}
-#else
-	return NULL;
-#endif
 }
 
 
@@ -2003,7 +1991,6 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 
 llvm::Value* SubtractionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
-#if USE_LLVM
 	if(this->type()->getType() == Type::FloatType || (this->type()->getType() == Type::VectorTypeType && this->type().downcastToPtr<VectorType>()->elem_type->getType() == Type::FloatType))
 	{
 		return params.builder->CreateBinOp(
@@ -2024,9 +2011,6 @@ llvm::Value* SubtractionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llv
 	{
 		throw BaseException("Unknown type for SubtractionExpression code emission");
 	}
-#else
-	return NULL;
-#endif
 }
 
 
@@ -2285,7 +2269,6 @@ std::string MulExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 llvm::Value* MulExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
-#if USE_LLVM
 	if(this->type()->getType() == Type::VectorTypeType)
 	{
 		if(a->type()->getType() == Type::FloatType)
@@ -2401,9 +2384,6 @@ llvm::Value* MulExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 	{
 		throw BaseException("Unknown type for MulExpression code emission");
 	}
-#else
-	return NULL;
-#endif
 }
 
 
@@ -2887,7 +2867,6 @@ std::string DivExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 llvm::Value* DivExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
-#if USE_LLVM
 	if(this->type()->getType() == Type::FloatType)
 	{
 		return params.builder->CreateBinOp(
@@ -2909,10 +2888,6 @@ llvm::Value* DivExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 		assert(!"divexpression type invalid!");
 		return NULL;
 	}
-
-#else
-	return NULL;
-#endif
 }
 
 
@@ -3052,7 +3027,6 @@ std::string BinaryBooleanExpr::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 llvm::Value* BinaryBooleanExpr::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
-#if USE_LLVM
 	if(t == AND)
 	{
 		return params.builder->CreateBinOp(
@@ -3074,10 +3048,6 @@ llvm::Value* BinaryBooleanExpr::emitLLVMCode(EmitLLVMCodeParams& params, llvm::V
 		assert(!"t type invalid!");
 		return NULL;
 	}
-
-#else
-	return NULL;
-#endif
 }
 
 
@@ -3219,7 +3189,6 @@ std::string UnaryMinusExpression::emitOpenCLC(EmitOpenCLCodeParams& params) cons
 
 llvm::Value* UnaryMinusExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
-#if USE_LLVM
 	if(this->type()->getType() == Type::FloatType)
 	{
 		return params.builder->CreateFNeg(
@@ -3267,9 +3236,6 @@ llvm::Value* UnaryMinusExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm
 		assert(!"UnaryMinusExpression type invalid!");
 		return NULL;
 	}
-#else
-	return NULL;
-#endif
 }
 
 

@@ -188,13 +188,13 @@ public:
 	FunctionDefinition* currently_building_func_def;
 	const PlatformUtils::CPUInfo* cpu_info;
 	//bool hidden_voidptr_arg;
-#if USE_LLVM
+	
 	llvm::IRBuilder<>* builder;
 	llvm::Module* module;
 	llvm::Function* currently_building_func;
 	llvm::LLVMContext* context;
 	const llvm::DataLayout/*TargetData*/* target_data;
-#endif
+	
 	std::vector<ASTNode*> node_stack;
 	std::vector<LetBlock*> let_block_stack;
 

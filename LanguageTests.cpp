@@ -2974,7 +2974,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 
 	// Test floor on vector
 	{
-		Float4Struct a(-1.2, -0.2, 0.2, 1.2);
+		Float4Struct a(-1.2f, -0.2f, 0.2f, 1.2f);
 		Float4Struct target_result(-2, -1, 0, 1);
 		
 		testFloat4Struct(
@@ -2993,7 +2993,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 
 	// Test ceil on vector
 	{
-		Float4Struct a(-1.2, -0.2, 0.2, 1.2);
+		Float4Struct a(-1.2f, -0.2f, 0.2f, 1.2f);
 		Float4Struct target_result(-1, 0, 1, 2);
 		
 		testFloat4Struct(
