@@ -1898,7 +1898,8 @@ Reference<ASTNode> FunctionExpression::clone()
 {
 	FunctionExpression* e = new FunctionExpression(srcLocation());
 	
-	e->get_func_expr = this->get_func_expr->clone();
+	if(get_func_expr.nonNull())
+		e->get_func_expr = this->get_func_expr->clone();
 
 	for(size_t i=0; i<argument_expressions.size(); ++i)
 		e->argument_expressions.push_back(argument_expressions[i]->clone());
