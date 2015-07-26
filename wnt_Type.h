@@ -224,12 +224,26 @@ public:
 	//std::vector<TypeRef> captured_var_types;
 	bool use_captured_vars;
 
+
+	static int functionPtrIndex() { return 3; } // Index in closure struct of function ptr.
+	static int capturedVarStructIndex() { return 4; } // Index in closure struct of captured var structure.
+
+	// Use for passing to ref counting functions etc..
+	static Reference<Function> dummyFunctionType() { return new Function(std::vector<TypeRef>(), new Int(), true); }
+
 	virtual const std::string toString() const; // { return "function"; }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 	virtual llvm::Type* LLVMType(llvm::Module& module) const;
 	virtual const std::string OpenCLCType() const;
 	// Pass by reference, because the actual value passed/returned is a closure structure.
-	virtual bool passByValue() const { return true; }
+	virtual bool passByValue() const { return true; } // Pass the pointer 'by value'
+
+	virtual bool hasDestructor() const { return true; } // Variables in closure may need decrementing/destroying.
+	virtual bool isHeapAllocated() const { return true; } // same as 'is refcounted'.
+
+	virtual void emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const;
+	virtual void emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const;
+
 	virtual bool lessThan(const Type& b) const
 	{
 		if(getType() < b.getType())

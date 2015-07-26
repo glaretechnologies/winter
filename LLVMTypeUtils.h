@@ -42,8 +42,8 @@ llvm::Type* pointerType(llvm::Type* type);
 
 llvm::Type* voidPtrType(llvm::LLVMContext& context);
 
-llvm::Type* getBaseCapturedVarStructType(llvm::LLVMContext& context);
-llvm::Type* getPtrToBaseCapturedVarStructType(llvm::LLVMContext& context);
+llvm::Type* getBaseCapturedVarStructType(llvm::Module& module);
+llvm::Type* getPtrToBaseCapturedVarStructType(llvm::Module& module);
 
 llvm::FunctionType* llvmFunctionType(const std::vector<TypeRef>& arg_types, 
 									 bool captured_var_struct_ptr_arg,

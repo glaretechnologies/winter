@@ -177,8 +177,12 @@ public:
 	FunctionDefinition* allocateVArrayFunc;
 	FunctionDefinition* freeVArrayFunc;
 
+	FunctionDefinition* allocateClosureFunc;
+	FunctionDefinition* freeClosureFunc;
+
 	llvm::Function* incrStringRefCountLLVMFunc;
 	llvm::Function* incrVArrayRefCountLLVMFunc;
+	llvm::Function* incrClosureRefCountLLVMFunc;
 };
 
 

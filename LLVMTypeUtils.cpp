@@ -76,19 +76,27 @@ llvm::Type* voidPtrType(llvm::LLVMContext& context)
 }
 
 
-llvm::Type* getBaseCapturedVarStructType(llvm::LLVMContext& context)
+llvm::Type* getBaseCapturedVarStructType(llvm::Module& module)
 {
-	const std::vector<llvm::Type*> params;
-	return llvm::StructType::get(
-		context,
-		params // params
+	const std::string struct_name = "base_captured_var_struct";
+	llvm::StructType* existing_struct_type = module.getTypeByName(struct_name);
+	if(existing_struct_type)
+		return existing_struct_type;
+
+	std::vector<llvm::Type*> elements;
+	//elements.push_back(llvm::Type::getIntNTy(module.getContext(), 64)); // Dummy struct member
+
+	return llvm::StructType::create(
+		module.getContext(),
+		elements, // elements
+		struct_name
 	);
 }
 
 
-llvm::Type* getPtrToBaseCapturedVarStructType(llvm::LLVMContext& context)
+llvm::Type* getPtrToBaseCapturedVarStructType(llvm::Module& module)
 {
-	return pointerType(*getBaseCapturedVarStructType(context));
+	return pointerType(*getBaseCapturedVarStructType(module));
 }
 
 
@@ -105,7 +113,7 @@ llvm::FunctionType* llvmFunctionType(const vector<TypeRef>& arg_types,
 			llvm_arg_types.push_back(arg_types[i]->passByValue() ? arg_types[i]->LLVMType(module) : LLVMTypeUtils::pointerType(*arg_types[i]->LLVMType(module)));
 
 		if(captured_var_struct_ptr_arg)
-			llvm_arg_types.push_back(getPtrToBaseCapturedVarStructType(module.getContext()));
+			llvm_arg_types.push_back(getPtrToBaseCapturedVarStructType(module));
 
 		//if(hidden_voidptr_arg)
 		//	llvm_arg_types.push_back(voidPtrType(context));
@@ -128,7 +136,7 @@ llvm::FunctionType* llvmFunctionType(const vector<TypeRef>& arg_types,
 			llvm_arg_types.push_back(arg_types[i]->passByValue() ? arg_types[i]->LLVMType(module) : LLVMTypeUtils::pointerType(*arg_types[i]->LLVMType(module)));
 
 		if(captured_var_struct_ptr_arg)
-			llvm_arg_types.push_back(getPtrToBaseCapturedVarStructType(module.getContext()));
+			llvm_arg_types.push_back(getPtrToBaseCapturedVarStructType(module));
 
 		//if(hidden_voidptr_arg)
 		//	llvm_arg_types.push_back(voidPtrType(context));

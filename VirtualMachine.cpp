@@ -127,6 +127,7 @@ static const std::string& getCharArg(const vector<ValueRef>& arg_values, int i)
 
 static int64 string_count = 0;//TEMP
 static int64 varray_count = 0;//TEMP
+static int64 closure_count = 0;//TEMP
 
 
 
@@ -311,6 +312,52 @@ static int freeVArray(VArrayRep* varray)
 
 	assert(varray->refcount == 1);
 	free(varray);
+	return 0;
+}
+
+
+//=====================================================================================
+
+
+// In-memory string representation for a Winter VArray
+class ClosureRep
+{
+public:
+	uint64 refcount;
+	uint64 len; // not used currently.
+	uint64 flags;
+	// Data follows..
+};
+
+
+static ClosureRep* allocateClosure(uint64 size_B)
+{
+	closure_count++;//TEMP
+
+	// Allocate space for the reference count, length, flags, and data.
+	ClosureRep* closure = (ClosureRep*)malloc(size_B);
+	closure->refcount = 666;
+	closure->len = 666;
+	closure->flags = 666;
+	//closure->flags = 1; // heap allocated
+	return closure;
+}
+
+
+static ValueRef allocateClosureInterpreted(const vector<ValueRef>& args)
+{
+	assert(0);
+	return NULL;
+}
+
+
+// NOTE: just return an int here as all external funcs need to return something (non-void).
+static int freeClosure(ClosureRep* closure)
+{
+	closure_count--;//TEMP
+
+	assert(closure->refcount == 1);
+	free(closure);
 	return 0;
 }
 
@@ -552,7 +599,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 	llvm_module(NULL),
 	llvm_exec_engine(NULL)
 {
-	assert(string_count == 0 && varray_count == 0);
+	assert(string_count == 0 && varray_count == 0 && closure_count == 0);
 
 	stats.num_heap_allocation_calls = 0;
 	
@@ -661,6 +708,31 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			external_functions.back()->has_side_effects = true;
 		}
 
+		const TypeRef dummy_func_type = Function::dummyFunctionType();
+
+		// Add allocateClosure
+		{
+			external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
+				(void*)allocateClosure,
+				allocateClosureInterpreted, // interpreted func
+				FunctionSignature("allocateClosure", vector<TypeRef>(1, new Int(64))),
+				dummy_func_type // return type
+			)));
+			external_functions.back()->has_side_effects = true;
+			external_functions.back()->is_allocation_function = true;
+		}
+
+		// Add freeClosure
+		{
+			external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
+				(void*)freeClosure,
+				NULL, // interpreted func TEMP
+				FunctionSignature("freeClosure", vector<TypeRef>(1, dummy_func_type)),
+				new Int() // return type
+			)));
+			external_functions.back()->has_side_effects = true;
+		}
+
 
 		// Load source buffers
 		loadSource(args, args.source_buffers, args.preconstructed_func_defs);
@@ -762,7 +834,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 VirtualMachine::~VirtualMachine()
 {
 	// llvm_exec_engine will delete llvm_module.
-	assert(string_count == 0 && varray_count == 0);
+	assert(string_count == 0 && varray_count == 0 && closure_count == 0);
 
 	delete this->llvm_exec_engine;
 
@@ -1123,6 +1195,14 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 
 		common_functions.freeVArrayFunc = findMatchingFunction(FunctionSignature("freeVArray", vector<TypeRef>(1, new VArrayType(new Int()))))./*new OpaqueType*/getPointer();
 		assert(common_functions.freeVArrayFunc);
+
+		
+		common_functions.allocateClosureFunc = findMatchingFunction(FunctionSignature("allocateClosure", vector<TypeRef>(1, new Int(64)))).getPointer();
+		assert(common_functions.allocateClosureFunc);
+
+		const TypeRef dummy_func_type = Function::dummyFunctionType();
+		common_functions.freeClosureFunc = findMatchingFunction(FunctionSignature("freeClosure", vector<TypeRef>(1, dummy_func_type))).getPointer();
+		assert(common_functions.freeClosureFunc);
 	}
 
 	RefCounting::emitRefCountingFunctions(this->llvm_module, this->llvm_exec_engine->getDataLayout(), common_functions);

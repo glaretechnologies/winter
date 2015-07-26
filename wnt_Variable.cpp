@@ -78,7 +78,7 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 			for(unsigned int i=0; i<def->args.size(); ++i) // For each argument to the function:
 				if(def->args[i].name == this->name) // If the argument name matches this variable name:
 				{
-					if(!in_current_func_def && payload.func_def_stack.back()->use_captured_vars)
+					if(!in_current_func_def && payload.func_def_stack.back()->is_anon_func) // use_captured_vars)
 					{
 						//this->captured_var_index = payload.captured_vars.size();
 						//this->use_captured_var = true;
@@ -140,7 +140,7 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 					{
 						if(let_block->lets[i]->vars[v].name == this->name)
 						{
-							if(!in_current_func_def && payload.func_def_stack.back()->use_captured_vars)
+							if(!in_current_func_def && payload.func_def_stack.back()->is_anon_func)// use_captured_vars)
 							{
 								//this->captured_var_index = payload.captured_vars.size();
 								//this->use_captured_var = true;
@@ -220,6 +220,10 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 		{
 			this->vartype = BoundToGlobalDefVariable;
 			this->bound_function = target_func_def;
+
+			// As the target function is being passed as an argument, we need a closure version of it.
+			target_func_def->need_to_emit_captured_var_struct_version = true;
+
 			return;
 		}
 	}

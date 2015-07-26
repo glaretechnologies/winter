@@ -149,6 +149,24 @@ void emitFreeCall(llvm::Module* module, llvm::IRBuilder<>& builder, const Common
 		);
 		builder.CreateCall(freeValueLLVMFunc, refcounted_val);
 	}
+	else if(refcounted_type->getType() == Type::FunctionType)
+	{
+		// Cast to required type
+		const TypeRef dummy_closure_type = Function::dummyFunctionType();
+		llvm::Value* cast_val = builder.CreatePointerCast(refcounted_val, dummy_closure_type->LLVMType(*module));
+
+		// Create call to freeClosure()
+		llvm::Function* freeClosureLLVMFunc = common_functions.freeClosureFunc->getOrInsertFunction(
+			module,
+			false // use_cap_var_struct_ptr: False as global functions don't have captured vars. ?!?!?
+			//true // target_takes_voidptr_arg // params.hidden_voidptr_arg
+		);
+		builder.CreateCall(freeClosureLLVMFunc, cast_val);
+	}
+	else
+	{
+		assert(0);
+	}
 }
 
 
@@ -451,6 +469,10 @@ void emitRefCountingFunctions(llvm::Module* module, const llvm::DataLayout* targ
 	// Since the varray type is generic, incrVArrayRefCount will just take an varray<int> arg, and the calling code must cast to varray<int>.
 	const TypeRef dummy_varray_type = new VArrayType(new Int());
 	common_functions.incrVArrayRefCountLLVMFunc = emitIncrRefCountFunc(module, target_data, "incrVArrayRefCount", dummy_varray_type);
+
+	// Since the closure type is generic, emitIncrRefCountFunc will just take dummy closure type arg, and the calling code must cast to it.
+	const TypeRef dummy_closure_type = Function::dummyFunctionType();
+	common_functions.incrClosureRefCountLLVMFunc = emitIncrRefCountFunc(module, target_data, "incrClosureRefCount", dummy_closure_type);
 }
 
 

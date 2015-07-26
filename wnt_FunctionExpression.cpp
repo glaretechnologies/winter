@@ -137,7 +137,7 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 	}
 
 	// If the target function is an anon function and has captured values, push that onto the stack
-	if(use_target_func->use_captured_vars)
+	if(use_target_func->is_anon_func)// use_captured_vars)
 	{
 		assert(target_func_val);
 		vmstate.argument_stack.push_back(target_func_val->captured_vars.getPointer());
@@ -1550,7 +1550,18 @@ TypeRef FunctionExpression::type() const
 	}
 	else if(this->get_func_expr.nonNull())
 	{
-		return this->get_func_expr->type();
+		TypeRef get_func_expr_type = this->get_func_expr->type();
+		if(get_func_expr_type.isNull())
+			return NULL;
+
+		if(get_func_expr_type->getType() == Type::FunctionType)
+		{
+			const Function* func_type = get_func_expr_type.downcastToPtr<Function>();
+
+			return func_type->return_type;
+		}
+		else
+			return NULL;
 	}
 	/*else if(this->binding_type == Let)
 	{
@@ -1582,102 +1593,110 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 	llvm::Value* captured_var_struct_ptr = NULL;
 
+	if(!this->static_target_function)
+	{
+		if(get_func_expr->nodeType() == ASTNode::VariableASTNodeType && get_func_expr.downcastToPtr<Variable>()->vartype == Variable::LetVariable)
+		{
 #if 0
-	if(binding_type == Let)
-	{
-		//target_llvm_func = this->bound_let_block->getLetExpressionLLVMValue(params, bound_index);
+			const Variable* var = get_func_expr.downcastToPtr<Variable>();
 
-		//llvm::Value* closure_pointer = this->bound_let_block->getLetExpressionLLVMValue(params, bound_index, ret_space_ptr);
-		assert(params.let_block_let_values.find(this->bound_let_block) != params.let_block_let_values.end());
-		llvm::Value* closure_pointer = params.let_block_let_values[this->bound_let_block][this->bound_index];
+			//target_llvm_func = this->bound_let_block->getLetExpressionLLVMValue(params, bound_index);
+
+			//llvm::Value* closure_pointer = this->bound_let_block->getLetExpressionLLVMValue(params, bound_index, ret_space_ptr);
+			assert(params.let_block_let_values.find(this->bound_let_block) != params.let_block_let_values.end());
+			llvm::Value* closure_pointer = params.let_block_let_values[var->bound_let_block][var->bound_index];
 
 
 		
-		//TEMP:
-		//std::cout << "closure_pointer: \n";
-		//closure_pointer->dump();
+			//TEMP:
+			//std::cout << "closure_pointer: \n";
+			//closure_pointer->dump();
 
-		// Load function pointer from closure.
+			// Load function pointer from closure.
 
-		/*{
-		vector<llvm::Value*> indices;
-		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))); // array index
-		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))); // field index
+			/*{
+			vector<llvm::Value*> indices;
+			indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))); // array index
+			indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))); // field index
 		
-		llvm::Value* func_ptr_ptr = params.builder->CreateGEP(
-			closure_pointer, // ptr
-			indices.begin(),
-			indices.end(),
-			"func_ptr_ptr"
-		);
+			llvm::Value* func_ptr_ptr = params.builder->CreateGEP(
+				closure_pointer, // ptr
+				indices.begin(),
+				indices.end(),
+				"func_ptr_ptr"
+			);
 
-		target_llvm_func = params.builder->CreateLoad(func_ptr_ptr, "func_ptr");
-		}*/
+			target_llvm_func = params.builder->CreateLoad(func_ptr_ptr, "func_ptr");
+			}*/
 
-		throw BaseException("Support for first class functions as let variables disabled.");//TEMP
+			throw BaseException("Support for first class functions as let variables disabled.");//TEMP
 
-		target_llvm_func = LLVMTypeUtils::createFieldLoad(
-			closure_pointer,
-			1, // field index
-			params.builder,
-			"target_llvm_func"
-		);
+			target_llvm_func = LLVMTypeUtils::createFieldLoad(
+				closure_pointer,
+				1, // field index
+				params.builder,
+				"target_llvm_func"
+			);
 
-		// NOTE: index 2 should hold the captured vars struct.
-		captured_var_struct_ptr = params.builder->CreateStructGEP(closure_pointer, 
-			2); // field index
-
-	}
-	else if(binding_type == Arg) // If function is bound to an argument, i.e. we are calling a first class function passed as an argument to the current function:
-	{
-		// If the current function returns its result via pointer, then all args are offset by one.
-		//if(params.currently_building_func_def->returnType()->passByValue())
-		//	closure_pointer = LLVMTypeUtils::getNthArg(params.currently_building_func, this->bound_index);
-		//else
-		//	closure_pointer = LLVMTypeUtils::getNthArg(params.currently_building_func, this->bound_index + 1);
-
-		llvm::Value* closure_pointer = LLVMTypeUtils::getNthArg(
-			params.currently_building_func,
-			params.currently_building_func_def->getLLVMArgIndex(this->bound_index)
-		);
-
-		//target_llvm_func = dynamic_cast<llvm::Function*>(func);
-
-		// Load function pointer from closure.
-
-		/*{
-		vector<llvm::Value*> indices;
-		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))); // array index
-		indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))); // field index
-		
-		llvm::Value* field_ptr = params.builder->CreateGEP(
-			closure_pointer, // ptr
-			indices.begin(),
-			indices.end(),
-			"func_ptr_ptr"
-		);
-
-		target_llvm_func = params.builder->CreateLoad(field_ptr, "func_ptr");
-		}*/
-		//closure_pointer->dump();
-
-		llvm::Value* target_llvm_func_ptr = params.builder->CreateStructGEP(closure_pointer, 0, "function_ptr_ptr");
-		llvm::Value* target_llvm_func = params.builder->CreateLoad(target_llvm_func_ptr, "function_ptr");
-
-		//throw BaseException("Support for first class functions passed as arguments disabled.");//TEMP
-
-		/*target_llvm_func = LLVMTypeUtils::createFieldLoad(
-			closure_pointer,
-			1, // field index
-			params.builder,
-			"target_llvm_func"
-		);*/
-
-		// NOTE: index 2 should hold the captured vars struct.
-		captured_var_struct_ptr = params.builder->CreateStructGEP(closure_pointer, 
-			2); // field index
-	}
+			// NOTE: index 2 should hold the captured vars struct.
+			captured_var_struct_ptr = params.builder->CreateStructGEP(closure_pointer, 
+				2); // field index
 #endif
+		}
+		else if(get_func_expr->nodeType() == ASTNode::VariableASTNodeType && get_func_expr.downcastToPtr<Variable>()->vartype == Variable::ArgumentVariable) 
+			// If function is bound to an argument, i.e. we are calling a first class function passed as an argument to the current function:
+		{
+			const Variable* var = get_func_expr.downcastToPtr<Variable>();
+
+			// If the current function returns its result via pointer, then all args are offset by one.
+			//if(params.currently_building_func_def->returnType()->passByValue())
+			//	closure_pointer = LLVMTypeUtils::getNthArg(params.currently_building_func, this->bound_index);
+			//else
+			//	closure_pointer = LLVMTypeUtils::getNthArg(params.currently_building_func, this->bound_index + 1);
+
+			llvm::Value* closure_pointer = LLVMTypeUtils::getNthArg(
+				params.currently_building_func,
+				params.currently_building_func_def->getLLVMArgIndex(var->bound_index)
+			);
+
+			//target_llvm_func = dynamic_cast<llvm::Function*>(func);
+
+			// Load function pointer from closure.
+
+			/*{
+			vector<llvm::Value*> indices;
+			indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))); // array index
+			indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))); // field index
+		
+			llvm::Value* field_ptr = params.builder->CreateGEP(
+				closure_pointer, // ptr
+				indices.begin(),
+				indices.end(),
+				"func_ptr_ptr"
+			);
+
+			target_llvm_func = params.builder->CreateLoad(field_ptr, "func_ptr");
+			}*/
+			//closure_pointer->dump();
+			//closure_pointer->getType()->dump();
+
+			llvm::Value* target_llvm_func_ptr = params.builder->CreateStructGEP(closure_pointer, Function::functionPtrIndex(), "function_ptr_ptr");
+			target_llvm_func = params.builder->CreateLoad(target_llvm_func_ptr, "function_ptr");
+
+			//throw BaseException("Support for first class functions passed as arguments disabled.");//TEMP
+
+			/*target_llvm_func = LLVMTypeUtils::createFieldLoad(
+				closure_pointer,
+				1, // field index
+				params.builder,
+				"target_llvm_func"
+			);*/
+
+			captured_var_struct_ptr = params.builder->CreateStructGEP(closure_pointer, 
+				Function::capturedVarStructIndex(), "captured_var_struct_ptr"); // field index
+		}
+	}
+
 
 	if(this->static_target_function)
 	{
@@ -1791,11 +1810,11 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		//closure_pointer = this->target_function->emitLLVMCode(params);
 		//assert(closure_pointer);
 	}
-	else
+	/*else
 	{
 		std::string msg = "Support for first class functions disabled." + errorContext(*this);
 		throw BaseException(msg);
-	}
+	}*/
 
 	//assert(closure_pointer);
 

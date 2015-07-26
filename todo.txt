@@ -13,7 +13,4 @@ TODO: add tests for update()
 
 TODO: type checking for fold(), iterate() args etc..
 
-
-TODO: integer divides by zero crash: testMainIntegerArg("def main(int x) int : 10 / x ", 0, 10);
-
 TODO: operator overloading doesn't work in template bodies.

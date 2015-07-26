@@ -128,7 +128,10 @@ void Linker::buildLLVMCode(llvm::Module* module, const llvm::DataLayout/*TargetD
 
 		if(!f.isGenericFunction() && !f.isExternalFunction())
 		{
-			f.buildLLVMFunction(module, cpu_info, hidden_voidptr_arg, target_data, common_functions, destructors_called_types, stats, emit_trace_code);
+			if(!f.is_anon_func)
+				f.buildLLVMFunction(module, cpu_info, hidden_voidptr_arg, target_data, common_functions, destructors_called_types, stats, emit_trace_code, false);
+			if(f.is_anon_func || f.need_to_emit_captured_var_struct_version)
+				f.buildLLVMFunction(module, cpu_info, hidden_voidptr_arg, target_data, common_functions, destructors_called_types, stats, emit_trace_code, true);
 		}
 	}
 
@@ -143,7 +146,7 @@ void Linker::buildLLVMCode(llvm::Module* module, const llvm::DataLayout/*TargetD
 	// Build 'unique' functions (like shuffle())
 	for(unsigned int i=0; i<unique_functions.size(); ++i)
 	{
-		unique_functions[i]->buildLLVMFunction(module, cpu_info, hidden_voidptr_arg, target_data, common_functions, destructors_called_types, stats, emit_trace_code);
+		unique_functions[i]->buildLLVMFunction(module, cpu_info, hidden_voidptr_arg, target_data, common_functions, destructors_called_types, stats, emit_trace_code, false);
 	}
 
 

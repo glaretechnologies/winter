@@ -73,7 +73,9 @@ public:
 	BuiltInFunctionImplRef built_in_func_impl;
 	ExternalFunctionRef external_function;
 
-	bool use_captured_vars; // Set to true if this is an anonymous function, in which case we will always pass it in a closure.
+	bool need_to_emit_captured_var_struct_version; 
+
+	//bool use_captured_vars; // Set to true if this is an anonymous function, in which case we will always pass it in a closure.
 	std::vector<CapturedVar> captured_vars; // For when parsing anon functions
 
 
@@ -95,6 +97,8 @@ public:
 	bool isGenericFunction() const; // true if it is parameterised by type.
 	bool isExternalFunction() const { return external_function.nonNull(); }
 
+	// with_captured_var_struct_ptr: add a ptr to a captured var struct as the last argument.
+	// This will be needed for when a global function is passed as a first-class function argument, e.g. when the top-level function definition square() is passed to map().
 	llvm::Function* buildLLVMFunction(
 		llvm::Module* module,
 		const PlatformUtils::CPUInfo& cpu_info,
@@ -103,9 +107,15 @@ public:
 		const CommonFunctions& common_functions,
 		std::set<Reference<const Type>, ConstTypeRefLessThan>& destructors_called_types,
 		ProgramStats& stats,
-		bool emit_trace_code
+		bool emit_trace_code,
+		bool with_captured_var_struct_ptr
 		//std::map<Lang::FunctionSignature, llvm::Function*>& external_functions
 	);
+
+	// use_cap_var_struct_ptr = false
+	llvm::Function* getOrInsertFunction(
+		llvm::Module* module
+	) const;
 
 	llvm::Function* getOrInsertFunction(
 		llvm::Module* module,

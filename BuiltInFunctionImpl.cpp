@@ -624,10 +624,12 @@ public:
 		llvm::Value* elem_ptr = builder.CreateInBoundsGEP(input_array, indices);
 		llvm::Value* elem = builder.CreateLoad(elem_ptr);
 
+		llvm::Value* args[2] = { elem, captured_var_struct_ptr };
+
 		// Call function on element
 		llvm::Value* mapped_elem = builder.CreateCall(
 			function, // Callee
-			elem, // Args
+			args, // Args
 			"map function call" // Name
 		);
 
@@ -638,6 +640,7 @@ public:
 
 	llvm::Value* return_ptr;
 	llvm::Value* function;
+	llvm::Value* captured_var_struct_ptr;
 	llvm::Value* input_array;
 };
 
@@ -739,7 +742,12 @@ llvm::Value* ArrayMapBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	);
 
 	llvm::Value* function = params.builder->CreateLoad(function_ptr);*/
-	llvm::Value* function = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
+
+	llvm::Value* closure_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
+	llvm::Value* function_ptr = params.builder->CreateStructGEP(closure_ptr, Function::functionPtrIndex());
+	llvm::Value* function = params.builder->CreateLoad(function_ptr);
+	llvm::Value* captured_var_struct_ptr = params.builder->CreateStructGEP(closure_ptr, Function::capturedVarStructIndex());
+
 
 	//llvm::Value* function_ptr = params.builder->CreateLoad(
 	//	closure_ptr,
@@ -788,6 +796,9 @@ llvm::Value* ArrayMapBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 		args.push_back(params.builder->CreatePointerCast(input_array, voidptr)); // input
 		args.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(64, this->from_type->num_elems))); // array_size
 		args.push_back(params.builder->CreatePointerCast(function, voidptr)); // map_function
+
+		//TODO: captured_var_struct_ptr stuff
+
 		args.push_back(params.builder->CreatePointerCast(work_function, voidptr)); // work_function
 		params.builder->CreateCall(llvm_func, args);
 
@@ -798,6 +809,7 @@ llvm::Value* ArrayMapBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 		ArrayMapBuiltInFunc_CreateLoopBodyCallBack callback;
 		callback.return_ptr = return_ptr;
 		callback.function = function;
+		callback.captured_var_struct_ptr = captured_var_struct_ptr;
 		callback.input_array = input_array;
 	
 		makeForLoop(
@@ -864,23 +876,27 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 {
 	// Get argument pointers/values
 	llvm::Value* return_ptr = NULL;
-	llvm::Value* function;
+	llvm::Value* closure_ptr;
 	llvm::Value* array_arg;
 	llvm::Value* initial_state_ptr_or_value;
 
 	if(state_type->passByValue())
 	{
-		function = LLVMTypeUtils::getNthArg(params.currently_building_func, 0); // Pointer to function
+		closure_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0); // Pointer to function
 		array_arg = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
 		initial_state_ptr_or_value = LLVMTypeUtils::getNthArg(params.currently_building_func, 2); // Pointer to, or value of initial state
 	}
 	else
 	{
 		return_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0); // Pointer to result structure
-		function = LLVMTypeUtils::getNthArg(params.currently_building_func, 1); // Pointer to function
+		closure_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 1); // Pointer to function
 		array_arg = LLVMTypeUtils::getNthArg(params.currently_building_func, 2);
 		initial_state_ptr_or_value = LLVMTypeUtils::getNthArg(params.currently_building_func, 3); // Pointer to, or value of initial state
 	}
+
+	llvm::Value* function_ptr = params.builder->CreateStructGEP(closure_ptr, Function::functionPtrIndex());
+	llvm::Value* function = params.builder->CreateLoad(function_ptr);
+	llvm::Value* captured_var_struct_ptr = params.builder->CreateStructGEP(closure_ptr, Function::capturedVarStructIndex());
 
 
 	// Emit the alloca in the entry block for better code-gen.
@@ -1126,7 +1142,7 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 		llvm::Value* running_state_value = params.builder->CreateLoad(running_state_alloca);
 
 		// Call function on element
-		llvm::Value* next_running_state_value = params.builder->CreateCall2(function, running_state_value, array_elem);
+		llvm::Value* next_running_state_value = params.builder->CreateCall3(function, running_state_value, array_elem, captured_var_struct_ptr);
 
 		// Store new value in running_state_alloca
 		params.builder->CreateStore(next_running_state_value, new_state_alloca); // running_state_alloca);
@@ -1134,10 +1150,11 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 	else
 	{
 		// Call function on element
-		params.builder->CreateCall3(function, 
+		params.builder->CreateCall4(function, 
 			new_state_alloca, // SRET return value arg
 			running_state_alloca, // current state
-			array_elem // array element
+			array_elem, // array element
+			captured_var_struct_ptr
 		);
 
 		// Copy the state from new_state_alloca to running_state_alloca
@@ -2078,14 +2095,14 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
 	// Get argument pointers/values
 	llvm::Value* return_ptr = NULL;
-	llvm::Value* function;
+	llvm::Value* closure_ptr;
 	llvm::Value* initial_state_ptr_or_value;
 	vector<llvm::Value*> invariant_data_ptr_or_value(invariant_data_types.size());
 
 
 	if(state_type->passByValue())
 	{
-		function = LLVMTypeUtils::getNthArg(params.currently_building_func, 0); // Pointer to function
+		closure_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0); // Pointer to function
 		initial_state_ptr_or_value = LLVMTypeUtils::getNthArg(params.currently_building_func, 1); // Pointer to, or value of initial state
 		for(size_t i=0; i<invariant_data_types.size(); ++i)
 			invariant_data_ptr_or_value[i] = LLVMTypeUtils::getNthArg(params.currently_building_func, 2 + (int)i); // Pointer to, or value of invariant_data
@@ -2093,11 +2110,16 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	else
 	{
 		return_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0); // Pointer to result structure
-		function = LLVMTypeUtils::getNthArg(params.currently_building_func, 1); // Pointer to function
+		closure_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 1); // Pointer to function
 		initial_state_ptr_or_value = LLVMTypeUtils::getNthArg(params.currently_building_func, 2); // Pointer to, or value of initial state
 		for(size_t i=0; i<invariant_data_types.size(); ++i)
 			invariant_data_ptr_or_value[i] = LLVMTypeUtils::getNthArg(params.currently_building_func, 3 + (int)i); // Pointer to, or value of invariant_data
 	}
+
+
+	llvm::Value* function_ptr = params.builder->CreateStructGEP(closure_ptr, Function::functionPtrIndex());
+	llvm::Value* function = params.builder->CreateLoad(function_ptr);
+	llvm::Value* captured_var_struct_ptr = params.builder->CreateStructGEP(closure_ptr, Function::capturedVarStructIndex());
 
 
 	// Allocate space on stack for tuple<State, bool> returned from f.
@@ -2182,6 +2204,8 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	args.push_back(loop_index_var); // iteration
 	for(size_t i=0; i<invariant_data_types.size(); ++i)
 		args.push_back(invariant_data_ptr_or_value[i]);
+
+	args.push_back(captured_var_struct_ptr); // captured var struct ptr
 
 	params.builder->CreateCall(
 		function, // Callee

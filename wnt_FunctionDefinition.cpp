@@ -60,7 +60,8 @@ FunctionDefinition::FunctionDefinition(const SrcLocation& src_loc, int order_num
 	built_in_func_impl(impl),
 	built_llvm_function(NULL),
 	jitted_function(NULL),
-	use_captured_vars(false),
+	//use_captured_vars(false),
+	need_to_emit_captured_var_struct_version(false),
 	closure_type(NULL),
 	alloc_func(NULL),
 	is_anon_func(false),
@@ -103,7 +104,7 @@ TypeRef FunctionDefinition::type() const
 	const TypeRef return_type = this->returnType();
 	if(return_type.isNull()) return NULL;
 
-	return TypeRef(new Function(arg_types, return_type, /*captured_var_types, */this->use_captured_vars));
+	return new Function(arg_types, return_type, /*captured_var_types, */true); //this->use_captured_vars);
 }
 
 
@@ -478,125 +479,135 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 	// This will be called for lambda expressions.
 	// Capture variables at this point, by getting them off the arg and let stack.
 
-	// Allocate space for the closure on the stack.
-	//llvm::Value* closure_pointer;
-
-
-	//closure_pointer = params.builder->CreateAlloca(
-	//	//this->getClosureStructLLVMType(*params.context)
-	//	this->type()->LLVMType(*params.context)
-	//);
-
-	/*const llvm::StructType* base_cap_var_type = llvm::StructType::get(
-		*params.context,
-		vector<const llvm::Type*>()
-	);*/
-
 	//TEMP: this needs to be in sync with Function::LLVMType()
-	const bool simple_func_ptr = true;
+	const bool simple_func_ptr = false;
 	if(simple_func_ptr)
 	{
 		llvm::Function* func = this->getOrInsertFunction(
 			params.module,
 			false // use_cap_var_struct_ptr: Since we're storing a func ptr, it will be passed the captured var struct on usage.
-			//params.hidden_voidptr_arg
 		);
-
 		return func;
 	}
 
 
-	assert(this->alloc_func);
-
-	// Get pointer to allocateRefCountedStructure() function.
-	llvm::Function* alloc_llvm_func = this->alloc_func->getOrInsertFunction(
-		params.module,
-		false // use_cap_var_struct_ptr: false as allocateRefCountedStructure() doesn't take it.
-		//params.hidden_voidptr_arg
-	);
+	// Get pointer to allocateClosureFunc() function.
+	llvm::Function* alloc_closure_func = params.common_functions.allocateClosureFunc->getOrInsertFunction(params.module);
 
 	/////////////////// Create function pointer type /////////////////////
 	// Build vector of function args
-	vector<llvm::Type*> llvm_arg_types(this->args.size());
+	/*vector<llvm::Type*> llvm_arg_types(this->args.size());
 	for(size_t i=0; i<this->args.size(); ++i)
 		llvm_arg_types[i] = this->args[i].type->LLVMType(*params.module);
 
 	// Add Pointer to captured var struct, if there are any captured vars
 	//TEMP since we are returning a closure, the functions will always be passed captured vars.  if(use_captured_vars)
 	
-//TEMP HACK NO CAPTURED VAR  STURCT ARG
-//	llvm_arg_types.push_back(LLVMTypeUtils::getPtrToBaseCapturedVarStructType(*params.context)); //LLVMTypeUtils::pointerType(*base_cap_var_type));
+	llvm_arg_types.push_back(LLVMTypeUtils::getPtrToBaseCapturedVarStructType(*params.module));
 
-	//TEMP HACK: add hidden void* arg  NOTE: should only do this when hidden_void_arg is true.
-	llvm_arg_types.push_back(LLVMTypeUtils::voidPtrType(*params.context));
+	// Add hidden void* arg  NOTE: should only do this when hidden_void_arg is true.
+	// llvm_arg_types.push_back(LLVMTypeUtils::voidPtrType(*params.context));
 
 	// Construct the function pointer type
 	llvm::Type* func_ptr_type = LLVMTypeUtils::pointerType(*llvm::FunctionType::get(
 		this->returnType()->LLVMType(*params.module), // result type
 		llvm_arg_types,
 		false // is var arg
-	));
+	));*/
+	TypeRef this_closure_type = this->type();
+
+	llvm::Type* this_closure_llvm_type = this_closure_type->LLVMType(*params.module);
+	assert(this_closure_llvm_type->isPointerTy());
+	assert(this_closure_llvm_type->getPointerElementType()->isStructTy());
+	llvm::StructType* this_closure_llvm_struct_type = (llvm::StructType*)this_closure_llvm_type->getPointerElementType();
+	llvm::Type* func_ptr_type = this_closure_llvm_struct_type->elements()[Function::functionPtrIndex()];
+
+	//func_ptr_type->dump();
 
 
 	/////////////////////// Get full captured var struct type ///////////////
 	llvm::Type* cap_var_type_ = this->getCapturedVariablesStructType()->LLVMType(*params.module);
+	assert(cap_var_type_->isStructTy());
 	llvm::StructType* cap_var_type = static_cast<llvm::StructType*>(cap_var_type_);
-
 
 	
 	///////////////// Create closure type //////////////////////////////
-	vector<llvm::Type*> closure_field_types(3);
-	closure_field_types[0] = llvm::Type::getInt32Ty(*params.context); // Int 32 reference count
-	closure_field_types[1] = func_ptr_type;
-	closure_field_types[2] = cap_var_type;
+	// NOTE: the number and type of captured variables depends on the call site, so isn't actually reflected in the function type.
+	vector<llvm::Type*> closure_field_types(5);
+	closure_field_types[0] = llvm::Type::getInt64Ty(*params.context); // Int 64 reference count
+	closure_field_types[1] = llvm::Type::getInt64Ty(*params.context); // len
+	closure_field_types[2] = llvm::Type::getInt64Ty(*params.context); // flags
+	closure_field_types[3] = func_ptr_type;
+	closure_field_types[4] = cap_var_type;
 	llvm::StructType* closure_type = llvm::StructType::get(
 		*params.context,
 		closure_field_types
 	);
+	/*llvm::Type* closure_ptr_type = this->type()->LLVMType(*params.module);
+	assert(closure_ptr_type->isPointerTy());
+	assert(closure_ptr_type->getPointerElementType()->isStructTy());
+	llvm::StructType* closure_type = (llvm::StructType*)closure_ptr_type->getPointerElementType();*/
+
 	
-	//////////////// Compute size of closure type /////////////////////////
+	//////////////// Compute size of complete closure type /////////////////////////
 	const llvm::StructLayout* layout = params.target_data->getStructLayout(closure_type);
 	
-	const uint64_t struct_size = layout->getSizeInBytes();
+	const uint64_t struct_size_B = layout->getSizeInBytes();
 
 	vector<llvm::Value*> args;
-	args.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, struct_size, true)));
+	args.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(64, struct_size_B, true)));
 	
 	// Set hidden voidptr argument
 	//if(params.hidden_voidptr_arg)
 	//	args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));
 
-	//target_llvm_func->dump();
+	// Call our allocateClosureFunc function
+	llvm::Value* closure_void_pointer = params.builder->CreateCall(alloc_closure_func, args, "base_closure_ptr");
 
-	// Call our allocateRefCountedStructure function
-	llvm::Value* closure_void_pointer = params.builder->CreateCall(alloc_llvm_func, args);
-
+	// Cast from dummy closure type to the actual closure type.
 	llvm::Value* closure_pointer = params.builder->CreateBitCast(
 		closure_void_pointer,
 		LLVMTypeUtils::pointerType(*closure_type),
 		"closure_pointer"
 	);
 
+
+	// Set the reference count in the closure to 1
+	llvm::Value* closure_ref_count_ptr = params.builder->CreateStructGEP(closure_pointer, 0, "closure_ref_count_ptr");
+	llvm::Value* one = llvm::ConstantInt::get(*params.context, llvm::APInt(64, 1, /*signed=*/true));
+	llvm::StoreInst* store_inst = params.builder->CreateStore(one, closure_ref_count_ptr);
+	addMetaDataCommentToInstruction(params, store_inst, "Set initial ref count to 1");
 	
+
+	// Set the flags
+	const int initial_flags = 1; // heap allocated
+	llvm::Value* flags_ptr = params.builder->CreateStructGEP(closure_pointer, 2, "closure_flags_ptr");
+	llvm::Value* flags_contant_val = llvm::ConstantInt::get(*params.context, llvm::APInt(64, initial_flags));
+	llvm::StoreInst* store_flags_inst = params.builder->CreateStore(flags_contant_val, flags_ptr);
+	addMetaDataCommentToInstruction(params, store_flags_inst, "set initial flags to " + toString(initial_flags));
+
 
 	// Store function pointer in the closure structure
 	{
 		llvm::Function* func = this->getOrInsertFunction(
 			params.module,
 			true // use_cap_var_struct_ptr: Since we're storing a func ptr, it will be passed the captured var struct on usage.
-			//params.hidden_voidptr_arg
 		);
 
-		llvm::Value* func_field_ptr = params.builder->CreateStructGEP(closure_pointer, 1);
+		//std::cout << "func type: \n";
+		//func->getType()->dump();
 
-		// Do the store.
-		params.builder->CreateStore(
-			func, // value
-			func_field_ptr // ptr
-		);
+		llvm::Value* func_field_ptr = params.builder->CreateStructGEP(closure_pointer, Function::functionPtrIndex(), "function_field_ptr");
+
+		//std::cout << "func_field_ptr type: \n";
+		//func_field_ptr->getType()->dump();
+
+		params.builder->CreateStore(func, func_field_ptr); // Do the store.
 	}
 
-	llvm::Value* captured_var_struct_ptr = params.builder->CreateStructGEP(closure_pointer, 2);
+	// Store captured vars in closure.
+	
+	llvm::Value* captured_var_struct_ptr = params.builder->CreateStructGEP(closure_pointer, Function::capturedVarStructIndex(), "captured_var_struct_ptr");
 
 	// for each captured var
 	for(size_t i=0; i<this->captured_vars.size(); ++i)
@@ -632,14 +643,14 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			assert(params.let_block_let_values.find(let_block) != params.let_block_let_values.end());
 			val = params.let_block_let_values[let_block][let_index];
 		}
+		else
+		{
+			assert(0);
+		}
 			
 		// store in captured var structure field
-		llvm::Value* field_ptr = params.builder->CreateStructGEP(captured_var_struct_ptr, i);
-
-		params.builder->CreateStore(
-			val, // value
-			field_ptr // ptr
-		);
+		llvm::Value* field_ptr = params.builder->CreateStructGEP(captured_var_struct_ptr, (unsigned int)i, "captured_var_" + toString(i) + "_field_ptr");
+		params.builder->CreateStore(val, field_ptr);
 	}
 
 	// Bitcast the closure pointer down to the 'base' closure type.
@@ -664,6 +675,14 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 //		return this->body->getConstantLLVMValue(params);
 //	}
 //}
+
+
+llvm::Function* FunctionDefinition::getOrInsertFunction(
+		llvm::Module* module
+	) const
+{
+	return getOrInsertFunction(module, false);
+}
 
 
 llvm::Function* FunctionDefinition::getOrInsertFunction(
@@ -731,14 +750,20 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 		}
 	}
 
+	std::string use_name = this->sig.typeMangledName();
+	if(use_cap_var_struct_ptr)
+		use_name += "_with_cap_var_struct_arg";
+
 
 	llvm::Constant* llvm_func_constant = module->getOrInsertFunction(
-		this->sig.typeMangledName(), //makeSafeStringForFunctionName(this->sig.toString()), // Name
+		use_name, //makeSafeStringForFunctionName(this->sig.toString()), // Name
 		functype // Type
 	);
 
 	if(!llvm::isa<llvm::Function>(llvm_func_constant))
 	{
+		//std::cout << std::endl;
+		//llvm_func_constant->dump();
 		assert(0);
 		throw BaseException("Internal error while building function '" + sig.toString() + "', result was not a function.");
 	}
@@ -839,7 +864,8 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	const CommonFunctions& common_functions,
 	std::set<Reference<const Type>, ConstTypeRefLessThan>& destructors_called_types,
 	ProgramStats& stats,
-	bool emit_trace_code
+	bool emit_trace_code,
+	bool with_captured_var_struct_ptr
 	//std::map<Lang::FunctionSignature, llvm::Function*>& external_functions
 	)
 {
@@ -853,7 +879,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 
 	llvm::Function* llvm_func = this->getOrInsertFunction(
 		module,
-		this->use_captured_vars // use_cap_var_struct_ptr
+		with_captured_var_struct_ptr//this->use_captured_vars // use_cap_var_struct_ptr
 		//hidden_voidptr_arg
 	);
 

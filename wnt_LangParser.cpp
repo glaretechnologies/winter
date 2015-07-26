@@ -818,10 +818,10 @@ ASTNodeRef LangParser::parseBasicExpression(ParseInfo& p)
 	{
 		return parseArrayOrVectorOrTupleLiteral(p);
 	}
-	/*TEMP else if(p.tokens[p.i]->getType() == BACK_SLASH_TOKEN)
+	else if(p.tokens[p.i]->getType() == BACK_SLASH_TOKEN)
 	{
-		return ASTNodeRef(parseAnonFunction(p).getPointer());
-	}*/
+		return parseAnonFunction(p);
+	}
 	else
 	{
 		throw LangParserExcep("Expected literal or identifier in expression." + errorPosition(p));
@@ -1622,7 +1622,7 @@ FunctionDefinitionRef LangParser::parseAnonFunction(ParseInfo& p)
 
 	FunctionDefinitionRef def = parseFunctionDefinitionGivenName(func_name, p);
 
-	def->use_captured_vars = true;
+	//def->use_captured_vars = true;
 	def->is_anon_func = true;
 
 	// Add this anon function to list of parsed function definitions.

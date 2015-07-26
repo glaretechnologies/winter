@@ -316,7 +316,7 @@ void LanguageTests::run()
 	--------------------------------------------------
 	*/
 
-	//testMainFloatArg("def g(function<float> f) float : f()       def main(float x) float : g(\\() float : x)",  4.0f, 4.0f, ALLOW_UNSAFE);
+	testMainFloatArg("def g(function<float> f) float : f()       def main(float x) float : g(\\() float : x)",  4.0f, 4.0f, ALLOW_UNSAFE);
 
 	// Test first class function with OpenCL code-gen
 	//testMainFloatArg("def f(array<float, 16> a, int i) float : a[i]    def g(function<array<float, 16>, int, float>      def main(float x) float : g(f, [truncateToInt(x)]", 2.1f, 3.0f, ALLOW_UNSAFE);

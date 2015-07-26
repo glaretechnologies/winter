@@ -312,6 +312,27 @@ llvm::Type* CharType::LLVMType(llvm::Module& module) const
 //==========================================================================
 
 
+void Function::emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const
+{
+	llvm::CallInst* inst = params.builder->CreateCall(params.common_functions.incrClosureRefCountLLVMFunc, ref_counted_value);
+
+	addMetaDataCommentToInstruction(params, inst, comment);
+}
+
+
+void Function::emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const
+{
+	llvm::Function* destructor_func = RefCounting::getOrInsertDecrementorForType(params.module, this);
+	llvm::CallInst* call_inst = params.builder->CreateCall(destructor_func, ref_counted_value);
+
+	addMetaDataCommentToInstruction(params, call_inst, comment);
+
+	// NOTE: this right?
+	params.destructors_called_types->insert(this);
+	//this->getContainedTypesWithDestructors(*params.destructors_called_types);
+}
+
+
 bool Function::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
 {
 	if(this->getType() != b.getType())
@@ -374,7 +395,7 @@ struct Closure
 llvm::Type* Function::LLVMType(llvm::Module& module) const
 {
 	//TEMP: this need to be in sync with FunctionDefinition::emitLLVMCode()
-	const bool simple_func_ptr = true;
+	const bool simple_func_ptr = false;
 	if(simple_func_ptr)
 	{
 		// Looks like we're not allowed to pass functions directly as args, have to be pointer-to-funcs
@@ -391,6 +412,10 @@ llvm::Type* Function::LLVMType(llvm::Module& module) const
 		return t;
 	}
 
+	const std::string use_name = makeSafeStringForFunctionName(this->toString()) + "closure";
+	llvm::StructType* existing_struct_type = module.getTypeByName(use_name);
+	if(existing_struct_type)
+		return LLVMTypeUtils::pointerType(existing_struct_type);
 
 
 	// Build Empty LLVM CapturedVars struct
@@ -442,18 +467,21 @@ llvm::Type* Function::LLVMType(llvm::Module& module) const
 
 	// Make the vector of fields for the closure type
 	vector<llvm::Type*> closure_field_types;
-	closure_field_types.push_back(TypeRef(new Int())->LLVMType(module)); // Ref count field
+	closure_field_types.push_back(TypeRef(new Int(64))->LLVMType(module)); // Ref count field
+	closure_field_types.push_back(TypeRef(new Int(64))->LLVMType(module)); // len field
+	closure_field_types.push_back(TypeRef(new Int(64))->LLVMType(module)); // flags field
 	closure_field_types.push_back(func_ptr_type);
-	closure_field_types.push_back(LLVMTypeUtils::getBaseCapturedVarStructType(module.getContext())); // cap_var_struct);
+	closure_field_types.push_back(LLVMTypeUtils::getBaseCapturedVarStructType(module)); // cap_var_struct);
 
 	// Return the closure structure type.
-	llvm::StructType* closure_struct_type = llvm::StructType::get(
+	llvm::StructType* closure_struct_type = llvm::StructType::create(
 		module.getContext(),
-		closure_field_types
+		closure_field_types,
+		use_name
 	);
 
 	//std::cout << "closure_struct_type: " << std::endl;
-	closure_struct_type->dump();
+	//closure_struct_type->dump();
 	//std::cout << std::endl;
 	
 
