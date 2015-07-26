@@ -1545,7 +1545,7 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 TypeRef FunctionExpression::type() const
 {
-	if(this->static_target_function) //this->binding_type == BoundToGlobalDef)
+	if(this->static_target_function)
 	{
 		return this->static_target_function->returnType();
 	}
@@ -1557,28 +1557,11 @@ TypeRef FunctionExpression::type() const
 
 		if(get_func_expr_type->getType() == Type::FunctionType)
 		{
-			const Function* func_type = get_func_expr_type.downcastToPtr<Function>();
-
-			return func_type->return_type;
+			return get_func_expr_type.downcastToPtr<Function>()->return_type;
 		}
 		else
 			return NULL;
 	}
-	/*else if(this->binding_type == Let)
-	{
-		TypeRef t = this->bound_let_block->lets[this->bound_index]->type();
-		Function* func_type = static_cast<Function*>(t.getPointer());
-		return func_type->return_type;
-	}
-	else if(this->binding_type == Arg)
-	{
-		Function* func_type = static_cast<Function*>(this->bound_function->args[this->bound_index].type.getPointer());
-		return func_type->return_type;
-	}
-	else if(this->binding_type == Unbound)
-	{
-		return TypeRef(NULL);
-	}*/
 	else
 	{
 		//assert(0);
@@ -1590,7 +1573,7 @@ TypeRef FunctionExpression::type() const
 llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
 	llvm::Value* target_llvm_func = NULL;
-	TypeRef target_ret_type = this->type(); //this->target_function_return_type;
+	TypeRef target_ret_type = this->type();
 
 	llvm::Value* captured_var_struct_ptr = NULL;
 
@@ -1607,15 +1590,13 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 		// Get the actual function pointer from the closure
 		llvm::Value* target_llvm_func_ptr = params.builder->CreateStructGEP(closure_pointer, Function::functionPtrIndex(), "function_ptr_ptr");
-			target_llvm_func = params.builder->CreateLoad(target_llvm_func_ptr, "function_ptr");
+		target_llvm_func = params.builder->CreateLoad(target_llvm_func_ptr, "function_ptr");
 
 		// Get the captured var struct from the closure
 		captured_var_struct_ptr = params.builder->CreateStructGEP(closure_pointer, 
 			Function::capturedVarStructIndex(), "captured_var_struct_ptr"); // field index
 	}
-
-
-	if(this->static_target_function)
+	else // else if this->static_target_function:
 	{
 		// For structure field access functions, instead of emitting an actual function call, just emit the LLVM code to access the field.
 		if(dynamic_cast<GetField*>(this->static_target_function->built_in_func_impl.getPointer()))
@@ -1697,44 +1678,11 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		}
 			
 
-
-
-		// Lookup LLVM function, which should already be created and added to the module.
-		/*llvm::Function* target_llvm_func = params.module->getFunction(
-			this->target_function->sig.toString() //internalFuncName(call_target_sig)
-			);
-		assert(target_llvm_func);*/
-
-		/*FunctionSignature target_sig = this->target_function->sig;
-
-		llvm::FunctionType* target_func_type = LLVMTypeUtils::llvmFunctionType(
-			target_sig.param_types, 
-			target_ret_type, 
-			*params.context,
-			params.hidden_voidptr_arg
-		);
-
-		target_llvm_func = params.module->getOrInsertFunction(
-			target_sig.toString(), // Name
-			target_func_type // Type
-		);*/
-
 		target_llvm_func = this->static_target_function->getOrInsertFunction(
 			params.module,
-			false // use_cap_var_struct_ptr: False as global functions don't have captured vars. ?!?!?
+			false // use_cap_var_struct_ptr: False as we are making a staticly bound call.
 		);
-
-		//closure_pointer = this->target_function->emitLLVMCode(params);
-		//assert(closure_pointer);
 	}
-	/*else
-	{
-		std::string msg = "Support for first class functions disabled." + errorContext(*this);
-		throw BaseException(msg);
-	}*/
-
-	//assert(closure_pointer);
-
 
 	assert(target_llvm_func);
 

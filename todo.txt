@@ -1,3 +1,5 @@
+TODO: check typechecking for function expressions with runtime get_func_expr's.
+
 TODO: need i32 -> i64 coercion
 
 TODO: need some way of making e.g. varrays with no elements.  Can't have a literal with no elements because then we don't know the type.
