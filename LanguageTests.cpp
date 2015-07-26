@@ -3727,14 +3727,17 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 					x + z							\n\
 				  def main(float x) float : f(x)");
 
+
+
+
 	// Test two let clauses where one refers to the other (reverse order)
-	/*testMainFloat("def f() float : \
-				  let	\
-					z = y \
-					y = 2.0 \
-				  in \
-					y \
-				  def main() float : f()", 2.0);
+	//testMainFloat("def f() float : \
+	//			  let	\
+	//				z = y \
+	//				y = 2.0 \
+	//			  in \
+	//				y \
+	//			  def main() float : f()", 2.0);
 
 	//testMainFloat("def f() float : \
 	//			  let	\
@@ -3745,26 +3748,26 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 	//			  def main() float : f()", 2.0);
 
 	// Test nested let blocks
-	//testMainFloat("def f() float : \n\
-	//			let	\n\
-	//				x = 2.0 \n\
-	//			in \n\
-	//				let           \n\
-	//					y = x     \n\
-	//				in               \n\
-	//					y           \n\
-	//			def main() float : f()", 2.0);
+	testMainFloat("def f() float :				\n\
+				let								\n\
+					x = 2.0						\n\
+				in								\n\
+					let							\n\
+						y = x					\n\
+					in							\n\
+						y						\n\
+				def main() float : f()", 2.0);
 
 	// Test Lambda in let
-	//testMainFloat("def main() float :           \n\
-	//			  let f = \\(float x) : x*x  in   \n\
-	//			  f(2.0)", 4.0f);
+	testMainFloat("def main() float :				\n\
+				  let f = \\(float x) : x*x  in		\n\
+				  f(2.0)", 4.0f);
 
-	//testMainFloat("	def f(float x) float : x+1.0    \n\
-	//					def main() float :							\n\
-	//						let g = f									\n\
-	//						in									\n\
-	//							g(1.0)", 2.0f);		
+	testMainFloat("	def f(float x) float : x + 1.0				\n\
+					def main() float :							\n\
+						let g = f								\n\
+							in									\n\
+						g(1.0)", 2.0f);		
 
 	// Test variable capture: the returned lambda needs to capture the value of x.
 	testMainFloat("	def makeFunc(float x) function<float> : \\() : x      \n\
@@ -3787,29 +3790,30 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 	//			  f(2.0)", 4.0f);
 
 	// Test Lambda passed as a function arg
-	testMainFloat("def g(function<float, float> f, float x) : f(x)       \n\
-					def main() float :           \n\
+	testMainFloat("def g(function<float, float> f, float x) : f(x)			\n\
+					def main() float :										\n\
 					g(\\(float x) : x*x*x, 2.0f)", 8.0f);
 
 
 	// Test passing a normal function as an argument
-	//TEMP: Can't do this yet as need to add code to compile globals in a version that takes captured var struct.
-	//testMainFloat("def g(function<float, float> f, float x) : f(x)       \n\
-	//			  def square(float x) : x*x                              \n\
-	//				def main() float :           \n\
-	//				g(square, 2.0f)", 4.0f);
+	testMainFloat("def g(function<float, float> f, float x) : f(x)			\n\
+					def square(float x) : x*x									\n\
+					def main() float :										\n\
+					g(square, 2.0f)", 4.0f);
+
 
 	// Test 'compose' function: returns the composition of two functions
 	// NOTE: this requires lexical closures to work :)
-	//TEMP: Can't do this yet as need to add code to compile globals in a version that takes captured var struct.
-	//testMainFloat("def compose(function<float, float> f, function<float, float> g) : \\(float x) : f(g(x))       \n\
-	//				def addOne(float x) : x + 1.0                \n\
-	//				def mulByTwo(float x) : x * 2.0                \n\
-	//				def main() float :                         \n\
-	//					let z = compose(addOne, mulByTwo)  in \n\
-	//					z(1.0)", 3.0f);
+/*	
+	// NOTE: Crashing for some reason.  TODO: Fix
+	testMainFloat("def compose(function<float, float> f, function<float, float> g) : \\(float x) : f(g(x))       \n\
+					def addOne(float x) : x + 1.0                \n\
+					def mulByTwo(float x) : x * 2.0                \n\
+					def main() float :                         \n\
+						let z = compose(addOne, mulByTwo)  in \n\
+						z(1.0)", 3.0f);
 
-
+*/
 	// Test closures
 
 	
@@ -3833,19 +3837,15 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 					f(3.0)", 5.0);
 
 	// Test capture of let variable.
-
-	//NOTE: Disabled, because these tests leak due to call to allocateRefCountedStructure().
-	//testMainFloat("	def main() float :                          \n\
-	//				let z = 3.0 in                     \n\
-	//				let f = \\() : z  in                    \n\
-	//				f()", 3.0);
+	testMainFloat("	def main() float :					\n\
+					let z = 3.0 in						\n\
+					let f = \\() : z  in				\n\
+					f()", 3.0);
 	
 
 	// TODO: test two lets varables at same level
 
 	// Test capture of let variable up one level.
-	
-	NOTE: Disabled, because these tests leak due to call to allocateRefCountedStructure().
 	testMainFloat("	def main() float :                          \n\
 					let x = 3.0 in                         \n\
 					let z = 4.0 in                         \n\
@@ -3857,7 +3857,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 					let z = 4.0 in                         \n\
 					let f = \\() : z  in                    \n\
 					f()", 4.0);
-	*/
+	
 
 
 

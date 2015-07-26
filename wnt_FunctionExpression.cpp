@@ -105,6 +105,7 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 	}
 	
 	// Get target function from the expression that returns the function
+	ValueRef base_target_function_val;
 	const FunctionValue* target_func_val = NULL;
 	FunctionDefinition* use_target_func;
 	if(static_target_function)
@@ -116,8 +117,8 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 		if(this->get_func_expr.isNull())
 			throw BaseException("Function is not bound.");
 
-		ValueRef use_target_func_ = this->get_func_expr->exec(vmstate);
-		target_func_val = checkedCast<FunctionValue>(use_target_func_);
+		base_target_function_val = this->get_func_expr->exec(vmstate);
+		target_func_val = checkedCast<FunctionValue>(base_target_function_val);
 		use_target_func = target_func_val->func_def;
 	}
 
@@ -1595,106 +1596,22 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 	if(!this->static_target_function)
 	{
-		if(get_func_expr->nodeType() == ASTNode::VariableASTNodeType && get_func_expr.downcastToPtr<Variable>()->vartype == Variable::LetVariable)
-		{
-#if 0
-			const Variable* var = get_func_expr.downcastToPtr<Variable>();
+		// Disable ref counting code for accessing the closure.
+		const bool old_emit_refcounting_code = params.emit_refcounting_code;
+		params.emit_refcounting_code = false;
 
-			//target_llvm_func = this->bound_let_block->getLetExpressionLLVMValue(params, bound_index);
+		// Emit code to get the function closure.
+		llvm::Value* closure_pointer = this->get_func_expr->emitLLVMCode(params, NULL);
 
-			//llvm::Value* closure_pointer = this->bound_let_block->getLetExpressionLLVMValue(params, bound_index, ret_space_ptr);
-			assert(params.let_block_let_values.find(this->bound_let_block) != params.let_block_let_values.end());
-			llvm::Value* closure_pointer = params.let_block_let_values[var->bound_let_block][var->bound_index];
+		params.emit_refcounting_code = old_emit_refcounting_code;
 
-
-		
-			//TEMP:
-			//std::cout << "closure_pointer: \n";
-			//closure_pointer->dump();
-
-			// Load function pointer from closure.
-
-			/*{
-			vector<llvm::Value*> indices;
-			indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))); // array index
-			indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))); // field index
-		
-			llvm::Value* func_ptr_ptr = params.builder->CreateGEP(
-				closure_pointer, // ptr
-				indices.begin(),
-				indices.end(),
-				"func_ptr_ptr"
-			);
-
-			target_llvm_func = params.builder->CreateLoad(func_ptr_ptr, "func_ptr");
-			}*/
-
-			throw BaseException("Support for first class functions as let variables disabled.");//TEMP
-
-			target_llvm_func = LLVMTypeUtils::createFieldLoad(
-				closure_pointer,
-				1, // field index
-				params.builder,
-				"target_llvm_func"
-			);
-
-			// NOTE: index 2 should hold the captured vars struct.
-			captured_var_struct_ptr = params.builder->CreateStructGEP(closure_pointer, 
-				2); // field index
-#endif
-		}
-		else if(get_func_expr->nodeType() == ASTNode::VariableASTNodeType && get_func_expr.downcastToPtr<Variable>()->vartype == Variable::ArgumentVariable) 
-			// If function is bound to an argument, i.e. we are calling a first class function passed as an argument to the current function:
-		{
-			const Variable* var = get_func_expr.downcastToPtr<Variable>();
-
-			// If the current function returns its result via pointer, then all args are offset by one.
-			//if(params.currently_building_func_def->returnType()->passByValue())
-			//	closure_pointer = LLVMTypeUtils::getNthArg(params.currently_building_func, this->bound_index);
-			//else
-			//	closure_pointer = LLVMTypeUtils::getNthArg(params.currently_building_func, this->bound_index + 1);
-
-			llvm::Value* closure_pointer = LLVMTypeUtils::getNthArg(
-				params.currently_building_func,
-				params.currently_building_func_def->getLLVMArgIndex(var->bound_index)
-			);
-
-			//target_llvm_func = dynamic_cast<llvm::Function*>(func);
-
-			// Load function pointer from closure.
-
-			/*{
-			vector<llvm::Value*> indices;
-			indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))); // array index
-			indices.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))); // field index
-		
-			llvm::Value* field_ptr = params.builder->CreateGEP(
-				closure_pointer, // ptr
-				indices.begin(),
-				indices.end(),
-				"func_ptr_ptr"
-			);
-
-			target_llvm_func = params.builder->CreateLoad(field_ptr, "func_ptr");
-			}*/
-			//closure_pointer->dump();
-			//closure_pointer->getType()->dump();
-
-			llvm::Value* target_llvm_func_ptr = params.builder->CreateStructGEP(closure_pointer, Function::functionPtrIndex(), "function_ptr_ptr");
+		// Get the actual function pointer from the closure
+		llvm::Value* target_llvm_func_ptr = params.builder->CreateStructGEP(closure_pointer, Function::functionPtrIndex(), "function_ptr_ptr");
 			target_llvm_func = params.builder->CreateLoad(target_llvm_func_ptr, "function_ptr");
 
-			//throw BaseException("Support for first class functions passed as arguments disabled.");//TEMP
-
-			/*target_llvm_func = LLVMTypeUtils::createFieldLoad(
-				closure_pointer,
-				1, // field index
-				params.builder,
-				"target_llvm_func"
-			);*/
-
-			captured_var_struct_ptr = params.builder->CreateStructGEP(closure_pointer, 
-				Function::capturedVarStructIndex(), "captured_var_struct_ptr"); // field index
-		}
+		// Get the captured var struct from the closure
+		captured_var_struct_ptr = params.builder->CreateStructGEP(closure_pointer, 
+			Function::capturedVarStructIndex(), "captured_var_struct_ptr"); // field index
 	}
 
 
@@ -1895,7 +1812,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 	for(unsigned int i=0; i<argument_expressions.size(); ++i)
 		if(shouldRefCount(params, argument_expressions[i]) && do_ref_counting_for_arg[i])
-			emitDestructorOrDecrCall(params, *argument_expressions[i], args[i + num_sret_args], "function expression '" + this->static_target_function->sig.toString() + "' argument " + toString(i) + " decrement");
+			emitDestructorOrDecrCall(params, *argument_expressions[i], args[i + num_sret_args], "function expression '" + (this->static_target_function ? this->static_target_function->sig.toString() : "[runtime]") + "' argument " + toString(i) + " decrement");
 
 	return target_ret_type->passByValue() ? call_inst : return_val_addr;
 }

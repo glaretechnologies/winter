@@ -4125,6 +4125,9 @@ llvm::Value* LetBlock::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 	//params.let_block_let_values.insert(std::make_pair(this, std::vector<llvm::Value*>()));
 	params.let_block_let_values[this] = std::vector<llvm::Value*>();
 
+
+	params.let_block_stack.push_back(const_cast<LetBlock*>(this));
+
 	//std::vector<llvm::Value*> let_values(lets.size());
 	for(size_t i=0; i<lets.size(); ++i)
 	{
@@ -4138,8 +4141,6 @@ llvm::Value* LetBlock::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 
 	//params.let_block_let_values.insert(std::make_pair(this, let_values));
 
-
-	params.let_block_stack.push_back(const_cast<LetBlock*>(this));
 
 	llvm::Value* expr_value = expr->emitLLVMCode(params, ret_space_ptr);
 

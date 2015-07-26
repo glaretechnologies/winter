@@ -630,9 +630,8 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			// Walk up AST until we get to the correct let block
 			const int let_frame_offset = this->captured_vars[i].let_frame_offset;
 
-			// TEMP HACK USING 2 instead of 1.
-			const int let_index = (int)params.let_block_stack.size() - 1 - let_frame_offset;
-			LetBlock* let_block = params.let_block_stack[let_index];
+			const int let_block_index = (int)params.let_block_stack.size() - 1 - let_frame_offset;
+			LetBlock* let_block = params.let_block_stack[let_block_index];
 	
 			//val = let_block->getLetExpressionLLVMValue(
 			//	params,
@@ -641,7 +640,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			//);
 
 			assert(params.let_block_let_values.find(let_block) != params.let_block_let_values.end());
-			val = params.let_block_let_values[let_block][let_index];
+			val = params.let_block_let_values[let_block][ this->captured_vars[i].index];
 		}
 		else
 		{

@@ -70,8 +70,8 @@ public:
 
 
 	CapturedVarType vartype;
-	int index;
-	int let_frame_offset;
+	int index; // Argument index, or index of let variable inside let block.
+	int let_frame_offset; // how many let blocks we need to ignore before we get to the let block with the var we are bound to.
 	//TypeRef type;
 
 
@@ -200,7 +200,7 @@ public:
 	const llvm::DataLayout/*TargetData*/* target_data;
 	
 	std::vector<ASTNode*> node_stack;
-	std::vector<LetBlock*> let_block_stack;
+	std::vector<LetBlock*> let_block_stack; // Pointers to all the let blocks that are parents of the current node
 
 	std::map<const LetBlock*, std::vector<llvm::Value*> > let_block_let_values;
 
