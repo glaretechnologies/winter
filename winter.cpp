@@ -14,6 +14,7 @@ Copyright Glare Technologies Limited 2015 -
 #include "Value.h"
 #include "LanguageTests.h"
 #include "VirtualMachine.h"
+#include "FuzzTests.h"
 #include "utils/FileUtils.h"
 #include "utils/Clock.h"
 #include <iostream>
@@ -40,6 +41,11 @@ int main(int argc, char** argv)
 	if(std::string(argv[1]) == "--test")
 	{
 		LanguageTests::run();
+		return 0;
+	}
+	else if(std::string(argv[1]) == "--fuzz")
+	{
+		fuzzTests();
 		return 0;
 	}
 

@@ -33,27 +33,30 @@ set(CURRENT_TARGET winter)
 set(CMAKE_SUPPRESS_REGENERATION TRUE)
 
 
-#checkAndGetEnvVar(INDIGO_TRUNK_DIR INDIGO_TRUNK_DIR)
-set(INDIGO_TRUNK_DIR $ENV{INDIGO_TRUNK_DIR})
+# Function for checking an environment variable exists
+function(checkAndGetEnvVar envvar result)
+	if(DEFINED ENV{${envvar}})
+		# To prevent issues with \ characters in macros, replace possible \ INDIGO_LIBS env vars and store it in INDIGO_LIBS_ENV.
+		string(REPLACE "\\" "/" var $ENV{${envvar}})
+		set (${result} ${var} PARENT_SCOPE)
+	else()
+		MESSAGE(FATAL_ERROR "ERROR: Environment variable ${envvar} not defined.")
+	endif()
+endfunction()
+
+checkAndGetEnvVar(INDIGO_TRUNK_DIR INDIGO_TRUNK_DIR)
+#set(INDIGO_TRUNK_DIR $ENV{INDIGO_TRUNK_DIR})
 MESSAGE("INDIGO_TRUNK_DIR: ${INDIGO_TRUNK_DIR}")
 
 
 
-# External library directory (apart from llvm, openssl and Qt)
 
-# Config
-#getConfigOption("--qtversion" INDIGO_QT_VERSION)
-#getConfigOption("--llvmversion" INDIGO_LLVM_VERSION)
-#MESSAGE("QT version: ${INDIGO_QT_VERSION}")
-#MESSAGE("LLVM version: ${INDIGO_LLVM_VERSION}")
-
-
-set(INDIGO_LLVM_VERSION "3.6")
+set(LLVM_VERSION "3.6")
 # The llvm dirs use the version seperator "_" instead of "."
-string(REPLACE "." "_" INDIGO_LLVM_VERSION_PATH ${INDIGO_LLVM_VERSION})
+string(REPLACE "." "_" LLVM_VERSION_PATH ${LLVM_VERSION})
 
 
-set(INDIGO_LIBS_ENV "D:/programming")
+set(LIBS_ENV "D:/programming")
 
 if(WIN32)
 	# VS subdir
@@ -67,13 +70,13 @@ if(WIN32)
 		
 	if(WINTER_64_BIT)
 		if(MSVC_VERSION EQUAL 1500) # VS2008
-			set(llvmdir "${INDIGO_LIBS_ENV}/llvm/llvm_${INDIGO_LLVM_VERSION_PATH}_install_vs2008_64")
+			set(llvmdir "${LIBS_ENV}/llvm/llvm_${LLVM_VERSION_PATH}_install_vs2008_64")
 		elseif(MSVC_VERSION EQUAL 1600) # VS2010
-			set(llvmdir "${INDIGO_LIBS_ENV}/llvm/llvm_${INDIGO_LLVM_VERSION_PATH}_install_vs2010_64")
+			set(llvmdir "${LIBS_ENV}/llvm/llvm_${LLVM_VERSION_PATH}_install_vs2010_64")
 		elseif(MSVC_VERSION EQUAL 1700) # VS2012
-			set(llvmdir "${INDIGO_LIBS_ENV}/llvm/llvm_${INDIGO_LLVM_VERSION_PATH}_install_vs2012_64")
+			set(llvmdir "${LIBS_ENV}/llvm/llvm_${LLVM_VERSION_PATH}_install_vs2012_64")
 		elseif(MSVC_VERSION EQUAL 1800) # VS2013
-			set(llvmdir "${INDIGO_LIBS_ENV}/llvm/llvm_${INDIGO_LLVM_VERSION_PATH}_install_vs2013_64")
+			set(llvmdir "${LIBS_ENV}/llvm/llvm_${LLVM_VERSION_PATH}_install_vs2013_64")
 		else()
 			message(FATAL_ERROR "unhandled MSVC version")
 		endif()
@@ -87,13 +90,13 @@ if(WIN32)
 #		set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY "$ENV{INDIGO_OUTPUT}/${VS_SUB_DIR}/indigo_x64")
 	else()
 		if(MSVC_VERSION EQUAL 1500) # VS2008
-			set(llvmdir "${INDIGO_LIBS_ENV}/llvm/llvm_${INDIGO_LLVM_VERSION_PATH}_install_vs2008_32")
+			set(llvmdir "${LIBS_ENV}/llvm/llvm_${LLVM_VERSION_PATH}_install_vs2008_32")
 		elseif(MSVC_VERSION EQUAL 1600) # VS2010
-			set(llvmdir "${INDIGO_LIBS_ENV}/llvm/llvm_${INDIGO_LLVM_VERSION_PATH}_install_vs2010_32")
+			set(llvmdir "${LIBS_ENV}/llvm/llvm_${LLVM_VERSION_PATH}_install_vs2010_32")
 		elseif(MSVC_VERSION EQUAL 1700) # VS2012
-			set(llvmdir "${INDIGO_LIBS_ENV}/llvm/llvm_${INDIGO_LLVM_VERSION_PATH}_install_vs2012_32")
+			set(llvmdir "${LIBS_ENV}/llvm/llvm_${LLVM_VERSION_PATH}_install_vs2012_32")
 		elseif(MSVC_VERSION EQUAL 1800) # VS2013
-			set(llvmdir "${INDIGO_LIBS_ENV}/llvm/llvm_${INDIGO_LLVM_VERSION_PATH}_install_vs2013_32")
+			set(llvmdir "${LIBS_ENV}/llvm/llvm_${LLVM_VERSION_PATH}_install_vs2013_32")
 		else()
 			message(FATAL_ERROR "unhandled MSVC version")
 		endif()
@@ -105,7 +108,7 @@ if(WIN32)
 	endif()
 	
 else() # Mac or Linux.
-	set(llvmdir "${INDIGO_LIBS_ENV}/llvm/llvm_${INDIGO_LLVM_VERSION_PATH}_install")
+	set(llvmdir "${LIBS_ENV}/llvm/llvm_${LLVM_VERSION_PATH}_install")
 
 #	set (CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "$ENV{INDIGO_OUTPUT}/test_builds")
 #	set (CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "$ENV{INDIGO_OUTPUT}/test_builds")
@@ -192,35 +195,16 @@ set(WINTER_FILES
 "${winterdir}/TestUtils.cpp"
 "${winterdir}/TestUtils.h"
 "${winterdir}/winter.cpp"
+"${winterdir}/notes.txt"
+"${winterdir}/todo.txt"
 )
-
-MESSAGE(STATUS "WINTER_FILES: " ${WINTER_FILES})
 
 
 
 ########### Utils ################
 SET(util_files
-#${INDIGO_TRUNK_DIR}/utils/AESEncryption.cpp
-#${INDIGO_TRUNK_DIR}/utils/AESEncryption.h
-#${INDIGO_TRUNK_DIR}/utils/ArgumentParser.cpp
-#${INDIGO_TRUNK_DIR}/utils/ArgumentParser.h
-#${INDIGO_TRUNK_DIR}/utils/Array.h
-#${INDIGO_TRUNK_DIR}/utils/Array2D.h
-#${INDIGO_TRUNK_DIR}/utils/Array3D.h
-#${INDIGO_TRUNK_DIR}/utils/Array4D.cpp
-#${INDIGO_TRUNK_DIR}/utils/Array4D.h
-#${INDIGO_TRUNK_DIR}/utils/BufferInStream.cpp
-#${INDIGO_TRUNK_DIR}/utils/BufferInStream.h
-#${INDIGO_TRUNK_DIR}/utils/BufferOutStream.cpp
-#${INDIGO_TRUNK_DIR}/utils/BufferOutStream.h
-##${INDIGO_TRUNK_DIR}/utils/Checksum.cpp
-##${INDIGO_TRUNK_DIR}/utils/Checksum.h
-#${INDIGO_TRUNK_DIR}/utils/CircularBuffer.cpp
-#${INDIGO_TRUNK_DIR}/utils/CircularBuffer.h
 ${INDIGO_TRUNK_DIR}/utils/Clock.cpp
 ${INDIGO_TRUNK_DIR}/utils/Clock.h
-##${INDIGO_TRUNK_DIR}/utils/Compression.cpp
-##${INDIGO_TRUNK_DIR}/utils/Compression.h
 ${INDIGO_TRUNK_DIR}/utils/Condition.cpp
 ${INDIGO_TRUNK_DIR}/utils/Condition.h
 ${INDIGO_TRUNK_DIR}/utils/ConPrint.cpp
@@ -228,67 +212,23 @@ ${INDIGO_TRUNK_DIR}/utils/ConPrint.h
 ${INDIGO_TRUNK_DIR}/utils/ContainerUtils.h
 ${INDIGO_TRUNK_DIR}/utils/CycleTimer.cpp
 ${INDIGO_TRUNK_DIR}/utils/CycleTimer.h
-#${INDIGO_TRUNK_DIR}/utils/EventFD.cpp
-#${INDIGO_TRUNK_DIR}/utils/EventFD.h
-#${INDIGO_TRUNK_DIR}/utils/Exception.cpp
-#${INDIGO_TRUNK_DIR}/utils/Exception.h
-#${INDIGO_TRUNK_DIR}/utils/FileHandle.cpp
-#${INDIGO_TRUNK_DIR}/utils/FileHandle.h
-#${INDIGO_TRUNK_DIR}/utils/FileInStream.cpp
-#${INDIGO_TRUNK_DIR}/utils/FileInStream.h
-#${INDIGO_TRUNK_DIR}/utils/FileOutStream.cpp
-#${INDIGO_TRUNK_DIR}/utils/FileOutStream.h
 ${INDIGO_TRUNK_DIR}/utils/FileUtils.cpp
 ${INDIGO_TRUNK_DIR}/utils/FileUtils.h
-#${INDIGO_TRUNK_DIR}/utils/IncludeWindows.h
-##${INDIGO_TRUNK_DIR}/utils/IndigoAtomic.cpp
-##${INDIGO_TRUNK_DIR}/utils/IndigoAtomic.h
-#${INDIGO_TRUNK_DIR}/utils/InStream.cpp
-#${INDIGO_TRUNK_DIR}/utils/InStream.h
-#${INDIGO_TRUNK_DIR}/utils/KillThreadMessage.cpp
-#${INDIGO_TRUNK_DIR}/utils/KillThreadMessage.h
 ${INDIGO_TRUNK_DIR}/utils/Lock.cpp
 ${INDIGO_TRUNK_DIR}/utils/Lock.h
-#${INDIGO_TRUNK_DIR}/utils/Maybe.h
 ${INDIGO_TRUNK_DIR}/utils/MemMappedFile.cpp
 ${INDIGO_TRUNK_DIR}/utils/MemMappedFile.h
-#${INDIGO_TRUNK_DIR}/utils/MessageableThread.cpp
-#${INDIGO_TRUNK_DIR}/utils/MessageableThread.h
 ${INDIGO_TRUNK_DIR}/utils/MTwister.cpp
 ${INDIGO_TRUNK_DIR}/utils/MTwister.h
 ${INDIGO_TRUNK_DIR}/utils/Mutex.cpp
 ${INDIGO_TRUNK_DIR}/utils/Mutex.h
 ${INDIGO_TRUNK_DIR}/utils/MyThread.cpp
 ${INDIGO_TRUNK_DIR}/utils/MyThread.h
-##${INDIGO_TRUNK_DIR}/utils/Numeric.cpp
-##${INDIGO_TRUNK_DIR}/utils/Numeric.h
-#${INDIGO_TRUNK_DIR}/utils/OutStream.cpp
-#${INDIGO_TRUNK_DIR}/utils/OutStream.h
 ${INDIGO_TRUNK_DIR}/utils/Parser.cpp
 ${INDIGO_TRUNK_DIR}/utils/Parser.h
-#${INDIGO_TRUNK_DIR}/utils/ParseUtils.cpp
-#${INDIGO_TRUNK_DIR}/utils/ParseUtils.h
-#${INDIGO_TRUNK_DIR}/utils/PauseThreadMessage.cpp
-#${INDIGO_TRUNK_DIR}/utils/PauseThreadMessage.h
 ${INDIGO_TRUNK_DIR}/utils/Platform.h
 ${INDIGO_TRUNK_DIR}/utils/PlatformUtils.cpp
 ${INDIGO_TRUNK_DIR}/utils/PlatformUtils.h
-##${INDIGO_TRUNK_DIR}/utils/Plotter.cpp
-##${INDIGO_TRUNK_DIR}/utils/Plotter.h
-#${INDIGO_TRUNK_DIR}/utils/RefCounted.cpp
-#${INDIGO_TRUNK_DIR}/utils/RefCounted.h
-#${INDIGO_TRUNK_DIR}/utils/Reference.cpp
-#${INDIGO_TRUNK_DIR}/utils/Reference.h
-#${INDIGO_TRUNK_DIR}/utils/SHA256.cpp
-#${INDIGO_TRUNK_DIR}/utils/SHA256.h
-#${INDIGO_TRUNK_DIR}/utils/Singleton.cpp
-#${INDIGO_TRUNK_DIR}/utils/Singleton.h
-##${INDIGO_TRUNK_DIR}/utils/SmallVector.cpp
-##${INDIGO_TRUNK_DIR}/utils/SmallVector.h
-#${INDIGO_TRUNK_DIR}/utils/Sort.cpp
-#${INDIGO_TRUNK_DIR}/utils/Sort.h
-#${INDIGO_TRUNK_DIR}/utils/StreamUtils.cpp
-#${INDIGO_TRUNK_DIR}/utils/StreamUtils.h
 ${INDIGO_TRUNK_DIR}/utils/StringUtils.cpp
 ${INDIGO_TRUNK_DIR}/utils/StringUtils.h
 ${INDIGO_TRUNK_DIR}/utils/Task.cpp
@@ -297,31 +237,10 @@ ${INDIGO_TRUNK_DIR}/utils/TaskManager.cpp
 ${INDIGO_TRUNK_DIR}/utils/TaskManager.h
 ${INDIGO_TRUNK_DIR}/utils/TaskRunnerThread.cpp
 ${INDIGO_TRUNK_DIR}/utils/TaskRunnerThread.h
-#${INDIGO_TRUNK_DIR}/utils/ThreadManager.cpp
-#${INDIGO_TRUNK_DIR}/utils/ThreadManager.h
-#${INDIGO_TRUNK_DIR}/utils/ThreadMessage.cpp
-#${INDIGO_TRUNK_DIR}/utils/ThreadMessage.h
-#${INDIGO_TRUNK_DIR}/utils/ThreadMessageSink.cpp
-#${INDIGO_TRUNK_DIR}/utils/ThreadMessageSink.h
-#${INDIGO_TRUNK_DIR}/utils/ThreadSafeQueue.h
-#${INDIGO_TRUNK_DIR}/utils/ThreadSafeRefCounted.cpp
-#${INDIGO_TRUNK_DIR}/utils/ThreadSafeRefCounted.h
-#${INDIGO_TRUNK_DIR}/utils/ThreadShouldAbortCallback.cpp
-#${INDIGO_TRUNK_DIR}/utils/ThreadShouldAbortCallback.h
-#${INDIGO_TRUNK_DIR}/utils/ThreadTerminatingMessage.cpp
-#${INDIGO_TRUNK_DIR}/utils/ThreadTerminatingMessage.h
 ${INDIGO_TRUNK_DIR}/utils/Timer.cpp
 ${INDIGO_TRUNK_DIR}/utils/Timer.h
-#${INDIGO_TRUNK_DIR}/utils/SocketBufferOutStream.cpp
-#${INDIGO_TRUNK_DIR}/utils/SocketBufferOutStream.h
-#${INDIGO_TRUNK_DIR}/utils/StreamShouldAbortCallback.cpp
-#${INDIGO_TRUNK_DIR}/utils/StreamShouldAbortCallback.h
 ${INDIGO_TRUNK_DIR}/utils/UTF8Utils.cpp
 ${INDIGO_TRUNK_DIR}/utils/UTF8Utils.h
-#${INDIGO_TRUNK_DIR}/utils/Base64.cpp
-#${INDIGO_TRUNK_DIR}/utils/Base64.h
-##${INDIGO_TRUNK_DIR}/utils/ImmutableVector.cpp
-#${INDIGO_TRUNK_DIR}/utils/ImmutableVector.h
 )
 
 SET(maths_files
