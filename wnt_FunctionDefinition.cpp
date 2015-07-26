@@ -520,7 +520,13 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 	assert(this_closure_llvm_type->isPointerTy());
 	assert(this_closure_llvm_type->getPointerElementType()->isStructTy());
 	llvm::StructType* this_closure_llvm_struct_type = (llvm::StructType*)this_closure_llvm_type->getPointerElementType();
-	llvm::Type* func_ptr_type = this_closure_llvm_struct_type->elements()[Function::functionPtrIndex()];
+	
+	// llvm::StructType::elements() function is not present in LLVM 3.4.
+	llvm::StructType::element_iterator it = this_closure_llvm_struct_type->element_begin();
+	for(int i=0; i<Function::functionPtrIndex(); ++i)
+		it++;
+
+	llvm::Type* func_ptr_type = *it; // this_closure_llvm_struct_type->elements()[Function::functionPtrIndex()];
 
 	//func_ptr_type->dump();
 
