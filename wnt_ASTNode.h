@@ -138,6 +138,9 @@ public:
 	Reference<ASTNodeVisitor> custom_visitor;
 
 	bool check_bindings; // If this is true, this is the final binding pass.  Any unbound functions or variables should throw an exception.
+
+	// Types that are captured by a function closure (lambda expression).
+	std::set<TypeRef> captured_types;
 };
 
 
@@ -157,6 +160,7 @@ bool shouldRefCount(EmitLLVMCodeParams& params, const Reference<ASTNode>& expr);
 bool shouldRefCount(EmitLLVMCodeParams& params, const ASTNode& expr);
 void addMetaDataCommentToInstruction(EmitLLVMCodeParams& params, llvm::Instruction* instr, const std::string& s);
 void emitDestructorOrDecrCall(EmitLLVMCodeParams& params, const ASTNode& e, llvm::Value* value, const std::string& comment);
+bool mayEscapeCurrentlyBuildingFunction(EmitLLVMCodeParams& params, const TypeRef& type);
 
 class CleanUpInfo
 {

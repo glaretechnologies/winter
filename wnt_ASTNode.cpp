@@ -18,6 +18,7 @@ File created by ClassTemplate on Wed Jun 11 03:55:25 2008
 #include "wnt_VArrayLiteral.h"
 #include "wnt_Variable.h"
 #include "VMState.h"
+#include "VirtualMachine.h"
 #include "Value.h"
 #include "VMState.h"
 #include "Linker.h"
@@ -662,6 +663,30 @@ void emitDestructorOrDecrCall(EmitLLVMCodeParams& params, const ASTNode& e, llvm
 }
 
 
+bool mayEscapeCurrentlyBuildingFunction(EmitLLVMCodeParams& params, const TypeRef& type)
+{
+	const TypeRef return_type = params.currently_building_func_def->returnType();
+
+	// If the type is the same as the function return type, or is contained by the return type (e.g. is a field of the return type), return true.
+	if(isEqualToOrContains(*return_type, *type))
+		return true;
+
+	// Return true if the type may be captured by a closure being returned.
+	if(params.currently_building_func_def->returnType()->getType() == Type::FunctionType)
+	{
+		for(auto i = params.currently_building_func_def->captured_var_types.begin(); i != params.currently_building_func_def->captured_var_types.end(); ++i)
+		{
+			const TypeRef captured_var_type = *i;
+
+			if(isEqualToOrContains(*captured_var_type, *type)) // (*captured_var_type == *type) || captured_var_type->containsType(*this_type))
+				return true;
+		}
+	}
+	
+	return false;
+}
+
+
 //----------------------------------------------------------------------------------
 
 
@@ -1192,14 +1217,14 @@ llvm::Value* StringLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 	llvm::Value* elem_0 = params.builder->CreateStructGEP(string_global, 0);
 
 
-	const bool may_escape_function = isEqualToOrContains(*params.currently_building_func_def->returnType(), *this->type());
-
-	const bool alloc_on_heap = may_escape_function;
+	const bool alloc_on_heap = mayEscapeCurrentlyBuildingFunction(params, this->type());
 
 	llvm::Value* string_value;
 	uint64 initial_flags;
 	if(alloc_on_heap)
 	{
+		params.stats->num_heap_allocation_calls++;
+
 		llvm::Value* elem_bitcast = params.builder->CreateBitCast(elem_0, LLVMTypeUtils::voidPtrType(*params.context));
 
 		// Emit a call to allocateString

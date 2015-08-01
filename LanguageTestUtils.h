@@ -655,7 +655,7 @@ static void testMainStringArg(const std::string& src, const std::string& arg, co
 }
 
 
-static void testMainIntegerArg(const std::string& src, int x, int target_return_val, uint32 test_flags = 0)
+static ProgramStats testMainIntegerArg(const std::string& src, int x, int target_return_val, uint32 test_flags = 0)
 {
 	std::cout << "===================== Winter testMainIntegerArg() =====================" << std::endl;
 	try
@@ -830,6 +830,8 @@ static void testMainIntegerArg(const std::string& src, int x, int target_return_
 			}
 #endif // #if USE_OPENCL
 		}
+
+		return vm.getProgramStats();
 	}
 	catch(Winter::BaseException& e)
 	{

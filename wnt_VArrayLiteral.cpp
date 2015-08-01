@@ -190,9 +190,7 @@ bool VArrayLiteral::areAllElementsConstant() const
 
 llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
-	const bool same_as_or_contained_by_ret_type = isEqualToOrContains(*params.currently_building_func_def->returnType(), *this->type());
-
-	const bool alloc_on_heap = same_as_or_contained_by_ret_type;
+	const bool alloc_on_heap = mayEscapeCurrentlyBuildingFunction(params, this->type());
 
 	llvm::Value* varray_ptr;
 	uint64 initial_flags;

@@ -78,6 +78,9 @@ public:
 	//bool use_captured_vars; // Set to true if this is an anonymous function, in which case we will always pass it in a closure.
 	std::vector<CapturedVar> captured_vars; // For when parsing anon functions
 
+	// Types that are captured by any lambda expressions in this function definition.
+	std::set<TypeRef> captured_var_types;
+
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual ValueRef exec(VMState& vmstate);

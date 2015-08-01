@@ -12,6 +12,7 @@ Generated at 2011-04-25 19:15:40 +0100
 #include "wnt_SourceBuffer.h"
 #include "wnt_RefCounting.h"
 #include "wnt_Variable.h"
+#include "VirtualMachine.h"
 #include "VMState.h"
 #include "Value.h"
 #include "Linker.h"
@@ -236,7 +237,10 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 	//		}
 	//	}
 	//}
-
+	if(payload.operation == TraversalPayload::TypeCheck)
+	{
+		payload.captured_types.clear();
+	}
 	else if(payload.operation == TraversalPayload::CustomVisit)
 	{
 		if(payload.custom_visitor.nonNull())
@@ -312,6 +316,27 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 				// Else return type is NULL, so infer it
 				//this->return_type = this->body->type();
 			}
+		}
+
+		// If this is an anon func, add any types that it captures to the current set for the top-level function we are in.
+		if(this->is_anon_func)
+		{
+			for(size_t i=0; i<this->captured_vars.size(); ++i)
+			{
+				payload.captured_types.insert(this->captured_vars[i].type());
+			}
+		}
+
+		if(stack.size() == 1)
+		{
+			assert(stack[0] == this);
+
+			// If this is a top-level func.
+			this->captured_var_types = payload.captured_types;
+
+			//std::cout << "captured var types for function " + this->sig.toString() + ": " << std::endl;
+			//for(auto i=captured_var_types.begin(); i != captured_var_types.end(); ++i)
+			//	std::cout << (*i)->toString() << std::endl;
 		}
 	}
 
@@ -480,6 +505,8 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 	// We want to return a function closure, which is allocated on the heap (usually) and contains a function pointer to the anonymous function, 
 	// a structure containing the captured variables, etc..
+
+	params.stats->num_heap_allocation_calls++;
 
 	// Capture variables at this point, by getting them off the arg and let stack.
 

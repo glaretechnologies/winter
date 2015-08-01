@@ -177,6 +177,9 @@ static const bool DO_OPENCL_TESTS = false;
 
 void LanguageTests::run()
 {
+	Timer timer;
+	ProgramStats stats;
+
 	//TEMP///////////////
 	
 	//useKnownReturnRefCountOptimsiation(3);
@@ -186,7 +189,7 @@ void LanguageTests::run()
 	//////////////////
 
 
-	Timer timer;
+	
 
 	const TypeRef ta = new Int();
 	const TypeRef tb = new Int();
@@ -633,7 +636,6 @@ void LanguageTests::run()
 	// ===================================================================
 	// Test optimisation of varray from heap allocated to stack allocated
 	// ===================================================================
-	ProgramStats stats;
 	stats = testMainFloatArg("def main(float x) float :	 [3.0, 4.0, 5.0]va[0]", 1.f, 3.f, INVALID_OPENCL);
 	testAssert(stats.num_heap_allocation_calls == 0);
 
@@ -3758,7 +3760,6 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 						y						\n\
 				def main() float : f()", 2.0);
 
-
 	// ===================================================================
 	// Test lambda expressions and closures
 	// ===================================================================
@@ -3864,6 +3865,50 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 							f = \\(int x) int : a[x]			\n\
 						in					                    \n\
 							f(x)", 2, 12, ALLOW_UNSAFE);
+
+	// Test capturing a heap-allocated type in a closure that is returned from a function
+	stats = testMainIntegerArg("def makeFunc() function<int, int> :		\n\
+						let					                    \n\
+							a = [10, 11, 12, 13]va				\n\
+						in										\n\
+							\\(int x) int : a[x]				\n\
+																\n\
+						def main(int x) int :                   \n\
+						let										\n\
+							f = makeFunc()						\n\
+						in					                    \n\
+							f(x)", 2, 12, ALLOW_UNSAFE);
+	testAssert(stats.num_heap_allocation_calls == 2); // Should be one alloc call for the varray, and one for the closure returned from makeFunc()
+
+
+	// Test capturing two varrays
+	stats = testMainIntegerArg("def makeFunc() function<int, int> :		\n\
+						let					                    \n\
+							a = [10, 11, 12, 13]va				\n\
+							b = [20, 21, 22, 23]va				\n\
+						in										\n\
+							\\(int x) int : a[x] + b[x]			\n\
+																\n\
+						def main(int x) int :                   \n\
+						let										\n\
+							f = makeFunc()						\n\
+						in					                    \n\
+							f(x)", 2, 34, ALLOW_UNSAFE);
+	testAssert(stats.num_heap_allocation_calls == 3); // Should be one alloc call for each varray, and one for the closure returned from makeFunc()
+
+	// Test capturing a string
+	stats = testMainIntegerArg("def makeFunc() function<int, int> :		\n\
+						let					                    \n\
+							s = \"hello\"						\n\
+						in										\n\
+							\\(int x) int : codePoint(elem(s, toInt64(x)))			\n\
+																\n\
+						def main(int x) int :                   \n\
+						let										\n\
+							f = makeFunc()						\n\
+						in					                    \n\
+							f(x)", 1, (int)'e', ALLOW_UNSAFE);
+	testAssert(stats.num_heap_allocation_calls == 2); // Should be one alloc call for the string, and one for the closure returned from makeFunc()
 
 	// Test closures
 
