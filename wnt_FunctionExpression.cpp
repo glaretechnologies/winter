@@ -1575,26 +1575,20 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 	llvm::Value* target_llvm_func = NULL;
 	TypeRef target_ret_type = this->type();
 
+	llvm::Value* closure_pointer = NULL;
 	llvm::Value* captured_var_struct_ptr = NULL;
 
 	if(!this->static_target_function)
 	{
-		// Disable ref counting code for accessing the closure.
-		const bool old_emit_refcounting_code = params.emit_refcounting_code;
-		params.emit_refcounting_code = false;
-
 		// Emit code to get the function closure.
-		llvm::Value* closure_pointer = this->get_func_expr->emitLLVMCode(params, NULL);
-
-		params.emit_refcounting_code = old_emit_refcounting_code;
+		closure_pointer = this->get_func_expr->emitLLVMCode(params, NULL);
 
 		// Get the actual function pointer from the closure
 		llvm::Value* target_llvm_func_ptr = params.builder->CreateStructGEP(closure_pointer, Function::functionPtrIndex(), "function_ptr_ptr");
 		target_llvm_func = params.builder->CreateLoad(target_llvm_func_ptr, "function_ptr");
 
 		// Get the captured var struct from the closure
-		captured_var_struct_ptr = params.builder->CreateStructGEP(closure_pointer, 
-			Function::capturedVarStructIndex(), "captured_var_struct_ptr"); // field index
+		captured_var_struct_ptr = params.builder->CreateStructGEP(closure_pointer, Function::capturedVarStructIndex(), "captured_var_struct_ptr"); // field index
 	}
 	else // else if this->static_target_function:
 	{
@@ -1761,6 +1755,15 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 	for(unsigned int i=0; i<argument_expressions.size(); ++i)
 		if(shouldRefCount(params, argument_expressions[i]) && do_ref_counting_for_arg[i])
 			emitDestructorOrDecrCall(params, *argument_expressions[i], args[i + num_sret_args], "function expression '" + (this->static_target_function ? this->static_target_function->sig.toString() : "[runtime]") + "' argument " + toString(i) + " decrement");
+
+
+	if(closure_pointer)
+	{
+		// Decrement ref count on closure that we evaluated.
+		// TODO: call shouldRefCount?
+		const std::string this_func_name = this->functionName();
+		emitDestructorOrDecrCall(params, *this->get_func_expr, closure_pointer, "function expression " + this_func_name + " get_func_expr result decrement");
+	}
 
 	return target_ret_type->passByValue() ? call_inst : return_val_addr;
 }

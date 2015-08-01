@@ -3758,6 +3758,11 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 						y						\n\
 				def main() float : f()", 2.0);
 
+
+	// ===================================================================
+	// Test lambda expressions and closures
+	// ===================================================================
+
 	// Test Lambda in let
 	testMainFloat("def main() float :				\n\
 				  let f = \\(float x) : x*x  in		\n\
@@ -3804,16 +3809,62 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 
 	// Test 'compose' function: returns the composition of two functions
 	// NOTE: this requires lexical closures to work :)
-/*	
+
+	// NOTE: Crashing for some reason.  TODO: Fix
+	testMainFloat("def compose(function<float, float> f) : f       \n\
+					def mulByTwo(float x) : x * 2.0                \n\
+					def main() float :                         \n\
+						let z = compose(mulByTwo)  in \n\
+						z(4.0)", 8.0f);
+
+	// Test lambda with function call in it.
+	testMainFloatArg("def square(float z) float : z*z						\n\
+					def main(float x) float :                         \n\
+						let													  \n\
+							f = \\(float y) : square(y)							\n\
+						in													\n\
+							f(x)", 4.0f, 16.0f);
+
+	// Test return of a lambda witha function call in it/
+	testMainFloatArg("def square(float z) float : z*z						\n\
+					def makeLambda() function<float, float> : \\(float y) : square(y)		\n\
+					def main(float x) float :                         \n\
+						let													  \n\
+							f = makeLambda()							\n\
+						in													\n\
+							f(x)", 4.0f, 16.0f);
+
+
+	// Test lambda being return from a function, where the lambda has a call to a function argument in it.
+	testMainFloat("def compose(function<float, float> f) : \\(float x) : f(x)       \n\
+					def mulByTwo(float x) : x * 2.0                \n\
+					def main() float :                         \n\
+						let z = compose(mulByTwo)  in \n\
+						8.f", 8.0f);
+
+	// Test lambda being return from a function, where the lambda has a call to a function argument in it.
+	testMainFloat("def compose(function<float, float> f) : \\(float x) : f(x)       \n\
+					def mulByTwo(float x) : x * 2.0                \n\
+					def main() float :                         \n\
+						let z = compose(mulByTwo)  in \n\
+						z(4.0)", 8.0f);
+
 	// NOTE: Crashing for some reason.  TODO: Fix
 	testMainFloat("def compose(function<float, float> f, function<float, float> g) : \\(float x) : f(g(x))       \n\
 					def addOne(float x) : x + 1.0                \n\
 					def mulByTwo(float x) : x * 2.0                \n\
 					def main() float :                         \n\
 						let z = compose(addOne, mulByTwo)  in \n\
-						z(1.0)", 3.0f);
+						z(10.0)", 21.0f);
+						
+	// Test capturing a heap-allocated type (varray in this case)
+	testMainIntegerArg("def main(int x) int :                          \n\
+						let					                    \n\
+							a = [10, 11, 12, 13]va				\n\
+							f = \\(int x) int : a[x]			\n\
+						in					                    \n\
+							f(x)", 2, 12, ALLOW_UNSAFE);
 
-*/
 	// Test closures
 
 	

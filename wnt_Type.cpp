@@ -314,7 +314,12 @@ llvm::Type* CharType::LLVMType(llvm::Module& module) const
 
 void Function::emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const
 {
-	llvm::CallInst* inst = params.builder->CreateCall(params.common_functions.incrClosureRefCountLLVMFunc, ref_counted_value);
+	// Cast to dummy function type.
+	const TypeRef dummy_function_type = Function::dummyFunctionType();
+	
+	llvm::Value* cast_val = params.builder->CreatePointerCast(ref_counted_value, dummy_function_type->LLVMType(*params.module));
+
+	llvm::CallInst* inst = params.builder->CreateCall(params.common_functions.incrClosureRefCountLLVMFunc, cast_val);
 
 	addMetaDataCommentToInstruction(params, inst, comment);
 }
@@ -456,6 +461,14 @@ llvm::Type* Function::LLVMType(llvm::Module& module) const
 		module
 	));
 
+	llvm::Type* destructor_arg_types[1] = { LLVMTypeUtils::getPtrToBaseCapturedVarStructType(module) };
+
+	llvm::FunctionType* destructor_type = llvm::FunctionType::get(
+		llvm::Type::getVoidTy(module.getContext()), // return type
+		destructor_arg_types,
+		false // varargs
+	);
+
 	//vector<const llvm::Type*> field_types;
 
 	// Add pointer to function type
@@ -466,17 +479,18 @@ llvm::Type* Function::LLVMType(llvm::Module& module) const
 	//	field_types.push_back(this->captured_vars[i].type->LLVMType(context));
 
 	// Make the vector of fields for the closure type
-	vector<llvm::Type*> closure_field_types;
-	closure_field_types.push_back(TypeRef(new Int(64))->LLVMType(module)); // Ref count field
-	closure_field_types.push_back(TypeRef(new Int(64))->LLVMType(module)); // len field
-	closure_field_types.push_back(TypeRef(new Int(64))->LLVMType(module)); // flags field
-	closure_field_types.push_back(func_ptr_type);
-	closure_field_types.push_back(LLVMTypeUtils::getBaseCapturedVarStructType(module)); // cap_var_struct);
+	llvm::Type* closure_field_types[] = {
+		llvm::Type::getInt64Ty(module.getContext()), // Ref count field
+		llvm::Type::getInt64Ty(module.getContext()), // flags field
+		func_ptr_type,
+		LLVMTypeUtils::pointerType(destructor_type),
+		LLVMTypeUtils::getBaseCapturedVarStructType(module) // cap_var_struct
+	};
 
 	// Return the closure structure type.
 	llvm::StructType* closure_struct_type = llvm::StructType::create(
 		module.getContext(),
-		closure_field_types,
+		llvm::makeArrayRef(closure_field_types),
 		use_name
 	);
 
@@ -494,6 +508,22 @@ const std::string Function::OpenCLCType() const
 {
 	assert(0);
 	return "";
+}
+
+
+void Function::emitDestructorCall(EmitLLVMCodeParams& params, llvm::Value* value, const std::string& comment) const
+{
+}
+
+
+void Function::getContainedTypesWithDestructors(std::set<ConstTypeRef, ConstTypeRefLessThan>& types) const
+{
+}
+
+
+bool Function::containsType(const Type& other_type) const
+{
+	return false;
 }
 
 

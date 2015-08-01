@@ -656,9 +656,9 @@ void emitDestructorOrDecrCall(EmitLLVMCodeParams& params, const ASTNode& e, llvm
 {
 	const TypeRef& type = e.type();
 	if(type->isHeapAllocated())
-		e.type()->emitDecrRefCount(params, value, comment);
+		type->emitDecrRefCount(params, value, comment);
 	else
-		e.type()->emitDestructorCall(params, value, comment);
+		type->emitDestructorCall(params, value, comment);
 }
 
 

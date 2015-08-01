@@ -225,7 +225,8 @@ public:
 	bool use_captured_vars;
 
 
-	static int functionPtrIndex() { return 3; } // Index in closure struct of function ptr.
+	static int functionPtrIndex() { return 2; } // Index in closure struct of function ptr.
+	static int destructorPtrIndex() { return 3; } // Index in closure struct of closure destructor ptr.
 	static int capturedVarStructIndex() { return 4; } // Index in closure struct of captured var structure.
 
 	// Use for passing to ref counting functions etc..
@@ -243,6 +244,10 @@ public:
 
 	virtual void emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const;
 	virtual void emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const;
+
+	virtual void emitDestructorCall(EmitLLVMCodeParams& params, llvm::Value* value, const std::string& comment) const;
+	virtual void getContainedTypesWithDestructors(std::set<ConstTypeRef, ConstTypeRefLessThan>& types) const;
+	virtual bool containsType(const Type& other_type) const;
 
 	virtual bool lessThan(const Type& b) const
 	{

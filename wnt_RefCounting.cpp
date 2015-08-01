@@ -66,6 +66,7 @@ llvm::Function* emitIncrRefCountFunc(llvm::Module* module, const llvm::DataLayou
 		functype // Type
 	);
 
+	assert(llvm::isa<llvm::Function>(llvm_func_constant));
 	llvm::Function* llvm_func = static_cast<llvm::Function*>(llvm_func_constant);
 	llvm::BasicBlock* block = llvm::BasicBlock::Create(module->getContext(), "entry", llvm_func);
 	llvm::IRBuilder<> builder(block);
@@ -189,7 +190,8 @@ void emitDecrementorForType(llvm::Module* module, const llvm::DataLayout* target
 	llvm::Value* ref_count = builder.CreateLoad(ref_ptr, "ref_count");
 
 	// Load flags
-	llvm::Value* flags_ptr = builder.CreateStructGEP(refcounted_val, 2, "flags_ptr");
+	const int flags_index = refcounted_type->getType() == Type::FunctionType ? 1 : 2;
+	llvm::Value* flags_ptr = builder.CreateStructGEP(refcounted_val, flags_index, "flags_ptr");
 	llvm::Value* flags_val = builder.CreateLoad(flags_ptr, "flags_val");
 
 
@@ -341,6 +343,27 @@ void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_
 				}
 			}
 		}
+
+		builder.CreateRetVoid();
+		return;
+	}
+	else if(type->getType() == Type::FunctionType)
+	{
+		// The destructor for a function type (closure) is different - we want to call the destructor pointer stored in the closure.
+		//const Function* function_type = type.downcastToPtr<Function>();
+
+		// Get arg 0 - (a pointer to) the ref counted value (closure)
+		llvm::Value* closure = LLVMTypeUtils::getNthArg(llvm_func, 0);
+
+		// Load the destructor ptr
+		llvm::Value* destructor_ptr_ptr = builder.CreateStructGEP(closure, Function::destructorPtrIndex(), "destructor_ptr_ptr");
+		llvm::Value* destructor_ptr = builder.CreateLoad(destructor_ptr_ptr, 0, "destructor_ptr");
+
+		// Get a pointer to the captured var struct (at the end of the closure)
+		llvm::Value* cap_var_struct_ptr = builder.CreateStructGEP(closure, Function::capturedVarStructIndex(), "cap_var_struct_ptr");
+
+		// Call the destructor!
+		builder.CreateCall(destructor_ptr, cap_var_struct_ptr);
 
 		builder.CreateRetVoid();
 		return;

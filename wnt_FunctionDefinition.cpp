@@ -477,6 +477,10 @@ std::string FunctionDefinition::emitOpenCLC(EmitOpenCLCodeParams& params) const
 llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
 	// This will be called for lambda expressions.
+
+	// We want to return a function closure, which is allocated on the heap (usually) and contains a function pointer to the anonymous function, 
+	// a structure containing the captured variables, etc..
+
 	// Capture variables at this point, by getting them off the arg and let stack.
 
 	//TEMP: this needs to be in sync with Function::LLVMType()
@@ -514,8 +518,10 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		llvm_arg_types,
 		false // is var arg
 	));*/
+
 	TypeRef this_closure_type = this->type();
 
+	// NOTE: this type doesn't have the actual captured var struct.
 	llvm::Type* this_closure_llvm_type = this_closure_type->LLVMType(*params.module);
 	assert(this_closure_llvm_type->isPointerTy());
 	assert(this_closure_llvm_type->getPointerElementType()->isStructTy());
@@ -528,31 +534,38 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 	llvm::Type* func_ptr_type = *it; // this_closure_llvm_struct_type->elements()[Function::functionPtrIndex()];
 
-	//func_ptr_type->dump();
+
+	/////////////////////// Get closure destructor type ///////////////
+	llvm::Type* destructor_arg_types[1] = { LLVMTypeUtils::getPtrToBaseCapturedVarStructType(*params.module) };
+
+	llvm::FunctionType* destructor_type = llvm::FunctionType::get(
+		llvm::Type::getVoidTy(params.module->getContext()), // return type
+		destructor_arg_types,
+		false // varargs
+	);
 
 
 	/////////////////////// Get full captured var struct type ///////////////
-	llvm::Type* cap_var_type_ = this->getCapturedVariablesStructType()->LLVMType(*params.module);
+	const StructureTypeRef captured_var_struct_type = this->getCapturedVariablesStructType();
+	llvm::Type* cap_var_type_ = captured_var_struct_type->LLVMType(*params.module);
 	assert(cap_var_type_->isStructTy());
 	llvm::StructType* cap_var_type = static_cast<llvm::StructType*>(cap_var_type_);
 
 	
-	///////////////// Create closure type //////////////////////////////
+	///////////////// Create full closure type //////////////////////////////
 	// NOTE: the number and type of captured variables depends on the call site, so isn't actually reflected in the function type.
-	vector<llvm::Type*> closure_field_types(5);
-	closure_field_types[0] = llvm::Type::getInt64Ty(*params.context); // Int 64 reference count
-	closure_field_types[1] = llvm::Type::getInt64Ty(*params.context); // len
-	closure_field_types[2] = llvm::Type::getInt64Ty(*params.context); // flags
-	closure_field_types[3] = func_ptr_type;
-	closure_field_types[4] = cap_var_type;
-	llvm::StructType* closure_type = llvm::StructType::get(
+	llvm::Type* closure_field_types[] = {
+		llvm::Type::getInt64Ty(*params.context), // Int 64 reference count
+		llvm::Type::getInt64Ty(*params.context), // flags
+		func_ptr_type,
+		LLVMTypeUtils::pointerType(destructor_type),
+		cap_var_type
+	};
+	llvm::StructType* closure_type = llvm::StructType::create(
 		*params.context,
-		closure_field_types
+		llvm::makeArrayRef(closure_field_types),
+		this->sig.typeMangledName() + "_closure"
 	);
-	/*llvm::Type* closure_ptr_type = this->type()->LLVMType(*params.module);
-	assert(closure_ptr_type->isPointerTy());
-	assert(closure_ptr_type->getPointerElementType()->isStructTy());
-	llvm::StructType* closure_type = (llvm::StructType*)closure_ptr_type->getPointerElementType();*/
 
 	
 	//////////////// Compute size of complete closure type /////////////////////////
@@ -560,23 +573,24 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 	
 	const uint64_t struct_size_B = layout->getSizeInBytes();
 
-	vector<llvm::Value*> args;
-	args.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(64, struct_size_B, true)));
+	llvm::Value* alloc_closure_func_args[] = { llvm::ConstantInt::get(*params.context, llvm::APInt(64, struct_size_B, true)) };
 	
 	// Set hidden voidptr argument
 	//if(params.hidden_voidptr_arg)
 	//	args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));
 
 	// Call our allocateClosureFunc function
-	llvm::Value* closure_void_pointer = params.builder->CreateCall(alloc_closure_func, args, "base_closure_ptr");
+	
+	llvm::CallInst* alloc_closure_func_call = params.builder->CreateCall(alloc_closure_func, alloc_closure_func_args, "base_closure_ptr");
+	addMetaDataCommentToInstruction(params, alloc_closure_func_call, "alloc closure for " + this->sig.typeMangledName());
+	llvm::Value* closure_void_pointer = alloc_closure_func_call;
 
-	// Cast from dummy closure type to the actual closure type.
+	// Cast the pointer returned from the alloc_closure_func, from dummy closure type to the actual closure type.
 	llvm::Value* closure_pointer = params.builder->CreateBitCast(
 		closure_void_pointer,
 		LLVMTypeUtils::pointerType(*closure_type),
 		"closure_pointer"
 	);
-
 
 	// Set the reference count in the closure to 1
 	llvm::Value* closure_ref_count_ptr = params.builder->CreateStructGEP(closure_pointer, 0, "closure_ref_count_ptr");
@@ -587,28 +601,22 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 	// Set the flags
 	const int initial_flags = 1; // heap allocated
-	llvm::Value* flags_ptr = params.builder->CreateStructGEP(closure_pointer, 2, "closure_flags_ptr");
+	llvm::Value* flags_ptr = params.builder->CreateStructGEP(closure_pointer, 1, "closure_flags_ptr");
 	llvm::Value* flags_contant_val = llvm::ConstantInt::get(*params.context, llvm::APInt(64, initial_flags));
 	llvm::StoreInst* store_flags_inst = params.builder->CreateStore(flags_contant_val, flags_ptr);
 	addMetaDataCommentToInstruction(params, store_flags_inst, "set initial flags to " + toString(initial_flags));
 
 
-	// Store function pointer in the closure structure
+	// Store function pointer to the anon function in the closure structure
 	{
 		llvm::Function* func = this->getOrInsertFunction(
 			params.module,
 			true // use_cap_var_struct_ptr: Since we're storing a func ptr, it will be passed the captured var struct on usage.
 		);
 
-		//std::cout << "func type: \n";
-		//func->getType()->dump();
-
 		llvm::Value* func_field_ptr = params.builder->CreateStructGEP(closure_pointer, Function::functionPtrIndex(), "function_field_ptr");
-
-		//std::cout << "func_field_ptr type: \n";
-		//func_field_ptr->getType()->dump();
-
-		params.builder->CreateStore(func, func_field_ptr); // Do the store.
+		llvm::StoreInst* store_inst = params.builder->CreateStore(func, func_field_ptr); // Do the store.
+		addMetaDataCommentToInstruction(params, store_inst, "Store function pointer in closure");
 	}
 
 	// Store captured vars in closure.
@@ -622,13 +630,10 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		if(this->captured_vars[i].vartype == CapturedVar::Arg)
 		{
 			// Load arg
-			//NOTE: offset if return by ref
-			//val = LLVMTypeUtils::getNthArg(params.currently_building_func, this->captured_vars[i].index);
 			val = LLVMTypeUtils::getNthArg(
 				params.currently_building_func,
 				params.currently_building_func_def->getLLVMArgIndex(this->captured_vars[i].index)
 			);
-			//val = LLVMTypeUtils::getNthArg(this
 		}
 		else if(this->captured_vars[i].vartype == CapturedVar::Let)
 		{
@@ -655,8 +660,57 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			
 		// store in captured var structure field
 		llvm::Value* field_ptr = params.builder->CreateStructGEP(captured_var_struct_ptr, (unsigned int)i, "captured_var_" + toString(i) + "_field_ptr");
-		params.builder->CreateStore(val, field_ptr);
+		llvm::StoreInst* store_inst = params.builder->CreateStore(val, field_ptr);
+
+		addMetaDataCommentToInstruction(params, store_inst, "Store captured var " + toString(i) + " in closure");
+
+		// If the captured var is a ref-counted type, we need to increment its reference count, since the struct now holds a reference to it. 
+		captured_var_struct_type->component_types[i]->emitIncrRefCount(params, val, "Capture var ref count increment");
 	}
+
+
+
+	// Emit a destructor function for this closure.
+	// Will be something like (C++ equiv):
+	// void anon_func_xx_captured_var_struct_destructor(base_captured_var_struct* s)
+	{
+		const std::string destructor_name = this->sig.typeMangledName() + "_captured_var_struct_destructor";
+
+		llvm::Constant* llvm_func_constant = params.module->getOrInsertFunction(
+			destructor_name, // Name
+			destructor_type // Type
+		);
+
+		assert(llvm::isa<llvm::Function>(llvm_func_constant));
+		llvm::Function* destructor = static_cast<llvm::Function*>(llvm_func_constant);
+		llvm::BasicBlock* block = llvm::BasicBlock::Create(params.module->getContext(), "entry", destructor);
+		llvm::IRBuilder<> builder(block);
+
+		// Get zeroth arg to func
+		llvm::Value* base_captured_var_struct = LLVMTypeUtils::getNthArg(destructor, 0);
+
+		// Downcast to known actual captured var struct type.
+		// Bitcast the closure pointer down to the 'base' closure type.
+		llvm::Value* actual_captured_var_struct = builder.CreateBitCast(
+			base_captured_var_struct, // value
+			LLVMTypeUtils::pointerType(cap_var_type), // dest type
+			"actual_captured_var_struct"
+		);
+
+		// Emit a call to the destructor for this captured var struct, if it has one.
+		EmitLLVMCodeParams temp_params = params;
+		temp_params.builder = &builder;
+		captured_var_struct_type->emitDestructorCall(temp_params, actual_captured_var_struct, "captured var struct destructor call");
+		
+		builder.CreateRetVoid();
+
+		// Store a pointer to the destructor in the closure.
+		llvm::StoreInst* store_inst = params.builder->CreateStore(destructor, params.builder->CreateStructGEP(closure_pointer, Function::destructorPtrIndex(), "destructor ptr"));
+
+		addMetaDataCommentToInstruction(params, store_inst, "Store destructor in closure");
+	}
+
+
 
 	// Bitcast the closure pointer down to the 'base' closure type.
 	llvm::Type* base_closure_type = this->type()->LLVMType(*params.module);
@@ -743,6 +797,9 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 		for(unsigned int i=0; i<arg_types.size(); ++i)
 			if(!arg_types[i]->passByValue() || arg_types[i]->isHeapAllocated())
 				has_ptr_arg = true;
+
+		if(use_cap_var_struct_ptr)
+			has_ptr_arg = true;
 
 		if(external_function.nonNull() && external_function->has_side_effects)
 		{}
@@ -1197,7 +1254,7 @@ bool FunctionDefinition::isConstant() const
 }*/
 
 
-TypeRef FunctionDefinition::getCapturedVariablesStructType() const
+StructureTypeRef FunctionDefinition::getCapturedVariablesStructType() const
 {
 	vector<TypeRef> field_types;
 	vector<string> field_names;
@@ -1231,7 +1288,7 @@ TypeRef FunctionDefinition::getCapturedVariablesStructType() const
 			
 
 	//NOTE: this is pretty heavyweight.
-	return TypeRef(new StructureType("captured_var_struct", field_types, field_names));
+	return new StructureType(this->sig.typeMangledName() + "_captured_var_struct", field_types, field_names);
 }
 
 

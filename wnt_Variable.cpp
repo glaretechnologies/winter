@@ -341,7 +341,7 @@ ValueRef Variable::exec(VMState& vmstate)
 	}
 	else if(this->vartype == BoundToGlobalDefVariable)
 	{
-		StructureValueRef captured_vars(new StructureValue(vector<ValueRef>()));
+		StructureValueRef captured_vars = new StructureValue(vector<ValueRef>());
 		return new FunctionValue(this->bound_function, captured_vars);
 	}
 	else if(this->vartype == BoundToNamedConstant)
@@ -596,7 +596,13 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 		// Load the value from the correct field.
 		llvm::Value* field_ptr = params.builder->CreateStructGEP(cap_var_structure, this->bound_index);
 
-		return params.builder->CreateLoad(field_ptr);
+		llvm::Value* field = params.builder->CreateLoad(field_ptr);
+
+		// Increment reference count
+		if(params.emit_refcounting_code && shouldRefCount(params, *this))
+			this->type()->emitIncrRefCount(params, field, "Variable::emitLLVMCode for captured var " + this->name);
+
+		return field;
 	}
 	else
 	{
