@@ -326,7 +326,7 @@ void Lexer::process(const SourceBufferRef& src, std::vector<Reference<TokenBase>
 			{
 				if(parser.current() == '-')
 				{
-					if(::isNumeric(parser.next()))
+					if(parser.nextIsNotEOF() && ::isNumeric(parser.next()))
 					{
 						// This is a negative numeric literal like '-3.0f'
 						parseNumericLiteral(src, parser, tokens_out);
