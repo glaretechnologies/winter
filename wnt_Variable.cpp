@@ -35,6 +35,7 @@ Copyright Glare Technologies Limited 2015 -
 #ifdef _MSC_VER
 #pragma warning(pop) // Re-enable warnings
 #endif
+//#include <iostream>
 
 
 using std::vector;
@@ -61,56 +62,103 @@ Variable::Variable(const std::string& name_, const SrcLocation& loc)
 }
 
 
-void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNode*>& stack)
+inline static const std::string varType(Variable::BindingType t)
 {
-	// Don't try and do the binding process again if already bound.
-	if(this->vartype != UnboundVariable)
-		return;
+	if(t == Variable::UnboundVariable)
+		return "Unbound";
+	else if(t == Variable::LetVariable)
+		return "Let";
+	else if(t == Variable::ArgumentVariable)
+		return "Arg";
+	else if(t == Variable::BoundToGlobalDefVariable)
+		return "BoundToGlobalDef";
+	else if(t == Variable::BoundToNamedConstant)
+		return "BoundToNamedConstant";
+	else if(t == Variable::CapturedVariable)
+		return "Captured";
+	else
+	{
+		assert(!"invalid var type");
+		return "";
+	}
+}
 
-	bool in_current_func_def = true;
-	int use_let_frame_offset = 0;
-	for(int s = (int)stack.size() - 1; s >= 0; --s) // Walk up the stack of ancestor nodes
+
+struct BindInfo
+{
+	BindInfo() : root_bound_node(NULL), bound_function(NULL), bound_let_block(NULL) {}
+
+	Variable::BindingType vartype;
+
+	int bound_index;
+	int let_var_index; // Index of the let variable bound to, for destructing assignment case may be > 0.
+
+	ASTNode* root_bound_node; // Node furthest up the node stack that we are bound to, if the variable is bound through one or more captured vars.
+	FunctionDefinition* bound_function; // Function for which the variable is an argument of,
+	LetBlock* bound_let_block;
+};
+
+
+BindInfo doBind(const std::vector<ASTNode*>& stack, int s, const std::string& name)
+{
+	for(; s >= 0; --s) // Walk up the stack of ancestor nodes
 	{
 		if(stack[s]->nodeType() == ASTNode::FunctionDefinitionType) // If node is a function definition:
 		{
 			FunctionDefinition* def = static_cast<FunctionDefinition*>(stack[s]);
 
+			// Try and bind to one of the function arguments:
 			for(unsigned int i=0; i<def->args.size(); ++i) // For each argument to the function:
-				if(def->args[i].name == this->name) // If the argument name matches this variable name:
+				if(def->args[i].name == name) // If the argument name matches this variable name:
 				{
-					if(!in_current_func_def && payload.func_def_stack.back()->is_anon_func) // use_captured_vars)
-					{
-						//this->captured_var_index = payload.captured_vars.size();
-						//this->use_captured_var = true;
-						this->vartype = CapturedVariable;
-						this->bound_index = (int)payload.func_def_stack.back()->captured_vars.size(); // payload.captured_vars.size();
-
-						// Save info to get bound function argument, so we can query it for the type of the captured var.
-						this->bound_function = def;
-						this->uncaptured_bound_index = i;
-
-						// Add this function argument as a variable that has to be captured for closures.
-						CapturedVar var;
-						var.vartype = CapturedVar::Arg;
-						var.bound_function = def;
-						var.index = i;
-						//payload.captured_vars.push_back(var);
-						payload.func_def_stack.back()->captured_vars.push_back(var);
-					}
-					else
-					{
-						// Bind this variable to the argument.
-						this->vartype = ArgumentVariable;
-						this->bound_index = i;
-						this->bound_function = def;
-					}
-
-					//def->args[i].ref_count++;
-
-					return;
+					// Bind this variable to the argument.
+					BindInfo bindinfo;
+					bindinfo.vartype = Variable::ArgumentVariable;
+					bindinfo.bound_index = i;
+					bindinfo.bound_function = def;
+					bindinfo.root_bound_node = def;
+					//std::cout << "Bound '" + name + "' to function arg, bound_index = " << bindinfo.bound_index << ", def = " << def->sig.toString() << std::endl;
+					return bindinfo;
 				}
 
-			in_current_func_def = false;
+			if(s >= 1)
+			{
+				assert(def->is_anon_func);
+
+				// We have reached a lambda expression.
+				// This means that the target of the current variable we are trying to bind must lie in the local environment, e.g. this is a captured var.
+				// So the variable we are trying to bind will be bound to capture result.  Now we need to determine what the capture result binds to.
+				BindInfo cap_var_bindinfo = doBind(stack, s - 1, name);
+
+				if(cap_var_bindinfo.vartype == Variable::UnboundVariable) // If binding failed:
+					return cap_var_bindinfo;
+
+				// Add this variable to the list of captured vars for this function
+				CapturedVar var;
+				if(cap_var_bindinfo.vartype == Variable::ArgumentVariable)
+					var.vartype = CapturedVar::Arg;
+				else if(cap_var_bindinfo.vartype == Variable::LetVariable)
+					var.vartype = CapturedVar::Let;
+				else if(cap_var_bindinfo.vartype == Variable::CapturedVariable)
+					var.vartype = CapturedVar::Captured;
+				else
+				{
+					assert(0);
+				}
+				var.bound_let_block = cap_var_bindinfo.bound_let_block;
+				var.index = cap_var_bindinfo.bound_index;
+				var.bound_let_block = cap_var_bindinfo.bound_let_block;
+				var.bound_function = cap_var_bindinfo.bound_function;
+				def->captured_vars.push_back(var);
+
+				BindInfo bindinfo;
+				bindinfo.vartype = Variable::CapturedVariable;
+				bindinfo.bound_index = (int)def->captured_vars.size() - 1;
+				bindinfo.root_bound_node = cap_var_bindinfo.root_bound_node;
+				bindinfo.bound_function = def;
+				//std::cout << "Bound '" + name + "' to captured var, bound_index = " << bindinfo.bound_index << ", captured var type = " << varType(cap_var_bindinfo.vartype) << std::endl;
+				return bindinfo;
+			}
 		}
 		else if(stack[s]->nodeType() == ASTNode::LetBlockType)
 		{
@@ -138,52 +186,43 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 				{
 					for(size_t v=0; v<let_block->lets[i]->vars.size(); ++v)
 					{
-						if(let_block->lets[i]->vars[v].name == this->name)
+						if(let_block->lets[i]->vars[v].name == name)
 						{
-							if(!in_current_func_def && payload.func_def_stack.back()->is_anon_func)// use_captured_vars)
-							{
-								//this->captured_var_index = payload.captured_vars.size();
-								//this->use_captured_var = true;
-								this->vartype = CapturedVariable;
-								this->bound_index = (int)payload.func_def_stack.back()->captured_vars.size(); // payload.captured_vars.size();
-
-								// Save info to get bound let, so we can query it for the type of the captured var.
-								this->bound_let_block = let_block;
-								this->uncaptured_bound_index = i;
-								this->let_var_index = (int)v;
-
-								// Add this function argument as a variable that has to be captured for closures.
-								CapturedVar var;
-								var.vartype = CapturedVar::Let;
-								var.bound_let_block = let_block;
-								var.index = i;
-								var.let_frame_offset = use_let_frame_offset;
-								//payload.captured_vars.push_back(var);
-								payload.func_def_stack.back()->captured_vars.push_back(var);
-							}
-							else
-							{
-								this->vartype = LetVariable;
-								this->bound_let_block = let_block;
-								this->bound_index = i;
-								this->let_frame_offset = use_let_frame_offset;
-								this->let_var_index = (int)v;
-							}
-		
-							return;
+							BindInfo bindinfo;
+							bindinfo.vartype = Variable::LetVariable;
+							bindinfo.bound_let_block = let_block;
+							bindinfo.bound_index = i;
+							bindinfo.let_var_index = (int)v;
+							//std::cout << "Bound '" + name + "' to let variable, bound_index = " << bindinfo.bound_index << std::endl;
+							return bindinfo;
 						}
 					}
 				}
 			}
-
-			// We only want to count an ancestor let block as an offsetting block if we are not currently in a let clause of it.
-			/*bool is_this_let_clause = false;
-			for(size_t z=0; z<let_block->lets.size(); ++z)
-				if(let_block->lets[z].getPointer() == stack[s+1])
-					is_this_let_clause = true;
-			if(!is_this_let_clause)*/
-				use_let_frame_offset++;
 		}
+	}
+	
+	BindInfo info;
+	info.vartype = Variable::UnboundVariable;
+	return info;
+}
+
+
+void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNode*>& stack)
+{
+	// Don't try and do the binding process again if already bound.
+	if(this->vartype != UnboundVariable)
+		return;
+
+	BindInfo bindinfo = doBind(stack, (int)stack.size() - 1, name);
+	if(bindinfo.vartype != UnboundVariable)
+	{
+		this->vartype = bindinfo.vartype;
+		this->bound_index = bindinfo.bound_index;
+		this->let_var_index = bindinfo.let_var_index;
+		this->bound_function = bindinfo.bound_function;
+		this->bound_let_block = bindinfo.bound_let_block;
+		return;
 	}
 
 	// Try and bind to top level function definition
@@ -352,7 +391,6 @@ ValueRef Variable::exec(VMState& vmstate)
 	{
 		// Get ref to capturedVars structure of values, will be passed in as last arg to function
 		ValueRef captured_struct = vmstate.argument_stack.back();
-		assert(dynamic_cast<StructureValue*>(captured_struct.getPointer()));
 		const StructureValue* s = checkedCast<StructureValue>(captured_struct.getPointer());
 
 		return s->fields[this->bound_index];
@@ -391,37 +429,14 @@ TypeRef Variable::type() const
 		return this->bound_named_constant->type();
 	else if(this->vartype == CapturedVariable)
 	{
-		if(this->bound_function != NULL)
-			return this->bound_function->args[this->uncaptured_bound_index].type;
-		else
-			return this->bound_let_block->lets[this->uncaptured_bound_index]->type();
+		FunctionDefinition* def = this->bound_function;
+
+		return def->captured_vars[this->bound_index].type();
 	}
 	else
 	{
 		//assert(!"invalid vartype.");
 		return TypeRef(NULL);
-	}
-}
-
-
-inline static const std::string varType(Variable::VariableType t)
-{
-	if(t == Variable::UnboundVariable)
-		return "Unbound";
-	else if(t == Variable::LetVariable)
-		return "Let";
-	else if(t == Variable::ArgumentVariable)
-		return "Arg";
-	else if(t == Variable::BoundToGlobalDefVariable)
-		return "BoundToGlobalDef";
-	else if(t == Variable::BoundToNamedConstant)
-		return "BoundToNamedConstant";
-	else if(t == Variable::CapturedVariable)
-		return "Captured";
-	else
-	{
-		assert(!"invalid var type");
-		return "";
 	}
 }
 
@@ -620,8 +635,8 @@ Reference<ASTNode> Variable::clone()
 	v->bound_let_block = bound_let_block;
 	v->bound_named_constant = bound_named_constant;
 	v->bound_index = bound_index;
-	v->let_frame_offset = let_frame_offset;
-	v->uncaptured_bound_index = uncaptured_bound_index;
+	//v->let_frame_offset = let_frame_offset;
+	//v->uncaptured_bound_index = uncaptured_bound_index;
 	v->let_var_index = let_var_index;
 	return v;
 }

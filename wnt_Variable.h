@@ -22,8 +22,7 @@ Variable AST node.
 class Variable : public ASTNode
 {
 public:
-	// More accurately, type of binding
-	enum VariableType
+	enum BindingType
 	{
 		UnboundVariable,
 		LetVariable,
@@ -50,24 +49,26 @@ public:
 	//AnonFunction* parent_anon_function;
 	//ASTNode* referenced_var;
 	//TypeRef referenced_var_type; // Type of the variable.
-	VariableType vartype; // let or arg.
+
+	std::string name; // variable name.
+
+	BindingType vartype; // one of BindingType above.
 
 	FunctionDefinition* bound_function; // Function for which the variable is an argument of,
 	LetBlock* bound_let_block;
 	NamedConstant* bound_named_constant;
 
-	int bound_index; // index in parent function definition argument list.
-	//int argument_offset; // Currently, a variable must be an argument to the enclosing function
-	std::string name; // variable name.
+	int bound_index; // index in parent function definition argument list, or index of let var in let block, or index of captured var.
 
 	// Offset of zero means use the latest/deepest set of let values.  Offset 1 means the next oldest, etc.
-	int let_frame_offset;
+	//int let_frame_offset;
 
 	// bool use_captured_var;
 	// int captured_var_index;
 
-	int uncaptured_bound_index;
+	//int uncaptured_bound_index;
 	int let_var_index; // Index of the let variable bound to, for destructing assignment case may be > 0.
+
 };
 
 

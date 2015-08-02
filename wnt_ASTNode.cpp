@@ -708,6 +708,11 @@ TypeRef CapturedVar::type() const
 		assert(this->bound_function);
 		return this->bound_function->args[this->index].type;
 	}
+	else if(this->vartype == Captured)
+	{
+		assert(this->bound_function);
+		return this->bound_function->captured_vars[this->index].type();
+	}
 	else
 	{
 		assert(!"Invalid vartype");

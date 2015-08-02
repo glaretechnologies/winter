@@ -3783,8 +3783,8 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 					def main() float :							\n\
 						let g = f								\n\
 							in									\n\
-						g(1.0)", 2.0f);		
-
+						g(1.0)", 2.0f);
+						
 	// Test variable capture: the returned lambda needs to capture the value of x.
 	testMainFloat("	def makeFunc(float x) function<float> : \\() : x      \n\
 					def main() float :                          \n\
@@ -3920,6 +3920,16 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 							f(x)", 1, (int)'e', ALLOW_UNSAFE);
 	testAssert(stats.num_heap_allocation_calls == 2); // Should be one alloc call for the string, and one for the closure returned from makeFunc()
 
+
+
+	// Test escape analyis allowing a closure to be stack-allocated.
+	stats = testMainIntegerArg("def main(int x) int :			\n\
+						let										\n\
+							f = \\(int x) : x + 10				\n\
+						in					                    \n\
+							f(x)", 2, 12, ALLOW_UNSAFE);
+	testAssert(stats.num_heap_allocation_calls == 0);
+
 	// Test closures
 
 	
@@ -3994,6 +4004,93 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 					f(x, true)");
 
 
+	// ===================================================================
+	// Test correct captures with let blocks
+	// ===================================================================
+
+	// Test that let blocks in the lambda expression function are ignored when computing the let block offset.
+	testMainFloat("def main() float :						\n\
+							let 							\n\
+								a = 3.0						\n\
+							in 								\n\
+								let 						\n\
+									f =\\() : 				\n\
+										a 					\n\
+								in f()						\n\
+								", 3.0f);
+
+	testMainFloat("def main() float :						\n\
+							let 							\n\
+								a = 3.0						\n\
+							in 								\n\
+								let 						\n\
+									f =\\() : 				\n\
+										let 				\n\
+										in 					\n\
+											a 				\n\
+								in f()						\n\
+								", 3.f);
+
+	testMainFloat("def main() float :						\n\
+							let 							\n\
+								a = 3.0						\n\
+							in 								\n\
+								let 						\n\
+									f =\\() : 				\n\
+										let 				\n\
+										in 					\n\
+											let				\n\
+											in				\n\
+												a 			\n\
+								in f()						\n\
+								", 3.f);
+
+	// ===================================================================
+	// Test capturing vars with nested lambdas
+	// ===================================================================
+
+	testMainFloatArg("def main(float x) float :							\n\
+								let 									\n\
+									a = x								\n\
+									f = \\() : 		# captures 'a'		\n\
+										let 							\n\
+											g = \\() : a				\n\
+										in								\n\
+											g()							\n\
+								in										\n\
+									f()									\n\
+								", 10.f, 10.f);
+
+
+	testMainFloatArg("def main(float x) float :		\n\
+								let 						\n\
+									f = \\() : 				\n\
+										let 				\n\
+											g = \\() : x	\n\
+										in					\n\
+											g()				\n\
+								in							\n\
+									f()						\n\
+								", 10.f, 10.f);
+
+	// ===================================================================
+	// Test binding with let blocks and nested lambdas
+	// ===================================================================
+	testMainFloat("def main() float :		\n\
+							let 							\n\
+								a = 3.0						\n\
+							in 								\n\
+								let 						\n\
+									f = \\() : 				\n\
+										let 				\n\
+											g = \\() :		\n\
+												let			\n\
+												in 			\n\
+													a 		\n\
+										in					\n\
+											g()				\n\
+								in f()						\n\
+								", 3.f);
 
 
 	// Test addition expression in let

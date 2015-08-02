@@ -20,6 +20,31 @@ const std::string makeSafeStringForFunctionName(const std::string& s);
 struct ProgramStats;
 
 
+class CapturedVar
+{
+public:
+	CapturedVar();
+
+	enum CapturedVarType
+	{
+		Let,
+		Arg,
+		Captured // we are capturing a captured var from an enclosing lambda expression :)
+	};
+
+	TypeRef type() const;
+
+
+	CapturedVarType vartype;
+	int index; // Argument index, or index of let variable inside let block, or index of captured var.
+	//int let_frame_offset; // how many let blocks we need to ignore before we get to the let block with the var we are bound to.
+
+
+	FunctionDefinition* bound_function; // Function for which the variable is an argument of,
+	LetBlock* bound_let_block;
+};
+
+
 /*=====================================================================
 FunctionDefinition
 -------------------

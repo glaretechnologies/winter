@@ -55,31 +55,6 @@ class TraversalPayload;
 struct ProgramStats;
 
 
-class CapturedVar
-{
-public:
-	CapturedVar();
-
-	enum CapturedVarType
-	{
-		Let,
-		Arg
-	};
-
-	TypeRef type() const;
-
-
-	CapturedVarType vartype;
-	int index; // Argument index, or index of let variable inside let block.
-	int let_frame_offset; // how many let blocks we need to ignore before we get to the let block with the var we are bound to.
-	//TypeRef type;
-
-
-	FunctionDefinition* bound_function; // Function for which the variable is an argument of,
-	LetBlock* bound_let_block;
-};
-
-
 class ASTNodeVisitor : public RefCounted
 {
 public:
