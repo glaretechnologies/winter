@@ -124,6 +124,9 @@ void IfExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 	}
 	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
+		if(this->condition->type().isNull() || this->then_expr->type().isNull() || this->else_expr->type().isNull())
+			throw BaseException("Unknown type." + errorContext(*this->condition));
+
 		if(this->condition->type()->getType() != Type::BoolType)
 			throw BaseException("First argument to if expression must have bool type." + errorContext(*this->condition));
 

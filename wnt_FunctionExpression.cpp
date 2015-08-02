@@ -649,6 +649,25 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 	}
 	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
+		// If the function is bound at runtime, need to do some type-checking here.
+		if(this->get_func_expr.nonNull())
+		{
+			const TypeRef get_func_expr_type = this->get_func_expr->type();
+			if(get_func_expr_type->getType() != Type::FunctionType)
+				throw BaseException("expression did not have function type." + errorContext(*get_func_expr));
+
+			const Function* function_type = get_func_expr_type.downcastToPtr<Function>();
+
+			if(function_type->arg_types.size() != argument_expressions.size())
+				throw BaseException("Incorrect number of arguments for function." + errorContext(*get_func_expr));
+
+			for(size_t i=0; i<function_type->arg_types.size(); ++i)
+			{
+				if(*argument_expressions[i]->type() != *function_type->arg_types[i])
+					throw BaseException("Invalid type for argument: argument type was " + argument_expressions[i]->type()->toString() + ", expected type " + function_type->arg_types[i]->toString() + "." + errorContext(*get_func_expr));
+			}
+		}
+
 		// Check the argument expression types still match the function argument types.
 		// They may have changed due to e.g. type coercion from int->float, in which case they won't be valid any more.
 		/*vector<TypeRef> argtypes(argument_expressions.size());
@@ -1560,7 +1579,7 @@ TypeRef FunctionExpression::type() const
 			return get_func_expr_type.downcastToPtr<Function>()->return_type;
 		}
 		else
-			return NULL;
+			throw BaseException("expression does not have function type." + errorContext(*this));
 	}
 	else
 	{

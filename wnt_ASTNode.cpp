@@ -1678,23 +1678,28 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 		if(this_type.isNull())
 			throw BaseException("Unknown operand type." + errorContext(*this, payload));
 
+		const TypeRef a_type = a->type();
+		const TypeRef b_type = b->type();
+		if(a_type.isNull() || b_type.isNull())
+			throw BaseException("Unknown operand type." + errorContext(*this, payload));
+
 		if(this_type->getType() == Type::GenericTypeType || this_type->getType() == Type::IntType || this_type->getType() == Type::FloatType)
 		{
-			if(*a->type() != *b->type())
-				throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
+			if(*a_type != *b_type)
+				throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
 		}
-		else if(a->type()->getType() == Type::VectorTypeType && b->type()->getType() == Type::VectorTypeType) // Vector + vector addition.
+		else if(a_type->getType() == Type::VectorTypeType && b_type->getType() == Type::VectorTypeType) // Vector + vector addition.
 		{
-			if(*a->type() != *b->type())
-				throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
+			if(*a_type != *b_type)
+				throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
 
 			// Check element type is int or float
-			if(!(a->type().downcast<VectorType>()->elem_type->getType() == Type::IntType || a->type().downcast<VectorType>()->elem_type->getType() == Type::FloatType))
-				throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
+			if(!(a_type.downcast<VectorType>()->elem_type->getType() == Type::IntType || a_type.downcast<VectorType>()->elem_type->getType() == Type::FloatType))
+				throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
 		}
 		else
 		{
-			throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
+			throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'." + errorContext(*this, payload));
 		}
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
@@ -1939,23 +1944,28 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 		if(this_type.isNull())
 			throw BaseException("Unknown operand type." + errorContext(*this, payload));
 
+		const TypeRef a_type = a->type();
+		const TypeRef b_type = b->type();
+		if(a_type.isNull() || b_type.isNull())
+			throw BaseException("Unknown operand type." + errorContext(*this, payload));
+
 		if(this_type->getType() == Type::GenericTypeType || this_type->getType() == Type::IntType || this_type->getType() == Type::FloatType)
 		{
-			if(*a->type() != *b->type())
-				throw BaseException("AdditionExpression: Binary operator '-' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
+			if(*a_type != *b_type)
+				throw BaseException("AdditionExpression: Binary operator '-' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
 		}
-		else if(a->type()->getType() == Type::VectorTypeType && b->type()->getType() == Type::VectorTypeType) // Vector + vector addition.
+		else if(a_type->getType() == Type::VectorTypeType && b_type->getType() == Type::VectorTypeType) // Vector + vector addition.
 		{
-			if(*a->type() != *b->type())
-				throw BaseException("AdditionExpression: Binary operator '-' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
+			if(*a_type != *b_type)
+				throw BaseException("AdditionExpression: Binary operator '-' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
 
 			// Check element type is int or float
-			if(!(a->type().downcast<VectorType>()->elem_type->getType() == Type::IntType || a->type().downcast<VectorType>()->elem_type->getType() == Type::FloatType))
-				throw BaseException("AdditionExpression: Binary operator '-' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
+			if(!(a_type.downcast<VectorType>()->elem_type->getType() == Type::IntType || a_type.downcast<VectorType>()->elem_type->getType() == Type::FloatType))
+				throw BaseException("AdditionExpression: Binary operator '-' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
 		}
 		else
 		{
-			throw BaseException("AdditionExpression: Binary operator '-' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
+			throw BaseException("AdditionExpression: Binary operator '-' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'." + errorContext(*this, payload));
 		}
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
@@ -2153,39 +2163,44 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 		if(this_type.isNull())
 			throw BaseException("Unknown operand type." + errorContext(*this, payload));
 
+		const TypeRef a_type = a->type();
+		const TypeRef b_type = b->type();
+		if(a_type.isNull() || b_type.isNull())
+			throw BaseException("Unknown operand type." + errorContext(*this, payload));
+
 		if(this_type->getType() == Type::GenericTypeType || this_type->getType() == Type::IntType || this_type->getType() == Type::FloatType)
 		{
-			if(*a->type() != *b->type())
-				throw BaseException("AdditionExpression: Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
+			if(*a_type != *b_type)
+				throw BaseException("AdditionExpression: Binary operator '*' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
 		}
-		else if(a->type()->getType() == Type::VectorTypeType && b->type()->getType() == Type::VectorTypeType) // Vector + vector addition.
+		else if(a_type->getType() == Type::VectorTypeType && b_type->getType() == Type::VectorTypeType) // Vector + vector addition.
 		{
-			if(*a->type() != *b->type())
-				throw BaseException("AdditionExpression: Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
+			if(*a_type != *b_type)
+				throw BaseException("AdditionExpression: Binary operator '*' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
 
 			// Check element type is int or float
-			if(!(a->type().downcast<VectorType>()->elem_type->getType() == Type::IntType || a->type().downcast<VectorType>()->elem_type->getType() == Type::FloatType))
-				throw BaseException("AdditionExpression: Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
+			if(!(a_type.downcast<VectorType>()->elem_type->getType() == Type::IntType || a_type.downcast<VectorType>()->elem_type->getType() == Type::FloatType))
+				throw BaseException("AdditionExpression: Binary operator '*' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
 		}
-		else if(a->type()->getType() == Type::VectorTypeType && *b->type() == *a->type().downcast<VectorType>()->elem_type)
+		else if(a_type->getType() == Type::VectorTypeType && *b_type == *a_type.downcast<VectorType>()->elem_type)
 		{
 			// A is a vector<T>, and B is of type T
 
 			// Check element type is int or float
-			if(!(a->type().downcast<VectorType>()->elem_type->getType() == Type::IntType || a->type().downcast<VectorType>()->elem_type->getType() == Type::FloatType))
-				throw BaseException("AdditionExpression: Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
+			if(!(a_type.downcast<VectorType>()->elem_type->getType() == Type::IntType || a_type.downcast<VectorType>()->elem_type->getType() == Type::FloatType))
+				throw BaseException("AdditionExpression: Binary operator '*' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
 		}
-		else if(b->type()->getType() == Type::VectorTypeType && *a->type() == *b->type().downcast<VectorType>()->elem_type)
+		else if(b_type->getType() == Type::VectorTypeType && *a_type == *b_type.downcast<VectorType>()->elem_type)
 		{
 			// B is a vector<T>, and A is of type T
 
 			// Check element type is int or float
-			if(!(b->type().downcast<VectorType>()->elem_type->getType() == Type::IntType || b->type().downcast<VectorType>()->elem_type->getType() == Type::FloatType))
-				throw BaseException("AdditionExpression: Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
+			if(!(b_type.downcast<VectorType>()->elem_type->getType() == Type::IntType || b_type.downcast<VectorType>()->elem_type->getType() == Type::FloatType))
+				throw BaseException("AdditionExpression: Binary operator '*' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
 		}
 		else
 		{
-			throw BaseException("AdditionExpression: Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
+			throw BaseException("AdditionExpression: Binary operator '*' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'." + errorContext(*this, payload));
 		}
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
@@ -2561,6 +2576,11 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	{
 		const TypeRef& this_type = this->type();
 		if(this_type.isNull())
+			throw BaseException("Unknown operand type." + errorContext(*this, payload));
+
+		const TypeRef a_type = a->type();
+		const TypeRef b_type = b->type();
+		if(a_type.isNull() || b_type.isNull())
 			throw BaseException("Unknown operand type." + errorContext(*this, payload));
 
 		if(this_type->getType() == Type::GenericTypeType || *this_type == Int() || *this_type == Float())
