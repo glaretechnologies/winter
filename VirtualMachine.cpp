@@ -73,6 +73,7 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/DynamicLibrary.h"
+#include "llvm/Analysis/Lint.h"
 #ifdef _MSC_VER
 #pragma warning(pop) // Re-enable warnings
 #endif
@@ -1337,6 +1338,16 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 	const bool optimise = true;
 	const bool verbose = false;
 
+	// Do Linting
+	/*llvm::lintModule(*this->llvm_module);
+
+	for(llvm::Module::iterator i = this->llvm_module->begin(); i != this->llvm_module->end(); ++i)
+		if(!i->isIntrinsic() && !i->isDeclaration())
+			llvm::lintFunction(*i);
+	*/
+
+
+
 	// Do LLVM optimisations
 	if(optimise)
 	{
@@ -1487,6 +1498,17 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode() const
 			const FunctionDefinitionRef f = linker.top_level_defs[i].downcast<FunctionDefinition>();
 			if(!f->isGenericFunction() && !f->isExternalFunction() && f->built_in_func_impl.isNull())
 				top_level_def_src += f->emitOpenCLC(params) + "\n";
+
+			// Collect any tuple types used in external functions
+			if(f->isExternalFunction())
+			{
+				for(unsigned int i=0; i<f->args.size(); ++i)
+					if(f->args[i].type->getType() == Type::TupleTypeType)
+						params.tuple_types_used.insert(f->args[i].type.downcast<TupleType>());
+				
+				if(f->returnType()->getType() == Type::TupleTypeType)
+					params.tuple_types_used.insert(f->returnType().downcast<TupleType>());
+			}
 		}
 		else if(linker.top_level_defs[i]->nodeType() == ASTNode::NamedConstantType)
 		{
