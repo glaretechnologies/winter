@@ -292,12 +292,15 @@ llvm::Value* TupleLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 }
 
 
-Reference<ASTNode> TupleLiteral::clone()
+Reference<ASTNode> TupleLiteral::clone(CloneMapType& clone_map)
 {
 	std::vector<ASTNodeRef> elems(this->elements.size());
 	for(size_t i=0; i<elements.size(); ++i)
-		elems[i] = this->elements[i]->clone();
-	return new TupleLiteral(elems, srcLocation());
+		elems[i] = this->elements[i]->clone(clone_map);
+
+	TupleLiteral* res = new TupleLiteral(elems, srcLocation());
+	clone_map.insert(std::make_pair(this, res));
+	return res;
 }
 
 

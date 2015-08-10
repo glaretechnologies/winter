@@ -49,6 +49,46 @@ namespace Winter
 {
 
 
+CapturedVar::CapturedVar()
+:	bound_function(NULL),
+	bound_let_node(NULL)
+	//substituted_expr(NULL)
+{}
+
+
+TypeRef CapturedVar::type() const
+{
+	if(this->vartype == Let)
+	{
+		assert(this->bound_let_node);
+		return this->bound_let_node->type();
+	}
+	else if(this->vartype == Arg)
+	{
+		assert(this->bound_function);
+		return this->bound_function->args[this->index].type;
+	}
+	else if(this->vartype == Captured)
+	{
+		assert(this->bound_function);
+		return this->bound_function->captured_vars[this->index].type();
+	}
+	else if(this->vartype == Removed)
+	{
+		assert(false);
+		return NULL;
+	}
+	else
+	{
+		assert(!"Invalid vartype");
+		return TypeRef();
+	}
+}
+
+
+//----------------------------------------------------------------------------------
+
+
 FunctionDefinition::FunctionDefinition(const SrcLocation& src_loc, int order_num_, const std::string& name, const std::vector<FunctionArg>& args_, 
 									   const ASTNodeRef& body_, const TypeRef& declared_rettype, 
 									   const BuiltInFunctionImplRef& impl
@@ -113,41 +153,42 @@ ValueRef FunctionDefinition::exec(VMState& vmstate)
 {
 	// Capture variables at this point, by getting them off the arg and let stack.
 	vector<ValueRef> vals;
-	for(size_t i=0; i<this->captured_vars.size(); ++i)
-	{
-		if(this->captured_vars[i].vartype == CapturedVar::Arg)
+	if(vmstate.capture_vars)
+		for(size_t i=0; i<this->captured_vars.size(); ++i)
 		{
-			vals.push_back(vmstate.argument_stack[vmstate.func_args_start.back() + this->captured_vars[i].index]);
+			if(this->captured_vars[i].vartype == CapturedVar::Arg)
+			{
+				vals.push_back(vmstate.argument_stack[vmstate.func_args_start.back() + this->captured_vars[i].index]);
+			}
+			else if(this->captured_vars[i].vartype == CapturedVar::Let)
+			{
+				//const int let_frame_offset = this->captured_vars[i].let_frame_offset;
+				//assert(let_frame_offset < (int)vmstate.let_stack_start.size());
+
+				//const int let_stack_start = (int)vmstate.let_stack_start[vmstate.let_stack_start.size() - 1 - let_frame_offset];
+				//vals.push_back(vmstate.let_stack[let_stack_start + this->captured_vars[i].index]);
+
+				ValueRef val = this->captured_vars[i].bound_let_node->exec(vmstate);
+				vals.push_back(val);
+
+				//NOTE: this looks wrong, should use index here as well?
+			}
+			else if(this->captured_vars[i].vartype == CapturedVar::Captured)
+			{
+				// Get ref to capturedVars structure of values, will be passed in as last arg to function
+				ValueRef captured_struct = vmstate.argument_stack.back();
+				const StructureValue* s = checkedCast<StructureValue>(captured_struct.getPointer());
+
+				ValueRef val = s->fields[this->captured_vars[i].index];
+
+				vals.push_back(val);
+			}
+			else
+			{
+				assert(0);
+				throw BaseException("internal error 136");
+			}
 		}
-		else if(this->captured_vars[i].vartype == CapturedVar::Let)
-		{
-			//const int let_frame_offset = this->captured_vars[i].let_frame_offset;
-			//assert(let_frame_offset < (int)vmstate.let_stack_start.size());
-
-			//const int let_stack_start = (int)vmstate.let_stack_start[vmstate.let_stack_start.size() - 1 - let_frame_offset];
-			//vals.push_back(vmstate.let_stack[let_stack_start + this->captured_vars[i].index]);
-
-			ValueRef val = this->captured_vars[i].bound_let_block->lets[this->captured_vars[i].index]->exec(vmstate);
-			vals.push_back(val);
-
-			//NOTE: this looks wrong, should use index here as well?
-		}
-		else if(this->captured_vars[i].vartype == CapturedVar::Captured)
-		{
-			// Get ref to capturedVars structure of values, will be passed in as last arg to function
-			ValueRef captured_struct = vmstate.argument_stack.back();
-			const StructureValue* s = checkedCast<StructureValue>(captured_struct.getPointer());
-
-			ValueRef val = s->fields[this->captured_vars[i].index];
-
-			vals.push_back(val);
-		}
-		else
-		{
-			assert(0);
-			throw BaseException("internal error 136");
-		}
-	}
 
 	// Put captured values into the variable struct.
 	Reference<StructureValue> var_struct = new StructureValue(vals);
@@ -206,7 +247,7 @@ ValueRef FunctionDefinition::invoke(VMState& vmstate)
 void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
 	// Don't traverse function defn from top level directly, wait until it is traversed as the child of the enclosing function
-	if(is_anon_func && stack.empty())
+	if(is_anon_func && stack.empty() && (payload.operation != TraversalPayload::UpdateUpRefs))
 		return;
 
 	if(this->isGenericFunction())
@@ -305,7 +346,49 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 
 	//payload.capture_variables = old_use_captured_vars;
 
-	if(payload.operation == TraversalPayload::TypeCheck)
+	if(payload.operation == TraversalPayload::InlineFunctionCalls)
+	{
+		if(body.nonNull())
+			checkInlineExpression(body, payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::UpdateUpRefs)
+	{
+		for(size_t i=0; i<captured_vars.size(); ++i)
+		{
+			switch(captured_vars[i].vartype)
+			{
+			case CapturedVar::Let:
+				{
+					ASTNode* updated_node = payload.clone_map[captured_vars[i].bound_let_node];
+					if(updated_node)
+						captured_vars[i].bound_let_node = (LetASTNode*)updated_node;
+					break;
+				}
+			case CapturedVar::Arg:
+				break;
+			case CapturedVar::Captured:
+				{
+					break;
+				}
+			}
+		}
+	}
+	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	{
+		if(body.nonNull())
+			checkSubstituteVariable(body, payload);
+
+		for(size_t i=0; i<this->captured_vars.size(); ++i)
+		{
+			if(captured_vars[i].vartype == CapturedVar::Arg)
+			{
+				// We need to change the captured var to capture the expression that is the argument value.
+				//captured_vars[i].substituted_expr = payload.variable_substitutes[i]->clone();
+				//captured_vars[i].substituted_expr = cloneASTNodeSubtree(payload.variable_substitutes[i]);
+			}
+		}
+	}
+	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
 		if(this->body.nonNull())
 		{
@@ -415,6 +498,13 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 			
 		this->can_maybe_constant_fold = body_is_literal;
 	}
+	else if(payload.operation == TraversalPayload::DeadFunctionElimination)
+	{
+		if(this->is_anon_func)
+		{
+			payload.reachable_defs.insert(this);
+		}
+	}
 
 	stack.pop_back();
 	payload.func_def_stack.pop_back();
@@ -424,13 +514,15 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 void FunctionDefinition::print(int depth, std::ostream& s) const
 {
 	printMargin(depth, s);
-	s << "FunctionDef: " << this->sig.toString() << " " << 
+	s << "FunctionDef (" + toHexString((uint64)this) + "): " << this->sig.toString() << " " << 
 		(this->returnType().nonNull() ? this->returnType()->toString() : "[Unknown ret type]");
 	if(this->declared_return_type.nonNull())
 		s << " (Declared ret type: " + this->declared_return_type->toString() << ")";
 	s << "\n";
-	//for(unsigned int i=0; i<this->lets.size(); ++i)
-	//	lets[i]->print(depth + 1, s);
+
+	for(size_t i=0; i<this->captured_vars.size(); ++i)
+		captured_vars[i].print(depth + 1, s);
+
 
 	if(this->built_in_func_impl.nonNull())
 	{
@@ -515,6 +607,8 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 	// We want to return a function closure, which is allocated on the heap (usually) and contains a function pointer to the anonymous function, 
 	// a structure containing the captured variables, etc..
+
+	params.stats->num_closure_allocations++;
 
 	TypeRef this_closure_type = this->type();
 
@@ -689,7 +783,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 	llvm::Value* captured_var_struct_ptr = params.builder->CreateStructGEP(closure_pointer, Function::capturedVarStructIndex(), "captured_var_struct_ptr");
 
 	// for each captured var
-	for(size_t i=0; i<this->captured_vars.size(); ++i)
+	for(size_t i=0, use_index=0; i<this->captured_vars.size(); ++i)
 	{
 		llvm::Value* val = NULL;
 		if(this->captured_vars[i].vartype == CapturedVar::Arg)
@@ -709,7 +803,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			const int let_block_index = (int)params.let_block_stack.size() - 1 - let_frame_offset;
 			LetBlock* let_block = params.let_block_stack[let_block_index];*/
 
-			LetBlock* let_block = this->captured_vars[i].bound_let_block;
+			LetASTNode* let_node = this->captured_vars[i].bound_let_node;
 	
 			//val = let_block->getLetExpressionLLVMValue(
 			//	params,
@@ -717,8 +811,8 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			//	ret_space_ptr // TEMP
 			//);
 
-			assert(params.let_block_let_values.find(let_block) != params.let_block_let_values.end());
-			val = params.let_block_let_values[let_block][ this->captured_vars[i].index];
+			assert(params.let_values.find(let_node) != params.let_values.end());
+			val = params.let_values[let_node];
 		}
 		else if(this->captured_vars[i].vartype == CapturedVar::Captured)
 		{
@@ -736,19 +830,28 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			
 			val = params.builder->CreateLoad(field_ptr);
 		}
+		else if(this->captured_vars[i].vartype == CapturedVar::Removed)
+		{}
 		else
 		{
 			assert(0);
 		}
-			
-		// store in captured var structure field
-		llvm::Value* field_ptr = params.builder->CreateStructGEP(captured_var_struct_ptr, (unsigned int)i, "captured_var_" + toString(i) + "_field_ptr");
-		llvm::StoreInst* store_inst = params.builder->CreateStore(val, field_ptr);
 
-		addMetaDataCommentToInstruction(params, store_inst, "Store captured var " + toString(i) + " in closure");
+		
+		if(this->captured_vars[i].vartype != CapturedVar::Removed)
+		{
+			// store in captured var structure field
+			llvm::Value* field_ptr = params.builder->CreateStructGEP(captured_var_struct_ptr, (unsigned int)use_index, "captured_var_" + toString(use_index) + "_field_ptr");
+			llvm::StoreInst* store_inst = params.builder->CreateStore(val, field_ptr);
 
-		// If the captured var is a ref-counted type, we need to increment its reference count, since the struct now holds a reference to it. 
-		captured_var_struct_type->component_types[i]->emitIncrRefCount(params, val, "Capture var ref count increment");
+			addMetaDataCommentToInstruction(params, store_inst, "Store captured var " + toString(use_index) + " in closure");
+
+			// If the captured var is a ref-counted type, we need to increment its reference count, since the struct now holds a reference to it. 
+			captured_var_struct_type->component_types[use_index]->emitIncrRefCount(params, val, "Capture var ref count increment");
+
+		
+			use_index++;
+		}
 	}
 
 
@@ -757,7 +860,9 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 	// Will be something like (C++ equiv):
 	// void anon_func_xx_captured_var_struct_destructor(base_captured_var_struct* s)
 	{
-		const std::string destructor_name = this->sig.typeMangledName() + "_captured_var_struct_destructor";
+		const std::string destructor_name = this->sig.typeMangledName() + toHexString((uint64)this) + "_captured_var_struct_destructor";
+
+		assert(params.module->getFunction(destructor_name) == NULL);
 
 		llvm::Constant* llvm_func_constant = params.module->getOrInsertFunction(
 			destructor_name, // Name
@@ -1260,18 +1365,23 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 }
 
 
-Reference<ASTNode> FunctionDefinition::clone()
+Reference<ASTNode> FunctionDefinition::clone(CloneMapType& clone_map)
 {
 	FunctionDefinitionRef f = new FunctionDefinition(
 		this->srcLocation(),
 		this->order_num,
 		this->sig.name,
 		this->args,
-		this->body.nonNull() ? this->body->clone() : NULL,
+		this->body.nonNull() ? this->body->clone(clone_map) : NULL,
 		this->declared_return_type,
 		this->built_in_func_impl
 	);
 
+	f->captured_vars = this->captured_vars;
+	f->captured_var_types = this->captured_var_types;
+	f->is_anon_func = this->is_anon_func;
+
+	clone_map.insert(std::make_pair(this, f.getPointer()));
 	return f;
 }
 
@@ -1300,10 +1410,13 @@ bool FunctionDefinition::isConstant() const
 {
 	//assert(!"FunctionDefinition::isConstant()");
 	//return false;//TEMP
-	if(body.isNull())
+	/*if(body.isNull())
 		return false;
 
-	return this->body->isConstant();
+	return this->body->isConstant();*/
+
+	// A FunctionDefinition node always returns the same anonymous function, so it's constant.
+	return true;
 }
 
 
@@ -1345,9 +1458,12 @@ StructureTypeRef FunctionDefinition::getCapturedVariablesStructType() const
 	for(size_t i=0; i<this->captured_vars.size(); ++i)
 	{
 		// Get the type of the captured variable.
-		field_types.push_back(this->captured_vars[i].type());
+		if(this->captured_vars[i].vartype != CapturedVar::Removed)
+		{
+			field_types.push_back(this->captured_vars[i].type());
 
-		field_names.push_back("captured_var_" + toString((uint64)i));
+			field_names.push_back("captured_var_" + toString((uint64)i));
+		}
 	}
 			
 
@@ -1389,6 +1505,31 @@ const std::string makeSafeStringForFunctionName(const std::string& s)
 			res[i] = '_';
 
 	return res;
+}
+
+
+void CapturedVar::print(int depth, std::ostream& s) const
+{
+	printMargin(depth, s);
+	std::string vartype_s;
+	switch(vartype)
+	{
+	case Let:
+		vartype_s = "Let"; break;
+	case Arg:
+		vartype_s = "Arg"; break;
+	case Captured:
+		vartype_s = "Captured"; break;
+	case Removed:
+		vartype_s = "Removed"; break;
+	};
+
+	s << "captured var, vartype=" + vartype_s + ", index=" << index;
+	if(bound_function)
+		s << " bound func: " + bound_function->sig.toString();
+	if(bound_let_node)
+		s << " bound let node: " + toHexString((uint64)bound_let_node);
+	s << "\n";
 }
 
 

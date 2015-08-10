@@ -359,12 +359,14 @@ llvm::Value* VectorLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 }
 
 
-Reference<ASTNode> VectorLiteral::clone()
+Reference<ASTNode> VectorLiteral::clone(CloneMapType& clone_map)
 {
 	std::vector<ASTNodeRef> elems(this->elements.size());
 	for(size_t i=0; i<elements.size(); ++i)
-		elems[i] = this->elements[i]->clone();
-	return new VectorLiteral(elems, srcLocation(), has_int_suffix, int_suffix);
+		elems[i] = this->elements[i]->clone(clone_map);
+	VectorLiteral* res = new VectorLiteral(elems, srcLocation(), has_int_suffix, int_suffix);
+	clone_map.insert(std::make_pair(this, res));
+	return res;
 }
 
 

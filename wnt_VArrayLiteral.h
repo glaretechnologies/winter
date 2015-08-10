@@ -34,7 +34,7 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual llvm::Value* getConstantLLVMValue(EmitLLVMCodeParams& params) const;
 	virtual void emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* val) const;
-	virtual Reference<ASTNode> clone();
+	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 
 

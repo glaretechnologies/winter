@@ -176,6 +176,11 @@ void VArrayLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 			this->can_maybe_constant_fold = this->can_maybe_constant_fold && elem_is_literal;
 		}
 	}
+	else if(payload.operation == TraversalPayload::DeadFunctionElimination)
+	{
+		//FunctionDefinitionRef def = payload.linker->findMatchingFunctionSimple(FunctionSignature("allocateVArray", vector<TypeRef>(2, new Int(64))));
+		//payload.reachable_defs.insert(def.getPointer());
+	}
 }
 
 
@@ -377,12 +382,15 @@ llvm::Value* VArrayLiteral::getConstantLLVMValue(EmitLLVMCodeParams& params) con
 }
 
 
-Reference<ASTNode> VArrayLiteral::clone()
+Reference<ASTNode> VArrayLiteral::clone(CloneMapType& clone_map)
 {
 	std::vector<ASTNodeRef> elems(this->elements.size());
 	for(size_t i=0; i<elements.size(); ++i)
-		elems[i] = this->elements[i]->clone();
-	return new VArrayLiteral(elems, srcLocation(), has_int_suffix, int_suffix);
+		elems[i] = this->elements[i]->clone(clone_map);
+
+	VArrayLiteral* res = new VArrayLiteral(elems, srcLocation(), has_int_suffix, int_suffix);
+	clone_map.insert(std::make_pair(this, res));
+	return res;
 }
 
 

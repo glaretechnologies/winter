@@ -56,7 +56,7 @@ public:
 class VMConstructionArgs
 {
 public:
-	VMConstructionArgs() : env(NULL), allow_unsafe_operations(false), emit_trace_code(false) /*, add_opaque_env_arg(false)*/ {}
+	VMConstructionArgs() : env(NULL), allow_unsafe_operations(false), emit_trace_code(false), build_llvm_code(true) /*, add_opaque_env_arg(false)*/ {}
 	std::vector<ExternalFunctionRef> external_functions;
 	std::vector<SourceBufferRef> source_buffers;
 	std::vector<FunctionSignature> entry_point_sigs;
@@ -66,13 +66,15 @@ public:
 	bool allow_unsafe_operations; // If this is true, in-bounds proof requirements of elem() etc.. are disabled.
 	bool emit_trace_code; // If this is true, information is printed out to std out as the program executes.
 	std::vector<Reference<FunctionRewriter> > function_rewriters;
+
+	bool build_llvm_code; // JIT compile executable code with LLVM.  Can be set to false when e.g. you just want OpenCL code.
 };
 
 
 struct ProgramStats
 {
 	uint64 num_heap_allocation_calls;
-
+	uint64 num_closure_allocations; // Num closures allocated, either on stack or on the heap.
 };
 
 
@@ -98,8 +100,13 @@ public:
 		std::string struct_def_code;
 		std::string function_code;
 	};
-	OpenCLCCode buildOpenCLCode() const;
-	std::string buildOpenCLCodeCombined() const;
+	struct BuildOpenCLCodeArgs
+	{
+		std::vector<TupleTypeRef> tuple_types_used; // For tuples used with external funcs, to make sure the OpenCL definitions for these are emitted.
+	};
+
+	OpenCLCCode buildOpenCLCode(const BuildOpenCLCodeArgs& args) const;
+	std::string buildOpenCLCodeCombined(const BuildOpenCLCodeArgs& args) const;
 
 	const ProgramStats& getProgramStats() const { return stats; }
 

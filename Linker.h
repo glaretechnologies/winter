@@ -53,7 +53,7 @@ public:
 	typedef std::map<std::string, Reference<NamedConstant> > NamedConstantMap;
 	NamedConstantMap named_constant_map;
 
-private:
+//private:
 	void addFunction(const FunctionDefinitionRef& f);
 	FunctionDefinitionRef makeConcreteFunction(Reference<FunctionDefinition> generic_func, 
 		std::vector<TypeRef> type_mappings);

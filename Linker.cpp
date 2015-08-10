@@ -1161,7 +1161,10 @@ Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDef
 	BuiltInFunctionImpl* built_in_impl = NULL;
 
 	if(generic_func->body.nonNull())
-		body = generic_func->body->clone();
+	{
+		CloneMapType clone_map;
+		body = generic_func->body->clone(clone_map);
+	}
 	else
 	{
 		if(generic_func->sig.name == "fold")

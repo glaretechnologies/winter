@@ -51,6 +51,7 @@ File created by ClassTemplate on Wed Jun 11 03:55:25 2008
 #ifdef _MSC_VER
 #pragma warning(pop) // Re-enable warnings
 #endif
+#include <iostream>
 
 
 using std::vector;
@@ -302,21 +303,52 @@ void checkInlineExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector
 	{
 		FunctionExpressionRef func_expr = e.downcast<FunctionExpression>();
 
-		if(func_expr->static_target_function &&/*func_expr->isBoundToGlobalDef() && *//*func_expr->binding_type == FunctionExpression::BoundToGlobalDef && */!func_expr->static_target_function->isExternalFunction() && func_expr->static_target_function->body.nonNull())
+		FunctionDefinition* target_func = NULL;
+		if(func_expr->static_target_function)
+		{
+			target_func = func_expr->static_target_function;
+		}
+		else if(func_expr->get_func_expr.nonNull() && func_expr->get_func_expr->isConstant())
+		{
+			//if(func_expr->get_func_expr.isType<Variable>())
+			//{
+			//	const Variable* var = func_expr->get_func_expr
+			try
+			{
+				VMState vmstate;
+				vmstate.capture_vars = false;
+				vmstate.func_args_start.push_back(0);
+				ValueRef base_target_function_val = func_expr->get_func_expr->exec(vmstate);
+				const FunctionValue* target_func_val = checkedCast<FunctionValue>(base_target_function_val);
+				target_func = target_func_val->func_def;
+			}
+			catch(BaseException&)
+			{
+			}
+		}
+
+
+		if(target_func && !target_func->isExternalFunction() && target_func->body.nonNull())
 		{
 		
-			//std::cout << "------------original expr: " << std::endl;
-			//e->print(0, std::cout);
+			std::cout << "\n=================== Inlining function call =====================\n";
+			std::cout << "------------original expr----------: " << std::endl;
+			e->print(0, std::cout);
+
+			std::cout << "------------original target function body-----------: " << std::endl;
+			target_func->body->print(0, std::cout);
 
 			// Replace e with a copy of the target function body.
+			ASTNodeRef cloned_body = cloneASTNodeSubtree(target_func->body);
+			e = cloned_body;
 
-			e = func_expr->static_target_function->body->clone();
+			std::cout << "------------new expr: (cloned function body)-----------: " << std::endl;
+			e->print(0, std::cout);
 
-			//std::cout << "------------new expr: " << std::endl;
-			//e->print(0, std::cout);
 
+			// Now replace all variables in the target function body with the argument values from func_expr
 			TraversalPayload sub_payload(TraversalPayload::SubstituteVariables);
-
+			sub_payload.func_args_to_sub = target_func;
 			sub_payload.variable_substitutes.resize(func_expr->argument_expressions.size());
 			for(size_t i=0; i<func_expr->argument_expressions.size(); ++i)
 			{
@@ -325,14 +357,14 @@ void checkInlineExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector
 				//std::cout << "------------sub_payload.variable_substitutes[i]: " << std::endl;
 				//sub_payload.variable_substitutes[i]->print(0, std::cout);
 			}
-
-			// Now replace all variables in the target function body with the argument values from func_expr
 			e->traverse(sub_payload, stack);
+
+			checkSubstituteVariable(e, sub_payload); // e itself might be a variable that needs substituting.
 
 			payload.tree_changed = true;
 
-			//std::cout << "------------final expr: " << std::endl;
-			//e->print(0, std::cout);
+			std::cout << "------------final expr: (with vars subbed)------------- " << std::endl;
+			e->print(0, std::cout);
 		}
 	}
 }
@@ -344,11 +376,93 @@ void checkSubstituteVariable(ASTNodeRef& e, TraversalPayload& payload)
 	{
 		Reference<Variable> var = e.downcast<Variable>();
 
-		if(var->vartype == Variable::ArgumentVariable)
+		if(var->vartype == Variable::ArgumentVariable && var->bound_function == payload.func_args_to_sub)
 		{
-			e = payload.variable_substitutes[var->bound_index]->clone(); // Replace the variable with the argument value.	
+			// Replace the variable with the argument value.	
+			if(var->bound_index >= payload.variable_substitutes.size())
+				return; // May be out of bounds for invalid programs.
+			e = cloneASTNodeSubtree(payload.variable_substitutes[var->bound_index]);
 
 			payload.tree_changed = true;
+		}
+		else if(var->vartype == Variable::CapturedVariable)
+		{
+			// If this variable is bound to a captured var, and that captured var in turn is bound to an argument that we are substituting, then substitute the value for the variable.
+			const CapturedVar& captured_var = var->bound_function->captured_vars[var->bound_index];
+			if(captured_var.vartype == CapturedVar::Arg)// && captured_var.bound_function == payload.func_args_to_sub)
+			{
+				// If the captured variable was capturing an argument of the function body we were inlining, then use the substituted value:
+				if(captured_var.bound_function == payload.func_args_to_sub)
+					e = cloneASTNodeSubtree(payload.variable_substitutes[captured_var.index]);
+				else
+				{
+					var->vartype = Variable::ArgumentVariable;
+					var->bound_function = captured_var.bound_function;
+					var->bound_index = captured_var.index;
+				}
+			}
+			else if(captured_var.vartype == CapturedVar::Let)
+			{
+				e = cloneASTNodeSubtree(captured_var.bound_let_node->expr);
+			}
+			else if(captured_var.vartype == CapturedVar::Captured)
+			{
+				//CapturedVar& bound_cap_var = captured_var.bound_function->captured_vars[captured_var.index];
+				//e = cloneASTNodeSubtree(captured_var.bound_let_node->expr);
+				// The variable was bound to a captured var, which in turn was bound to another captured var.
+				// We want to bind the variable directly to the second captured var.
+				var->bound_function = captured_var.bound_function; // payload.func_args_to_sub;
+				var->bound_index = captured_var.index;
+			}
+		}
+	}
+	else if(e->nodeType() == ASTNode::FunctionDefinitionType)
+	{
+		Reference<FunctionDefinition> def = e.downcast<FunctionDefinition>();
+
+		//std::vector<CapturedVar> updated_captured_vars;
+		for(size_t i=0; i<def->captured_vars.size(); ++i)
+		{
+			CapturedVar& captured_var = def->captured_vars[i];
+
+			if(captured_var.vartype == CapturedVar::Arg && captured_var.bound_function == payload.func_args_to_sub)
+			{
+				//e = payload.variable_substitutes[var->bound_index]->clone(); // Replace the variable with the argument value.	
+				/*if(captured_var.index >= payload.variable_substitutes.size())
+					continue; // May be out of bounds for invalid programs.
+				e = cloneASTNodeSubtree(payload.variable_substitutes[var->bound_index]);*/
+
+				captured_var.vartype = CapturedVar::Removed;
+
+				payload.tree_changed = true;
+			}
+			else if(captured_var.vartype == CapturedVar::Captured)
+			{
+				//TEMP HACK:
+				captured_var.vartype = CapturedVar::Removed;
+
+				payload.tree_changed = true;
+
+				// If this variable is bound to a captured var, and that captured var in turn is bound to an argument that we are substituting, then substitute the value for the variable.
+				/*const CapturedVar& captured_var = var->bound_function->captured_vars[var->bound_index];
+				if(captured_var.vartype == CapturedVar::Arg && captured_var.bound_function == payload.func_args_to_sub)
+				{
+					e = cloneASTNodeSubtree(payload.variable_substitutes[captured_var.index]);
+				}
+				else if(captured_var.vartype == CapturedVar::Let)
+				{
+					e = cloneASTNodeSubtree(captured_var.bound_let_node->expr);
+				}
+				else if(captured_var.vartype == CapturedVar::Captured)
+				{
+					//CapturedVar& bound_cap_var = captured_var.bound_function->captured_vars[captured_var.index];
+					//e = cloneASTNodeSubtree(captured_var.bound_let_node->expr);
+					// The variable was bound to a captured var, which in turn was bound to another captured var.
+					// We want to bind the variable directly to the second captured var.
+					var->bound_function = captured_var.bound_function; // payload.func_args_to_sub;
+					var->bound_index = captured_var.index;
+				}*/
+			}
 		}
 	}
 }
@@ -639,8 +753,8 @@ bool expressionsHaveSameValue(const ASTNodeRef& a, const ASTNodeRef& b)
 		else if(avar->vartype == Variable::LetVariable)
 		{
 			return 
-				avar->bound_let_block == bvar->bound_let_block && 
-				avar->bound_index == bvar->bound_index;
+				avar->bound_let_node == bvar->bound_let_node && 
+				avar->let_var_index == bvar->let_var_index;
 		}
 		else
 		{
@@ -687,39 +801,29 @@ bool mayEscapeCurrentlyBuildingFunction(EmitLLVMCodeParams& params, const TypeRe
 }
 
 
-//----------------------------------------------------------------------------------
-
-
-CapturedVar::CapturedVar()
-:	bound_function(NULL),
-	bound_let_block(NULL)
-{}
-
-
-TypeRef CapturedVar::type() const
+/*void replaceAllUsesWith(Reference<ASTNode>& old_node, Reference<ASTNode>& new_node)
 {
-	if(this->vartype == Let)
+	new_node->uprefs.resize(old_node->uprefs.size());
+	for(size_t i=0; i<old_node->uprefs.size(); ++i)
 	{
-		assert(this->bound_let_block);
-		return this->bound_let_block->lets[this->index]->type();
+		old_node->uprefs[i]->updateTarget(new_node.getPointer());
+		new_node->uprefs[i] = old_node->uprefs[i];
 	}
-	else if(this->vartype == Arg)
-	{
-		assert(this->bound_function);
-		return this->bound_function->args[this->index].type;
-	}
-	else if(this->vartype == Captured)
-	{
-		assert(this->bound_function);
-		return this->bound_function->captured_vars[this->index].type();
-	}
-	else
-	{
-		assert(!"Invalid vartype");
-		return TypeRef();
-	}
-}
+}*/
 
+
+Reference<ASTNode> cloneASTNodeSubtree(Reference<ASTNode>& n)
+{
+	TraversalPayload update_refs_payload(TraversalPayload::UpdateUpRefs);
+
+	Reference<ASTNode> cloned = n->clone(update_refs_payload.clone_map);
+
+	// Update all uprefs in the cloned body to point to the cloned body instead of the original body.
+	std::vector<ASTNode*> stack; // NOTE: does it matter that stack is empty here?
+	cloned->traverse(update_refs_payload, stack);
+
+	return cloned;
+}
 
 //----------------------------------------------------------------------------------
 
@@ -832,7 +936,7 @@ llvm::Value* BufferRoot::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* r
 }
 
 
-Reference<ASTNode> BufferRoot::clone()
+Reference<ASTNode> BufferRoot::clone(CloneMapType& clone_map)
 {
 	throw BaseException("BufferRoot::clone()");
 }
@@ -941,9 +1045,11 @@ llvm::Value* FloatLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 }
 
 
-Reference<ASTNode> FloatLiteral::clone()
+Reference<ASTNode> FloatLiteral::clone(CloneMapType& clone_map)
 {
-	return new FloatLiteral(value, srcLocation());
+	FloatLiteral* res = new FloatLiteral(value, srcLocation());
+	clone_map.insert(std::make_pair(this, res));
+	return res;
 }
 
 
@@ -988,9 +1094,11 @@ llvm::Value* IntLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* r
 }
 
 
-Reference<ASTNode> IntLiteral::clone()
+Reference<ASTNode> IntLiteral::clone(CloneMapType& clone_map)
 {
-	return new IntLiteral(value, num_bits, srcLocation());
+	IntLiteral* res = new IntLiteral(value, num_bits, srcLocation());
+	clone_map.insert(std::make_pair(this, res));
+	return res;
 }
 
 
@@ -1035,9 +1143,11 @@ llvm::Value* BoolLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* 
 }
 
 
-Reference<ASTNode> BoolLiteral::clone()
+Reference<ASTNode> BoolLiteral::clone(CloneMapType& clone_map)
 {
-	return new BoolLiteral(value, srcLocation());
+	BoolLiteral* res = new BoolLiteral(value, srcLocation());
+	clone_map.insert(std::make_pair(this, res));
+	return res;
 }
 
 
@@ -1135,12 +1245,14 @@ llvm::Value* MapLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* r
 }
 
 
-Reference<ASTNode> MapLiteral::clone()
+Reference<ASTNode> MapLiteral::clone(CloneMapType& clone_map)
 {
 	MapLiteral* m = new MapLiteral(srcLocation());
 	m->maptype = this->maptype;
 	for(size_t i=0; i<items.size(); ++i)
-		m->items.push_back(std::make_pair(items[0].first->clone(), items[0].second->clone()));
+		m->items.push_back(std::make_pair(items[0].first->clone(clone_map), items[0].second->clone(clone_map)));
+
+	clone_map.insert(std::make_pair(this, m));
 	return m;
 }
 
@@ -1327,9 +1439,11 @@ llvm::Value* StringLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 //}
 
 
-Reference<ASTNode> StringLiteral::clone()
+Reference<ASTNode> StringLiteral::clone(CloneMapType& clone_map)
 {
-	return new StringLiteral(value, srcLocation());
+	StringLiteral* res = new StringLiteral(value, srcLocation());
+	clone_map.insert(std::make_pair(this, res));
+	return res;
 }
 
 
@@ -1397,9 +1511,11 @@ llvm::Value* CharLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* 
 //}
 
 
-Reference<ASTNode> CharLiteral::clone()
+Reference<ASTNode> CharLiteral::clone(CloneMapType& clone_map)
 {
-	return new CharLiteral(value, srcLocation());
+	CharLiteral* res = new CharLiteral(value, srcLocation());
+	clone_map.insert(std::make_pair(this, res));
+	return res;
 }
 
 
@@ -1815,9 +1931,11 @@ llvm::Value* AdditionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 }
 
 
-Reference<ASTNode> AdditionExpression::clone()
+Reference<ASTNode> AdditionExpression::clone(CloneMapType& clone_map)
 {
-	return new AdditionExpression(this->srcLocation(), this->a->clone(), this->b->clone());
+	AdditionExpression* res = new AdditionExpression(this->srcLocation(), this->a->clone(clone_map), this->b->clone(clone_map));
+	clone_map.insert(std::make_pair(this, res));
+	return res;
 }
 
 
@@ -2054,9 +2172,11 @@ llvm::Value* SubtractionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llv
 }
 
 
-Reference<ASTNode> SubtractionExpression::clone()
+Reference<ASTNode> SubtractionExpression::clone(CloneMapType& clone_map)
 {
-	return new SubtractionExpression(this->srcLocation(), this->a->clone(), this->b->clone());
+	SubtractionExpression* res = new SubtractionExpression(this->srcLocation(), this->a->clone(clone_map), this->b->clone(clone_map));
+	clone_map.insert(std::make_pair(this, res));
+	return res;
 }
 
 
@@ -2432,9 +2552,11 @@ llvm::Value* MulExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 }
 
 
-Reference<ASTNode> MulExpression::clone()
+Reference<ASTNode> MulExpression::clone(CloneMapType& clone_map)
 {
-	return new MulExpression(this->srcLocation(), this->a->clone(), this->b->clone());
+	MulExpression* res = new MulExpression(this->srcLocation(), this->a->clone(clone_map), this->b->clone(clone_map));
+	clone_map.insert(std::make_pair(this, res));
+	return res;
 }
 
 
@@ -2941,9 +3063,11 @@ llvm::Value* DivExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 }
 
 
-Reference<ASTNode> DivExpression::clone()
+Reference<ASTNode> DivExpression::clone(CloneMapType& clone_map)
 {
-	return new DivExpression(this->srcLocation(), this->a->clone(), this->b->clone());
+	DivExpression* res = new DivExpression(this->srcLocation(), this->a->clone(clone_map), this->b->clone(clone_map));
+	clone_map.insert(std::make_pair(this, res));
+	return res;
 }
 
 
@@ -3101,9 +3225,11 @@ llvm::Value* BinaryBooleanExpr::emitLLVMCode(EmitLLVMCodeParams& params, llvm::V
 }
 
 
-Reference<ASTNode> BinaryBooleanExpr::clone()
+Reference<ASTNode> BinaryBooleanExpr::clone(CloneMapType& clone_map)
 {
-	return new BinaryBooleanExpr(t, a->clone(), b->clone(), srcLocation());
+	BinaryBooleanExpr* res = new BinaryBooleanExpr(t, a->clone(clone_map), b->clone(clone_map), srcLocation());
+	clone_map.insert(std::make_pair(this, res));
+	return res;
 }
 
 
@@ -3289,9 +3415,11 @@ llvm::Value* UnaryMinusExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm
 }
 
 
-Reference<ASTNode> UnaryMinusExpression::clone()
+Reference<ASTNode> UnaryMinusExpression::clone(CloneMapType& clone_map)
 {
-	return new UnaryMinusExpression(this->srcLocation(), this->expr->clone());
+	UnaryMinusExpression* res = new UnaryMinusExpression(this->srcLocation(), this->expr->clone(clone_map));
+	clone_map.insert(std::make_pair(this, res));
+	return res;
 }
 
 
@@ -3391,9 +3519,11 @@ llvm::Value* LogicalNegationExpr::emitLLVMCode(EmitLLVMCodeParams& params, llvm:
 }
 
 
-Reference<ASTNode> LogicalNegationExpr::clone()
+Reference<ASTNode> LogicalNegationExpr::clone(CloneMapType& clone_map)
 {
-	return new LogicalNegationExpr(this->srcLocation(), this->expr->clone());
+	LogicalNegationExpr* res = new LogicalNegationExpr(this->srcLocation(), this->expr->clone(clone_map));
+	clone_map.insert(std::make_pair(this, res));
+	return res;
 }
 
 
@@ -3432,7 +3562,7 @@ ValueRef LetASTNode::exec(VMState& vmstate)
 void LetASTNode::print(int depth, std::ostream& s) const
 {
 	printMargin(depth, s);
-	//TEMP s << "Let, var_name = '" + this->variable_name + "'\n";
+	s << "Let node (" + toHexString((uint64)this) + "), var_name = '" + this->vars[0].name + "'\n"; // TODO: print out other var names as well
 	this->expr->print(depth+1, s);
 }
 
@@ -3569,10 +3699,11 @@ llvm::Value* LetASTNode::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* r
 //}
 
 
-Reference<ASTNode> LetASTNode::clone()
+Reference<ASTNode> LetASTNode::clone(CloneMapType& clone_map)
 {
 	LetASTNode* e = new LetASTNode(this->vars, this->srcLocation());
-	e->expr = this->expr->clone();
+	e->expr = this->expr->clone(clone_map);
+	clone_map.insert(std::make_pair(this, e));
 	return e;
 }
 
@@ -3861,9 +3992,11 @@ llvm::Value* ComparisonExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm
 }
 
 
-Reference<ASTNode> ComparisonExpression::clone()
+Reference<ASTNode> ComparisonExpression::clone(CloneMapType& clone_map)
 {
-	return Reference<ASTNode>(new ComparisonExpression(token, a->clone(), b->clone(), this->srcLocation()));
+	ComparisonExpression* res = new ComparisonExpression(token, a->clone(clone_map), b->clone(clone_map), this->srcLocation());
+	clone_map.insert(std::make_pair(this, res));
+	return res;
 }
 
 
@@ -3917,7 +4050,7 @@ ValueRef LetBlock::exec(VMState& vmstate)
 void LetBlock::print(int depth, std::ostream& s) const
 {
 	printMargin(depth, s);
-	s << "Let Block.  lets:\n";
+	s << "Let Block.  (" + toHexString((uint64)this) + ") lets:\n";
 	for(size_t i=0; i<lets.size(); ++i)
 		lets[i]->print(depth + 1, s);
 	printMargin(depth, s); s << "in:\n";
@@ -4173,7 +4306,7 @@ llvm::Value* LetBlock::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 	//	let_exprs_llvm_value[i] = this->lets[i]->emitLLVMCode(params, ret_space_ptr);
 
 	//params.let_block_let_values.insert(std::make_pair(this, std::vector<llvm::Value*>()));
-	params.let_block_let_values[this] = std::vector<llvm::Value*>();
+	//params.let_block_let_values[this] = std::vector<llvm::Value*>();
 
 
 	params.let_block_stack.push_back(const_cast<LetBlock*>(this));
@@ -4186,7 +4319,8 @@ llvm::Value* LetBlock::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 		if(params.emit_trace_code && this->lets[i]->type()->getType() == Type::FloatType)
 			emitTracePrintCall(params, this->lets[i]->vars[0].name, let_value);
 
-		params.let_block_let_values[this].push_back(let_value);
+		//params.let_block_let_values[this].push_back(let_value);
+		params.let_values[this->lets[i].getPointer()] = let_value;
 	}
 
 	//params.let_block_let_values.insert(std::make_pair(this, let_values));
@@ -4200,20 +4334,22 @@ llvm::Value* LetBlock::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 	for(size_t i=0; i<lets.size(); ++i)
 	{
 		if(shouldRefCount(params, this->lets[i]->expr))
-			emitDestructorOrDecrCall(params, *this->lets[i]->expr, params.let_block_let_values[this][i],  "Let block for let var " + this->lets[i]->vars[0].name + " decrement/destructor");
+			emitDestructorOrDecrCall(params, *this->lets[i]->expr, params.let_values[this->lets[i].getPointer()],  "Let block for let var " + this->lets[i]->vars[0].name + " decrement/destructor");
 	}
 
 	return expr_value;
 }
 
 
-Reference<ASTNode> LetBlock::clone()
+Reference<ASTNode> LetBlock::clone(CloneMapType& clone_map)
 {
 	vector<Reference<LetASTNode> > new_lets(lets.size());
 	for(size_t i=0; i<new_lets.size(); ++i)
-		new_lets[i] = Reference<LetASTNode>(static_cast<LetASTNode*>(lets[i]->clone().getPointer()));
-	Winter::ASTNodeRef clone = this->expr->clone();
-	return new LetBlock(clone, new_lets, this->srcLocation());
+		new_lets[i] = Reference<LetASTNode>(static_cast<LetASTNode*>(lets[i]->clone(clone_map).getPointer()));
+	Winter::ASTNodeRef clone = this->expr->clone(clone_map);
+	LetBlock* res = new LetBlock(clone, new_lets, this->srcLocation());
+	clone_map.insert(std::make_pair(this, res));
+	return res;
 }
 
 
@@ -4323,9 +4459,11 @@ llvm::Value* ArraySubscript::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Valu
 }
 
 
-Reference<ASTNode> ArraySubscript::clone()
+Reference<ASTNode> ArraySubscript::clone(CloneMapType& clone_map)
 {
-	return new ArraySubscript(subscript_expr->clone(), this->srcLocation());
+	ArraySubscript* res = new ArraySubscript(subscript_expr->clone(clone_map), this->srcLocation());
+	clone_map.insert(std::make_pair(this, res));
+	return res;
 }
 
 
@@ -4476,9 +4614,11 @@ llvm::Value* NamedConstant::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 }
 
 
-Reference<ASTNode> NamedConstant::clone()
+Reference<ASTNode> NamedConstant::clone(CloneMapType& clone_map)
 {
-	return new NamedConstant(declared_type, name, value_expr->clone(), srcLocation(), order_num);
+	NamedConstant* res = new NamedConstant(declared_type, name, value_expr->clone(clone_map), srcLocation(), order_num);
+	clone_map.insert(std::make_pair(this, res));
+	return res;
 }
 
 

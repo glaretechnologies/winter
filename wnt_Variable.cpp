@@ -52,7 +52,7 @@ Variable::Variable(const std::string& name_, const SrcLocation& loc)
 	name(name_),
 	bound_index(-1),
 	bound_function(NULL),
-	bound_let_block(NULL),
+	bound_let_node(NULL),
 	bound_named_constant(NULL),
 	let_var_index(-1)
 	//use_captured_var(false),
@@ -86,7 +86,7 @@ inline static const std::string varType(Variable::BindingType t)
 
 struct BindInfo
 {
-	BindInfo() : root_bound_node(NULL), bound_function(NULL), bound_let_block(NULL) {}
+	BindInfo() : root_bound_node(NULL), bound_function(NULL), bound_let_node(NULL) {}
 
 	Variable::BindingType vartype;
 
@@ -95,7 +95,7 @@ struct BindInfo
 
 	ASTNode* root_bound_node; // Node furthest up the node stack that we are bound to, if the variable is bound through one or more captured vars.
 	FunctionDefinition* bound_function; // Function for which the variable is an argument of,
-	LetBlock* bound_let_block;
+	LetASTNode* bound_let_node;
 };
 
 
@@ -145,9 +145,8 @@ BindInfo doBind(const std::vector<ASTNode*>& stack, int s, const std::string& na
 				{
 					assert(0);
 				}
-				var.bound_let_block = cap_var_bindinfo.bound_let_block;
 				var.index = cap_var_bindinfo.bound_index;
-				var.bound_let_block = cap_var_bindinfo.bound_let_block;
+				var.bound_let_node = cap_var_bindinfo.bound_let_node;
 				var.bound_function = cap_var_bindinfo.bound_function;
 				def->captured_vars.push_back(var);
 
@@ -190,7 +189,7 @@ BindInfo doBind(const std::vector<ASTNode*>& stack, int s, const std::string& na
 						{
 							BindInfo bindinfo;
 							bindinfo.vartype = Variable::LetVariable;
-							bindinfo.bound_let_block = let_block;
+							bindinfo.bound_let_node = let_block->lets[i].getPointer();
 							bindinfo.bound_index = i;
 							bindinfo.let_var_index = (int)v;
 							//std::cout << "Bound '" + name + "' to let variable, bound_index = " << bindinfo.bound_index << std::endl;
@@ -221,7 +220,7 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 		this->bound_index = bindinfo.bound_index;
 		this->let_var_index = bindinfo.let_var_index;
 		this->bound_function = bindinfo.bound_function;
-		this->bound_let_block = bindinfo.bound_let_block;
+		this->bound_let_node = bindinfo.bound_let_node;
 		return;
 	}
 
@@ -339,7 +338,7 @@ void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 	{
 		if(this->vartype == LetVariable)
 		{
-			const bool let_val_is_literal = checkFoldExpression(this->bound_let_block->lets[this->bound_index]->expr, payload);
+			const bool let_val_is_literal = checkFoldExpression(this->bound_let_node->expr, payload);
 			//this->can_constant_fold = a->can_constant_fold && b->can_constant_fold && expressionIsWellTyped(*this, payload);
 			//const bool a_is_literal = checkFoldExpression(a, payload);
 			//const bool b_is_literal = checkFoldExpression(b, payload);
@@ -352,6 +351,79 @@ void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 			this->can_maybe_constant_fold = let_val_is_literal;
 		}
 	}
+	else if(payload.operation == TraversalPayload::UpdateUpRefs)
+	{
+		switch(vartype)
+		{
+		case UnboundVariable:
+			break;
+		case ArgumentVariable:
+			{
+				ASTNode* updated_node = payload.clone_map[bound_function];
+				if(updated_node)
+					bound_function = (FunctionDefinition*)updated_node;
+				break;
+			}
+		case BoundToNamedConstant:
+			{
+				break;
+			}
+		case LetVariable:
+			{
+				ASTNode* updated_node = payload.clone_map[bound_let_node];
+				if(updated_node)
+					bound_let_node = (LetASTNode*)updated_node;
+				break;
+			}
+		case CapturedVariable:
+			{
+				ASTNode* updated_node = payload.clone_map[bound_function];
+				if(updated_node)
+					bound_function = (FunctionDefinition*)updated_node;
+				break;
+			}
+		}
+	}
+	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	{
+		if(this->vartype == CapturedVariable)
+		{
+			CapturedVar& captured_var = this->bound_function->captured_vars[this->bound_index];
+			if(captured_var.vartype == CapturedVar::Arg)
+			{
+				if(captured_var.bound_function == payload.func_args_to_sub)
+				{
+
+				}
+			}
+		}
+		/*for(size_t i=0; i<this->captured_vars.size(); ++i)
+		{
+			if(captured_vars[i].vartype == CapturedVar::Arg)
+			{
+				// We need to change the captured var to capture the expression that is the argument value.
+				//captured_vars[i].substituted_expr = payload.variable_substitutes[i]->clone();
+				captured_vars[i].substituted_expr = cloneASTNodeSubtree(payload.variable_substitutes[i]);
+			}
+		}*/
+	}
+	else if(payload.operation == TraversalPayload::DeadFunctionElimination)
+	{
+		// If this variable refers to a global function, then we will consider the global function reachable from this function.
+		// This is conservative.
+		if(this->vartype == BoundToGlobalDefVariable)
+		{
+			payload.reachable_defs.insert(this->bound_function);
+			if(payload.processed_defs.find(this->bound_function) == payload.processed_defs.end()) // If has not been processed yet:
+				payload.defs_to_process.push_back(this->bound_function);
+		}
+		else if(this->vartype == BoundToNamedConstant)
+		{
+			payload.reachable_defs.insert(this->bound_named_constant);
+			if(payload.processed_defs.find(this->bound_named_constant) == payload.processed_defs.end()) // If has not been processed yet:
+				payload.defs_to_process.push_back(this->bound_named_constant);
+		}
+	}
 }
 
 
@@ -359,6 +431,9 @@ ValueRef Variable::exec(VMState& vmstate)
 {
 	if(this->vartype == ArgumentVariable)
 	{
+		if(vmstate.func_args_start.back() + bound_index >= vmstate.argument_stack.size())
+			throw BaseException("out of bounds");
+
 		return vmstate.argument_stack[vmstate.func_args_start.back() + bound_index];
 	}
 	else if(this->vartype == LetVariable)
@@ -367,7 +442,7 @@ ValueRef Variable::exec(VMState& vmstate)
 
 		//const int let_stack_start = (int)vmstate.let_stack_start[vmstate.let_stack_start.size() - 1 - this->let_frame_offset];
 		//return vmstate.let_stack[let_stack_start + this->bound_index];
-		LetASTNode* let_node = this->bound_let_block->lets[this->bound_index].getPointer();
+		LetASTNode* let_node = this->bound_let_node;
 		ValueRef val = let_node->exec(vmstate);
 		if(let_node->vars.size() == 1)
 			return val;
@@ -407,8 +482,8 @@ TypeRef Variable::type() const
 {
 	if(this->vartype == LetVariable)
 	{
-		const TypeRef let_var_type = this->bound_let_block->lets[this->bound_index]->type();
-		if(this->bound_let_block->lets[this->bound_index]->vars.size() == 1)
+		const TypeRef let_var_type = this->bound_let_node->type();
+		if(this->bound_let_node->vars.size() == 1)
 			return let_var_type;
 		else // Else if destructuring assignment:
 		{
@@ -444,7 +519,28 @@ TypeRef Variable::type() const
 void Variable::print(int depth, std::ostream& s) const
 {
 	printMargin(depth, s);
-	s << "Variable, name=" << this->name << ", " + varType(this->vartype) + ", bound_index=" << bound_index << "\n";
+
+	switch(vartype)
+	{
+	case UnboundVariable:
+		s << "Var '" << this->name << "' (" + toHexString((uint64)this) + "), unbound\n";
+		break;
+	case LetVariable:
+		s << "Var '" << this->name << "' (" + toHexString((uint64)this) + "), bound to let node: " << toHexString((uint64)this->bound_let_node) + ", let_var_index=" << let_var_index << "\n";
+		break;
+	case ArgumentVariable:
+		s << "Var '" << this->name << "' (" + toHexString((uint64)this) + "), bound to arg, function: " << toHexString((uint64)this->bound_function) + " (" + this->bound_function->sig.name + "), index=" << bound_index << "\n";
+		break;
+	case BoundToGlobalDefVariable:
+		s << "Var '" << this->name << "' (" + toHexString((uint64)this) + "), bound to global function: " << toHexString((uint64)this->bound_function) + " (" + this->bound_function->sig.name + ")" << "\n";
+		break;
+	case BoundToNamedConstant:
+		s << "Var '" << this->name << "' (" + toHexString((uint64)this) + "), bound to named constant: " << toHexString((uint64)this->bound_named_constant) << "\n";
+		break;
+	case CapturedVariable:
+		s << "Var '" << this->name << "' (" + toHexString((uint64)this) + "), captured, function: " << toHexString((uint64)this->bound_function) + " (" + this->bound_function->sig.name + "), index: " << this->bound_index << "\n";
+		break;
+	};
 }
 
 
@@ -466,11 +562,11 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 	{
 		//return this->bound_let_block->getLetExpressionLLVMValue(params, this->bound_index, ret_space_ptr);
 		//TEMP:
-		assert(params.let_block_let_values.find(this->bound_let_block) != params.let_block_let_values.end());
+		assert(params.let_values.find(this->bound_let_node) != params.let_values.end());
 
-		llvm::Value* value = params.let_block_let_values[this->bound_let_block][this->bound_index];
+		llvm::Value* value = params.let_values[this->bound_let_node];
 
-		LetASTNode* let_node = this->bound_let_block->lets[this->bound_index].getPointer();
+		LetASTNode* let_node = this->bound_let_node;
 		if(let_node->vars.size() == 1)
 		{
 			// Increment reference count
@@ -627,17 +723,19 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 }
 
 
-Reference<ASTNode> Variable::clone()
+Reference<ASTNode> Variable::clone(CloneMapType& clone_map)
 {
 	Variable* v = new Variable(name, srcLocation());
 	v->vartype = vartype;
 	v->bound_function = bound_function;
-	v->bound_let_block = bound_let_block;
+	v->bound_let_node = bound_let_node;
 	v->bound_named_constant = bound_named_constant;
 	v->bound_index = bound_index;
 	//v->let_frame_offset = let_frame_offset;
 	//v->uncaptured_bound_index = uncaptured_bound_index;
 	v->let_var_index = let_var_index;
+
+	clone_map.insert(std::make_pair(this, v));
 	return v;
 }
 
@@ -656,7 +754,7 @@ bool Variable::isConstant() const
 		}
 	case LetVariable:
 		{
-			return this->bound_let_block->lets[this->bound_index]->isConstant();
+			return this->bound_let_node->isConstant();
 		}
 	default:
 		return false;

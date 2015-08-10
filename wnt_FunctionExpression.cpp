@@ -22,6 +22,7 @@ Generated at 2011-04-30 18:53:38 +0100
 #include "ProofUtils.h"
 #include "wnt_IfExpression.h"
 #include "utils/StringUtils.h"
+#include "utils/ContainerUtils.h"
 #include "maths/mathstypes.h"
 #ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
@@ -458,7 +459,7 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 	{
 		if(get_func_expr.nonNull() && (get_func_expr->nodeType() == ASTNode::VariableASTNodeType))
 		{
-			if(!varWithNameIsInScope(get_func_expr.downcastToPtr<Variable>()->name, payload, stack))
+			if((get_func_expr.downcastToPtr<Variable>()->vartype == Variable::UnboundVariable) && !varWithNameIsInScope(get_func_expr.downcastToPtr<Variable>()->name, payload, stack))
 			{
 				// Convert to static function
 				this->static_function_name = get_func_expr.downcastToPtr<Variable>()->name;
@@ -484,6 +485,9 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 	}
 	else if(payload.operation == TraversalPayload::SubstituteVariables)
 	{
+		if(get_func_expr.nonNull())
+			checkSubstituteVariable(get_func_expr, payload);
+
 		for(size_t i=0; i<argument_expressions.size(); ++i)
 			checkSubstituteVariable(argument_expressions[i], payload);
 	}
@@ -733,7 +737,18 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 		else
 			this->can_maybe_constant_fold = false;
 	}
-	
+	else if(payload.operation == TraversalPayload::DeadFunctionElimination)
+	{
+		// if we have traversed here in the DeadFunctionElimination, we know this function is reachable.
+		if(this->static_target_function)
+		{
+			payload.reachable_defs.insert(this->static_target_function);
+			if(payload.processed_defs.find(this->static_target_function) == payload.processed_defs.end())
+				payload.defs_to_process.push_back(this->static_target_function);
+		}
+	}
+
+
 	stack.pop_back();
 }
 
@@ -1041,7 +1056,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 				const Variable* var =  argument_expressions[0].downcastToPtr<Variable>();
 				if(var->vartype == Variable::LetVariable)
 				{
-					ASTNode* target_let_node = var->bound_let_block->lets[var->let_var_index]->expr.getPointer();
+					ASTNode* target_let_node = var->bound_let_node->expr.getPointer();
 					if(target_let_node->nodeType() == ASTNode::VArrayLiteralType)
 					{
 						varray_literal = static_cast<const VArrayLiteral*>(target_let_node);
@@ -1206,14 +1221,21 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 void FunctionExpression::print(int depth, std::ostream& s) const
 {
 	printMargin(depth, s);
-	s << "FunctionExpr (" << this->functionName() << ")";//TODO: fix
+	s << "FunctionExpr, ";
+	if(!this->static_function_name.empty())
+		s << "static_function_name: " << static_function_name;
+	if(this->get_func_expr.nonNull())
+	{
+		s << "get_func_expr: \n";
+		get_func_expr->print(depth + 1, s);
+	}
+	
 	if(this->static_target_function)
-		s << "; target: " << this->static_target_function->sig.toString();
+		s << "; target: " << this->static_target_function->sig.toString() << "\n";
 	/*else if(this->binding_type == Arg)
 		s << "; runtime bound to arg index " << this->bound_index;
 	else if(this->binding_type == Let)
 		s << "; runtime bound to let index " << this->bound_index;*/
-	s << "\n";
 	for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
 		this->argument_expressions[i]->print(depth + 1, s);
 }
@@ -1800,19 +1822,20 @@ llvm::Value* FunctionExpression::getConstantLLVMValue(EmitLLVMCodeParams& params
 }
 
 
-Reference<ASTNode> FunctionExpression::clone()
+Reference<ASTNode> FunctionExpression::clone(CloneMapType& clone_map)
 {
 	FunctionExpression* e = new FunctionExpression(srcLocation());
 	
 	if(get_func_expr.nonNull())
-		e->get_func_expr = this->get_func_expr->clone();
+		e->get_func_expr = this->get_func_expr->clone(clone_map);
 
 	for(size_t i=0; i<argument_expressions.size(); ++i)
-		e->argument_expressions.push_back(argument_expressions[i]->clone());
+		e->argument_expressions.push_back(argument_expressions[i]->clone(clone_map));
 	
 	e->static_function_name = this->static_function_name;
 	e->static_target_function = this->static_target_function;
 
+	clone_map.insert(std::make_pair(this, e));
 	return e;
 }
 

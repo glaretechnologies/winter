@@ -56,7 +56,7 @@ public:
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
 	//virtual void emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* string_val) const;
 	//virtual llvm::Value* getConstantLLVMValue(EmitLLVMCodeParams& params) const;
-	virtual Reference<ASTNode> clone();
+	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual bool provenDefined() const;
 

@@ -379,12 +379,14 @@ llvm::Value* ArrayLiteral::getConstantLLVMValue(EmitLLVMCodeParams& params) cons
 }
 
 
-Reference<ASTNode> ArrayLiteral::clone()
+Reference<ASTNode> ArrayLiteral::clone(CloneMapType& clone_map)
 {
 	std::vector<ASTNodeRef> elems(this->elements.size());
 	for(size_t i=0; i<elements.size(); ++i)
-		elems[i] = this->elements[i]->clone();
-	return new ArrayLiteral(elems, srcLocation(), has_int_suffix, int_suffix);
+		elems[i] = this->elements[i]->clone(clone_map);
+	ArrayLiteral* a = new ArrayLiteral(elems, srcLocation(), has_int_suffix, int_suffix);
+	clone_map.insert(std::make_pair(this, a));
+	return a;
 }
 
 

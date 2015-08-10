@@ -79,7 +79,7 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	//virtual void emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* string_val) const;
 	virtual llvm::Value* getConstantLLVMValue(EmitLLVMCodeParams& params) const;
-	virtual Reference<ASTNode> clone();
+	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	FunctionDefinition* runtimeBind(VMState& vmstate, const FunctionValue*& function_value_out);
 	virtual bool provenDefined() const;

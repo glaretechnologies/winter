@@ -603,6 +603,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 	assert(string_count == 0 && varray_count == 0 && closure_count == 0);
 
 	stats.num_heap_allocation_calls = 0;
+	stats.num_closure_allocations = 0;
 	
 	/*if(!winter_global_task_manager)
 	{
@@ -738,86 +739,89 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 		// Load source buffers
 		loadSource(args, args.source_buffers, args.preconstructed_func_defs);
 
-
-		this->llvm_context = new llvm::LLVMContext();
-		this->llvm_module = new llvm::Module("WinterModule", *this->llvm_context);
-
-		//llvm::TargetOptions to;
-		//const char* argv[] = { "dummyprogname", "-vectorizer-min-trip-count=4"};
-		//llvm::cl::ParseCommandLineOptions(2, argv, "my tool");
-		//const char* argv[] = { "dummyprogname", "-debug"};
-		//llvm::cl::ParseCommandLineOptions(2, argv, "my tool");
-
-#if TARGET_LLVM_VERSION >= 36
-		llvm::EngineBuilder engine_builder(std::unique_ptr<llvm::Module>(this->llvm_module));
-#else
-		llvm::EngineBuilder engine_builder(this->llvm_module);
-#endif
-		engine_builder.setEngineKind(llvm::EngineKind::JIT);
-#if TARGET_LLVM_VERSION <= 34
-		if(USE_MCJIT) engine_builder.setUseMCJIT(true);
-#endif
-
-
-		if(USE_MCJIT)
+		if(args.build_llvm_code)
 		{
-			WinterMemoryManager* mem_manager = new WinterMemoryManager();
-			mem_manager->func_map = &func_map;
+
+			this->llvm_context = new llvm::LLVMContext();
+			this->llvm_module = new llvm::Module("WinterModule", *this->llvm_context);
+
+			//llvm::TargetOptions to;
+			//const char* argv[] = { "dummyprogname", "-vectorizer-min-trip-count=4"};
+			//llvm::cl::ParseCommandLineOptions(2, argv, "my tool");
+			//const char* argv[] = { "dummyprogname", "-debug"};
+			//llvm::cl::ParseCommandLineOptions(2, argv, "my tool");
+
 #if TARGET_LLVM_VERSION >= 36
-			engine_builder.setMCJITMemoryManager(std::unique_ptr<llvm::SectionMemoryManager>(mem_manager));
-#elif TARGET_LLVM_VERSION >= 34
-			engine_builder.setMCJITMemoryManager(mem_manager);
+			llvm::EngineBuilder engine_builder(std::unique_ptr<llvm::Module>(this->llvm_module));
 #else
-			engine_builder.setJITMemoryManager(mem_manager);
+			llvm::EngineBuilder engine_builder(this->llvm_module);
 #endif
-		}
-
-		this->triple = llvm::sys::getProcessTriple();
-		if(USE_MCJIT) this->triple.append("-elf"); // MCJIT requires the -elf suffix currently, see https://groups.google.com/forum/#!topic/llvm-dev/DOmHEXhNNWw
-
-		// Select the host computer architecture as the target.
-		this->target_machine = engine_builder.selectTarget(
-			llvm::Triple(this->triple), // target triple
-			"",  // march
-			llvm::sys::getHostCPUName(), // mcpu - e.g. "corei7", "core-avx2"
-			llvm::SmallVector<std::string, 4>());
-
-		// Enable floating point op fusion, to allow for FMA codegen.
-		this->target_machine->Options.AllowFPOpFusion = llvm::FPOpFusion::Fast;
-
-		this->llvm_exec_engine = engine_builder.create(target_machine);
+			engine_builder.setEngineKind(llvm::EngineKind::JIT);
+#if TARGET_LLVM_VERSION <= 34
+			if(USE_MCJIT) engine_builder.setUseMCJIT(true);
+#endif
 
 
-		this->llvm_exec_engine->DisableLazyCompilation();
-		//this->llvm_exec_engine->DisableSymbolSearching(); // Symbol searching is required for sin, pow intrinsics etc..
+			if(USE_MCJIT)
+			{
+				WinterMemoryManager* mem_manager = new WinterMemoryManager();
+				mem_manager->func_map = &func_map;
+#if TARGET_LLVM_VERSION >= 36
+				engine_builder.setMCJITMemoryManager(std::unique_ptr<llvm::SectionMemoryManager>(mem_manager));
+#elif TARGET_LLVM_VERSION >= 34
+				engine_builder.setMCJITMemoryManager(mem_manager);
+#else
+				engine_builder.setJITMemoryManager(mem_manager);
+#endif
+			}
+
+			this->triple = llvm::sys::getProcessTriple();
+			if(USE_MCJIT) this->triple.append("-elf"); // MCJIT requires the -elf suffix currently, see https://groups.google.com/forum/#!topic/llvm-dev/DOmHEXhNNWw
+
+			// Select the host computer architecture as the target.
+			this->target_machine = engine_builder.selectTarget(
+				llvm::Triple(this->triple), // target triple
+				"",  // march
+				llvm::sys::getHostCPUName(), // mcpu - e.g. "corei7", "core-avx2"
+				llvm::SmallVector<std::string, 4>());
+
+			// Enable floating point op fusion, to allow for FMA codegen.
+			this->target_machine->Options.AllowFPOpFusion = llvm::FPOpFusion::Fast;
+
+			this->llvm_exec_engine = engine_builder.create(target_machine);
+
+
+			this->llvm_exec_engine->DisableLazyCompilation();
+			//this->llvm_exec_engine->DisableSymbolSearching(); // Symbol searching is required for sin, pow intrinsics etc..
 
 
 		
-		/*ExternalFunctionRef alloc_ref(new ExternalFunction());
-		alloc_ref->interpreted_func = NULL;
-		alloc_ref->return_type = TypeRef(new OpaqueType());
-		alloc_ref->sig = FunctionSignature("allocateRefCountedStructure", std::vector<TypeRef>(1, TypeRef(new Int())));
-		alloc_ref->func = (void*)(allocateRefCountedStructure);
-		this->external_functions.push_back(alloc_ref);*/
+			/*ExternalFunctionRef alloc_ref(new ExternalFunction());
+			alloc_ref->interpreted_func = NULL;
+			alloc_ref->return_type = TypeRef(new OpaqueType());
+			alloc_ref->sig = FunctionSignature("allocateRefCountedStructure", std::vector<TypeRef>(1, TypeRef(new Int())));
+			alloc_ref->func = (void*)(allocateRefCountedStructure);
+			this->external_functions.push_back(alloc_ref);*/
 
 		
 		
 
-		// There is a problem with LLVM 3.3 and earlier with the pow intrinsic getting turned into exp2f().
-		// So for now just use our own pow() external function.
+			// There is a problem with LLVM 3.3 and earlier with the pow intrinsic getting turned into exp2f().
+			// So for now just use our own pow() external function.
 #if TARGET_LLVM_VERSION < 34
-		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
-			(void*)(float(*)(float, float))std::pow,
-			powInterpreted,
-			FunctionSignature("pow", vector<TypeRef>(2, new Float())),
-			new Float()
-		)));
+			external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
+				(void*)(float(*)(float, float))std::pow,
+				powInterpreted,
+				FunctionSignature("pow", vector<TypeRef>(2, new Float())),
+				new Float()
+			)));
 #endif
 
-		for(unsigned int i=0; i<this->external_functions.size(); ++i)
-			addExternalFunction(this->external_functions[i], *this->llvm_context, *this->llvm_module);
+			for(unsigned int i=0; i<this->external_functions.size(); ++i)
+				addExternalFunction(this->external_functions[i], *this->llvm_context, *this->llvm_module);
 
-		this->build(args);
+			this->build(args);
+		}
 	}
 	catch(BaseException& e)
 	{
@@ -1046,17 +1050,7 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 			tree_changed = tree_changed || payload.tree_changed;
 		}*/
 
-		// Do Function inlining
-		/*{
-			std::vector<ASTNode*> stack;
-			TraversalPayload payload(TraversalPayload::InlineFunctionCalls);
-			for(size_t i=0; i<func_defs.size(); ++i)
-				if(!func_defs[i]->is_anon_func)
-					func_defs[i]->traverse(payload, stack);
-			assert(stack.size() == 0);
-
-			tree_changed = tree_changed || payload.tree_changed;
-		}*/
+		
 
 		// Do another pass of type coercion, as constant folding may have made new literals that can be coerced.
 		{
@@ -1171,6 +1165,138 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 			linker.top_level_defs[i]->traverse(payload, stack);
 
 		assert(stack.size() == 0);
+	}
+
+
+	//TEMP:
+	/*for(size_t i=0; i<linker.top_level_defs.size(); ++i)
+	{
+		std::cout << "\n";
+		linker.top_level_defs[i]->print(0, std::cout);
+	}
+
+	// Do Function inlining
+	while(true)
+	{
+		bool tree_changed = false;
+
+		{
+			std::vector<ASTNode*> stack;
+			TraversalPayload payload(TraversalPayload::InlineFunctionCalls);
+			for(size_t i=0; i<linker.top_level_defs.size(); ++i)
+				linker.top_level_defs[i]->traverse(payload, stack);
+			assert(stack.size() == 0);
+
+			tree_changed = tree_changed || payload.tree_changed;
+		}
+
+		if(!tree_changed)
+			break;
+	}
+
+	//TEMP:
+	for(size_t i=0; i<linker.top_level_defs.size(); ++i)
+	{
+		std::cout << "\n";
+		linker.top_level_defs[i]->print(0, std::cout);
+	}*/
+
+
+	// do dead-function elimination pass.  This removes all function definitions that are not reachable (through direct or indirect function calls) from the set of entry functions.
+	if(true)
+	{
+		// std::cout << "Doing dead-function elimination pass..." << std::endl;
+
+		std::vector<ASTNode*> stack;
+		TraversalPayload payload(TraversalPayload::DeadFunctionElimination);
+		payload.linker = &linker;
+		
+		// Add entry functions to reachable set and defs_to_process set.
+		for(size_t i=0; i<args.entry_point_sigs.size(); ++i)
+		{
+			FunctionDefinitionRef f = linker.findMatchingFunctionSimple(args.entry_point_sigs[i]);
+			if(f.isNull())
+				throw BaseException("Failed to find entry point function " + args.entry_point_sigs[i].toString());
+			
+			payload.reachable_defs.insert(f.getPointer()); // Mark as reachable
+			payload.defs_to_process.push_back(f.getPointer()); // Add to to-process set.
+		}
+
+		while(!payload.defs_to_process.empty())
+		{
+			// Pop a node off the stack
+			ASTNode* def_to_process = payload.defs_to_process.back();
+			payload.defs_to_process.pop_back();
+
+			payload.processed_defs.insert(def_to_process); // Mark node as processed
+
+			def_to_process->traverse(payload, stack); // Process it
+			assert(stack.size() == 0);
+		}
+
+
+		// TEMP HACK: add some special functions to reachable set.
+		{
+			const FunctionSignature allocateStringSig("allocateString", vector<TypeRef>(1, new OpaqueType()));
+			payload.reachable_defs.insert(findMatchingFunction(allocateStringSig).getPointer());
+
+			vector<TypeRef> argtypes(1, new String());
+			const FunctionSignature freeStringSig("freeString", argtypes);
+			payload.reachable_defs.insert(findMatchingFunction(freeStringSig).getPointer());
+
+			payload.reachable_defs.insert(findMatchingFunction(FunctionSignature("allocateVArray", vector<TypeRef>(2, new Int(64)))).getPointer());
+
+			payload.reachable_defs.insert(findMatchingFunction(FunctionSignature("freeVArray", vector<TypeRef>(1, new VArrayType(new Int())))).getPointer());
+
+			payload.reachable_defs.insert(findMatchingFunction(FunctionSignature("allocateClosure", vector<TypeRef>(1, new Int(64)))).getPointer());
+
+			const TypeRef dummy_func_type = Function::dummyFunctionType();
+			payload.reachable_defs.insert(findMatchingFunction(FunctionSignature("freeClosure", vector<TypeRef>(1, dummy_func_type))).getPointer());
+		}
+
+		// Now remove any non-reachable functions and named constants from linker.top_level_defs
+		std::vector<ASTNodeRef> new_top_level_defs;
+		std::vector<ASTNodeRef> unreachable_defs;
+		for(size_t i=0; i<linker.top_level_defs.size(); ++i)
+			if(payload.reachable_defs.find(linker.top_level_defs[i].getPointer()) != payload.reachable_defs.end()) // if in reachable set:
+				new_top_level_defs.push_back(linker.top_level_defs[i]);
+			else
+				unreachable_defs.push_back(linker.top_level_defs[i]);
+
+		linker.top_level_defs = new_top_level_defs;
+
+		// Rebuild linker.sig_to_function_map
+		Linker::SigToFuncMapType new_map;
+		for(auto i = linker.sig_to_function_map.begin(); i != linker.sig_to_function_map.end(); ++i)
+		{
+			FunctionDefinitionRef def = i->second;
+			if(payload.reachable_defs.find(def.getPointer()) != payload.reachable_defs.end()) // if in reachable set:
+				new_map.insert(std::make_pair(def->sig, def));
+		}
+		linker.sig_to_function_map = new_map;
+		
+
+		// Print out reachable function sigs
+		/*std::cout << "Reachable top level defs:" << std::endl;
+		for(auto i = payload.reachable_defs.begin(); i != payload.reachable_defs.end(); ++i)
+		{
+			if((*i)->nodeType() == ASTNode::FunctionDefinitionType)
+			{
+				FunctionDefinition* def = (FunctionDefinition*)*i;
+				std::cout << "\t" << def->sig.toString() << "\n";
+			}
+		}
+
+		// Print out unreachable functions:
+		std::cout << "Unreachable top level defs:" << std::endl;
+		for(auto i = unreachable_defs.begin(); i != unreachable_defs.end(); ++i)
+		{
+			if((*i)->nodeType() == ASTNode::FunctionDefinitionType)
+			{
+				FunctionDefinition* def = (FunctionDefinition*)(*i).getPointer();
+				std::cout << "\t" << def->sig.toString() << "\n";
+			}
+		}*/
 	}
 }
 
@@ -1483,7 +1609,7 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 }
 
 
-VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode() const
+VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCodeArgs& args) const
 {
 	OpenCLCCode res;
 
@@ -1553,6 +1679,13 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode() const
 			constructor_code += (*i)->getOpenCLCConstructor();
 		}
 
+	for(auto i = args.tuple_types_used.begin(); i != args.tuple_types_used.end(); ++i)
+		if(!ContainerUtils::contains(emitted_tuples, *i)) // If not emitted yet:
+		{
+			struct_def_code += (*i)->getOpenCLCDefinition();
+			constructor_code += (*i)->getOpenCLCConstructor();
+		}
+
 		// Add some Winter built-in functions
 	const std::string built_in_func_code = 
 "// Winter built-in functions \n\
@@ -1569,9 +1702,9 @@ float print_float_(float x) { printf((__constant char *)\"%f\\n\", x); return x;
 }
 
 
-std::string VirtualMachine::buildOpenCLCodeCombined() const
+std::string VirtualMachine::buildOpenCLCodeCombined(const BuildOpenCLCodeArgs& args) const
 {
-	OpenCLCCode opencl_code = buildOpenCLCode();
+	OpenCLCCode opencl_code = buildOpenCLCode(args);
 	return opencl_code.struct_def_code + opencl_code.struct_def_code;
 }
 

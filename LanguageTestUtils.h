@@ -334,7 +334,8 @@ static ProgramStats doTestMainFloatArg(const std::string& src, float argument, f
 				command_queue
 			);
 
-			std::string opencl_code = vm.buildOpenCLCodeCombined();
+			Winter::VirtualMachine::BuildOpenCLCodeArgs opencl_args;
+			std::string opencl_code = vm.buildOpenCLCodeCombined(opencl_args);
 
 			// OpenCL keeps complaining about 'main must return type int', so rename main to main_.
 			//opencl_code = StringUtils::replaceAll(opencl_code, "main", "main_"); // NOTE: slightly dodgy string-based renaming.
@@ -733,7 +734,8 @@ static ProgramStats testMainIntegerArg(const std::string& src, int x, int target
 				int truncateToInt(float x) { return (int)x; } \n\
 				";*/
 
-			std::string opencl_code = vm.buildOpenCLCodeCombined();
+			Winter::VirtualMachine::BuildOpenCLCodeArgs opencl_args;
+			std::string opencl_code = vm.buildOpenCLCodeCombined(opencl_args);
 
 			// OpenCL keeps complaining about 'main must return type int', so rename main to main_.
 			//opencl_code = StringUtils::replaceAll(opencl_code, "main", "main_"); // NOTE: dodgy string-based renaming.

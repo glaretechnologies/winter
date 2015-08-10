@@ -25,11 +25,14 @@ class CapturedVar
 public:
 	CapturedVar();
 
+	void print(int depth, std::ostream& s) const;
+
 	enum CapturedVarType
 	{
 		Let,
 		Arg,
-		Captured // we are capturing a captured var from an enclosing lambda expression :)
+		Captured, // we are capturing a captured var from an enclosing lambda expression :)
+		Removed // deleted. Left in the vector so that indices don't change.
 	};
 
 	TypeRef type() const;
@@ -41,7 +44,7 @@ public:
 
 
 	FunctionDefinition* bound_function; // Function for which the variable is an argument of,
-	LetBlock* bound_let_block;
+	LetASTNode* bound_let_node;
 };
 
 
@@ -119,7 +122,7 @@ public:
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	//virtual llvm::Value* getConstantLLVMValue(EmitLLVMCodeParams& params) const;
-	virtual Reference<ASTNode> clone();
+	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 
 	bool isGenericFunction() const; // true if it is parameterised by type.

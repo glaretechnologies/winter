@@ -367,9 +367,11 @@ llvm::Value* IfExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 //}
 
 
-Reference<ASTNode> IfExpression::clone()
+Reference<ASTNode> IfExpression::clone(CloneMapType& clone_map)
 {
-	return new IfExpression(this->srcLocation(), this->condition->clone(), this->then_expr->clone(), this->else_expr->clone());
+	IfExpression* res = new IfExpression(this->srcLocation(), this->condition->clone(clone_map), this->then_expr->clone(clone_map), this->else_expr->clone(clone_map));
+	clone_map.insert(std::make_pair(this, res));
+	return res;
 }
 
 

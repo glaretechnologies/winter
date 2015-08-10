@@ -42,7 +42,7 @@ public:
 	void bindVariables(TraversalPayload& payload, const std::vector<ASTNode*>& stack);
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
-	virtual Reference<ASTNode> clone();
+	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 
 	// or for what it is a let of.
@@ -55,10 +55,11 @@ public:
 	BindingType vartype; // one of BindingType above.
 
 	FunctionDefinition* bound_function; // Function for which the variable is an argument of,
-	LetBlock* bound_let_block;
+	LetASTNode* bound_let_node;
+	//int bound_let_block_offset; // 0 = let block this variable is defin
 	NamedConstant* bound_named_constant;
 
-	int bound_index; // index in parent function definition argument list, or index of let var in let block, or index of captured var.
+	int bound_index; // index in parent function definition argument list, or index of captured var.
 
 	// Offset of zero means use the latest/deepest set of let values.  Offset 1 means the next oldest, etc.
 	//int let_frame_offset;
