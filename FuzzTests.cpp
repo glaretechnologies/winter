@@ -126,7 +126,8 @@ bool testFuzzProgram(const std::string& src)
 				command_queue
 			);
 
-			std::string opencl_code = vm.buildOpenCLCodeCombined();
+			Winter::VirtualMachine::BuildOpenCLCodeArgs opencl_args;
+			std::string opencl_code = vm.buildOpenCLCodeCombined(opencl_args);
 
 			// OpenCL keeps complaining about 'main must return type int', so rename main to main_.
 			//opencl_code = StringUtils::replaceAll(opencl_code, "main", "main_"); // NOTE: slightly dodgy string-based renaming.
@@ -319,7 +320,8 @@ static bool testFuzzASTProgram(const FunctionDefinitionRef& func)
 				command_queue
 			);
 
-			std::string opencl_code = vm.buildOpenCLCodeCombined();
+			Winter::VirtualMachine::BuildOpenCLCodeArgs opencl_args;
+			std::string opencl_code = vm.buildOpenCLCodeCombined(opencl_args);
 
 			// OpenCL keeps complaining about 'main must return type int', so rename main to main_.
 			//opencl_code = StringUtils::replaceAll(opencl_code, "main", "main_"); // NOTE: slightly dodgy string-based renaming.
@@ -995,7 +997,7 @@ void fuzzTests()
 
 
 		// Each stage has different random number seeds, and after each stage tested_programs will be cleared, otherwise it gets too large and uses up too much RAM.
-		int rng_seed = 280;
+		int rng_seed = 290;
 		for(int stage=0; stage<1000000; ++stage)
 		{
 			std::cout << "=========================== Stage " << stage << "===========================================" << std::endl;
