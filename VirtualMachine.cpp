@@ -1168,38 +1168,40 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 	}
 
 
-	//TEMP:
-	/*for(size_t i=0; i<linker.top_level_defs.size(); ++i)
+	// Do inlining pass
+	if(false)
 	{
-		std::cout << "\n";
-		linker.top_level_defs[i]->print(0, std::cout);
-	}
-
-	// Do Function inlining
-	while(true)
-	{
-		bool tree_changed = false;
-
+		/*for(size_t i=0; i<linker.top_level_defs.size(); ++i)
 		{
-			std::vector<ASTNode*> stack;
-			TraversalPayload payload(TraversalPayload::InlineFunctionCalls);
-			for(size_t i=0; i<linker.top_level_defs.size(); ++i)
-				linker.top_level_defs[i]->traverse(payload, stack);
-			assert(stack.size() == 0);
+			std::cout << "\n";
+			linker.top_level_defs[i]->print(0, std::cout);
+		}*/
 
-			tree_changed = tree_changed || payload.tree_changed;
+		// Do Function inlining
+		while(true)
+		{
+			bool tree_changed = false;
+
+			{
+				std::vector<ASTNode*> stack;
+				TraversalPayload payload(TraversalPayload::InlineFunctionCalls);
+				for(size_t i=0; i<linker.top_level_defs.size(); ++i)
+					linker.top_level_defs[i]->traverse(payload, stack);
+				assert(stack.size() == 0);
+
+				tree_changed = tree_changed || payload.tree_changed;
+			}
+
+			if(!tree_changed)
+				break;
 		}
 
-		if(!tree_changed)
-			break;
+		/*for(size_t i=0; i<linker.top_level_defs.size(); ++i)
+		{
+			std::cout << "\n";
+			linker.top_level_defs[i]->print(0, std::cout);
+		}*/
 	}
-
-	//TEMP:
-	for(size_t i=0; i<linker.top_level_defs.size(); ++i)
-	{
-		std::cout << "\n";
-		linker.top_level_defs[i]->print(0, std::cout);
-	}*/
 
 
 	// do dead-function elimination pass.  This removes all function definitions that are not reachable (through direct or indirect function calls) from the set of entry functions.
@@ -1215,11 +1217,13 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		for(size_t i=0; i<args.entry_point_sigs.size(); ++i)
 		{
 			FunctionDefinitionRef f = linker.findMatchingFunctionSimple(args.entry_point_sigs[i]);
-			if(f.isNull())
-				throw BaseException("Failed to find entry point function " + args.entry_point_sigs[i].toString());
-			
-			payload.reachable_defs.insert(f.getPointer()); // Mark as reachable
-			payload.defs_to_process.push_back(f.getPointer()); // Add to to-process set.
+			//if(f.isNull())
+			//	throw BaseException("Failed to find entry point function " + args.entry_point_sigs[i].toString());
+			if(f.nonNull())
+			{
+				payload.reachable_defs.insert(f.getPointer()); // Mark as reachable
+				payload.defs_to_process.push_back(f.getPointer()); // Add to to-process set.
+			}
 		}
 
 		while(!payload.defs_to_process.empty())
