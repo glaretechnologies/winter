@@ -6,7 +6,6 @@ Copyright Glare Technologies Limited 2015 -
 #include "wnt_Variable.h"
 
 
-#include "wnt_ASTNode.h"
 #include "wnt_SourceBuffer.h"
 #include "wnt_RefCounting.h"
 #include "VMState.h"
@@ -15,8 +14,8 @@ Copyright Glare Technologies Limited 2015 -
 #include "BuiltInFunctionImpl.h"
 #include "LLVMTypeUtils.h"
 #include "ProofUtils.h"
-#include "utils/StringUtils.h"
 #include "maths/mathstypes.h"
+#include "utils/StringUtils.h"
 #include <ostream>
 #ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
@@ -50,13 +49,11 @@ Variable::Variable(const std::string& name_, const SrcLocation& loc)
 :	ASTNode(VariableASTNodeType, loc),
 	vartype(UnboundVariable),
 	name(name_),
-	bound_index(-1),
 	bound_function(NULL),
 	bound_let_node(NULL),
 	bound_named_constant(NULL),
+	bound_index(-1),
 	let_var_index(-1)
-	//use_captured_var(false),
-	//captured_var_index(0)
 {
 	this->can_maybe_constant_fold = false;
 }
@@ -90,15 +87,17 @@ struct BindInfo
 
 	Variable::BindingType vartype;
 
-	int bound_index;
-	int let_var_index; // Index of the let variable bound to, for destructing assignment case may be > 0.
-
 	ASTNode* root_bound_node; // Node furthest up the node stack that we are bound to, if the variable is bound through one or more captured vars.
 	FunctionDefinition* bound_function; // Function for which the variable is an argument of,
 	LetASTNode* bound_let_node;
+
+	int bound_index;
+	int let_var_index; // Index of the let variable bound to, for destructing assignment case may be > 0.
 };
 
 
+// Walk up the AST, trying to find something to bind to.
+// s = current stack level.
 BindInfo doBind(const std::vector<ASTNode*>& stack, int s, const std::string& name)
 {
 	for(; s >= 0; --s) // Walk up the stack of ancestor nodes
@@ -224,31 +223,16 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 		return;
 	}
 
-	// Try and bind to top level function definition
-//	BufferRoot* root = static_cast<BufferRoot*>(stack[0]);
-//	vector<FunctionDefinitionRef
-//	for(size_t i=0; i<stack[0]->get
-
-//	Frame::NameToFuncMapType::iterator res = payload.top_lvl_frame->name_to_functions_map.find(this->name);
-//	if(res != payload.top_lvl_frame->name_to_functions_map.end())
-	//Frame::NameToFuncMapType::iterator res = payload.linker->findMatchingFunctionByName(this->name);
+	// Try and bind to a top level function definition
 	vector<FunctionDefinitionRef> matching_functions;
 	payload.linker->getFuncsWithMatchingName(this->name, matching_functions);
 
 	if(!matching_functions.empty())
 	{
-		//vector<FunctionDefinitionRef>& matching_functions = res->second;
-
-	
-
 		assert(matching_functions.size() > 0);
 
 		if(matching_functions.size() > 1)
 			throw BaseException("Ambiguous binding for variable '" + this->name + "': multiple functions with name." + errorContext(*this, payload));
-
-		//if(contains(payload.func_def_stack, matching_functions[0].getPointer()))
-		//	throw BaseException("Variable refer to current function definition." + errorContext(*this, payload));
-
 
 		FunctionDefinition* target_func_def = matching_functions[0].getPointer();
 
@@ -261,63 +245,25 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 
 			// As the target function is being passed as an argument, we need a closure version of it.
 			target_func_def->need_to_emit_captured_var_struct_version = true;
-
 			return;
 		}
 	}
 
 	// Try and bind to a named constant.
-	//Frame::NamedConstantMap::iterator name_res = payload.top_lvl_frame->named_constant_map.find(this->name);
-	//if(name_res != payload.top_lvl_frame->named_constant_map.end())
 	Frame::NamedConstantMap::iterator name_res = payload.linker->named_constant_map.find(this->name);
 	if(name_res != payload.linker->named_constant_map.end())
 	{
-		//if(payload.current_named_constant)
-		//{
-			const NamedConstant* target_named_constant = name_res->second.getPointer();
+		const NamedConstant* target_named_constant = name_res->second.getPointer();
 
-			// Only bind to a named constant defined earlier, and only bind to a named constant earlier than all functions we are defining.
-			if((!payload.current_named_constant || target_named_constant->order_num < payload.current_named_constant->order_num) &&
-				isTargetDefinedBeforeAllInStack(payload.func_def_stack, target_named_constant->order_num))
-			{
-				this->vartype = BoundToNamedConstant;
-				this->bound_named_constant = name_res->second.getPointer();
-				return;
-			}
-		//}
-
-
-		/*if(payload.current_named_constant)
+		// Only bind to a named constant defined earlier, and only bind to a named constant earlier than all functions we are defining.
+		if((!payload.current_named_constant || target_named_constant->order_num < payload.current_named_constant->order_num) &&
+			isTargetDefinedBeforeAllInStack(payload.func_def_stack, target_named_constant->order_num))
 		{
-			const int current_named_constant_src_pos = payload.current_named_constant->srcLocation().char_index;
-			const int target_named_constant_src_pos = name_res->second->srcLocation().char_index;
-
-			// Only bind to a named constant defined earlier in the file.
-			// NOTE: kind of an abuse of src location here.
-			if(target_named_constant_src_pos < current_named_constant_src_pos)
-			{
-				this->vartype = BoundToNamedConstant;
-				this->bound_named_constant = name_res->second.getPointer();
-				return;
-			}
+			this->vartype = BoundToNamedConstant;
+			this->bound_named_constant = name_res->second.getPointer();
+			return;
 		}
-		else
-		{
-			this->vartype = BoundToNamedConstant;
-			this->bound_named_constant = name_res->second.getPointer();
-			return;
-		}*/
-
-		// Don't try to bind to the named constant we are in the value expression for.
-		//if(payload.named_constant_stack.empty() || (payload.named_constant_stack[0] != name_res->second.getPointer()))
-		/*if(payload.current_named_constant != name_res->second.getPointer())
-		{
-			this->vartype = BoundToNamedConstant;
-			this->bound_named_constant = name_res->second.getPointer();
-			return;
-		}*/
 	}
-
 
 	throw BaseException("No such function, function argument, named constant or let definition '" + this->name + "'." + 
 		errorContext(*this, payload));
@@ -339,9 +285,6 @@ void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 		if(this->vartype == LetVariable)
 		{
 			const bool let_val_is_literal = checkFoldExpression(this->bound_let_node->expr, payload);
-			//this->can_constant_fold = a->can_constant_fold && b->can_constant_fold && expressionIsWellTyped(*this, payload);
-			//const bool a_is_literal = checkFoldExpression(a, payload);
-			//const bool b_is_literal = checkFoldExpression(b, payload);
 			
 			this->can_maybe_constant_fold = let_val_is_literal;
 		}
@@ -353,6 +296,7 @@ void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 	}
 	else if(payload.operation == TraversalPayload::UpdateUpRefs)
 	{
+		// When cloning a subtree of nodes, we will need to update upwards pointers to point into the new subtree.
 		switch(vartype)
 		{
 		case UnboundVariable:
@@ -384,29 +328,6 @@ void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 			}
 		}
 	}
-	else if(payload.operation == TraversalPayload::SubstituteVariables)
-	{
-		if(this->vartype == CapturedVariable)
-		{
-			CapturedVar& captured_var = this->bound_function->captured_vars[this->bound_index];
-			if(captured_var.vartype == CapturedVar::Arg)
-			{
-				if(captured_var.bound_function == payload.func_args_to_sub)
-				{
-
-				}
-			}
-		}
-		/*for(size_t i=0; i<this->captured_vars.size(); ++i)
-		{
-			if(captured_vars[i].vartype == CapturedVar::Arg)
-			{
-				// We need to change the captured var to capture the expression that is the argument value.
-				//captured_vars[i].substituted_expr = payload.variable_substitutes[i]->clone();
-				captured_vars[i].substituted_expr = cloneASTNodeSubtree(payload.variable_substitutes[i]);
-			}
-		}*/
-	}
 	else if(payload.operation == TraversalPayload::DeadFunctionElimination)
 	{
 		// If this variable refers to a global function, then we will consider the global function reachable from this function.
@@ -417,7 +338,7 @@ void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 			if(payload.processed_defs.find(this->bound_function) == payload.processed_defs.end()) // If has not been processed yet:
 				payload.defs_to_process.push_back(this->bound_function);
 		}
-		else if(this->vartype == BoundToNamedConstant)
+		else if(this->vartype == BoundToNamedConstant) // Similarly for named constants.
 		{
 			payload.reachable_defs.insert(this->bound_named_constant);
 			if(payload.processed_defs.find(this->bound_named_constant) == payload.processed_defs.end()) // If has not been processed yet:
@@ -431,7 +352,7 @@ ValueRef Variable::exec(VMState& vmstate)
 {
 	if(this->vartype == ArgumentVariable)
 	{
-		if(vmstate.func_args_start.back() + bound_index >= vmstate.argument_stack.size())
+		if(vmstate.func_args_start.empty() || (vmstate.func_args_start.back() + bound_index >= vmstate.argument_stack.size()))
 			throw BaseException("out of bounds");
 
 		return vmstate.argument_stack[vmstate.func_args_start.back() + bound_index];
@@ -439,12 +360,13 @@ ValueRef Variable::exec(VMState& vmstate)
 	else if(this->vartype == LetVariable)
 	{
 		// Instead of computing the values and placing on let stack, let's just execute the let expressions directly.
+		// NOTE: this can be very inefficient!
 
 		//const int let_stack_start = (int)vmstate.let_stack_start[vmstate.let_stack_start.size() - 1 - this->let_frame_offset];
 		//return vmstate.let_stack[let_stack_start + this->bound_index];
-		LetASTNode* let_node = this->bound_let_node;
-		ValueRef val = let_node->exec(vmstate);
-		if(let_node->vars.size() == 1)
+
+		ValueRef val = this->bound_let_node->exec(vmstate);
+		if(this->bound_let_node->vars.size() == 1)
 			return val;
 		else
 		{
@@ -465,6 +387,8 @@ ValueRef Variable::exec(VMState& vmstate)
 	else if(this->vartype == CapturedVariable)
 	{
 		// Get ref to capturedVars structure of values, will be passed in as last arg to function
+		if(vmstate.argument_stack.empty())
+			throw BaseException("out of bounds");
 		ValueRef captured_struct = vmstate.argument_stack.back();
 		const StructureValue* s = checkedCast<StructureValue>(captured_struct.getPointer());
 
@@ -503,11 +427,7 @@ TypeRef Variable::type() const
 	else if(this->vartype == BoundToNamedConstant)
 		return this->bound_named_constant->type();
 	else if(this->vartype == CapturedVariable)
-	{
-		FunctionDefinition* def = this->bound_function;
-
-		return def->captured_vars[this->bound_index].type();
-	}
+		return this->bound_function->captured_vars[this->bound_index].type();
 	else
 	{
 		//assert(!"invalid vartype.");
@@ -520,25 +440,27 @@ void Variable::print(int depth, std::ostream& s) const
 {
 	printMargin(depth, s);
 
+	s << "Var '" << this->name << "' (" + toHexString((uint64)this) + "), ";
+
 	switch(vartype)
 	{
 	case UnboundVariable:
-		s << "Var '" << this->name << "' (" + toHexString((uint64)this) + "), unbound\n";
+		s << "unbound\n";
 		break;
 	case LetVariable:
-		s << "Var '" << this->name << "' (" + toHexString((uint64)this) + "), bound to let node: " << toHexString((uint64)this->bound_let_node) + ", let_var_index=" << let_var_index << "\n";
+		s << "bound to let node: " << toHexString((uint64)this->bound_let_node) + ", let_var_index=" << let_var_index << "\n";
 		break;
 	case ArgumentVariable:
-		s << "Var '" << this->name << "' (" + toHexString((uint64)this) + "), bound to arg, function: " << toHexString((uint64)this->bound_function) + " (" + this->bound_function->sig.name + "), index=" << bound_index << "\n";
+		s << "bound to arg, function: " << toHexString((uint64)this->bound_function) + " (" + this->bound_function->sig.name + "), index=" << bound_index << "\n";
 		break;
 	case BoundToGlobalDefVariable:
-		s << "Var '" << this->name << "' (" + toHexString((uint64)this) + "), bound to global function: " << toHexString((uint64)this->bound_function) + " (" + this->bound_function->sig.name + ")" << "\n";
+		s << "bound to global function: " << toHexString((uint64)this->bound_function) + " (" + this->bound_function->sig.name + ")" << "\n";
 		break;
 	case BoundToNamedConstant:
-		s << "Var '" << this->name << "' (" + toHexString((uint64)this) + "), bound to named constant: " << toHexString((uint64)this->bound_named_constant) << "\n";
+		s << "bound to named constant: " << toHexString((uint64)this->bound_named_constant) << "\n";
 		break;
 	case CapturedVariable:
-		s << "Var '" << this->name << "' (" + toHexString((uint64)this) + "), captured, function: " << toHexString((uint64)this->bound_function) + " (" + this->bound_function->sig.name + "), index: " << this->bound_index << "\n";
+		s << "captured, function: " << toHexString((uint64)this->bound_function) + " (" + this->bound_function->sig.name + "), index: " << this->bound_index << "\n";
 		break;
 	};
 }
@@ -560,14 +482,11 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 {
 	if(vartype == LetVariable)
 	{
-		//return this->bound_let_block->getLetExpressionLLVMValue(params, this->bound_index, ret_space_ptr);
-		//TEMP:
 		assert(params.let_values.find(this->bound_let_node) != params.let_values.end());
 
 		llvm::Value* value = params.let_values[this->bound_let_node];
 
-		LetASTNode* let_node = this->bound_let_node;
-		if(let_node->vars.size() == 1)
+		if(this->bound_let_node->vars.size() == 1)
 		{
 			// Increment reference count
 			if(params.emit_refcounting_code)
@@ -577,7 +496,7 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 		}
 		else
 		{
-			// destructuring assignment, we just want to return the individual tuple element.
+			// Destructuring assignment, we just want to return the individual tuple element.
 			// Value should be a pointer to a tuple struct.
 			if(type()->passByValue())
 			{
@@ -592,8 +511,6 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 			else
 			{
 				llvm::Value* tuple_elem = params.builder->CreateStructGEP(value, this->let_var_index, "tuple_elem_ptr");
-				//tuple_elem->dump();
-				//tuple_elem->getType()->dump();
 
 				// Increment reference count
 				if(params.emit_refcounting_code)
@@ -611,14 +528,6 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 		if(!params.argument_values.empty())
 			return params.argument_values[this->bound_index];
 
-		//if(shouldPassByValue(*this->type()))
-		//{
-			// If the current function returns its result via pointer, then all args are offset by one.
-			//if(params.currently_building_func_def->returnType()->passByValue())
-			//	return LLVMTypeUtils::getNthArg(params.currently_building_func, this->bound_index);
-			//else
-			//	return LLVMTypeUtils::getNthArg(params.currently_building_func, this->bound_index + 1);
-
 		llvm::Value* arg = LLVMTypeUtils::getNthArg(
 			params.currently_building_func,
 			params.currently_building_func_def->getLLVMArgIndex(this->bound_index)
@@ -630,42 +539,6 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 			this->type()->emitIncrRefCount(params, arg, "Variable::emitLLVMCode for argument var " + this->name);
 
 		return arg;
-
-		/*if(ret_space_ptr)
-		{
-			assert(!this->type()->passByValue());
-
-			llvm::Value* size;
-			if(this->type()->getType() == Type::ArrayTypeType)
-			{
-				size = llvm::ConstantInt::get(*params.context, llvm::APInt(32, sizeof(float) * 4, true)); // TEMP HACK
-				//size = //this->type().downcast<ArrayType>()->t->LLVMType(*params.context)->getPrimitiveSizeInBits() * 8;
-			}
-			else
-			{
-				assert(0);
-			}
-			// Need to copy the value from the mem at arg to the mem at ret_space_ptr
-			params.builder->CreateMemCpy(
-				ret_space_ptr, // dest
-				arg, // src
-				size, // size
-				4 // align
-			);
-		}
-
-		return ret_space_ptr;*/
-
-		/*}
-		else
-		{
-			return params.builder->CreateLoad(
-				LLVMTypeUtils::getNthArg(params.currently_building_func, this->argument_index),
-				false, // true,// TEMP: volatile = true to pick up returned vector);
-				"argument" // name
-			);
-
-		}*/
 	}
 	else if(vartype == BoundToGlobalDefVariable)
 	{
@@ -685,18 +558,9 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 			params.currently_building_func_def->getCapturedVarStructLLVMArgIndex()
 		);
 
-		//std::cout << "base_cap_var_structure: " << std::endl;
-		//base_cap_var_structure->dump();
-		//std::cout << std::endl;
-		
-
 		llvm::Type* full_cap_var_type = LLVMTypeUtils::pointerType(
 			*params.currently_building_func_def->getCapturedVariablesStructType()->LLVMType(*params.module)
 		);
-
-		//std::cout << "full_cap_var_type: " << std::endl;
-		//full_cap_var_type->dump();
-		//std::cout << std::endl;
 
 		llvm::Value* cap_var_structure = params.builder->CreateBitCast(
 			base_cap_var_structure,
@@ -731,8 +595,6 @@ Reference<ASTNode> Variable::clone(CloneMapType& clone_map)
 	v->bound_let_node = bound_let_node;
 	v->bound_named_constant = bound_named_constant;
 	v->bound_index = bound_index;
-	//v->let_frame_offset = let_frame_offset;
-	//v->uncaptured_bound_index = uncaptured_bound_index;
 	v->let_var_index = let_var_index;
 
 	clone_map.insert(std::make_pair(this, v));

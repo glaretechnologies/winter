@@ -25,11 +25,11 @@ public:
 	enum BindingType
 	{
 		UnboundVariable,
-		LetVariable,
-		ArgumentVariable,
-		BoundToGlobalDefVariable,
-		BoundToNamedConstant,
-		CapturedVariable
+		LetVariable,					// Bound to a let variable
+		ArgumentVariable,				// Bound to an argument of the most-tightly enclosing function
+		BoundToGlobalDefVariable,		// Bound to a globally defined (program scope) function
+		BoundToNamedConstant,			// Bound to a named constant
+		CapturedVariable				// Bound to a captured variable of the most-tightly enclosing anonymous function.
 	};
 
 	Variable(const std::string& name, const SrcLocation& loc);
@@ -45,33 +45,20 @@ public:
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 
-	// or for what it is a let of.
-	//AnonFunction* parent_anon_function;
-	//ASTNode* referenced_var;
-	//TypeRef referenced_var_type; // Type of the variable.
+
 
 	std::string name; // variable name.
 
 	BindingType vartype; // one of BindingType above.
 
-	FunctionDefinition* bound_function; // Function for which the variable is an argument of,
-	LetASTNode* bound_let_node;
-	//int bound_let_block_offset; // 0 = let block this variable is defin
-	NamedConstant* bound_named_constant;
+	FunctionDefinition* bound_function; // Function for which the variable is an argument of.  Use in ArgumentVariable case.
+	LetASTNode* bound_let_node; // Used in LetVariable case.
+	NamedConstant* bound_named_constant; // Used in BoundToNamedConstant case.
 
-	int bound_index; // index in parent function definition argument list, or index of captured var.
+	int bound_index; // index in function argument list, or index of captured var.
 
-	// Offset of zero means use the latest/deepest set of let values.  Offset 1 means the next oldest, etc.
-	//int let_frame_offset;
-
-	// bool use_captured_var;
-	// int captured_var_index;
-
-	//int uncaptured_bound_index;
-	int let_var_index; // Index of the let variable bound to, for destructing assignment case may be > 0.
-
+	int let_var_index; // Index of the let variable bound to, for destructing assignment case may be > 0.  Used in LetVariable case.
 };
-
 
 
 typedef Reference<Variable> VariableRef;
