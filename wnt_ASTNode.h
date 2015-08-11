@@ -11,7 +11,6 @@ File created by ClassTemplate on Wed Jun 11 03:55:25 2008
 #include "wnt_FunctionSignature.h"
 #include "wnt_ExternalFunction.h"
 #include "wnt_Frame.h"
-#include "wnt_UpRef.h"
 #include "BaseException.h"
 #include "TokenBase.h"
 #include "Value.h"
