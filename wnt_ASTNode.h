@@ -86,7 +86,9 @@ public:
 		SubstituteVariables, // Used in InlineFunctionCalls passes: replace all variables in the function body with the argument values.
 		CustomVisit, // Calls supplied ASTNodeVisitor on each node visited.
 		UpdateUpRefs,
-		DeadFunctionElimination
+		DeadFunctionElimination,
+		DeadCodeElimination_ComputeAlive,
+		DeadCodeElimination_RemoveDead
 	};
 
 	TraversalPayload(Operation e) : 
@@ -124,11 +126,13 @@ public:
 	// Types that are captured by a function closure (lambda expression).
 	std::set<TypeRef> captured_types;
 
+	// Used in UpdateUpRefs:
 	CloneMapType clone_map;
 
-	std::set<ASTNode*> reachable_defs;
-	std::vector<ASTNode*> defs_to_process;
-	std::set<ASTNode*> processed_defs;
+	// Used in DeadFunctionElimination and DeadCodeElimination:
+	std::set<ASTNode*> reachable_nodes;
+	std::vector<ASTNode*> nodes_to_process;
+	std::set<ASTNode*> processed_nodes;
 };
 
 

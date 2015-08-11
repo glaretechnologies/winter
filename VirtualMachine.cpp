@@ -1190,6 +1190,14 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 				assert(stack.size() == 0);
 
 				tree_changed = tree_changed || payload.tree_changed;
+
+				// Rebind, some function expressions may be statically bound now.
+				if(tree_changed)
+				{
+					TraversalPayload payload(TraversalPayload::BindVariables);
+					for(size_t i=0; i<linker.top_level_defs.size(); ++i)
+						linker.top_level_defs[i]->traverse(payload, stack);
+				}
 			}
 
 			if(!tree_changed)
@@ -1201,6 +1209,33 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 			std::cout << "\n";
 			linker.top_level_defs[i]->print(0, std::cout);
 		}*/
+	}
+
+	// Do dead-code elimination pass.  This removes all let variables (LetASTNode's) in each function that are not used in the computation of the final function return value.
+	if(true)
+	{
+		std::vector<ASTNode*> stack;
+		TraversalPayload payload(TraversalPayload::DeadCodeElimination_ComputeAlive);
+		for(size_t i=0; i<linker.top_level_defs.size(); ++i)
+		{
+			//std::cout << "\n=====DCE pass before:======\n";
+			//linker.top_level_defs[i]->print(0, std::cout);
+
+			// Do a pass to get the set of live LetASTNodes for this function
+			payload.operation = TraversalPayload::DeadCodeElimination_ComputeAlive;
+			linker.top_level_defs[i]->traverse(payload, stack);
+			assert(stack.size() == 0);
+
+			// The payload will now contain the alive/reachable set.
+
+			// Remove unused let vars.
+			payload.operation = TraversalPayload::DeadCodeElimination_RemoveDead;
+			linker.top_level_defs[i]->traverse(payload, stack);
+			assert(stack.size() == 0);
+
+			//std::cout << "\n=====DCE pass results:======\n";
+			//linker.top_level_defs[i]->print(0, std::cout);
+		}
 	}
 
 
@@ -1221,18 +1256,18 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 			//	throw BaseException("Failed to find entry point function " + args.entry_point_sigs[i].toString());
 			if(f.nonNull())
 			{
-				payload.reachable_defs.insert(f.getPointer()); // Mark as reachable
-				payload.defs_to_process.push_back(f.getPointer()); // Add to to-process set.
+				payload.reachable_nodes.insert(f.getPointer()); // Mark as reachable
+				payload.nodes_to_process.push_back(f.getPointer()); // Add to to-process set.
 			}
 		}
 
-		while(!payload.defs_to_process.empty())
+		while(!payload.nodes_to_process.empty())
 		{
 			// Pop a node off the stack
-			ASTNode* def_to_process = payload.defs_to_process.back();
-			payload.defs_to_process.pop_back();
+			ASTNode* def_to_process = payload.nodes_to_process.back();
+			payload.nodes_to_process.pop_back();
 
-			payload.processed_defs.insert(def_to_process); // Mark node as processed
+			payload.processed_nodes.insert(def_to_process); // Mark node as processed
 
 			def_to_process->traverse(payload, stack); // Process it
 			assert(stack.size() == 0);
@@ -1242,27 +1277,27 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		// TEMP HACK: add some special functions to reachable set.
 		{
 			const FunctionSignature allocateStringSig("allocateString", vector<TypeRef>(1, new OpaqueType()));
-			payload.reachable_defs.insert(findMatchingFunction(allocateStringSig).getPointer());
+			payload.reachable_nodes.insert(findMatchingFunction(allocateStringSig).getPointer());
 
 			vector<TypeRef> argtypes(1, new String());
 			const FunctionSignature freeStringSig("freeString", argtypes);
-			payload.reachable_defs.insert(findMatchingFunction(freeStringSig).getPointer());
+			payload.reachable_nodes.insert(findMatchingFunction(freeStringSig).getPointer());
 
-			payload.reachable_defs.insert(findMatchingFunction(FunctionSignature("allocateVArray", vector<TypeRef>(2, new Int(64)))).getPointer());
+			payload.reachable_nodes.insert(findMatchingFunction(FunctionSignature("allocateVArray", vector<TypeRef>(2, new Int(64)))).getPointer());
 
-			payload.reachable_defs.insert(findMatchingFunction(FunctionSignature("freeVArray", vector<TypeRef>(1, new VArrayType(new Int())))).getPointer());
+			payload.reachable_nodes.insert(findMatchingFunction(FunctionSignature("freeVArray", vector<TypeRef>(1, new VArrayType(new Int())))).getPointer());
 
-			payload.reachable_defs.insert(findMatchingFunction(FunctionSignature("allocateClosure", vector<TypeRef>(1, new Int(64)))).getPointer());
+			payload.reachable_nodes.insert(findMatchingFunction(FunctionSignature("allocateClosure", vector<TypeRef>(1, new Int(64)))).getPointer());
 
 			const TypeRef dummy_func_type = Function::dummyFunctionType();
-			payload.reachable_defs.insert(findMatchingFunction(FunctionSignature("freeClosure", vector<TypeRef>(1, dummy_func_type))).getPointer());
+			payload.reachable_nodes.insert(findMatchingFunction(FunctionSignature("freeClosure", vector<TypeRef>(1, dummy_func_type))).getPointer());
 		}
 
 		// Now remove any non-reachable functions and named constants from linker.top_level_defs
 		std::vector<ASTNodeRef> new_top_level_defs;
 		std::vector<ASTNodeRef> unreachable_defs;
 		for(size_t i=0; i<linker.top_level_defs.size(); ++i)
-			if(payload.reachable_defs.find(linker.top_level_defs[i].getPointer()) != payload.reachable_defs.end()) // if in reachable set:
+			if(payload.reachable_nodes.find(linker.top_level_defs[i].getPointer()) != payload.reachable_nodes.end()) // if in reachable set:
 				new_top_level_defs.push_back(linker.top_level_defs[i]);
 			else
 				unreachable_defs.push_back(linker.top_level_defs[i]);
@@ -1274,7 +1309,7 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		for(auto i = linker.sig_to_function_map.begin(); i != linker.sig_to_function_map.end(); ++i)
 		{
 			FunctionDefinitionRef def = i->second;
-			if(payload.reachable_defs.find(def.getPointer()) != payload.reachable_defs.end()) // if in reachable set:
+			if(payload.reachable_nodes.find(def.getPointer()) != payload.reachable_nodes.end()) // if in reachable set:
 				new_map.insert(std::make_pair(def->sig, def));
 		}
 		linker.sig_to_function_map = new_map;

@@ -297,6 +297,16 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 		if(payload.custom_visitor.nonNull())
 			payload.custom_visitor->visit(*this, payload);
 	}
+	else if(payload.operation == TraversalPayload::DeadCodeElimination_ComputeAlive)
+	{
+		if(stack.empty()) // If this is a top-level global func (not a lambda expression):
+		{
+			// Clear this data in preparation for the analysis.
+			payload.reachable_nodes.clear();
+			payload.nodes_to_process.clear();
+			payload.processed_nodes.clear();
+		}
+	}
 
 	//if(payload.operation == TraversalPayload::BindVariables) // LinkFunctions)
 	//{
@@ -502,7 +512,32 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 	{
 		if(this->is_anon_func)
 		{
-			payload.reachable_defs.insert(this);
+			payload.reachable_nodes.insert(this);
+		}
+	}
+	else if(payload.operation == TraversalPayload::DeadCodeElimination_ComputeAlive)
+	{
+		if(!this->is_anon_func) // if this is a top-level func:
+		{
+			while(!payload.nodes_to_process.empty())
+			{
+				ASTNode* n = payload.nodes_to_process.back();
+				payload.nodes_to_process.pop_back();
+
+				n->traverse(payload, stack); // stack will be wrong, but it shouldn't matter.
+			}
+		}
+		else
+		{
+			for(size_t i=0; i<captured_vars.size(); ++i)
+			{
+				if(captured_vars[i].vartype == CapturedVar::Let)
+				{
+					payload.reachable_nodes.insert(captured_vars[i].bound_let_node); // Mark as alive
+					if(payload.processed_nodes.find(captured_vars[i].bound_let_node) == payload.processed_nodes.end()) // If has not been processed yet:
+						payload.nodes_to_process.push_back(captured_vars[i].bound_let_node); // Add to to-process list.
+				}
+			}
 		}
 	}
 

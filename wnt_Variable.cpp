@@ -334,15 +334,24 @@ void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 		// This is conservative.
 		if(this->vartype == BoundToGlobalDefVariable)
 		{
-			payload.reachable_defs.insert(this->bound_function);
-			if(payload.processed_defs.find(this->bound_function) == payload.processed_defs.end()) // If has not been processed yet:
-				payload.defs_to_process.push_back(this->bound_function);
+			payload.reachable_nodes.insert(this->bound_function);
+			if(payload.processed_nodes.find(this->bound_function) == payload.processed_nodes.end()) // If has not been processed yet:
+				payload.nodes_to_process.push_back(this->bound_function);
 		}
 		else if(this->vartype == BoundToNamedConstant) // Similarly for named constants.
 		{
-			payload.reachable_defs.insert(this->bound_named_constant);
-			if(payload.processed_defs.find(this->bound_named_constant) == payload.processed_defs.end()) // If has not been processed yet:
-				payload.defs_to_process.push_back(this->bound_named_constant);
+			payload.reachable_nodes.insert(this->bound_named_constant);
+			if(payload.processed_nodes.find(this->bound_named_constant) == payload.processed_nodes.end()) // If has not been processed yet:
+				payload.nodes_to_process.push_back(this->bound_named_constant);
+		}
+	}
+	else if(payload.operation == TraversalPayload::DeadCodeElimination_ComputeAlive)
+	{
+		if(vartype == LetVariable)
+		{
+			payload.reachable_nodes.insert(this->bound_let_node); // Mark as alive
+			if(payload.processed_nodes.find(this->bound_let_node) == payload.processed_nodes.end()) // If has not been processed yet:
+				payload.nodes_to_process.push_back(this->bound_let_node); // Add to to-process list
 		}
 	}
 }

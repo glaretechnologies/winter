@@ -335,6 +335,18 @@ void LanguageTests::run()
 
 	//testMainFloatArg("def main(float x) float : let a = [1.0, 2.0, 3.0, 4.0]a in a[truncateToInt(x)]", 2.1f, 3.0f, ALLOW_UNSAFE);
 
+	// ===================================================================
+	// Test dead code elimination
+	// ===================================================================
+	testMainIntegerArg("def main(int x) int :				\n\
+		let													\n\
+			a = 1 + x	# dead								\n\
+			b = 3 + x	# alive								\n\
+			c = b + x	# alive								\n\
+		in													\n\
+			c + x			# c is alive						\n\
+		", 1, 6);
+
 
 	// ===================================================================
 	// Test dead function elimination
@@ -664,7 +676,7 @@ void LanguageTests::run()
 
 	// Test varray being returned from function, has to be heap allocated.  (Assuming no inlining of f)
 	stats = testMainFloatArgAllowUnsafe("def f(float x) : [x + 3.0, x + 4.0, x + 5.0]va             def main(float x) float :	 let v = f(x) in v[0]", 10.f, 13.f, INVALID_OPENCL);
-	testAssert(stats.num_heap_allocation_calls == 1);
+	testAssert(stats.num_heap_allocation_calls <= 1);
 
 	
 	// ===================================================================
@@ -3824,7 +3836,6 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 	// Test 'compose' function: returns the composition of two functions
 	// NOTE: this requires lexical closures to work :)
 
-	// NOTE: Crashing for some reason.  TODO: Fix
 	testMainFloat("def compose(function<float, float> f) : f       \n\
 					def mulByTwo(float x) : x * 2.0                \n\
 					def main() float :                         \n\
@@ -3862,15 +3873,17 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 						let z = compose(mulByTwo)  in \n\
 						z(4.0)", 8.0f);
 
-		testMainFloatArg("def compose(function<float, float> f, function<float, float> g) : \\(float x) : f(g(x))       \n\
+
+
+	testMainFloatArg("def compose(function<float, float> f, function<float, float> g) : \\(float x) : f(g(x))       \n\
 					def addOne(float x) : x + 1.0                \n\
 					def mulByTwo(float x) : x * 2.0                \n\
 					def main(float x) float :                         \n\
 						let z = compose(addOne, mulByTwo)  in \n\
 						z(x)", 10.0, 21.0f);
 
-		//inlining compose(), goes to:
-		testMainFloatArg("def compose(function<float, float> f, function<float, float> g) : \\(float x) : f(g(x))       \n\
+	//inlining compose(), goes to:
+	testMainFloatArg("def compose(function<float, float> f, function<float, float> g) : \\(float x) : f(g(x))       \n\
 					def addOne(float x) : x + 1.0                \n\
 					def mulByTwo(float x) : x * 2.0                \n\
 					def main(float x) float :                         \n\
@@ -3894,7 +3907,6 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 					def main() float :                         \n\
 						let z = compose(addOne, mulByTwo)  in \n\
 						z(10.0)", 21.0f);
-	
 
 	// Test capturing a heap-allocated type (varray in this case)
 	testMainIntegerArg("def main(int x) int :                          \n\
@@ -3916,8 +3928,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 							f = makeFunc()						\n\
 						in					                    \n\
 							f(x)", 2, 12, ALLOW_UNSAFE);
-	testAssert(stats.num_heap_allocation_calls == 2); // Should be one alloc call for the varray, and one for the closure returned from makeFunc()
-
+	testAssert(stats.num_heap_allocation_calls <= 2); // Should be one alloc call for the varray, and one for the closure returned from makeFunc()
 
 	// Test capturing two varrays
 	stats = testMainIntegerArg("def makeFunc() function<int, int> :		\n\
@@ -3932,7 +3943,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 							f = makeFunc()						\n\
 						in					                    \n\
 							f(x)", 2, 34, ALLOW_UNSAFE);
-	testAssert(stats.num_heap_allocation_calls == 3); // Should be one alloc call for each varray, and one for the closure returned from makeFunc()
+	testAssert(stats.num_heap_allocation_calls <= 3); // Should be one alloc call for each varray, and one for the closure returned from makeFunc()
 
 	// Test capturing a string
 	stats = testMainIntegerArg("def makeFunc() function<int, int> :		\n\
@@ -3946,7 +3957,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 							f = makeFunc()						\n\
 						in					                    \n\
 							f(x)", 1, (int)'e', ALLOW_UNSAFE);
-	testAssert(stats.num_heap_allocation_calls == 2); // Should be one alloc call for the string, and one for the closure returned from makeFunc()
+	testAssert(stats.num_heap_allocation_calls <= 2); // Should be one alloc call for the string, and one for the closure returned from makeFunc()
 
 
 
@@ -3960,7 +3971,6 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 
 	// Test closures
 
-	
 	//// Test variable capture: the returned lambda needs to capture the value of x.
 	testMainFloat("	def makeFunc(float x) function<float> : \\() : x      \n\
 					def main() float :                          \n\
@@ -4118,23 +4128,6 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 									in									\n\
 										a								\n\
 								", 10.f, 10.f);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

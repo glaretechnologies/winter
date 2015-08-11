@@ -233,7 +233,7 @@ bool FunctionExpression::doesFunctionTypeMatch(const TypeRef& type)
 void FunctionExpression::bindFunction(Linker& linker, TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
 	// Return if we have already bound this function in an earlier pass.
-	if(static_target_function != NULL)
+	if(this->static_function_name.empty() || static_target_function != NULL)
 		return;
 
 	// We want to find a function that matches our argument expression types, and the function name
@@ -464,6 +464,19 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 				// Convert to static function
 				this->static_function_name = get_func_expr.downcastToPtr<Variable>()->name;
 				get_func_expr = NULL;
+			}
+		}
+
+
+		// Convert get_func_expr variable expressions bound to a global def to direct static bindings.  This kind of conversion may be possible after inlining.
+		// NOTE: there is is probably a better way of doing this.
+		if(!this->static_target_function && get_func_expr.nonNull())
+		{
+			if(this->get_func_expr->nodeType() == ASTNode::VariableASTNodeType && 
+				this->get_func_expr.downcastToPtr<Variable>()->vartype == Variable::BoundToGlobalDefVariable)
+			{
+				this->static_target_function = this->get_func_expr.downcastToPtr<Variable>()->bound_function;
+				this->get_func_expr = NULL;
 			}
 		}
 	}
@@ -739,12 +752,12 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 	}
 	else if(payload.operation == TraversalPayload::DeadFunctionElimination)
 	{
-		// if we have traversed here in the DeadFunctionElimination, we know this function is reachable.
+		// if we have traversed here in the DeadFunctionElimination pass, we know this function is reachable.
 		if(this->static_target_function)
 		{
-			payload.reachable_defs.insert(this->static_target_function);
-			if(payload.processed_defs.find(this->static_target_function) == payload.processed_defs.end())
-				payload.defs_to_process.push_back(this->static_target_function);
+			payload.reachable_nodes.insert(this->static_target_function); // Mark as alive
+			if(payload.processed_nodes.find(this->static_target_function) == payload.processed_nodes.end()) // If not processed yet:
+				payload.nodes_to_process.push_back(this->static_target_function); // Add to to-process list
 		}
 	}
 

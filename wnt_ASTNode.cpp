@@ -4161,13 +4161,36 @@ std::string LetBlock::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 void LetBlock::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
+	stack.push_back(this);
+
 	/*if(payload.operation == TraversalPayload::ConstantFolding)
 	{
 		checkFoldExpression(expr, payload);
 	}*/
 
+	if(payload.operation == TraversalPayload::DeadCodeElimination_ComputeAlive)
+	{
+		// The let value expression is alive, but the let vars are not necessarily alive.  So just traverse to the let value expression.
+		expr->traverse(payload, stack);
+		stack.pop_back();
+		return;
+	}
+	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
+	{
+		// Remove unused let nodes
+		for(auto i=lets.begin(); i!=lets.end();)
+		{
+			LetASTNode* node = i->getPointer();
+			if(payload.reachable_nodes.find(node) == payload.reachable_nodes.end()) // If this let node is not reachable:
+			{
+				// std::cout << "Removing unused let node '" + node->vars[0].name + "'.\n";
+				i = lets.erase(i); // Remove it
+			}
+			else
+				i++;
+		}
+	}
 
-	stack.push_back(this);
 
 	for(unsigned int i=0; i<lets.size(); ++i)
 		lets[i]->traverse(payload, stack);
