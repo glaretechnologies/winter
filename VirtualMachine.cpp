@@ -1681,6 +1681,7 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 		{
 			struct_def_code += (*i)->getOpenCLCDefinition();
 			constructor_code += (*i)->getOpenCLCConstructor();
+			emitted_tuples.insert(*i); // Add to set of emitted tuples
 		}
 
 	for(auto i = args.tuple_types_used.begin(); i != args.tuple_types_used.end(); ++i)
@@ -1688,6 +1689,7 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 		{
 			struct_def_code += (*i)->getOpenCLCDefinition();
 			constructor_code += (*i)->getOpenCLCConstructor();
+			emitted_tuples.insert(*i); // Add to set of emitted tuples
 		}
 
 		// Add some Winter built-in functions
