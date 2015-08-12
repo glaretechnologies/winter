@@ -122,6 +122,7 @@ bool testFuzzProgram(const std::string& src)
 			cl_command_queue command_queue;
 			opencl->deviceInit(
 				opencl->getDeviceInfo()[0],
+				/*enable_profiling=*/false, 
 				context,
 				command_queue
 			);
@@ -316,6 +317,7 @@ static bool testFuzzASTProgram(const FunctionDefinitionRef& func)
 			cl_command_queue command_queue;
 			opencl->deviceInit(
 				opencl->getDeviceInfo()[0],
+				/*enable_profiling=*/false, 
 				context,
 				command_queue
 			);
