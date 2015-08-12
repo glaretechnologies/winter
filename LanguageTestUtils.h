@@ -330,6 +330,7 @@ static ProgramStats doTestMainFloatArg(const std::string& src, float argument, f
 			cl_command_queue command_queue;
 			opencl->deviceInit(
 				gpu_device,
+				/*enable_profiling=*/false, 
 				context,
 				command_queue
 			);
@@ -725,6 +726,7 @@ static ProgramStats testMainIntegerArg(const std::string& src, int x, int target
 			cl_command_queue command_queue;
 			opencl->deviceInit(
 				opencl->getDeviceInfo()[0],
+				/*enable_profiling=*/false, 
 				context,
 				command_queue
 			);
