@@ -63,6 +63,8 @@ public:
 	typedef std::map<FunctionSignature, Reference<FunctionDefinition> > SigToFuncMapType;
 	SigToFuncMapType sig_to_function_map;
 
+	std::vector<FunctionDefinitionRef> anon_functions_to_codegen;
+
 	std::vector<Reference<FunctionDefinition> > unique_functions;
 
 	std::vector<Reference<FunctionDefinition> > unique_functions_no_codegen; // hang on to them, don't generate code for them though.

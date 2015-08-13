@@ -183,6 +183,8 @@ ValueRef FunctionDefinition::exec(VMState& vmstate)
 
 				vals.push_back(val);
 			}
+			else if(this->captured_vars[i].vartype == CapturedVar::Removed)
+			{}
 			else
 			{
 				assert(0);
@@ -540,6 +542,12 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 			}
 		}
 	}
+	else if(payload.operation == TraversalPayload::AddAnonFuncsToLinker)
+	{
+		if(this->is_anon_func)
+			payload.linker->anon_functions_to_codegen.push_back(this);
+	}
+	
 
 	stack.pop_back();
 	payload.func_def_stack.pop_back();
@@ -1415,6 +1423,7 @@ Reference<ASTNode> FunctionDefinition::clone(CloneMapType& clone_map)
 	f->captured_vars = this->captured_vars;
 	f->captured_var_types = this->captured_var_types;
 	f->is_anon_func = this->is_anon_func;
+	f->need_to_emit_captured_var_struct_version = this->need_to_emit_captured_var_struct_version;
 
 	clone_map.insert(std::make_pair(this, f.getPointer()));
 	return f;

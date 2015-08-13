@@ -760,6 +760,21 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 				payload.nodes_to_process.push_back(this->static_target_function); // Add to to-process list
 		}
 	}
+	else if(payload.operation == TraversalPayload::CountFunctionCalls)
+	{
+		if(this->static_target_function)
+			payload.calls_to_func_count[this->static_target_function]++;
+		else if(this->get_func_expr.nonNull())
+		{
+			// Walk up the tree until we get to a node that is not a variable bound to a let node:
+			ASTNode* cur = this->get_func_expr.getPointer();
+			while((cur->nodeType() == ASTNode::VariableASTNodeType) && (((Variable*)cur)->vartype == Variable::LetVariable))
+				cur = ((Variable*)cur)->bound_let_node->expr.getPointer();
+
+			if(cur->nodeType() == ASTNode::FunctionDefinitionType)
+				payload.calls_to_func_count[(FunctionDefinition*)cur]++;
+		}
+	}
 
 
 	stack.pop_back();

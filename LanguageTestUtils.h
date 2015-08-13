@@ -361,15 +361,12 @@ static ProgramStats doTestMainFloatArg(const std::string& src, float argument, f
 			//std::string options = "-save-temps";
 			//options += " -fbin-llvmir";//TEMP
 
-			StandardPrintOutput print_output;
-
 			// Compile and build program.
 			cl_program program = opencl->buildProgram(
 				program_lines,
 				context,
 				gpu_device.opencl_device,
-				options,
-				print_output
+				options
 			);
 
 
@@ -746,11 +743,11 @@ static ProgramStats testMainIntegerArg(const std::string& src, int x, int target
 				"	output_buffer[0] = main_int_(x);		\n" + 
 				" }";
 
-			/*std::cout << extended_source << std::endl;
+			std::cout << extended_source << std::endl;
 			{
 				std::ofstream f("opencl_source.c");
 				f << extended_source;
-			}*/
+			}
 
 			OpenCLBuffer output_buffer(context, sizeof(float), CL_MEM_READ_WRITE);
 
@@ -760,15 +757,12 @@ static ProgramStats testMainIntegerArg(const std::string& src, int x, int target
 
 			std::string options = "";
 
-			StandardPrintOutput print_output;
-
 			// Compile and build program.
 			cl_program program = opencl->buildProgram(
 				program_lines,
 				context,
 				opencl->getDeviceInfo()[0].opencl_device,
-				options,
-				print_output
+				options
 			);
 
 
@@ -853,13 +847,13 @@ static ProgramStats testMainIntegerArg(const std::string& src, int x, int target
 
 
 
-static void testMainInt64Arg(const std::string& src, int64 x, int64 target_return_val, bool allow_unsafe_operations = false, uint32 test_flags = 0)
+static void testMainInt64Arg(const std::string& src, int64 x, int64 target_return_val, uint32 test_flags = 0)
 {
 	std::cout << "===================== Winter testMainInt64Arg() =====================" << std::endl;
 	try
 	{
 		VMConstructionArgs vm_args;
-		vm_args.allow_unsafe_operations = allow_unsafe_operations;
+		vm_args.allow_unsafe_operations = (test_flags & ALLOW_UNSAFE) != 0;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
 
 		const FunctionSignature mainsig("main", std::vector<TypeRef>(1, new Int(64)));

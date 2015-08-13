@@ -88,7 +88,9 @@ public:
 		UpdateUpRefs,
 		DeadFunctionElimination,
 		DeadCodeElimination_ComputeAlive,
-		DeadCodeElimination_RemoveDead
+		DeadCodeElimination_RemoveDead,
+		CountFunctionCalls,
+		AddAnonFuncsToLinker
 	};
 
 	TraversalPayload(Operation e) : 
@@ -133,6 +135,8 @@ public:
 	std::set<ASTNode*> reachable_nodes;
 	std::vector<ASTNode*> nodes_to_process;
 	std::set<ASTNode*> processed_nodes;
+
+	std::map<FunctionDefinition*, int> calls_to_func_count;
 };
 
 

@@ -506,8 +506,7 @@ llvm::Type* Function::LLVMType(llvm::Module& module) const
 
 const std::string Function::OpenCLCType() const
 {
-	assert(0);
-	return "";
+	throw BaseException("Function (closure) types not supported for OpenCL C emission");
 }
 
 

@@ -332,8 +332,23 @@ void LanguageTests::run()
 
 
 
-
 	//testMainFloatArg("def main(float x) float : let a = [1.0, 2.0, 3.0, 4.0]a in a[truncateToInt(x)]", 2.1f, 3.0f, ALLOW_UNSAFE);
+
+	// ===================================================================
+	// Test function inlining
+	// ===================================================================
+	testMainIntegerArg("def f(int x) : x + 1    def main(int x) int : f(x)", 1, 2); // f should be inlined.
+
+	testMainIntegerArg("def f(int x) : x + 1    def main(int x) int : f(x) + f(x + 1)", 1, 5); // f should not be inlined, duplicate calls to it.
+
+	// Test inlining where the inlined function body contains a variable with the same name as the call location context.
+	testMainIntegerArg("def f(int x) : let a = 1 in x + a						\n\
+		def main(int x) int :													\n\
+			let																	\n\
+				a = f(x) # When f is inlined here, need to be careful with 'a'	\n\
+			in																	\n\
+				a", 1, 2); // f should be inlined.
+
 
 	// ===================================================================
 	// Test dead code elimination
@@ -466,28 +481,28 @@ void LanguageTests::run()
 	// Test string elem function (elem(string s, uint64 index) char)
 	// ===================================================================
 	// TODO: should be able to remove ALLOW_UNSAFE at some point.
-	testMainIntegerArg("def main(int x) int : codePoint(elem(\"a\", 0i64))", 0, (int)'a', ALLOW_UNSAFE);
-	testMainIntegerArg("def main(int x) int : codePoint(elem(\"hello\", 0i64))", 0, (int)'h', ALLOW_UNSAFE);
-	testMainIntegerArg("def main(int x) int : codePoint(elem(\"hello\", 1i64))", 0, (int)'e', ALLOW_UNSAFE);
-	testMainIntegerArg("def main(int x) int : codePoint(elem(\"hello\", 4i64))", 0, (int)'o', ALLOW_UNSAFE);
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"abc\", x)))", 0, (int)'a', ALLOW_UNSAFE);
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"abc\", x)))", 1, (int)'b', ALLOW_UNSAFE);
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"abc\", x)))", 2, (int)'c', ALLOW_UNSAFE);
+	testMainIntegerArg("def main(int x) int : codePoint(elem(\"a\", 0i64))", 0, (int)'a', ALLOW_UNSAFE | INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int : codePoint(elem(\"hello\", 0i64))", 0, (int)'h', ALLOW_UNSAFE | INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int : codePoint(elem(\"hello\", 1i64))", 0, (int)'e', ALLOW_UNSAFE | INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int : codePoint(elem(\"hello\", 4i64))", 0, (int)'o', ALLOW_UNSAFE | INVALID_OPENCL);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"abc\", x)))", 0, (int)'a', ALLOW_UNSAFE | INVALID_OPENCL);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"abc\", x)))", 1, (int)'b', ALLOW_UNSAFE | INVALID_OPENCL);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"abc\", x)))", 2, (int)'c', ALLOW_UNSAFE | INVALID_OPENCL);
 
 	// with multi-byte chars:
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"\\u{393}\", x)))", 0, 0x393, ALLOW_UNSAFE);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"\\u{393}\", x)))", 0, 0x393, ALLOW_UNSAFE | INVALID_OPENCL);
 
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"\\u{393}bc\", x)))", 0, 0x393, ALLOW_UNSAFE);
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"\\u{393}bc\", x)))", 1, (int)'b', ALLOW_UNSAFE);
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"\\u{393}bc\", x)))", 2, (int)'c', ALLOW_UNSAFE);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"\\u{393}bc\", x)))", 0, 0x393, ALLOW_UNSAFE | INVALID_OPENCL);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"\\u{393}bc\", x)))", 1, (int)'b', ALLOW_UNSAFE | INVALID_OPENCL);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"\\u{393}bc\", x)))", 2, (int)'c', ALLOW_UNSAFE | INVALID_OPENCL);
 
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"a\\u{393}c\", x)))", 0, (int)'a', ALLOW_UNSAFE);
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"a\\u{393}c\", x)))", 1, 0x393, ALLOW_UNSAFE);
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"a\\u{393}c\", x)))", 2, (int)'c', ALLOW_UNSAFE);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"a\\u{393}c\", x)))", 0, (int)'a', ALLOW_UNSAFE | INVALID_OPENCL);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"a\\u{393}c\", x)))", 1, 0x393, ALLOW_UNSAFE | INVALID_OPENCL);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"a\\u{393}c\", x)))", 2, (int)'c', ALLOW_UNSAFE | INVALID_OPENCL);
 
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"ab\\u{393}\", x)))", 0, (int)'a', ALLOW_UNSAFE);
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"ab\\u{393}\", x)))", 1, (int)'b', ALLOW_UNSAFE);
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"ab\\u{393}\", x)))", 2, 0x393, ALLOW_UNSAFE);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"ab\\u{393}\", x)))", 0, (int)'a', ALLOW_UNSAFE | INVALID_OPENCL);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"ab\\u{393}\", x)))", 1, (int)'b', ALLOW_UNSAFE | INVALID_OPENCL);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"ab\\u{393}\", x)))", 2, 0x393, ALLOW_UNSAFE | INVALID_OPENCL);
 
 	// ===================================================================
 	// Test Escaped characters in string literals
@@ -516,9 +531,9 @@ void LanguageTests::run()
 	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\"); // EOF in middle of literal
 
 	// Test Unicode code-point escape sequence
-	testMainIntegerArg("def main(int x) int : length(" + DBL_QUOTE + "\\u{0}" + DBL_QUOTE + ")", 2, 1);
-	testMainIntegerArg("def main(int x) int : length(" + DBL_QUOTE + "\\u{7FFF}" + DBL_QUOTE + ")", 2, 1);
-	testMainIntegerArg("def main(int x) int : length(" + DBL_QUOTE + "\\u{10FFFF}" + DBL_QUOTE + ")", 2, 1);
+	testMainIntegerArg("def main(int x) int : length(" + DBL_QUOTE + "\\u{0}" + DBL_QUOTE + ")", 2, 1, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int : length(" + DBL_QUOTE + "\\u{7FFF}" + DBL_QUOTE + ")", 2, 1, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int : length(" + DBL_QUOTE + "\\u{10FFFF}" + DBL_QUOTE + ")", 2, 1, INVALID_OPENCL);
 
 	testMainStringArg("def main(string s) string : " + DBL_QUOTE + "\\u{393}" + DBL_QUOTE, "hello", "\xCE\x93"); // Greek capital letter gamma, U+393, http://unicodelookup.com/#gamma/1, 
 	testMainStringArg("def main(string s) string : " + DBL_QUOTE + "\\u{20AC}" + DBL_QUOTE, "hello", "\xE2\x82\xAC"); // Euro sign, U+20AC
@@ -556,9 +571,9 @@ void LanguageTests::run()
 	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\"); // EOF in middle of literal
 
 	// Test Unicode code-point escape sequence
-	testMainIntegerArg("def main(int x) int : length(toString('\\u{0}'))", 2, 1);
-	testMainIntegerArg("def main(int x) int : length(toString('\\u{7FFF}'))", 2, 1);
-	testMainIntegerArg("def main(int x) int : length(toString('\\u{10FFFF}'))", 2, 1);
+	testMainIntegerArg("def main(int x) int : length(toString('\\u{0}'))", 2, 1, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int : length(toString('\\u{7FFF}'))", 2, 1, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int : length(toString('\\u{10FFFF}'))", 2, 1, INVALID_OPENCL);
 
 	testMainStringArg("def main(string s) string : toString('\\u{393}')", "hello", "\xCE\x93"); // Greek capital letter gamma, U+393, http://unicodelookup.com/#gamma/1, 
 	testMainStringArg("def main(string s) string : toString('\\u{20AC}')", "hello", "\xE2\x82\xAC"); // Euro sign, U+20AC
@@ -577,20 +592,20 @@ void LanguageTests::run()
 	// ===================================================================
 	// Test codePoint()
 	// ===================================================================
-	testMainIntegerArg("def main(int x) int : codePoint('\\u{0}')", 2, 0);
-	testMainIntegerArg("def main(int x) int : codePoint('a')", 2, 0x61);
-	testMainIntegerArg("def main(int x) int : codePoint('\\u{393}')", 2, 0x393);
-	testMainIntegerArg("def main(int x) int : codePoint('\\u{20AC}')", 2, 0x20AC);
-	testMainIntegerArg("def main(int x) int : codePoint('\\u{2005A}')", 2, 0x2005A);
+	testMainIntegerArg("def main(int x) int : codePoint('\\u{0}')", 2, 0, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int : codePoint('a')", 2, 0x61, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int : codePoint('\\u{393}')", 2, 0x393, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int : codePoint('\\u{20AC}')", 2, 0x20AC, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int : codePoint('\\u{2005A}')", 2, 0x2005A, INVALID_OPENCL);
 
 	// ===================================================================
 	// Test character literals
 	// ===================================================================
-	testMainIntegerArg("def main(int x) int : let c = 'a' in 10 ", 2, 10);
+	testMainIntegerArg("def main(int x) int : let c = 'a' in 10 ", 2, 10, INVALID_OPENCL);
 
 
 	// Return a character from a function
-	testMainIntegerArg("def f() char : 'a'    def main(int x) int : let c = f() in 10 ", 2, 10);
+	testMainIntegerArg("def f() char : 'a'    def main(int x) int : let c = f() in 10 ", 2, 10, INVALID_OPENCL);
 
 
 	// ===================================================================
@@ -601,9 +616,9 @@ void LanguageTests::run()
 	testMainStringArg("def main(string s) string : toString(length(s) < 2 ? 'a' : 'b')", "", "a"); // Test with runtime character choice
 	testMainStringArg("def main(string s) string : toString(length(s) < 2 ? 'a' : 'b')", "hello", "b"); // Test with runtime character choice
 
-	testMainIntegerArg("def main(int x) int : length(toString('a'))", 2, 1);
+	testMainIntegerArg("def main(int x) int : length(toString('a'))", 2, 1, INVALID_OPENCL);
 
-	testMainIntegerArg("def main(int x) int : length(toString(x < 5 ? 'a' : 'b'))", 2, 1); // Test with runtime character
+	testMainIntegerArg("def main(int x) int : length(toString(x < 5 ? 'a' : 'b'))", 2, 1, INVALID_OPENCL); // Test with runtime character
 
 
 	testMainStringArg("def main(string s) string : concatStrings(toString('a'), toString('b'))", "", "ab");
@@ -3784,10 +3799,36 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 	// ===================================================================
 	// Test lambda expressions and closures
 	// ===================================================================
+
+
+	// Test Lambda applied directly
+	testMainFloatArg("def main(float x) float : (\\(float y) : y*y) (x)", 4.0f, 16.0f, INVALID_OPENCL);
+
+	// Test Lambda applied directly (with same variable names)
+	testMainFloatArg("def main(float x) float : (\\(float x) : x*x) (x)", 4.0f, 16.0f, INVALID_OPENCL);
+	testMainFloatArg("def main(float x) float : (\\(float x) : x*x) (x + 1)", 4.0f, 25.0f, INVALID_OPENCL);
+
+
+
 	// Test Lambda in let
+	// f should be inlined if it's only called once.
 	testMainFloat("def main() float :				\n\
 				  let f = \\(float x) : x*x  in		\n\
 				  f(2.0)", 4.0f);
+
+	testMainFloat("def main() float :				\n\
+				  let f = \\(float x) : x*x  in		\n\
+					let g = f in					\n\
+				  g(2.0)", 4.0f);
+
+	testMainFloatArg("def main(float x) float :				\n\
+				  let f = \\(float x) : x*x  in		\n\
+					let g = f in					\n\
+				  g(x)", 2.0f, 4.0f);
+
+	testMainFloat("def main() float :				\n\
+				  let f = \\(float x) : x*x  in		\n\
+				  f(2.0) + f(3.0)", 13.0f);
 
 	testMainFloat("	def f(float x) float : x + 1.0				\n\
 					def main() float :							\n\
@@ -3848,7 +3889,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 						let													  \n\
 							f = \\(float y) : square(y)							\n\
 						in													\n\
-							f(x)", 4.0f, 16.0f);
+							f(x)", 4.0f, 16.0f, INVALID_OPENCL);
 
 	// Test return of a lambda witha function call in it/
 	testMainFloatArg("def square(float z) float : z*z						\n\
@@ -3857,7 +3898,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 						let													  \n\
 							f = makeLambda()							\n\
 						in													\n\
-							f(x)", 4.0f, 16.0f);
+							f(x)", 4.0f, 16.0f, INVALID_OPENCL);
 
 	// Test lambda being return from a function, where the lambda has a call to a function argument in it.
 	testMainFloat("def compose(function<float, float> f) : \\(float x) : f(x)       \n\
@@ -3880,7 +3921,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 					def mulByTwo(float x) : x * 2.0                \n\
 					def main(float x) float :                         \n\
 						let z = compose(addOne, mulByTwo)  in \n\
-						z(x)", 10.0, 21.0f);
+						z(x)", 10.0, 21.0f, INVALID_OPENCL);
 
 	//inlining compose(), goes to:
 	testMainFloatArg("def compose(function<float, float> f, function<float, float> g) : \\(float x) : f(g(x))       \n\
@@ -3888,7 +3929,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 					def mulByTwo(float x) : x * 2.0                \n\
 					def main(float x) float :                         \n\
 						let z = \\(float x) : addOne(mulByTwo(x))  in \n\
-						z(x)", 10.0, 21.0f);
+						z(x)", 10.0, 21.0f, INVALID_OPENCL);
 	// Test map with lambda expression
 	{
 		const float a[] = {1.0f, 2.0f, 3.0f, 4.0f};
@@ -3914,7 +3955,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 							a = [10, 11, 12, 13]va				\n\
 							f = \\(int x) int : a[x]			\n\
 						in					                    \n\
-							f(x)", 2, 12, ALLOW_UNSAFE);
+							f(x)", 2, 12, ALLOW_UNSAFE | INVALID_OPENCL);
 
 	// Test capturing a heap-allocated type in a closure that is returned from a function
 	stats = testMainIntegerArg("def makeFunc() function<int, int> :		\n\
@@ -3927,7 +3968,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 						let										\n\
 							f = makeFunc()						\n\
 						in					                    \n\
-							f(x)", 2, 12, ALLOW_UNSAFE);
+							f(x)", 2, 12, ALLOW_UNSAFE | INVALID_OPENCL);
 	testAssert(stats.num_heap_allocation_calls <= 2); // Should be one alloc call for the varray, and one for the closure returned from makeFunc()
 
 	// Test capturing two varrays
@@ -3942,7 +3983,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 						let										\n\
 							f = makeFunc()						\n\
 						in					                    \n\
-							f(x)", 2, 34, ALLOW_UNSAFE);
+							f(x)", 2, 34, ALLOW_UNSAFE | INVALID_OPENCL);
 	testAssert(stats.num_heap_allocation_calls <= 3); // Should be one alloc call for each varray, and one for the closure returned from makeFunc()
 
 	// Test capturing a string
@@ -3956,7 +3997,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 						let										\n\
 							f = makeFunc()						\n\
 						in					                    \n\
-							f(x)", 1, (int)'e', ALLOW_UNSAFE);
+							f(x)", 1, (int)'e', ALLOW_UNSAFE | INVALID_OPENCL);
 	testAssert(stats.num_heap_allocation_calls <= 2); // Should be one alloc call for the string, and one for the closure returned from makeFunc()
 
 
@@ -3966,7 +4007,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 						let										\n\
 							f = \\(int x) : x + 10				\n\
 						in					                    \n\
-							f(x)", 2, 12, ALLOW_UNSAFE);
+							f(x)", 2, 12, ALLOW_UNSAFE | INVALID_OPENCL);
 	testAssert(stats.num_heap_allocation_calls == 0);
 
 	// Test closures
@@ -4018,7 +4059,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 	// ===================================================================
 	testMainFloatArg("def main(float x) float :							\n\
 					let f = \\(float y) : y + 10.0  in					\n\
-					f(x)", 3.0, 13.0, ALLOW_UNSAFE);
+					f(x)", 3.0, 13.0, ALLOW_UNSAFE | INVALID_OPENCL);
 
 	// Test with invalid number of args:
 	// zero args:
@@ -4096,7 +4137,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 											g()							\n\
 								in										\n\
 									f()									\n\
-								", 10.f, 10.f);
+								", 10.f, 10.f, INVALID_OPENCL);
 
 	// transforms to:
 
@@ -4110,7 +4151,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 											a							\n\
 								in										\n\
 									f()									\n\
-								", 10.f, 10.f);
+								", 10.f, 10.f, INVALID_OPENCL);
 
 	//then:
 
@@ -4127,7 +4168,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 										g = \\() : a	# captures 'a' as well	\n\
 									in									\n\
 										a								\n\
-								", 10.f, 10.f);
+								", 10.f, 10.f, INVALID_OPENCL);
 
 
 
@@ -4142,7 +4183,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 											g()				\n\
 								in							\n\
 									f()						\n\
-								", 10.f, 10.f);
+								", 10.f, 10.f, INVALID_OPENCL);
 
 	//inlining g:
 	testMainFloatArg("def main(float x) float :		\n\
@@ -4154,7 +4195,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 											x				\n\
 								in							\n\
 									f()						\n\
-								", 10.f, 10.f);
+								", 10.f, 10.f, INVALID_OPENCL);
 
 	// inlining f:
 	testMainFloatArg("def main(float x) float :		\n\
@@ -4169,7 +4210,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 										g = \\() : x	\n\
 									in					\n\
 										x				\n\
-								", 10.f, 10.f);
+								", 10.f, 10.f, INVALID_OPENCL);
 
 
 	// ===================================================================
@@ -4235,7 +4276,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 						z = S(x)				\n\
 					in								\n\
 						z.a + 1.0						\n\
-				def main(float x) float : f(x)", 4.0, 5.0);
+				def main(float x) float : f(x)", 4.0, 5.0, INVALID_OPENCL);
 
 
 	// Test a let var set to a structure passed as an argument.
@@ -4245,7 +4286,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 						z = s				\n\
 					in								\n\
 						z.a + 1.0						\n\
-				def main(float x) float : f(x, S(x))", 4.0, 5.0);
+				def main(float x) float : f(x, S(x))", 4.0, 5.0, INVALID_OPENCL);
 
 
 

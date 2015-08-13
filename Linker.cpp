@@ -135,6 +135,14 @@ void Linker::buildLLVMCode(llvm::Module* module, const llvm::DataLayout/*TargetD
 		}
 	}
 
+	// Emit code for anonymous functions
+	for(size_t i=0; i<anon_functions_to_codegen.size(); ++i)
+	{
+		anon_functions_to_codegen[i]->buildLLVMFunction(module, cpu_info, hidden_voidptr_arg, target_data, common_functions, destructors_called_types, stats, emit_trace_code, 
+			true // with_captured_var_struct_ptr
+		);
+	}
+
 	// Build concrete funcs
 	/*for(unsigned int i=0; i<concrete_funcs.size(); ++i)
 	{

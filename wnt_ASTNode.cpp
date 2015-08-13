@@ -304,67 +304,89 @@ void checkInlineExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector
 		FunctionExpressionRef func_expr = e.downcast<FunctionExpression>();
 
 		FunctionDefinition* target_func = NULL;
+		bool is_beta_reduction = false; // Is this a lambda being applied directly, e.g. an expression like "(\\(float y) : y*y) (x)" ?
 		if(func_expr->static_target_function)
 		{
 			target_func = func_expr->static_target_function;
 		}
-		else if(func_expr->get_func_expr.nonNull() && func_expr->get_func_expr->isConstant())
+		else if(func_expr->get_func_expr.nonNull())
 		{
-			//if(func_expr->get_func_expr.isType<Variable>())
-			//{
-			//	const Variable* var = func_expr->get_func_expr
-			try
+			if(func_expr->get_func_expr->nodeType() == ASTNode::FunctionDefinitionType)
 			{
-				VMState vmstate;
-				vmstate.capture_vars = false;
-				vmstate.func_args_start.push_back(0);
-				ValueRef base_target_function_val = func_expr->get_func_expr->exec(vmstate);
-				const FunctionValue* target_func_val = checkedCast<FunctionValue>(base_target_function_val);
-				target_func = target_func_val->func_def;
+				target_func = func_expr->get_func_expr.downcastToPtr<FunctionDefinition>();
+				is_beta_reduction = true;
 			}
-			catch(BaseException&)
+			else if(func_expr->get_func_expr->isConstant())
 			{
+				//if(func_expr->get_func_expr.isType<Variable>())
+				//{
+				//	const Variable* var = func_expr->get_func_expr
+				try
+				{
+					VMState vmstate;
+					vmstate.capture_vars = false;
+					vmstate.func_args_start.push_back(0);
+					ValueRef base_target_function_val = func_expr->get_func_expr->exec(vmstate);
+					const FunctionValue* target_func_val = checkedCast<FunctionValue>(base_target_function_val);
+					target_func = target_func_val->func_def;
+				}
+				catch(BaseException&)
+				{
+				}
 			}
 		}
 
 
-		if(target_func && !target_func->isExternalFunction() && target_func->body.nonNull())
+		if(target_func && !target_func->isExternalFunction() && target_func->body.nonNull()) // If is potentially inlinable:
 		{
-		
-			std::cout << "\n=================== Inlining function call =====================\n";
-			std::cout << "------------original expr----------: " << std::endl;
-			e->print(0, std::cout);
+			const bool verbose = true;
+			if(verbose) std::cout << "\n=================== Considering inlining function call =====================\n";
+			
+			const int call_count = payload.calls_to_func_count[target_func];
+			
+			if(verbose) std::cout << "target: " + target_func->sig.toString() + ", call_count=" << call_count << ", beta reduction=" << boolToString(is_beta_reduction) << "\n";
 
-			std::cout << "------------original target function body-----------: " << std::endl;
-			target_func->body->print(0, std::cout);
-
-			// Replace e with a copy of the target function body.
-			ASTNodeRef cloned_body = cloneASTNodeSubtree(target_func->body);
-			e = cloned_body;
-
-			std::cout << "------------new expr: (cloned function body)-----------: " << std::endl;
-			e->print(0, std::cout);
-
-
-			// Now replace all variables in the target function body with the argument values from func_expr
-			TraversalPayload sub_payload(TraversalPayload::SubstituteVariables);
-			sub_payload.func_args_to_sub = target_func;
-			sub_payload.variable_substitutes.resize(func_expr->argument_expressions.size());
-			for(size_t i=0; i<func_expr->argument_expressions.size(); ++i)
+			const bool should_inline = is_beta_reduction || (call_count == 1);
+			if(should_inline)
 			{
-				sub_payload.variable_substitutes[i] = func_expr->argument_expressions[i]; // NOTE: Don't clone now, will clone the expressions when they are pulled out of argument_expressions.
+				if(verbose) std::cout << "------------original expr----------: " << std::endl;
+				if(verbose) e->print(0, std::cout);
 
-				//std::cout << "------------sub_payload.variable_substitutes[i]: " << std::endl;
-				//sub_payload.variable_substitutes[i]->print(0, std::cout);
+				if(verbose) std::cout << "------------original target function body-----------: " << std::endl;
+				if(verbose) target_func->body->print(0, std::cout);
+
+				// Replace e with a copy of the target function body.
+				ASTNodeRef cloned_body = cloneASTNodeSubtree(target_func->body);
+				e = cloned_body;
+
+				if(verbose) std::cout << "------------new expr: (cloned function body)-----------: " << std::endl;
+				if(verbose) e->print(0, std::cout);
+
+
+				// Now replace all variables in the target function body with the argument values from func_expr
+				TraversalPayload sub_payload(TraversalPayload::SubstituteVariables);
+				sub_payload.func_args_to_sub = target_func;
+				sub_payload.variable_substitutes.resize(func_expr->argument_expressions.size());
+				for(size_t i=0; i<func_expr->argument_expressions.size(); ++i)
+				{
+					sub_payload.variable_substitutes[i] = func_expr->argument_expressions[i]; // NOTE: Don't clone now, will clone the expressions when they are pulled out of argument_expressions.
+
+					//std::cout << "------------sub_payload.variable_substitutes[i]: " << std::endl;
+					//sub_payload.variable_substitutes[i]->print(0, std::cout);
+				}
+				e->traverse(sub_payload, stack);
+
+				checkSubstituteVariable(e, sub_payload); // e itself might be a variable that needs substituting.
+
+				payload.tree_changed = true;
+
+				if(verbose) std::cout << "------------final expr: (with vars subbed)------------- " << std::endl;
+				if(verbose) e->print(0, std::cout);
 			}
-			e->traverse(sub_payload, stack);
-
-			checkSubstituteVariable(e, sub_payload); // e itself might be a variable that needs substituting.
-
-			payload.tree_changed = true;
-
-			std::cout << "------------final expr: (with vars subbed)------------- " << std::endl;
-			e->print(0, std::cout);
+			else
+			{
+				if(verbose) std::cout << "not inlining.\n";
+			}
 		}
 	}
 }

@@ -1626,7 +1626,7 @@ FunctionDefinitionRef LangParser::parseAnonFunction(ParseInfo& p)
 	def->is_anon_func = true;
 
 	// Add this anon function to list of parsed function definitions.
-	p.top_level_defs.push_back(def);
+	//p.top_level_defs.push_back(def);
 	return def;
 
 	/*

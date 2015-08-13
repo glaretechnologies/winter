@@ -6,6 +6,9 @@ project (dummy)
 set(PROJECT_NAME "winter")
 
 
+set(WINTER_USE_OPENCL TRUE)
+
+
 # detect bitness
 if(WIN32)
 	if(CMAKE_CL_64)
@@ -128,6 +131,29 @@ else() # Mac or Linux.
 endif()
 
 
+set(WINTER_INCLUDE_DIRS "")
+
+# Add OpenCL paths
+if(WINTER_USE_OPENCL)
+	message("Building with OpenCL support.")
+	
+	if(WIN32)
+		if(DEFINED ENV{AMDAPPSDKROOT})
+			message("OpenCL include path: Using AMDAPPSDKROOT")
+			SET(WINTER_INCLUDE_DIRS "${WINTER_INCLUDE_DIRS} $ENV{AMDAPPSDKROOT}include")
+		else()
+			message("OpenCL include path: Using CUDA_INC_PATH")
+			SET(WINTER_INCLUDE_DIRS "${WINTER_INCLUDE_DIRS} $ENV{CUDA_INC_PATH}")
+		endif()
+	elseif(APPLE)
+	else() # linux
+		# Just use the OpenCL headers from the CUDA SDK for now.
+		addIncludeDirectory("/usr/local/cuda/include")
+	endif()
+	
+	add_definitions("-DUSE_OPENCL=1")
+endif()
+
 
 set(winterdir ".")
 
@@ -164,6 +190,7 @@ set(WINTER_FILES
 "${winterdir}/BuiltInFunctionImpl.h"
 "${winterdir}/GeneratedTokens.h"
 "${winterdir}/LanguageTests.h"
+"${winterdir}/LanguageTestUtils.h"
 "${winterdir}/Linker.h"
 "${winterdir}/LLVMTypeUtils.h"
 "${winterdir}/TokenBase.h"
@@ -212,6 +239,8 @@ ${INDIGO_TRUNK_DIR}/utils/ConPrint.h
 ${INDIGO_TRUNK_DIR}/utils/ContainerUtils.h
 ${INDIGO_TRUNK_DIR}/utils/CycleTimer.cpp
 ${INDIGO_TRUNK_DIR}/utils/CycleTimer.h
+${INDIGO_TRUNK_DIR}/utils/DynamicLib.cpp
+${INDIGO_TRUNK_DIR}/utils/DynamicLib.h
 ${INDIGO_TRUNK_DIR}/utils/FileUtils.cpp
 ${INDIGO_TRUNK_DIR}/utils/FileUtils.h
 ${INDIGO_TRUNK_DIR}/utils/Lock.cpp
@@ -271,10 +300,22 @@ ${INDIGO_TRUNK_DIR}/double-conversion/utils.h
 )
 
 
+if(WINTER_USE_OPENCL)
+	SET(glare_opencl_files
+	${INDIGO_TRUNK_DIR}/opencl/OpenCL.cpp
+	${INDIGO_TRUNK_DIR}/opencl/OpenCL.h
+	${INDIGO_TRUNK_DIR}/opencl/OpenCLKernel.cpp
+	${INDIGO_TRUNK_DIR}/opencl/OpenCLKernel.h
+	${INDIGO_TRUNK_DIR}/opencl/OpenCLBuffer.cpp
+	${INDIGO_TRUNK_DIR}/opencl/OpenCLBuffer.h
+	)
+endif()
+
 
 SOURCE_GROUP(winter FILES ${WINTER_FILES})
 SOURCE_GROUP(utils FILES ${util_files})
 SOURCE_GROUP(double_conversion FILES ${double_conversion_files})
+SOURCE_GROUP(opencl FILES ${glare_opencl_files})
 
 
 include_directories(
@@ -282,6 +323,7 @@ ${llvmdir}/include
 ${INDIGO_TRUNK_DIR}
 ${INDIGO_TRUNK_DIR}/utils
 ${INDIGO_TRUNK_DIR}/maths
+${WINTER_INCLUDE_DIRS}
 )
 
 
@@ -290,6 +332,7 @@ ${WINTER_FILES}
 ${util_files}
 ${maths_files}
 ${double_conversion_files}
+${glare_opencl_files}
 )
 
 

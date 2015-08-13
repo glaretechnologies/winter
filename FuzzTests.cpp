@@ -147,19 +147,16 @@ bool testFuzzProgram(const std::string& src)
 
 			std::string options = "-save-temps";
 
-			StandardPrintOutput print_output;
-
 			// Compile and build program.
 			cl_program program = opencl->buildProgram(
 				program_lines,
 				context,
 				opencl->getDeviceInfo()[0].opencl_device,
-				options,
-				print_output
+				options
 			);
 
 
-			opencl->dumpBuildLog(program, opencl->getDeviceInfo()[0].opencl_device, print_output); 
+			opencl->dumpBuildLog(program, opencl->getDeviceInfo()[0].opencl_device); 
 
 			// Create kernel
 			cl_int result;
@@ -349,12 +346,11 @@ static bool testFuzzASTProgram(const FunctionDefinitionRef& func)
 				program_lines,
 				context,
 				opencl->getDeviceInfo()[0].opencl_device,
-				options,
-				print_output
+				options
 			);
 
 
-			opencl->dumpBuildLog(program, opencl->getDeviceInfo()[0].opencl_device, print_output); 
+			opencl->dumpBuildLog(program, opencl->getDeviceInfo()[0].opencl_device); 
 
 			// Create kernel
 			cl_int result;

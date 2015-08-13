@@ -1182,9 +1182,17 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		{
 			bool tree_changed = false;
 
+			// Do a CountFunctionCalls pass.  This will compute payload.calls_to_func_count.
+			std::vector<ASTNode*> stack;
+			TraversalPayload payload(TraversalPayload::CountFunctionCalls);
 			{
-				std::vector<ASTNode*> stack;
-				TraversalPayload payload(TraversalPayload::InlineFunctionCalls);
+				for(size_t i=0; i<linker.top_level_defs.size(); ++i)
+					linker.top_level_defs[i]->traverse(payload, stack);
+				assert(stack.size() == 0);
+			}
+
+			{
+				payload.operation = TraversalPayload::InlineFunctionCalls;
 				for(size_t i=0; i<linker.top_level_defs.size(); ++i)
 					linker.top_level_defs[i]->traverse(payload, stack);
 				assert(stack.size() == 0);
@@ -1314,28 +1322,49 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		}
 		linker.sig_to_function_map = new_map;
 		
-
+		
 		// Print out reachable function sigs
-		/*std::cout << "Reachable top level defs:" << std::endl;
-		for(auto i = payload.reachable_defs.begin(); i != payload.reachable_defs.end(); ++i)
+		/*std::cout << "Reachable defs:" << std::endl;
+		for(auto i = payload.reachable_nodes.begin(); i != payload.reachable_nodes.end(); ++i)
 		{
 			if((*i)->nodeType() == ASTNode::FunctionDefinitionType)
 			{
 				FunctionDefinition* def = (FunctionDefinition*)*i;
-				std::cout << "\t" << def->sig.toString() << "\n";
+				std::cout << "\t" << def->sig.toString() << " (" + toHexString((uint64)def) + ")\n";
 			}
 		}
 
 		// Print out unreachable functions:
-		std::cout << "Unreachable top level defs:" << std::endl;
+		std::cout << "Unreachable defs:" << std::endl;
 		for(auto i = unreachable_defs.begin(); i != unreachable_defs.end(); ++i)
 		{
 			if((*i)->nodeType() == ASTNode::FunctionDefinitionType)
 			{
 				FunctionDefinition* def = (FunctionDefinition*)(*i).getPointer();
-				std::cout << "\t" << def->sig.toString() << "\n";
+				std::cout << "\t" << def->sig.toString() << " (" + toHexString((uint64)def) + ")\n";
+			}
+		}
+
+		// Print out reachable function sigs
+		std::cout << "new_top_level_defs:" << std::endl;
+		for(auto i = new_top_level_defs.begin(); i != new_top_level_defs.end(); ++i)
+		{
+			if((*i)->nodeType() == ASTNode::FunctionDefinitionType)
+			{
+				FunctionDefinition* def = (FunctionDefinition*)i->getPointer();
+				std::cout << "\t" << def->sig.toString() << " (" + toHexString((uint64)def) + ")\n";
 			}
 		}*/
+	}
+
+	// Do a pass to get pointers to anon functions
+	{
+		std::vector<ASTNode*> stack;
+		TraversalPayload payload(TraversalPayload::AddAnonFuncsToLinker);
+		payload.linker = &linker;
+		for(size_t i=0; i<linker.top_level_defs.size(); ++i)
+			linker.top_level_defs[i]->traverse(payload, stack);
+		assert(stack.size() == 0);
 	}
 }
 
@@ -1727,7 +1756,7 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 			emitted_tuples.insert(*i); // Add to set of emitted tuples
 		}
 
-		// Add some Winter built-in functions
+		// Add some Winter built-in functions.  TODO: move this stuff some place better?
 	const std::string built_in_func_code = 
 "// Winter built-in functions \n\
 float toFloat_int_(int x) { return (float)x; } \n\
@@ -1735,6 +1764,8 @@ int truncateToInt_float_(float x) { return (int)x; } \n\
 int8 truncateToInt_vector_float__8__(float8 v) { return convert_int8(v); }  \n\
 long toInt_opaque_(void* p) { return (long)p; }  \n\
 float print_float_(float x) { printf((__constant char *)\"%f\\n\", x); return x; }    \n\
+int toInt32_int64_(long x) { return (int)x; }		\n\
+long toInt64_int_(int x) { return (long)x; }		\n\
 \n";
 
 	res.struct_def_code = struct_def_code;
@@ -1746,7 +1777,7 @@ float print_float_(float x) { printf((__constant char *)\"%f\\n\", x); return x;
 std::string VirtualMachine::buildOpenCLCodeCombined(const BuildOpenCLCodeArgs& args) const
 {
 	OpenCLCCode opencl_code = buildOpenCLCode(args);
-	return opencl_code.struct_def_code + opencl_code.struct_def_code;
+	return opencl_code.struct_def_code + opencl_code.function_code;
 }
 
 
