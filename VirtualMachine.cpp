@@ -1169,7 +1169,7 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 
 
 	// Do inlining pass
-	if(false)
+	if(true)
 	{
 		/*for(size_t i=0; i<linker.top_level_defs.size(); ++i)
 		{
@@ -1192,10 +1192,19 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 			}
 
 			{
-				payload.operation = TraversalPayload::InlineFunctionCalls;
 				for(size_t i=0; i<linker.top_level_defs.size(); ++i)
+				{
+					std::unordered_set<std::string> used_names;
+					// Do a pass over this function to get the set of names used, so that we can avoid them when generating new names for inlined let vars.
+					payload.operation = TraversalPayload::GetAllNamesInScope;
+					payload.used_names = &used_names;
 					linker.top_level_defs[i]->traverse(payload, stack);
-				assert(stack.size() == 0);
+					assert(stack.size() == 0);
+
+					payload.operation = TraversalPayload::InlineFunctionCalls;
+					linker.top_level_defs[i]->traverse(payload, stack);
+					assert(stack.size() == 0);
+				}
 
 				tree_changed = tree_changed || payload.tree_changed;
 

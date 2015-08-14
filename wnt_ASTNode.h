@@ -27,6 +27,7 @@ File created by ClassTemplate on Wed Jun 11 03:55:25 2008
 #include <string>
 #include <vector>
 #include <set>
+#include <unordered_set>
 namespace llvm { class Function; };
 namespace llvm { class Value; };
 namespace llvm { class Module; };
@@ -90,7 +91,8 @@ public:
 		DeadCodeElimination_ComputeAlive,
 		DeadCodeElimination_RemoveDead,
 		CountFunctionCalls,
-		AddAnonFuncsToLinker
+		AddAnonFuncsToLinker,
+		GetAllNamesInScope
 	};
 
 	TraversalPayload(Operation e) : 
@@ -120,6 +122,7 @@ public:
 	// Used in SubstituteVariables pass:
 	FunctionDefinition* func_args_to_sub; // This is the function whose body is getting inlined into the call site.
 	std::vector<Reference<ASTNode> > variable_substitutes; // Used in SubstituteVariables pass
+	std::map<std::pair<ASTNode*, int>, std::string> new_let_var_name_map;
 
 	Reference<ASTNodeVisitor> custom_visitor;
 
@@ -137,6 +140,9 @@ public:
 	std::set<ASTNode*> processed_nodes;
 
 	std::map<FunctionDefinition*, int> calls_to_func_count;
+
+	// GetAllNamesInScope, InlineFunctionCalls:
+	std::unordered_set<std::string>* used_names;
 };
 
 

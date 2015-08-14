@@ -334,9 +334,104 @@ void LanguageTests::run()
 
 	//testMainFloatArg("def main(float x) float : let a = [1.0, 2.0, 3.0, 4.0]a in a[truncateToInt(x)]", 2.1f, 3.0f, ALLOW_UNSAFE);
 
+
+
+	// ===================================================================
+	// Test variable shadowing
+	// ===================================================================
+	testMainFloatArg("def main(float x) float :						\n\
+		let															\n\
+			y = x + 1												\n\
+		in															\n\
+			let														\n\
+				y =	x + 2											\n\
+			in														\n\
+				y													\n\
+			", 0.0f, 2.0f);
+
+	testMainFloatArg("def main(float x) float :						\n\
+		let															\n\
+			y = x												\n\
+		in															\n\
+			let														\n\
+				y1 = y + 1											\n\
+				y =	y1 + 2											\n\
+			in														\n\
+				y													\n\
+			", 0.0f, 3.0f);
+	
+	testMainFloatArgInvalidProgram("def main(float x) float :						\n\
+		let															\n\
+			y = x + 1												\n\
+		in															\n\
+			let														\n\
+				y =	y + 10											\n\
+			in														\n\
+				y													\n\
+			");
+
+	testMainFloatArgInvalidProgram("def main(float x) float : let x = x in x");
+	testMainFloatArgInvalidProgram("def main(float x) float : let x = x + 1 in x");
+
 	// ===================================================================
 	// Test function inlining
 	// ===================================================================
+
+	testMainFloatArg("def f(float b) float : let x = b in x					\n\
+		def main(float x) float : f(x * 10)									\n\
+			", 1.0f, 10.0f);
+
+	// Naive inlining of f() without variable renaming results in
+	// def main(float x) float : let x = x * 10 in x	
+
+	// If we rename all let vars, we get something like:
+	testMainFloatArg("def f(float b) float : let x = b in x					\n\
+		def main(float x) float : let x_new = x * 10 in x_new				\n\
+			", 1.0f, 10.0f);
+
+
+	testMainFloatArg("def f(float b) float : let x = b in x					\n\
+		def main(float x) float : f(x)										\n\
+			", 1.0f, 1.0f);
+
+	testMainFloatArg("def f(float b) float : let x, y = (b, b) in x			\n\
+		def main(float x) float : f(x * 10.0)								\n\
+			", 1.0f, 10.0f);
+
+	testMainFloatArg("def f(float b) float : let y, x = (b, b) in x			\n\
+		def main(float x) float : f(x * 10.0)								\n\
+			", 1.0f, 10.0f);
+
+
+	// Test that new names are checked properly
+	testMainFloatArg("def f(float b) float : let x, x_0 = (b, b) in x					\n\
+		def main(float x) float : f(x * 10)									\n\
+			", 1.0f, 10.0f);
+
+	// Test that new names are checked properly
+	testMainFloatArg("def f(float b) float : let x = b in x					\n\
+		def main(float x) float : let x_0 = 10 in f(x * x_0)									\n\
+			", 1.0f, 10.0f);
+
+
+	// Test that new names are checked properly
+	testMainFloatArg("def f(float b) float : let x = b in x					\n\
+					 def main(float x) float : let x_0 = 10 x_1 = 11 x_2 = 12 x_3 = 13 x_4 = 14 x_5 = 15 x_6 = 16 x_7 = 17 x_8 = 18 x_9 = 19 x_10 = 20    in f(x * x_0)									\n\
+			", 1.0f, 10.0f);
+
+	// Test with two functions being inlined that both have the same let var name (x), it should be assigned different names.
+	testMainFloatArg("def f(float b) float : let x = b in x					\n\
+					 def g(float b) float : let x = b in x					\n\
+			def main(float x) float : f(x * 10) + g(x * 20)									\n\
+			", 1.0f, 30.0f);
+
+	// Test with two functions being inlined that both have the same let var name (x), it should be assigned different names.
+	testMainFloatArg("def f(float b) float : let x = b in x					\n\
+					 def g(float b) float : let x = b in x					\n\
+			def main(float x) float : let x_0 = 10 x_1 = 11 x_2 = 12 x_3 = 13 x_4 = 14 x_5 = 15 x_6 = 16 x_7 = 17 x_8 = 18 x_9 = 19 x_10 = 20    in f(x * 10) + g(x * 20)									\n\
+			", 1.0f, 30.0f);
+
+
 	testMainIntegerArg("def f(int x) : x + 1    def main(int x) int : f(x)", 1, 2); // f should be inlined.
 
 	testMainIntegerArg("def f(int x) : x + 1    def main(int x) int : f(x) + f(x + 1)", 1, 5); // f should not be inlined, duplicate calls to it.

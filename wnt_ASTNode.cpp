@@ -339,14 +339,14 @@ void checkInlineExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector
 
 		if(target_func && !target_func->isExternalFunction() && target_func->body.nonNull()) // If is potentially inlinable:
 		{
-			const bool verbose = true;
+			const bool verbose = false;
 			if(verbose) std::cout << "\n=================== Considering inlining function call =====================\n";
 			
 			const int call_count = payload.calls_to_func_count[target_func];
 			
 			if(verbose) std::cout << "target: " + target_func->sig.toString() + ", call_count=" << call_count << ", beta reduction=" << boolToString(is_beta_reduction) << "\n";
 
-			const bool should_inline = is_beta_reduction || (call_count == 1);
+			const bool should_inline = is_beta_reduction || (call_count <= 1);
 			if(should_inline)
 			{
 				if(verbose) std::cout << "------------original expr----------: " << std::endl;
@@ -365,6 +365,7 @@ void checkInlineExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector
 
 				// Now replace all variables in the target function body with the argument values from func_expr
 				TraversalPayload sub_payload(TraversalPayload::SubstituteVariables);
+				sub_payload.used_names = payload.used_names;
 				sub_payload.func_args_to_sub = target_func;
 				sub_payload.variable_substitutes.resize(func_expr->argument_expressions.size());
 				for(size_t i=0; i<func_expr->argument_expressions.size(); ++i)
@@ -3686,6 +3687,11 @@ void LetASTNode::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 		const bool is_literal = checkFoldExpression(expr, payload);
 		this->can_maybe_constant_fold = is_literal;
 	}
+	else if(payload.operation == TraversalPayload::GetAllNamesInScope)
+	{
+		for(size_t i=0; i<vars.size(); ++i)
+			payload.used_names->insert(vars[i].name);
+	}
 
 	stack.pop_back();
 }
@@ -4181,6 +4187,32 @@ std::string LetBlock::emitOpenCLC(EmitOpenCLCodeParams& params) const
 }
 
 
+// Return a new name for the let variable, that is not in the set of used names.
+// See "Secrets of the Glasgow Haskell Compiler inliner", 
+// http://research.microsoft.com/en-us/um/people/simonpj/Papers/inlining/inline.pdf
+// Section 3.3: "Choosing a new name" for a discussion of the issues.
+static std::string getNewName(const std::string& old_name, const std::unordered_set<std::string> used_names)
+{
+	// Try and pick a new name for "x" like "x_0", "x_1".  These names might be used though, so give up after a while.
+	for(int i=0; i<10; ++i)
+	{
+		const std::string n = old_name + "_" + toString(i);
+		if(used_names.find(n) == used_names.end()) // If this new name is not used:
+			return n;
+	}
+
+	// Try and pick a new name for "x" like "x_n", "x_{n+1}", where n = num elements in used_name set.
+	for(int i=0; i<100; ++i)
+	{
+		const std::string n = old_name + "_" + toString(used_names.size() + i);
+		if(used_names.find(n) == used_names.end()) // If this new name is not used:
+			return n;
+	}
+
+	throw BaseException("Failed to find new name in a reasonable time.");
+}
+
+
 void LetBlock::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
 	stack.push_back(this);
@@ -4212,6 +4244,25 @@ void LetBlock::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 				i++;
 		}
 	}
+	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	{
+		// Rename all let vars
+		for(size_t i=0; i<lets.size(); ++i)
+			for(size_t z=0; z<lets[i]->vars.size(); ++z)
+			{
+				if(payload.used_names->count(lets[i]->vars[z].name)) // If var name is in set of used names:
+				{
+					// Pick a new name for the let variable
+					const std::string new_name = getNewName(lets[i]->vars[z].name, *payload.used_names);
+					payload.used_names->insert(new_name);
+
+					lets[i]->vars[z].name = new_name;
+					payload.new_let_var_name_map[std::make_pair(lets[i].getPointer(), (int)z)] = new_name;
+				}
+			}
+
+		checkSubstituteVariable(expr, payload);
+	}
 
 
 	for(unsigned int i=0; i<lets.size(); ++i)
@@ -4226,10 +4277,6 @@ void LetBlock::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 	if(payload.operation == TraversalPayload::InlineFunctionCalls)
 	{
 		checkInlineExpression(expr, payload, stack);
-	}
-	else if(payload.operation == TraversalPayload::SubstituteVariables)
-	{
-		checkSubstituteVariable(expr, payload);
 	}
 	// Convert overloaded operators before we pop this node off the stack.
 	// This node needs to be on the node stack if an operator overloading substitution is made,

@@ -162,7 +162,7 @@ BindInfo doBind(const std::vector<ASTNode*>& stack, int s, const std::string& na
 		{
 			LetBlock* let_block = static_cast<LetBlock*>(stack[s]);
 			
-			for(unsigned int i=0; i<let_block->lets.size(); ++i)
+			for(unsigned int i=0; i<let_block->lets.size(); ++i) // For each let node in the block:
 			{
 				// If the variable we are tring to bind is in a let expression for the current Let Block, then
 				// we only want to bind to let variables from let expressions that are *before* the current let expression.
@@ -175,9 +175,18 @@ BindInfo doBind(const std::vector<ASTNode*>& stack, int s, const std::string& na
 				//	z = y
 				//	y = x
 				// it also prevent y from binding to the y from the line below. (which could cause a cycle of references)
+
+				// If the stack entry at the next level down is a let AST node, and the current variable lies is in the value expression for it:
 				if((s + 1 < stack.size()) && (stack[s+1]->nodeType() == ASTNode::LetType) && (let_block->lets[i].getPointer() == stack[s+1]))
 				{
-					// We have reached the let expression for the current variable we are tring to bind, so don't try and bind with let variables equal to or past this one.
+					// We have reached the let expression for the current variable we are tring to bind.
+
+					// It's an error to have code like "let x = x + 1"
+					for(size_t v=0; v<let_block->lets[i]->vars.size(); ++v)
+						if(let_block->lets[i]->vars[v].name == name)
+							throw BaseException("Variable '" + name + "' is in a let expression with the same name");
+
+					// Don't try and bind with let variables equal to or past this one.
 					break;
 				}
 				else
@@ -212,15 +221,22 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 	if(this->vartype != UnboundVariable)
 		return;
 
-	BindInfo bindinfo = doBind(stack, (int)stack.size() - 1, name);
-	if(bindinfo.vartype != UnboundVariable)
+	try
 	{
-		this->vartype = bindinfo.vartype;
-		this->bound_index = bindinfo.bound_index;
-		this->let_var_index = bindinfo.let_var_index;
-		this->bound_function = bindinfo.bound_function;
-		this->bound_let_node = bindinfo.bound_let_node;
-		return;
+		BindInfo bindinfo = doBind(stack, (int)stack.size() - 1, name);
+		if(bindinfo.vartype != UnboundVariable)
+		{
+			this->vartype = bindinfo.vartype;
+			this->bound_index = bindinfo.bound_index;
+			this->let_var_index = bindinfo.let_var_index;
+			this->bound_function = bindinfo.bound_function;
+			this->bound_let_node = bindinfo.bound_let_node;
+			return;
+		}
+	}
+	catch(BaseException& e)
+	{
+		throw BaseException(e.what() + errorContext(*this, payload));
 	}
 
 	// Try and bind to a top level function definition
@@ -353,6 +369,20 @@ void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 			if(payload.processed_nodes.find(this->bound_let_node) == payload.processed_nodes.end()) // If has not been processed yet:
 				payload.nodes_to_process.push_back(this->bound_let_node); // Add to to-process list
 		}
+	}
+	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	{
+		if(vartype == LetVariable)
+		{
+			// Handle renaming of let variables in the cloned sub-tree.
+			const auto res = payload.new_let_var_name_map.find(std::make_pair(this->bound_let_node, this->let_var_index));
+			if(res != payload.new_let_var_name_map.end()) // If there is a new name for this let variable to use:
+				this->name = res->second; // Use it
+		}
+	}
+	else if(payload.operation == TraversalPayload::GetAllNamesInScope)
+	{
+		payload.used_names->insert(this->name);
 	}
 }
 
