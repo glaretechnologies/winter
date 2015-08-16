@@ -309,6 +309,7 @@ static ValueRef allocateVArrayInterpreted(const vector<ValueRef>& args)
 // NOTE: just return an int here as all external funcs need to return something (non-void).
 static int freeVArray(VArrayRep* varray)
 {
+	assert(varray_count >= 1);
 	varray_count--;//TEMP
 
 	assert(varray->refcount == 1);
@@ -910,6 +911,188 @@ static void optimiseFunctions(llvm::FunctionPassManager& fpm, llvm::Module* modu
 }
 
 
+// Returns if tree changed.
+bool VirtualMachine::doInliningPass()
+{
+	// Do a CountFunctionCalls pass.  This will compute payload.calls_to_func_count.
+	std::vector<ASTNode*> stack;
+	TraversalPayload payload(TraversalPayload::CountFunctionCalls);
+	payload.linker = &linker;
+	{
+		for(size_t i=0; i<linker.top_level_defs.size(); ++i)
+			linker.top_level_defs[i]->traverse(payload, stack);
+		assert(stack.size() == 0);
+	}
+
+	for(size_t i=0; i<linker.top_level_defs.size(); ++i)
+	{
+		std::unordered_set<std::string> used_names;
+		// Do a pass over this function to get the set of names used, so that we can avoid them when generating new names for inlined let vars.
+		payload.operation = TraversalPayload::GetAllNamesInScope;
+		payload.used_names = &used_names;
+		linker.top_level_defs[i]->traverse(payload, stack);
+		assert(stack.size() == 0);
+
+		payload.operation = TraversalPayload::InlineFunctionCalls;
+		linker.top_level_defs[i]->traverse(payload, stack);
+		assert(stack.size() == 0);
+	}
+
+	const bool tree_changed = payload.tree_changed;
+
+	// Rebind, some function expressions may be statically bound now.
+	if(tree_changed)
+	{
+		TraversalPayload payload(TraversalPayload::BindVariables);
+		for(size_t i=0; i<linker.top_level_defs.size(); ++i)
+			linker.top_level_defs[i]->traverse(payload, stack);
+	}
+
+	return tree_changed;
+}
+
+
+bool VirtualMachine::doDeadCodeEliminationPass()
+{
+	std::vector<ASTNode*> stack;
+	TraversalPayload payload(TraversalPayload::DeadCodeElimination_ComputeAlive);
+	for(size_t i=0; i<linker.top_level_defs.size(); ++i)
+	{
+		//std::cout << "\n=====DCE pass before:======\n";
+		//linker.top_level_defs[i]->print(0, std::cout);
+
+		// Do a pass to get the set of live LetASTNodes for this function
+		payload.operation = TraversalPayload::DeadCodeElimination_ComputeAlive;
+		linker.top_level_defs[i]->traverse(payload, stack);
+		assert(stack.size() == 0);
+
+		// The payload will now contain the alive/reachable set.
+
+		// Remove unused let vars.
+		payload.operation = TraversalPayload::DeadCodeElimination_RemoveDead;
+		linker.top_level_defs[i]->traverse(payload, stack);
+		assert(stack.size() == 0);
+
+		//std::cout << "\n=====DCE pass results:======\n";
+		//linker.top_level_defs[i]->print(0, std::cout);
+	}
+
+	return payload.tree_changed;
+}
+
+
+void VirtualMachine::doDeadFunctionEliminationPass(const VMConstructionArgs& args)
+{
+	// do dead-function elimination pass.  This removes all function definitions that are not reachable (through direct or indirect function calls) from the set of entry functions.
+
+	// std::cout << "Doing dead-function elimination pass..." << std::endl;
+
+	std::vector<ASTNode*> stack;
+	TraversalPayload payload(TraversalPayload::DeadFunctionElimination);
+	payload.linker = &linker;
+		
+	// Add entry functions to reachable set and defs_to_process set.
+	for(size_t i=0; i<args.entry_point_sigs.size(); ++i)
+	{
+		FunctionDefinitionRef f = linker.findMatchingFunctionSimple(args.entry_point_sigs[i]);
+		//if(f.isNull())
+		//	throw BaseException("Failed to find entry point function " + args.entry_point_sigs[i].toString());
+		if(f.nonNull())
+		{
+			payload.reachable_nodes.insert(f.getPointer()); // Mark as reachable
+			payload.nodes_to_process.push_back(f.getPointer()); // Add to to-process set.
+		}
+	}
+
+	while(!payload.nodes_to_process.empty())
+	{
+		// Pop a node off the stack
+		ASTNode* def_to_process = payload.nodes_to_process.back();
+		payload.nodes_to_process.pop_back();
+
+		payload.processed_nodes.insert(def_to_process); // Mark node as processed
+
+		def_to_process->traverse(payload, stack); // Process it
+		assert(stack.size() == 0);
+	}
+
+
+	// TEMP HACK: add some special functions to reachable set.
+	{
+		const FunctionSignature allocateStringSig("allocateString", vector<TypeRef>(1, new OpaqueType()));
+		payload.reachable_nodes.insert(findMatchingFunction(allocateStringSig).getPointer());
+
+		vector<TypeRef> argtypes(1, new String());
+		const FunctionSignature freeStringSig("freeString", argtypes);
+		payload.reachable_nodes.insert(findMatchingFunction(freeStringSig).getPointer());
+
+		payload.reachable_nodes.insert(findMatchingFunction(FunctionSignature("allocateVArray", vector<TypeRef>(2, new Int(64)))).getPointer());
+
+		payload.reachable_nodes.insert(findMatchingFunction(FunctionSignature("freeVArray", vector<TypeRef>(1, new VArrayType(new Int())))).getPointer());
+
+		payload.reachable_nodes.insert(findMatchingFunction(FunctionSignature("allocateClosure", vector<TypeRef>(1, new Int(64)))).getPointer());
+
+		const TypeRef dummy_func_type = Function::dummyFunctionType();
+		payload.reachable_nodes.insert(findMatchingFunction(FunctionSignature("freeClosure", vector<TypeRef>(1, dummy_func_type))).getPointer());
+	}
+
+	// Now remove any non-reachable functions and named constants from linker.top_level_defs
+	std::vector<ASTNodeRef> new_top_level_defs;
+	std::vector<ASTNodeRef> unreachable_defs;
+	for(size_t i=0; i<linker.top_level_defs.size(); ++i)
+		if(payload.reachable_nodes.find(linker.top_level_defs[i].getPointer()) != payload.reachable_nodes.end()) // if in reachable set:
+			new_top_level_defs.push_back(linker.top_level_defs[i]);
+		else
+			unreachable_defs.push_back(linker.top_level_defs[i]);
+
+	linker.top_level_defs = new_top_level_defs;
+
+	// Rebuild linker.sig_to_function_map
+	Linker::SigToFuncMapType new_map;
+	for(auto i = linker.sig_to_function_map.begin(); i != linker.sig_to_function_map.end(); ++i)
+	{
+		FunctionDefinitionRef def = i->second;
+		if(payload.reachable_nodes.find(def.getPointer()) != payload.reachable_nodes.end()) // if in reachable set:
+			new_map.insert(std::make_pair(def->sig, def));
+	}
+	linker.sig_to_function_map = new_map;
+		
+		
+	// Print out reachable function sigs
+	/*std::cout << "Reachable defs:" << std::endl;
+	for(auto i = payload.reachable_nodes.begin(); i != payload.reachable_nodes.end(); ++i)
+	{
+		if((*i)->nodeType() == ASTNode::FunctionDefinitionType)
+		{
+			FunctionDefinition* def = (FunctionDefinition*)*i;
+			std::cout << "\t" << def->sig.toString() << " (" + toHexString((uint64)def) + ")\n";
+		}
+	}
+
+	// Print out unreachable functions:
+	std::cout << "Unreachable defs:" << std::endl;
+	for(auto i = unreachable_defs.begin(); i != unreachable_defs.end(); ++i)
+	{
+		if((*i)->nodeType() == ASTNode::FunctionDefinitionType)
+		{
+			FunctionDefinition* def = (FunctionDefinition*)(*i).getPointer();
+			std::cout << "\t" << def->sig.toString() << " (" + toHexString((uint64)def) + ")\n";
+		}
+	}
+
+	// Print out reachable function sigs
+	std::cout << "new_top_level_defs:" << std::endl;
+	for(auto i = new_top_level_defs.begin(); i != new_top_level_defs.end(); ++i)
+	{
+		if((*i)->nodeType() == ASTNode::FunctionDefinitionType)
+		{
+			FunctionDefinition* def = (FunctionDefinition*)i->getPointer();
+			std::cout << "\t" << def->sig.toString() << " (" + toHexString((uint64)def) + ")\n";
+		}
+	}*/
+}
+
+
 void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vector<SourceBufferRef>& source_buffers, const std::vector<FunctionDefinitionRef>& preconstructed_func_defs)
 {
 	std::map<std::string, TypeRef> named_types;
@@ -1168,92 +1351,19 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 	}
 
 
-	// Do inlining pass
-	if(true)
+
+	while(true)
 	{
-		/*for(size_t i=0; i<linker.top_level_defs.size(); ++i)
-		{
-			std::cout << "\n";
-			linker.top_level_defs[i]->print(0, std::cout);
-		}*/
+		bool inline_change = doInliningPass();
 
-		// Do Function inlining
-		while(true)
-		{
-			bool tree_changed = false;
+		bool dce_change = doDeadCodeEliminationPass();
 
-			// Do a CountFunctionCalls pass.  This will compute payload.calls_to_func_count.
-			std::vector<ASTNode*> stack;
-			TraversalPayload payload(TraversalPayload::CountFunctionCalls);
-			{
-				for(size_t i=0; i<linker.top_level_defs.size(); ++i)
-					linker.top_level_defs[i]->traverse(payload, stack);
-				assert(stack.size() == 0);
-			}
-
-			{
-				for(size_t i=0; i<linker.top_level_defs.size(); ++i)
-				{
-					std::unordered_set<std::string> used_names;
-					// Do a pass over this function to get the set of names used, so that we can avoid them when generating new names for inlined let vars.
-					payload.operation = TraversalPayload::GetAllNamesInScope;
-					payload.used_names = &used_names;
-					linker.top_level_defs[i]->traverse(payload, stack);
-					assert(stack.size() == 0);
-
-					payload.operation = TraversalPayload::InlineFunctionCalls;
-					linker.top_level_defs[i]->traverse(payload, stack);
-					assert(stack.size() == 0);
-				}
-
-				tree_changed = tree_changed || payload.tree_changed;
-
-				// Rebind, some function expressions may be statically bound now.
-				if(tree_changed)
-				{
-					TraversalPayload payload(TraversalPayload::BindVariables);
-					for(size_t i=0; i<linker.top_level_defs.size(); ++i)
-						linker.top_level_defs[i]->traverse(payload, stack);
-				}
-			}
-
-			if(!tree_changed)
-				break;
-		}
-
-		/*for(size_t i=0; i<linker.top_level_defs.size(); ++i)
-		{
-			std::cout << "\n";
-			linker.top_level_defs[i]->print(0, std::cout);
-		}*/
+		bool changed = inline_change || dce_change;
+		if(!changed)
+			break;
 	}
 
-	// Do dead-code elimination pass.  This removes all let variables (LetASTNode's) in each function that are not used in the computation of the final function return value.
-	if(true)
-	{
-		std::vector<ASTNode*> stack;
-		TraversalPayload payload(TraversalPayload::DeadCodeElimination_ComputeAlive);
-		for(size_t i=0; i<linker.top_level_defs.size(); ++i)
-		{
-			//std::cout << "\n=====DCE pass before:======\n";
-			//linker.top_level_defs[i]->print(0, std::cout);
 
-			// Do a pass to get the set of live LetASTNodes for this function
-			payload.operation = TraversalPayload::DeadCodeElimination_ComputeAlive;
-			linker.top_level_defs[i]->traverse(payload, stack);
-			assert(stack.size() == 0);
-
-			// The payload will now contain the alive/reachable set.
-
-			// Remove unused let vars.
-			payload.operation = TraversalPayload::DeadCodeElimination_RemoveDead;
-			linker.top_level_defs[i]->traverse(payload, stack);
-			assert(stack.size() == 0);
-
-			//std::cout << "\n=====DCE pass results:======\n";
-			//linker.top_level_defs[i]->print(0, std::cout);
-		}
-	}
 
 
 	// do dead-function elimination pass.  This removes all function definitions that are not reachable (through direct or indirect function calls) from the set of entry functions.

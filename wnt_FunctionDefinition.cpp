@@ -51,7 +51,8 @@ namespace Winter
 
 CapturedVar::CapturedVar()
 :	bound_function(NULL),
-	bound_let_node(NULL)
+	bound_let_node(NULL),
+	enclosing_lambda(NULL)
 	//substituted_expr(NULL)
 {}
 
@@ -60,23 +61,31 @@ TypeRef CapturedVar::type() const
 {
 	if(this->vartype == Let)
 	{
-		assert(this->bound_let_node);
-		return this->bound_let_node->type();
+		// NOTE: duplicated from var, de-duplicate
+
+		const TypeRef let_var_type = this->bound_let_node->type();
+		if(this->bound_let_node->vars.size() == 1)
+			return let_var_type;
+		else // Else if destructuring assignment:
+		{
+			if(let_var_type.isNull() || (let_var_type->getType() != Type::TupleTypeType))
+				return NULL;
+			const TupleType* tuple_type = let_var_type.downcastToPtr<TupleType>();
+			if(this->let_var_index >= 0 && this->let_var_index < (int)tuple_type->component_types.size()) // If in bounds:
+				return tuple_type->component_types[this->let_var_index];
+			else
+				return NULL;
+		}
 	}
 	else if(this->vartype == Arg)
 	{
 		assert(this->bound_function);
-		return this->bound_function->args[this->index].type;
+		return this->bound_function->args[this->arg_index].type;
 	}
 	else if(this->vartype == Captured)
 	{
-		assert(this->bound_function);
-		return this->bound_function->captured_vars[this->index].type();
-	}
-	else if(this->vartype == Removed)
-	{
-		assert(false);
-		return NULL;
+		assert(this->enclosing_lambda);
+		return this->enclosing_lambda->captured_vars[this->free_index].type();
 	}
 	else
 	{
@@ -158,7 +167,7 @@ ValueRef FunctionDefinition::exec(VMState& vmstate)
 		{
 			if(this->captured_vars[i].vartype == CapturedVar::Arg)
 			{
-				vals.push_back(vmstate.argument_stack[vmstate.func_args_start.back() + this->captured_vars[i].index]);
+				vals.push_back(vmstate.argument_stack[vmstate.func_args_start.back() + this->captured_vars[i].arg_index]);
 			}
 			else if(this->captured_vars[i].vartype == CapturedVar::Let)
 			{
@@ -168,10 +177,19 @@ ValueRef FunctionDefinition::exec(VMState& vmstate)
 				//const int let_stack_start = (int)vmstate.let_stack_start[vmstate.let_stack_start.size() - 1 - let_frame_offset];
 				//vals.push_back(vmstate.let_stack[let_stack_start + this->captured_vars[i].index]);
 
+				LetASTNode* bound_let_node = this->captured_vars[i].bound_let_node;
 				ValueRef val = this->captured_vars[i].bound_let_node->exec(vmstate);
-				vals.push_back(val);
 
-				//NOTE: this looks wrong, should use index here as well?
+				if(bound_let_node->vars.size() == 1)
+				{}
+				else
+				{
+					// Destructuring assignment, return the particular element from the tuple.
+					const TupleValue* t = checkedCast<TupleValue>(val.getPointer());
+					val = t->e[this->captured_vars[i].let_var_index];
+				}
+
+				vals.push_back(val);
 			}
 			else if(this->captured_vars[i].vartype == CapturedVar::Captured)
 			{
@@ -179,12 +197,10 @@ ValueRef FunctionDefinition::exec(VMState& vmstate)
 				ValueRef captured_struct = vmstate.argument_stack.back();
 				const StructureValue* s = checkedCast<StructureValue>(captured_struct.getPointer());
 
-				ValueRef val = s->fields[this->captured_vars[i].index];
+				ValueRef val = s->fields[this->captured_vars[i].free_index];
 
 				vals.push_back(val);
 			}
-			else if(this->captured_vars[i].vartype == CapturedVar::Removed)
-			{}
 			else
 			{
 				assert(0);
@@ -390,15 +406,10 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 		if(body.nonNull())
 			checkSubstituteVariable(body, payload);
 
-		for(size_t i=0; i<this->captured_vars.size(); ++i)
-		{
-			if(captured_vars[i].vartype == CapturedVar::Arg)
-			{
-				// We need to change the captured var to capture the expression that is the argument value.
-				//captured_vars[i].substituted_expr = payload.variable_substitutes[i]->clone();
-				//captured_vars[i].substituted_expr = cloneASTNodeSubtree(payload.variable_substitutes[i]);
-			}
-		}
+		// Clear captured vars
+		this->captured_vars.resize(0);
+
+		this->order_num = payload.new_order_num;
 	}
 	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
@@ -547,6 +558,11 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 		if(this->is_anon_func)
 			payload.linker->anon_functions_to_codegen.push_back(this);
 	}
+	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
+	{
+		if(body.nonNull())
+			doDeadCodeElimination(body, payload, stack);
+	}
 	
 
 	stack.pop_back();
@@ -633,7 +649,7 @@ std::string FunctionDefinition::emitOpenCLC(EmitOpenCLCodeParams& params) const
 	params.blocks.pop_back();
 
 	// If the body expression is just an argument, and it is pass by pointer, then it will need to be dereferenced.
-	if((body->nodeType() == ASTNode::VariableASTNodeType) && (body.downcastToPtr<Variable>()->vartype == Variable::ArgumentVariable) && body->type()->OpenCLPassByPointer())
+	if((body->nodeType() == ASTNode::VariableASTNodeType) && (body.downcastToPtr<Variable>()->binding_type == Variable::ArgumentVariable) && body->type()->OpenCLPassByPointer())
 		s += "\treturn *" + body_expr + ";\n";// Deref
 	else
 		s += "\treturn " + body_expr + ";\n";
@@ -826,7 +842,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 	llvm::Value* captured_var_struct_ptr = params.builder->CreateStructGEP(closure_pointer, Function::capturedVarStructIndex(), "captured_var_struct_ptr");
 
 	// for each captured var
-	for(size_t i=0, use_index=0; i<this->captured_vars.size(); ++i)
+	for(size_t i=0; i<this->captured_vars.size(); ++i)
 	{
 		llvm::Value* val = NULL;
 		if(this->captured_vars[i].vartype == CapturedVar::Arg)
@@ -834,7 +850,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			// Load arg
 			val = LLVMTypeUtils::getNthArg(
 				params.currently_building_func,
-				params.currently_building_func_def->getLLVMArgIndex(this->captured_vars[i].index)
+				params.currently_building_func_def->getLLVMArgIndex(this->captured_vars[i].arg_index)
 			);
 		}
 		else if(this->captured_vars[i].vartype == CapturedVar::Let)
@@ -848,14 +864,27 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 			LetASTNode* let_node = this->captured_vars[i].bound_let_node;
 	
-			//val = let_block->getLetExpressionLLVMValue(
-			//	params,
-			//	this->captured_vars[i].index,
-			//	ret_space_ptr // TEMP
-			//);
-
 			assert(params.let_values.find(let_node) != params.let_values.end());
 			val = params.let_values[let_node];
+
+			// NOTE: This code is duplicated from Variable.  de-duplicate.
+			TypeRef cap_var_type = this->captured_vars[i].type();
+
+			if(let_node->vars.size() > 1)
+			{
+				// Destructuring assignment, we just want to return the individual tuple element.
+				// Value should be a pointer to a tuple struct.
+				if(cap_var_type->passByValue())
+				{
+					llvm::Value* tuple_elem = params.builder->CreateLoad(params.builder->CreateStructGEP(val, this->captured_vars[i].let_var_index, "tuple_elem_ptr"));
+					val = tuple_elem;
+				}
+				else
+				{
+					llvm::Value* tuple_elem = params.builder->CreateStructGEP(val, this->captured_vars[i].let_var_index, "tuple_elem_ptr");
+					val = tuple_elem;
+				}
+			}
 		}
 		else if(this->captured_vars[i].vartype == CapturedVar::Captured)
 		{
@@ -869,32 +898,24 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			
 			llvm::Value* current_func_captured_var_struct = params.builder->CreateBitCast(base_current_func_captured_var_struct, LLVMTypeUtils::pointerType(actual_cap_var_struct_type), "actual_cap_var_struct_type");
 
-			llvm::Value* field_ptr = params.builder->CreateStructGEP(current_func_captured_var_struct, this->captured_vars[i].index);
+			llvm::Value* field_ptr = params.builder->CreateStructGEP(current_func_captured_var_struct, this->captured_vars[i].free_index);
 			
 			val = params.builder->CreateLoad(field_ptr);
 		}
-		else if(this->captured_vars[i].vartype == CapturedVar::Removed)
-		{}
 		else
 		{
 			assert(0);
 		}
 
 		
-		if(this->captured_vars[i].vartype != CapturedVar::Removed)
-		{
-			// store in captured var structure field
-			llvm::Value* field_ptr = params.builder->CreateStructGEP(captured_var_struct_ptr, (unsigned int)use_index, "captured_var_" + toString(use_index) + "_field_ptr");
-			llvm::StoreInst* store_inst = params.builder->CreateStore(val, field_ptr);
+		// store in captured var structure field
+		llvm::Value* field_ptr = params.builder->CreateStructGEP(captured_var_struct_ptr, (unsigned int)i, "captured_var_" + toString(i) + "_field_ptr");
+		llvm::StoreInst* store_inst = params.builder->CreateStore(val, field_ptr);
 
-			addMetaDataCommentToInstruction(params, store_inst, "Store captured var " + toString(use_index) + " in closure");
+		addMetaDataCommentToInstruction(params, store_inst, "Store captured var " + toString(i) + " in closure");
 
-			// If the captured var is a ref-counted type, we need to increment its reference count, since the struct now holds a reference to it. 
-			captured_var_struct_type->component_types[use_index]->emitIncrRefCount(params, val, "Capture var ref count increment");
-
-		
-			use_index++;
-		}
+		// If the captured var is a ref-counted type, we need to increment its reference count, since the struct now holds a reference to it. 
+		captured_var_struct_type->component_types[i]->emitIncrRefCount(params, val, "Capture var ref count increment");
 	}
 
 
@@ -1036,10 +1057,12 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 		{}
 		else
 		{
-			if(has_ptr_arg)
-				function_attr_builder.addAttribute(llvm::Attribute::ReadOnly); // This attribute indicates that the function does not write through any pointer arguments etc..
-			else
-				function_attr_builder.addAttribute(llvm::Attribute::ReadNone); // Function computes its result based strictly on its arguments, without dereferencing any pointer arguments etc..
+			//if(has_ptr_arg)
+			//	function_attr_builder.addAttribute(llvm::Attribute::ReadOnly); // This attribute indicates that the function does not write through any pointer arguments etc..
+			//else
+			//TEMP	function_attr_builder.addAttribute(llvm::Attribute::ReadNone); // Function computes its result based strictly on its arguments, without dereferencing any pointer arguments etc..
+
+			//NOTE: can't have readnone when we're doing heap allocs
 		}
 	}
 
@@ -1502,12 +1525,8 @@ StructureTypeRef FunctionDefinition::getCapturedVariablesStructType() const
 	for(size_t i=0; i<this->captured_vars.size(); ++i)
 	{
 		// Get the type of the captured variable.
-		if(this->captured_vars[i].vartype != CapturedVar::Removed)
-		{
-			field_types.push_back(this->captured_vars[i].type());
-
-			field_names.push_back("captured_var_" + toString((uint64)i));
-		}
+		field_types.push_back(this->captured_vars[i].type());
+		field_names.push_back("captured_var_" + toString((uint64)i));
 	}
 			
 
@@ -1564,13 +1583,11 @@ void CapturedVar::print(int depth, std::ostream& s) const
 		vartype_s = "Arg"; break;
 	case Captured:
 		vartype_s = "Captured"; break;
-	case Removed:
-		vartype_s = "Removed"; break;
 	};
 
-	s << "captured var, vartype=" + vartype_s + ", index=" << index;
+	s << "captured var, vartype=" + vartype_s + ", free_index=" << free_index;
 	if(bound_function)
-		s << " bound func: " + bound_function->sig.toString();
+		s << " bound func: " + bound_function->sig.toString() + ", arg_index=" << arg_index;
 	if(bound_let_node)
 		s << " bound let node: " + toHexString((uint64)bound_let_node);
 	s << "\n";

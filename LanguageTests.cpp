@@ -178,7 +178,7 @@ static const bool DO_OPENCL_TESTS = false;
 void LanguageTests::run()
 {
 	Timer timer;
-	ProgramStats stats;
+	TestResults results;
 
 	//useKnownReturnRefCountOptimsiation(3);
 
@@ -188,18 +188,20 @@ void LanguageTests::run()
 
 
 	
-
+	// ===================================================================
+	// Check equality for types, and that they work in sets etc.. correctly.
+	// ===================================================================
 	const TypeRef ta = new Int();
 	const TypeRef tb = new Int();
 
-	//assert(ta == tb);
-	//assert(!(ta < tb));
-	//assert(!(tb < ta));
+	testAssert(*ta == *tb);
 
-	std::set<TypeRef, TypeRefLessThan> type_set;
-	type_set.insert(ta);
-	type_set.insert(tb);
-	assert(type_set.size() == 1);
+	{
+		std::set<TypeRef, TypeRefLessThan> type_set;
+		type_set.insert(ta);
+		type_set.insert(tb);
+		testAssert(type_set.size() == 1);
+	}
 
 	//testMainFloatArgInvalidProgram("struct s { s a, s b } def main(float x) float : x");
 	//testMainFloatArgInvalidProgram("def main(float x) float : let varray<T> v = [v]va in x");
@@ -323,8 +325,7 @@ void LanguageTests::run()
 	testMainFloatArgInvalidProgram("def main(float x) float : (1 * (1 * ((1 + 1) * (1 - 1 + 1)) - 1 - ((1 + (((((1 + 		 1 / (1 + (((1 + 1 / (1 * (1 - 1 + 1 / 1 / 1))) - 1 - 1 - (1 + 1 / 1) + (((1 * 1 		) * 1) * 1) / 1) - 1 + 1)) - 1 / 1) + (1 * 1)) + 1 - 1) + 1) * 1)) + 1) / (1 + 1 		) / 1 - ((1 + 1 / 1 - (((1 * ((1 - 1 - 1 / 1 - 1 * 1) - (1 / 1 - 1 * 1) + ((1 +	 		1) - 1 * 1) - 1 / 1)) + (1 / 1 / 1 - 1 - (1 + 1) / (1 + 1) + 1)) * (1 * ((((1 +	 		1) * 1) / 1 - 1 - 1 - (((1 + 1) * 1 - (((1 / 1 * 1) * (1 + 1) - 1) / 1 / 1 / 1 - 		 (1 + (((1 + 1) + 1) * 1)) - 1 / ((1 + 1) / (1 * 1) / (1 + (1 / 1 * 1 / 1 - 1 -	 		(1 * 1) / (1 + 1) - 1 - 1 - 1 - 1 - 1 / 1)) / (1 / 1 * 1) + (((1 + 1) * ((1 + 1) 		 * 1)) / 1 + ((1 - ((1 * 1) + 1) + 1) + 1 - 1 / ((1 / (1 - ((1 + 1) - ((((1 - (( 		1 * ((1 * ((1 + 1) + ((1 - (1 * 1) + (1 - (1 - 1 - (1 * 1) / (1 + 1) / 1 * (1 -	 		1 + (1 + 1) - ((1 / 1 / 1 + 1) * 1) - (1 - 1 * 1))) * 1) - 1 - 1 - 1 - (1 * (((1 		 * 1) * ((1 + (1 / (1 * 1) * 1 - 1)) * (1 + (((1 + 1) + 1) + 1)))) + 1)) / 1)) +	 		1 / 1) / 1 - 1)) * 1 - 1)) / 1 * (1 * 1) - 1 - 1 / (1 * ((((1 + 1) + 1) * 1 - 1	 		- 1 / ((1 + 1) / (1 * 1) - ((1 / 1 + 1) * 1) + (1 + (1 * 1) - 1 - 1 - 1 - (1 + ( 		1 + 1))) / 1)) - 1 * (1 / ((1 * 1) + ((1 - 1 + (1 + 1)) + ((1 + 1) * 1))) / 1 *	 		1)) - 1) / 1 / 1 / 1) / 1 + 1) / (1 / (1 + (1 + (1 * 1 - 1)) - 1) / 1 - ((1 * 1	 		/ 1 / (1 / (1 * 1 / 1 - 1) / 1 * 1) / 1) - 1 * ((1 + (((1 + 1) + 1) - ((1 * ((1	 		+ 1) + 1)) * ((1 * 1) * 1) - 1) / 1 / (1 - 1 / (1 - 1 * 1) / 1 * 1) / ((1 - (1 + 		 1) / 1 * 1) + 1 - (1 + (1 * 1)) - 1) - 1 * 1) - 1 / 1) * 1)) + (((1 - (1 / 1 -	 		1 + 1 - (1 * (1 + 1)) / (1 + (1 + 1))) + 1) - ((1 + 1) * (1 * 1 / 1)) * 1 - 1) + 		 1) - 1 / 1 - (((1 * 1 - 1) + 1) - (1 + 1) - 1 - 1 * 1)) / (1 + 1) + (((1 * ((1	 		/ (1 * 1) * 1) * 1)) * 1) + 1 - (1 * 1)) / 1) * 1) + (1 / 1 * 1 / (1 * (1 + (1 / 		 1 / 1 - ((1 + ((1 - 1 / 1 + 1 / 1 - 1) * 1)) * 1) - 1 / 1 / 1 / (1 + 1) - (1 +	 		((1 + (((1 + 1 - 1 / ((1 + 1) * (1 + (1 / 1 + (1 + 1))))) * 1) * ((1 - 1 / (1 +	 		1 - (((1 / 1 - 1 / 1 * (1 + (((1 * 1) * (1 - 1 * (1 * 1))) - 1 + ((1 * 1) * ((1	 		- 1 * 1) / 1 + (1 + 1))()))) * 1) + 1 - 1 - 1 / (1 + ((1 * (1 + 1)) * 1)))) / (1	 		+ 1 - 1) + 1) - 1 * 1) / 1 - 1 / 1 - ((((1 + (1 * 1 - 1)) * ((1 + (1 * 1)) * 1)) 		 * ((1 + 1) + 1)) + 1) / 1 / 1 - ((1 / 1 - (((1 + (1 * 1) - 1) - 1 * 1 - (1 + 1) 		 - 1) + 1) + (1 / (1 + (1 * 1)) / 1 * 1 / 1) / (1 + 1)) * 1 / 1 - 1) - 1 - 1 - 1 		) / 1) * 1) / 1) + 1))) / 1 / 1)) / 1) * ((((1 / 1 + 1) - 1 * 1 / (1 + 1)) * 1 /	 		1) / 1 * 1) / 1 / 1 / 1 - ((1 * (((1 / 1 * (1 * (1 / ((1 - 1 * (1 * 1 / 1)) + (( 		1 * (1 + 1)) * 1)) * (1 + (1 + (1 * (1 + 1 / 1 - (1 - 1 * ((1 + 1) + 1 - (1 * 1) 		) / ((1 - 1 + 1) - 1 + 1)))) - 1 / (1 + 1) / 1 / 1 / 1 / (1 + (1 * (1 - (1 * 1 / 		 1) * 1))) / 1 - 1 - 1))) / ((1 + 1) + 1 / (1 * 1) / 1 / (1 * 1 / 1) - 1 - 1 - 1 		 / (1 * ((1 / 1 - 1 / 1 - 1 / 1 / 1 / 1 / 1 * 1) - 1 / (1 - ((1 / 1 + 1) + 1) -	 		1 / (1 * (1 + 1)) / 1 * (1 * 1) / 1) / 1 * 1)) / (1 + 1) / (((1 - 1 * 1) + (1 -	 		(1 + 1) + 1 / 1)) * 1) - (1 / 1 / 1 * 1) - (1 - ((1 * (1 - (1 + 1) + 1)) * (1 +	 		1)) / 1 / 1 + (1 - 1 - (1 + (1 * 1)) - ((1 + 1 - ((1 + ((1 * 1) * 1 - 1 / 1)) +	 		1) - 1) / 1 - 1 + 1) / (((1 * 1) + 1) + 1) * (1 * 1)))) / 1 / ((1 * 1) + 1 - 1)) 		 / 1) * 1) * 1)) * ((1 - (1 * 1 / 1) + 1) * 1 / 1)) / (1 + 1) / 1) + (1 / 1 * (1 		 + 1 / 1 - (1 / (1 - 1 + 1) + 1) / (1 + 1) - (1 * 1)) - (((1 / 1 + 1 - 1 - 1) /	 		1 * 1) + (1 * 1) / (1 / 1 * 1) - 1 - (1 + 1))) / 1) + 1) + 1)) / 1 / 1)) + 1) -	 		1( - (1 * 1 - 1)) * ((1 + 1) * 1)) - 1 * (1 + ((1 * 1) + (1 * 1)))) - 1 * 1)))) * 		 1) - 1 - 1 - 1))");
 	testMainFloatArgInvalidProgram("def main(float x) float : (1 * (1 * ((1 + 1) * (1 - 1 + 1)) - 1 - ((1 + (((((1 + 		 1 / (1 + (((1 + 1 / (1 * (1 - 1 + 1 / 1 / 1))) - 1 - 1 - (1 + 1 / 1) + (((1 * 1 		) * 1) * 1) / 1) - 1 + 1)) - 1 / 1) + (1 * 1)) + 1 - 1) + 1) * 1)) + 1) / (1 + 1 		) / 1 - ((1 + 1 / 1 - (((1 * ((1 - 1 - 1 / 1 - 1 * 1) - (1 / 1 - 1 * 1) + ((1 +	 		1) - 1 * 1) - 1 / 1)) + (1 / 1 / 1 - 1 - (1 + 1) / (1 + 1) + 1)) * (1 * ((((1 +	 		1) * 1) / 1 - 1 - 1 - (((1 + 1) * 1 - (((1 / 1 * 1) * (1 + 1) - 1) / 1 / 1 / 1 - 		 (1 + (((1 + 1) + 1) * 1)) - 1 / ((1 + 1) / (1 * 1) / (1 + (1 / 1 * 1 / 1 - 1 -	 		(1 * 1) / (1 + 1) - 1 - 1 - 1 - 1 - 1 / 1)) / (1 / 1 * 1) + (((1 + 1) * ((1 + 1) 		 * 1)) / 1 + ((1 -  true ((1 * 1) + 1) + 1) + 1 - 1 / ((1 / (1 - ((1 + 1) - ((((1 - (( 		1 * ((1 * ((1 + 1) + ((1 - (1 * 1) + (1 - (1 - 1 - (1 * 1) / (1 + 1) / 1 * (1 -	 		1 + (1 + 1) - ((1 / 1 / 1 + 1) * 1) - (1 - 1 * 1))) * 1) - 1 - 1 - 1 - (1 * (((1 		 * 1) * ((1 + (1 / (1 * 1) * 1 - 1)) * (1 + (((1 + 1) + 1) + 1)))) + 1) / 1)) +	 		1 / 1) / 1 - 1)) * 1 - 1)) / 1 * (1 * 1) - 1 - 1 / (1 * ((((1 + 1) + 1) * 1 - 1	 		- 1 / ((1 + 1) / (1 * 1) - ((1 / 1 + 1) * 1) + (1 + (1 * 1) - 1 - 1 - 1 - (1 + ( 		1 + 1))) / 1)) - 1 * (1 / ((1 * 1) + ((1 - 1 + (1 + 1)) + ((1 + 1) * 1))) / 1 *	 		1)) - 1) / 1 / 1 / 1) / 1 + 1) / (1 / (1 + (1 + (1 * 1 - 1)) - 1) / 1 - ((1 * 1	 		/ 1 / (1 / (1 * 1 / 1 - 1) / 1 * 1) / 1) - 1 * ((1 + (((1 + 1) + 1) - ((1 * ((1	 		+ 1) + 1)) * ((1 * 1) * 1) - 1) / 1 / (1 - 1 / (1 - 1 * 1) / 1 * 1) / ((1 - (1 + 		 1) / 1 * 1) + 1 - (1 + (1 * 1)) - 1) - 1 * 1) - 1 / 1) * 1)) + (((1 - (1 / 1 -	 		1 + 1 - (1 * (1 + 1)) / (1 + (1 + 1))) + 1) - ((1 + 1) * (1 * 1 / 1)) * 1 - 1) + 		 1) - 1 / 1 - (((1 * 1 - 1) + 1) - (1 + 1) - 1 - 1 * 1)) / (1 + 1) + (((1 * ((1	 		/ (1 * 1) * 1) * 1)) * 1) + 1 - (1 * 1)) / 1) * 1) + (1 / 1 * 1 / (1 * (1 + (1 / 		 1 / 1 - ((1 + ((1 - 1 / 1 + 1 / 1 - 1) * 1)) * 1) - 1 / 1 / 1 / (1 + 1) - (1 +	 		((1 + (((1 + 1 - 1 / ((1 + 1) * (1 + (1 / 1 + (1 + 1))))) * 1) * ((1 - 1 / (1 +	 		1 - (((1 / 1 - 1 / 1 * (1 + (((1 * 1) * (1 - 1 * (1 * 1))) - 1 + ((1 * 1) * ((1	 		- 1 * 1) / 1 + (1 + 1)))))) * 1) + 1 - 1 - 1 / (1 + ((1 * (1 + 1)) * 1)))) / (1	 		+ 1 - 1) + 1) - 1 * 1) / 1 - 1 / 1 - ((((1 + (1 * 1 - 1)) * ((1 + (1 * 1)) * 1)) 		 * ((1 + 1) + 1)) + 1) / 1 / 1 - ((1 / 1 - (((1 + (1 * 1) - 1) - 1 * 1 - (1 + 1) 		 - 1) + 1) + (1 / (1 + (1 * 1)) / 1 * 1 / 1) / (1 + 1)) * 1 / 1 - 1) - 1 - 1 - 1 		) / 1) * 1) / 1) + 1)) / 1 / 1)) / 1) * ((((1 / 1 + 1) - 1 * 1 / (1 + 1)) * 1 /	 		1) / 1 * 1) / 1 / 1 / 1 - ((1 * (((1 / 1 * (1 * (1 / ((1 - 1 * (1 * 1 / 1)) + (( 		1 * (1 + 1)) * 1)) * (1 + (1 + (1 * (1 + 1 / 1 - (1 - 1 * ((1 + 1) + 1 - (1 * 1) 		) / ((1 - 1 + 1) - 1 + 1)))) - 1 / (1 + 1) / 1 / 1 / 1 / (1 + (1 * (1 - (1 * 1 / 		 1) * 1))) / 1 - 1 - 1))) / ((1 + 1) + 1 / (1 * 1) / 1 / (1 * 1 / 1) - 1 - 1 - 1 		 / (1 * ((1 / 1 - 1 / 1 - 1 / 1 / 1 / 1 / 1 * 1) - 1 / (1 - ((1 / 1 + 1) + 1) -	 		1 / (1 * (1 + 1)) / 1 * (1 * 1) / 1) / 1 * 1)) / (1 + 1) / (((1 - 1 * 1) + (1 -	 		(1 + 1) + 1 / 1)) * 1) - (1 / 1 / 1 * 1) - (1 - ((1 * (1 - (1 + 1) + 1)) * (1 +	 		1)) / 1 / 1 + (1 - 1 - (1 + (1 * 1)) - ((1 + 1 - ((1 + ((1 * 1) * 1 - 1 / 1)) +	 		1) - 1) / 1 - 1 + 1) / (((1 * 1) + 1) + 1) * (1 * 1)))) / 1 / ((1 * 1) + 1 - 1)) 		 / 1) * 1) * 1)) * ((1 - (1 * 1 / 1) + 1) * 1 / 1)) / (1 + 1) / 1) + (1 / 1 * (1 		 + 1 / 1 - (1 / (1 - 1 + 1) + 1) / (1 + 1) - (1 * 1)) - (((1 / 1 + 1 - 1 - 1) /	 		1 * 1) + (1 * 1) / (1 / 1 * 1) - 1 - (1 + 1))) / 1) + 1) + 1)) / 1 / 1)) + 1) -	 		1 - (1 * 1 - 1)) * ((1 + 1) * 1)) - 1 * (1 + ((1 * 1) + (1 * 1)))) - 1 * 1)))) * 		 1) - 1 - 1 - 1))");
 
-
-	testMainFloatArg("def g(function<float> f) float : f()       def main(float x) float : g(\\() float : x)",  4.0f, 4.0f, ALLOW_UNSAFE);
+	testMainFloatArg("def g(function<float> f) float : f()       def main(float x) float : g(\\() float : x)",  4.0f, 4.0f, ALLOW_UNSAFE | INVALID_OPENCL);
 
 	// Test first class function with OpenCL code-gen
 	//testMainFloatArg("def f(array<float, 16> a, int i) float : a[i]    def g(function<array<float, 16>, int, float>      def main(float x) float : g(f, [truncateToInt(x)]", 2.1f, 3.0f, ALLOW_UNSAFE);
@@ -376,6 +377,7 @@ void LanguageTests::run()
 	// ===================================================================
 	// Test function inlining
 	// ===================================================================
+	testMainIntegerArg("def f(int y) : y + 1    def main(int x) int : f(x)", 1, 2); // f should be inlined.
 
 	testMainFloatArg("def f(float b) float : let x = b in x					\n\
 		def main(float x) float : f(x * 10)									\n\
@@ -456,6 +458,15 @@ void LanguageTests::run()
 		in													\n\
 			c + x			# c is alive						\n\
 		", 1, 6);
+
+	// Test that a let block with no let vars is removed, and is replaced with the value expression (x var)
+	results = testMainIntegerArg("def main(int x) int :		\n\
+		let													\n\
+			a = 1 + x	# dead								\n\
+		in													\n\
+			x												\n\
+		", 4, 4);
+	testAssert(results.maindef->body->nodeType() == ASTNode::VariableASTNodeType);
 
 
 	// ===================================================================
@@ -769,24 +780,24 @@ void LanguageTests::run()
 	// ===================================================================
 	// Test optimisation of varray from heap allocated to stack allocated
 	// ===================================================================
-	stats = testMainFloatArg("def main(float x) float :	 [3.0, 4.0, 5.0]va[0]", 1.f, 3.f, INVALID_OPENCL);
-	testAssert(stats.num_heap_allocation_calls == 0);
+	results = testMainFloatArg("def main(float x) float :	 [3.0, 4.0, 5.0]va[0]", 1.f, 3.f, INVALID_OPENCL);
+	testAssert(results.stats.num_heap_allocation_calls == 0);
 
-	stats = testMainFloatArg("def main(float x) float :	 let v = [3.0, 4.0, 5.0]va in v[0]", 1.f, 3.f, INVALID_OPENCL);
-	testAssert(stats.num_heap_allocation_calls == 0);
+	results = testMainFloatArg("def main(float x) float :	 let v = [3.0, 4.0, 5.0]va in v[0]", 1.f, 3.f, INVALID_OPENCL);
+	testAssert(results.stats.num_heap_allocation_calls == 0);
 
-	stats = testMainFloatArg("def main(float x) float :	 let v = [3.0, 4.0, 5.0]va in v[1]", 1.f, 4.f, INVALID_OPENCL);
-	testAssert(stats.num_heap_allocation_calls == 0);
+	results = testMainFloatArg("def main(float x) float :	 let v = [3.0, 4.0, 5.0]va in v[1]", 1.f, 4.f, INVALID_OPENCL);
+	testAssert(results.stats.num_heap_allocation_calls == 0);
 
-	stats = testMainFloatArg("def main(float x) float :	 let v = [3.0, 4.0, 5.0]va in v[2]", 1.f, 5.f, INVALID_OPENCL);
-	testAssert(stats.num_heap_allocation_calls == 0);
+	results = testMainFloatArg("def main(float x) float :	 let v = [3.0, 4.0, 5.0]va in v[2]", 1.f, 5.f, INVALID_OPENCL);
+	testAssert(results.stats.num_heap_allocation_calls == 0);
 
-	stats = testMainFloatArg("def main(float x) float :	 let v = [x + 3.0, x + 4.0, x + 5.0]va in v[0]", 10.f, 13.f, INVALID_OPENCL);
-	testAssert(stats.num_heap_allocation_calls == 0);
+	results = testMainFloatArg("def main(float x) float :	 let v = [x + 3.0, x + 4.0, x + 5.0]va in v[0]", 10.f, 13.f, INVALID_OPENCL);
+	testAssert(results.stats.num_heap_allocation_calls == 0);
 
 	// Test varray being returned from function, has to be heap allocated.  (Assuming no inlining of f)
-	stats = testMainFloatArgAllowUnsafe("def f(float x) : [x + 3.0, x + 4.0, x + 5.0]va             def main(float x) float :	 let v = f(x) in v[0]", 10.f, 13.f, INVALID_OPENCL);
-	testAssert(stats.num_heap_allocation_calls <= 1);
+	results = testMainFloatArgAllowUnsafe("def f(float x) : [x + 3.0, x + 4.0, x + 5.0]va             def main(float x) float :	 let v = f(x) in v[0]", 10.f, 13.f, INVALID_OPENCL);
+	testAssert(results.stats.num_heap_allocation_calls <= 1);
 
 	
 	// ===================================================================
@@ -3895,31 +3906,34 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 	// Test lambda expressions and closures
 	// ===================================================================
 
-
-	// Test Lambda applied directly
-	testMainFloatArg("def main(float x) float : (\\(float y) : y*y) (x)", 4.0f, 16.0f, INVALID_OPENCL);
+	// Test Lambda applied directly.  Function inlining (beta reduction) should be done.
+	results = testMainFloatArg("def main(float x) float : (\\(float y) : y*y) (x)", 4.0f, 16.0f, INVALID_OPENCL);
+	testAssert(results.maindef->body->nodeType() == ASTNode::MulExpressionType);
 
 	// Test Lambda applied directly (with same variable names)
 	testMainFloatArg("def main(float x) float : (\\(float x) : x*x) (x)", 4.0f, 16.0f, INVALID_OPENCL);
 	testMainFloatArg("def main(float x) float : (\\(float x) : x*x) (x + 1)", 4.0f, 25.0f, INVALID_OPENCL);
 
-
+	
 
 	// Test Lambda in let
 	// f should be inlined if it's only called once.
-	testMainFloat("def main() float :				\n\
+	results = testMainFloat("def main() float :				\n\
 				  let f = \\(float x) : x*x  in		\n\
 				  f(2.0)", 4.0f);
+	testAssert(results.maindef->body->nodeType() == ASTNode::MulExpressionType);
 
-	testMainFloat("def main() float :				\n\
+	results = testMainFloat("def main() float :				\n\
 				  let f = \\(float x) : x*x  in		\n\
 					let g = f in					\n\
 				  g(2.0)", 4.0f);
+	testAssert(results.maindef->body->nodeType() == ASTNode::MulExpressionType);
 
-	testMainFloatArg("def main(float x) float :				\n\
+	results = testMainFloatArg("def main(float x) float :				\n\
 				  let f = \\(float x) : x*x  in		\n\
 					let g = f in					\n\
-				  g(x)", 2.0f, 4.0f);
+				  g(x)", 2.0f, 4.0f, INVALID_OPENCL);
+	testAssert(results.maindef->body->nodeType() == ASTNode::MulExpressionType);
 
 	testMainFloat("def main() float :				\n\
 				  let f = \\(float x) : x*x  in		\n\
@@ -3932,10 +3946,11 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 						g(1.0)", 2.0f);
 
 	// Test return of a lambda from a function
-	testMainFloat("def makeLambda() : \\(float x) : x*x    \n\
+	results = testMainFloat("def makeLambda() : \\(float x) : x*x    \n\
 					def main() float :           \n\
 					let f = makeLambda()  in   \n\
 				  f(2.0)", 4.0f);
+	testAssert(results.maindef->body->nodeType() == ASTNode::MulExpressionType);
 
 	// Test variable capture: the returned lambda needs to capture the value of x.
 	testMainFloat("	def makeFunc(float x) function<float> : \\() : x      \n\
@@ -3971,29 +3986,31 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 
 	// Test 'compose' function: returns the composition of two functions
 	// NOTE: this requires lexical closures to work :)
-
-	testMainFloat("def compose(function<float, float> f) : f       \n\
+	results = testMainFloat("def compose(function<float, float> f) : f       \n\
 					def mulByTwo(float x) : x * 2.0                \n\
 					def main() float :                         \n\
 						let z = compose(mulByTwo)  in \n\
 						z(4.0)", 8.0f);
+	testAssert(results.maindef->body->nodeType() == ASTNode::MulExpressionType); // Function calls should be inlined.
 
 	// Test lambda with function call in it.
-	testMainFloatArg("def square(float z) float : z*z						\n\
+	results = testMainFloatArg("def square(float z) float : z*z						\n\
 					def main(float x) float :                         \n\
 						let													  \n\
 							f = \\(float y) : square(y)							\n\
 						in													\n\
 							f(x)", 4.0f, 16.0f, INVALID_OPENCL);
+	testAssert(results.maindef->body->nodeType() == ASTNode::MulExpressionType); // Function calls should be inlined.
 
-	// Test return of a lambda witha function call in it/
-	testMainFloatArg("def square(float z) float : z*z						\n\
+	// Test return of a lambda with a function call in it
+	results = testMainFloatArg("def square(float z) float : z*z						\n\
 					def makeLambda() function<float, float> : \\(float y) : square(y)		\n\
 					def main(float x) float :                         \n\
 						let													  \n\
 							f = makeLambda()							\n\
 						in													\n\
 							f(x)", 4.0f, 16.0f, INVALID_OPENCL);
+	testAssert(results.maindef->body->nodeType() == ASTNode::MulExpressionType); // Function calls should be inlined.
 
 	// Test lambda being return from a function, where the lambda has a call to a function argument in it.
 	testMainFloat("def compose(function<float, float> f) : \\(float x) : f(x)       \n\
@@ -4002,6 +4019,15 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 						let z = compose(mulByTwo)  in \n\
 						8.f", 8.0f);
 
+	/*
+
+	def compose(function<float, float> f) : \\(float x) : f(x)   
+	def mulByTwo(float x) : x * 2.0            
+	def main() float :                        
+		let z = \\(float x) : mulByTwo(x)  in 
+
+		*/
+
 	// Test lambda being return from a function, where the lambda has a call to a function argument in it.
 	testMainFloat("def compose(function<float, float> f) : \\(float x) : f(x)       \n\
 					def mulByTwo(float x) : x * 2.0                \n\
@@ -4011,12 +4037,13 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 
 
 
-	testMainFloatArg("def compose(function<float, float> f, function<float, float> g) : \\(float x) : f(g(x))       \n\
+	results = testMainFloatArg("def compose(function<float, float> f, function<float, float> g) : \\(float x) : f(g(x))       \n\
 					def addOne(float x) : x + 1.0                \n\
 					def mulByTwo(float x) : x * 2.0                \n\
 					def main(float x) float :                         \n\
 						let z = compose(addOne, mulByTwo)  in \n\
 						z(x)", 10.0, 21.0f, INVALID_OPENCL);
+	testAssert(results.maindef->body->nodeType() == ASTNode::AdditionExpressionType); // Function calls should be inlined.
 
 	//inlining compose(), goes to:
 	testMainFloatArg("def compose(function<float, float> f, function<float, float> g) : \\(float x) : f(g(x))       \n\
@@ -4043,7 +4070,6 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 					def main() float :                         \n\
 						let z = compose(addOne, mulByTwo)  in \n\
 						z(10.0)", 21.0f);
-
 	// Test capturing a heap-allocated type (varray in this case)
 	testMainIntegerArg("def main(int x) int :                          \n\
 						let					                    \n\
@@ -4053,7 +4079,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 							f(x)", 2, 12, ALLOW_UNSAFE | INVALID_OPENCL);
 
 	// Test capturing a heap-allocated type in a closure that is returned from a function
-	stats = testMainIntegerArg("def makeFunc() function<int, int> :		\n\
+	results = testMainIntegerArg("def makeFunc() function<int, int> :		\n\
 						let					                    \n\
 							a = [10, 11, 12, 13]va				\n\
 						in										\n\
@@ -4064,10 +4090,43 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 							f = makeFunc()						\n\
 						in					                    \n\
 							f(x)", 2, 12, ALLOW_UNSAFE | INVALID_OPENCL);
-	testAssert(stats.num_heap_allocation_calls <= 2); // Should be one alloc call for the varray, and one for the closure returned from makeFunc()
+	testAssert(results.stats.num_heap_allocation_calls <= 2); // Should be one alloc call for the varray, and one for the closure returned from makeFunc()
+
+	/*
+	def main(int x) int :              
+		let								
+			f = let					                    \n\
+					a = [10, 11, 12, 13]va				\n\
+				in										\n\
+					\\(int x) int : a[x]		
+		in					            
+			f(x)
+
+
+	def main(int x) int :              
+		let								
+			f = ..
+		in					            
+			(let					                    \n\
+				a = [10, 11, 12, 13]va				\n\
+			in										\n\
+				\\(int x) int : a[x])(x)
+
+
+	=> goes to?
+
+	def main(int x) int :              
+		let								
+			f = ..
+		in					            
+			let					                    \n\
+				a = [10, 11, 12, 13]va				\n\
+			in										\n\
+				a[x]
+	*/
 
 	// Test capturing two varrays
-	stats = testMainIntegerArg("def makeFunc() function<int, int> :		\n\
+	results = testMainIntegerArg("def makeFunc() function<int, int> :		\n\
 						let					                    \n\
 							a = [10, 11, 12, 13]va				\n\
 							b = [20, 21, 22, 23]va				\n\
@@ -4079,10 +4138,10 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 							f = makeFunc()						\n\
 						in					                    \n\
 							f(x)", 2, 34, ALLOW_UNSAFE | INVALID_OPENCL);
-	testAssert(stats.num_heap_allocation_calls <= 3); // Should be one alloc call for each varray, and one for the closure returned from makeFunc()
+	testAssert(results.stats.num_heap_allocation_calls <= 3); // Should be one alloc call for each varray, and one for the closure returned from makeFunc()
 
 	// Test capturing a string
-	stats = testMainIntegerArg("def makeFunc() function<int, int> :		\n\
+	results = testMainIntegerArg("def makeFunc() function<int, int> :		\n\
 						let					                    \n\
 							s = \"hello\"						\n\
 						in										\n\
@@ -4093,17 +4152,17 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 							f = makeFunc()						\n\
 						in					                    \n\
 							f(x)", 1, (int)'e', ALLOW_UNSAFE | INVALID_OPENCL);
-	testAssert(stats.num_heap_allocation_calls <= 2); // Should be one alloc call for the string, and one for the closure returned from makeFunc()
+	testAssert(results.stats.num_heap_allocation_calls <= 2); // Should be one alloc call for the string, and one for the closure returned from makeFunc()
 
 
 
 	// Test escape analyis allowing a closure to be stack-allocated.
-	stats = testMainIntegerArg("def main(int x) int :			\n\
+	results = testMainIntegerArg("def main(int x) int :			\n\
 						let										\n\
 							f = \\(int x) : x + 10				\n\
 						in					                    \n\
 							f(x)", 2, 12, ALLOW_UNSAFE | INVALID_OPENCL);
-	testAssert(stats.num_heap_allocation_calls == 0);
+	testAssert(results.stats.num_heap_allocation_calls == 0);
 
 	// Test closures
 
@@ -4219,6 +4278,28 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 								in f()						\n\
 								", 3.f);
 
+	// Test correct capture of destructured let var
+	testMainFloat("def main() float :						\n\
+							let 							\n\
+								a, b = (3.0, 4.0)			\n\
+							in 								\n\
+								let 						\n\
+									f =\\() : 				\n\
+										a 					\n\
+								in f()						\n\
+								", 3.0f);
+
+	// Test correct capture of destructured let var
+	testMainFloat("def main() float :						\n\
+							let 							\n\
+								a, b = (3.0, 4.0)			\n\
+							in 								\n\
+								let 						\n\
+									f =\\() : 				\n\
+										b 					\n\
+								in f()						\n\
+								", 4.0f);
+
 	// ===================================================================
 	// Test capturing vars with nested lambdas
 	// ===================================================================
@@ -4233,6 +4314,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 								in										\n\
 									f()									\n\
 								", 10.f, 10.f, INVALID_OPENCL);
+
 
 	// transforms to:
 
@@ -4306,6 +4388,58 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 									in					\n\
 										x				\n\
 								", 10.f, 10.f, INVALID_OPENCL);
+
+	// Test with ref-counted values:
+	testMainFloatArg("def main(float x) float :							\n\
+								let 									\n\
+									a = [x + 1.0]va						\n\
+									f = \\() : 		# captures 'a'		\n\
+										let 							\n\
+										g = \\() : a[0]		# captures 'a' as well	\n\
+										in								\n\
+											g()							\n\
+								in										\n\
+									f()									\n\
+								", 10.f, 11.f, INVALID_OPENCL);
+
+	// Test with ref-counted values:
+	testMainFloatArg("def somefunc(float x) varray<float> :					\n\
+								[x + 1.0]va									\n\
+							def main(float x) float : somefunc(x)[0] + somefunc(x)[0]							\n\
+							", 10.f, 22.f,  ALLOW_UNSAFE | INVALID_OPENCL);
+
+	// Test with ref-counted values:
+	testMainFloatArg("def somefunc(float x) varray<float> :							\n\
+								let 									\n\
+									a = [x + 1.0]va						\n\
+								in										\n\
+									a									\n\
+							def main(float x) float : somefunc(x)[0] + somefunc(x)[0]							\n\
+							", 10.f, 22.f,  ALLOW_UNSAFE | INVALID_OPENCL);
+
+	// Test capture of ref-counted values.
+	testMainFloatArg("def somefunc(float x) varray<float> :							\n\
+								let 									\n\
+									a = [x + 1.0]va						\n\
+									f = \\() : 	a						\n\
+								in										\n\
+									f()									\n\
+							def main(float x) float : somefunc(x)[0] + somefunc(x)[0]							\n\
+							", 10.f, 22.f,  ALLOW_UNSAFE | INVALID_OPENCL);
+
+	// Test capture of ref-counted values, captured twice:
+	testMainFloatArg("def somefunc(float x) varray<float> :							\n\
+								let 									\n\
+									a = [x + 1.0]va						\n\
+									f = \\() : 		# captures 'a'		\n\
+										let 							\n\
+										g = \\() : a		# captures 'a' as well	\n\
+										in								\n\
+											g()							\n\
+								in										\n\
+									f()									\n\
+							def main(float x) float : somefunc(x)[0] + somefunc(x)[0]							\n\
+							", 10.f, 22.f,  ALLOW_UNSAFE | INVALID_OPENCL);
 
 
 	// ===================================================================

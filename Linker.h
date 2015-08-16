@@ -7,7 +7,6 @@
 #include "wnt_ASTNode.h"
 #include "wnt_FunctionDefinition.h"
 #include <map>
-#include <set>
 namespace llvm { class Module; /*class TargetData; */class DataLayout; }
 
 

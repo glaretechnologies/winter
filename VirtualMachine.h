@@ -115,6 +115,9 @@ private:
 	void build(const VMConstructionArgs& args);
 	void addExternalFunction(const ExternalFunctionRef& f, llvm::LLVMContext& context, llvm::Module& module);
 	void compileToNativeAssembly(llvm::Module* mod, const std::string& filename);
+	bool doInliningPass();
+	bool doDeadCodeEliminationPass();
+	void doDeadFunctionEliminationPass(const VMConstructionArgs& args);
 
 	std::vector<ExternalFunctionRef> external_functions;
 	//ASTNodeRef rootref;

@@ -28,8 +28,7 @@ public:
 		LetVariable,					// Bound to a let variable
 		ArgumentVariable,				// Bound to an argument of the most-tightly enclosing function
 		BoundToGlobalDefVariable,		// Bound to a globally defined (program scope) function
-		BoundToNamedConstant,			// Bound to a named constant
-		CapturedVariable				// Bound to a captured variable of the most-tightly enclosing anonymous function.
+		BoundToNamedConstant			// Bound to a named constant
 	};
 
 	Variable(const std::string& name, const SrcLocation& loc);
@@ -49,13 +48,17 @@ public:
 
 	std::string name; // variable name.
 
-	BindingType vartype; // one of BindingType above.
+	BindingType binding_type; // one of BindingType above.
 
 	FunctionDefinition* bound_function; // Function for which the variable is an argument of.  Use in ArgumentVariable case.
 	LetASTNode* bound_let_node; // Used in LetVariable case.
 	NamedConstant* bound_named_constant; // Used in BoundToNamedConstant case.
 
-	int bound_index; // index in function argument list, or index of captured var.
+	int arg_index; // index in function argument list, or index of captured var.
+
+	FunctionDefinition* enclosing_lambda;
+	int free_index; // If this variable is in a lambda expression, and the variable is free in the mostly tightly enclosing lambda, then this is the index of this variable in the list
+	// of free variables of the lambda.  If it's not free in a lambda then it is -1.
 
 	int let_var_index; // Index of the let variable bound to, for destructing assignment case may be > 0.  Used in LetVariable case.
 };

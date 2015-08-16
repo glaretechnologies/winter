@@ -43,6 +43,13 @@ const uint32 INVALID_OPENCL = 1; // Flag value
 const uint32 ALLOW_UNSAFE = 2; // Flag value
 
 
+struct TestResults
+{
+	ProgramStats stats;
+	Reference<FunctionDefinition> maindef;
+};
+
+
 static bool epsEqual(float x, float y)
 {
 	return std::fabs(x - y) < 1.0e-5f;
@@ -101,7 +108,7 @@ static ValueRef testExternalFuncInterpreted(const std::vector<ValueRef>& arg_val
 typedef float(WINTER_JIT_CALLING_CONV * float_void_func)(void* env);
 
 
-static ProgramStats testMainFloat(const std::string& src, float target_return_val)
+static TestResults testMainFloat(const std::string& src, float target_return_val)
 {
 	std::cout << "===================== Winter testMainFloat() =====================" << std::endl;
 	try
@@ -182,8 +189,10 @@ static ProgramStats testMainFloat(const std::string& src, float target_return_va
 			exit(1);
 		}
 
-	//	delete retval;
-		return vm.getProgramStats();
+		TestResults res;
+		res.stats = vm.getProgramStats();
+		res.maindef = maindef;
+		return res;
 	}
 	catch(Winter::BaseException& e)
 	{
@@ -235,7 +244,7 @@ static void testMainFloatArgInvalidProgram(const std::string& src)
 }
 
 
-static ProgramStats doTestMainFloatArg(const std::string& src, float argument, float target_return_val, bool check_constant_folded_to_literal, uint32 test_flags)
+static TestResults doTestMainFloatArg(const std::string& src, float argument, float target_return_val, bool check_constant_folded_to_literal, uint32 test_flags)
 {
 	std::cout << "===================== Winter testMainFloatArg() =====================" << std::endl;
 	try
@@ -370,7 +379,7 @@ static ProgramStats doTestMainFloatArg(const std::string& src, float argument, f
 			);
 
 
-			//opencl->dumpBuildLog(program, opencl->getDeviceInfo()[0].opencl_device, print_output); 
+			opencl->dumpBuildLog(program, gpu_device.opencl_device); 
 
 			// Create kernel
 			cl_int result;
@@ -433,7 +442,10 @@ static ProgramStats doTestMainFloatArg(const std::string& src, float argument, f
 #endif // #if USE_OPENCL
 		}
 
-		return vm.getProgramStats();
+		TestResults res;
+		res.stats = vm.getProgramStats();
+		res.maindef = maindef;
+		return res;
 	}
 	catch(Winter::BaseException& e)
 	{
@@ -450,7 +462,7 @@ static ProgramStats doTestMainFloatArg(const std::string& src, float argument, f
 }
 
 
-static ProgramStats testMainFloatArg(const std::string& src, float argument, float target_return_val, uint32 test_flags = 0)
+static TestResults testMainFloatArg(const std::string& src, float argument, float target_return_val, uint32 test_flags = 0)
 {
 	return doTestMainFloatArg(src, argument, target_return_val,
 		false, // check constant-folded to literal
@@ -459,7 +471,7 @@ static ProgramStats testMainFloatArg(const std::string& src, float argument, flo
 }
 
 
-static ProgramStats testMainFloatArgAllowUnsafe(const std::string& src, float argument, float target_return_val, uint32 test_flags = 0)
+static TestResults testMainFloatArgAllowUnsafe(const std::string& src, float argument, float target_return_val, uint32 test_flags = 0)
 {
 	return doTestMainFloatArg(src, argument, target_return_val,
 		false, // check constant-folded to literal
@@ -654,7 +666,7 @@ static void testMainStringArg(const std::string& src, const std::string& arg, co
 }
 
 
-static ProgramStats testMainIntegerArg(const std::string& src, int x, int target_return_val, uint32 test_flags = 0)
+static TestResults testMainIntegerArg(const std::string& src, int x, int target_return_val, uint32 test_flags = 0)
 {
 	std::cout << "===================== Winter testMainIntegerArg() =====================" << std::endl;
 	try
@@ -829,7 +841,10 @@ static ProgramStats testMainIntegerArg(const std::string& src, int x, int target
 #endif // #if USE_OPENCL
 		}
 
-		return vm.getProgramStats();
+		TestResults res;
+		res.stats = vm.getProgramStats();
+		res.maindef = maindef;
+		return res;
 	}
 	catch(Winter::BaseException& e)
 	{

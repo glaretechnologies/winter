@@ -316,7 +316,19 @@ void checkInlineExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector
 				target_func = func_expr->get_func_expr.downcastToPtr<FunctionDefinition>();
 				is_beta_reduction = true;
 			}
-			else if(func_expr->get_func_expr->isConstant())
+			else
+			{
+				// Walk up the tree until we get to a node that is not a variable bound to a let node:
+				ASTNode* cur = func_expr->get_func_expr.getPointer();
+				while((cur->nodeType() == ASTNode::VariableASTNodeType) && (((Variable*)cur)->binding_type == Variable::LetVariable))
+					cur = ((Variable*)cur)->bound_let_node->expr.getPointer();
+
+				if(cur->nodeType() == ASTNode::FunctionDefinitionType)
+					target_func = (FunctionDefinition*)cur;
+				else if(cur->nodeType() == ASTNode::VariableASTNodeType && ((Variable*)cur)->binding_type == Variable::BoundToGlobalDefVariable)
+					target_func = ((Variable*)cur)->bound_function;
+			}
+			/*else if(func_expr->get_func_expr->isConstant())
 			{
 				//if(func_expr->get_func_expr.isType<Variable>())
 				//{
@@ -333,7 +345,7 @@ void checkInlineExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector
 				catch(BaseException&)
 				{
 				}
-			}
+			}*/
 		}
 
 
@@ -368,6 +380,16 @@ void checkInlineExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector
 				sub_payload.used_names = payload.used_names;
 				sub_payload.func_args_to_sub = target_func;
 				sub_payload.variable_substitutes.resize(func_expr->argument_expressions.size());
+				
+				// Work out effective call site position.
+				int effective_callsite_order_num = 1000000000;
+				if(payload.current_named_constant)
+					effective_callsite_order_num = payload.current_named_constant->order_num;
+				for(size_t z=0; z<payload.func_def_stack.size(); ++z)
+					effective_callsite_order_num = myMin(effective_callsite_order_num, payload.func_def_stack[z]->order_num);
+
+				sub_payload.new_order_num = effective_callsite_order_num;
+
 				for(size_t i=0; i<func_expr->argument_expressions.size(); ++i)
 				{
 					sub_payload.variable_substitutes[i] = func_expr->argument_expressions[i]; // NOTE: Don't clone now, will clone the expressions when they are pulled out of argument_expressions.
@@ -379,10 +401,47 @@ void checkInlineExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector
 
 				checkSubstituteVariable(e, sub_payload); // e itself might be a variable that needs substituting.
 
-				payload.tree_changed = true;
-
-				if(verbose) std::cout << "------------final expr: (with vars subbed)------------- " << std::endl;
+				if(verbose) std::cout << "------------Substituted expression-----------: " << std::endl;
 				if(verbose) e->print(0, std::cout);
+
+
+				// NEW: SubstituteVariables pass has set all variables in e to unbound.  Rebind all variables in e.
+				{
+					TraversalPayload temp_payload(TraversalPayload::UnbindVariables);
+					temp_payload.linker = payload.linker;
+					temp_payload.func_def_stack = payload.func_def_stack;
+					e->traverse(temp_payload, stack);
+				}
+
+				
+				if(!payload.func_def_stack.empty())
+				{
+					if(verbose) std::cout << "------------Full function-----------: " << std::endl;
+					if(verbose) payload.func_def_stack[0]->print(0, std::cout);
+				}
+				else if(payload.current_named_constant)
+				{
+					if(verbose) std::cout << "------------Full named constant-----------: " << std::endl;
+					if(verbose) payload.current_named_constant->print(0, std::cout);
+				}
+				else
+				{
+					assert(0);
+				}
+
+				{
+					TraversalPayload temp_payload(TraversalPayload::BindVariables);
+					temp_payload.linker = payload.linker;
+					temp_payload.func_def_stack = payload.func_def_stack;
+					e->traverse(temp_payload, stack);
+				}
+
+				if(verbose) std::cout << "------------Rebound expression-----------: " << std::endl;
+				if(verbose) e->print(0, std::cout);
+
+				
+
+				payload.tree_changed = true;
 			}
 			else
 			{
@@ -399,93 +458,32 @@ void checkSubstituteVariable(ASTNodeRef& e, TraversalPayload& payload)
 	{
 		Reference<Variable> var = e.downcast<Variable>();
 
-		if(var->vartype == Variable::ArgumentVariable && var->bound_function == payload.func_args_to_sub)
+		if(var->binding_type == Variable::ArgumentVariable && var->bound_function == payload.func_args_to_sub)
 		{
 			// Replace the variable with the argument value.	
-			if(var->bound_index >= payload.variable_substitutes.size())
+			if(var->arg_index >= payload.variable_substitutes.size())
 				return; // May be out of bounds for invalid programs.
-			e = cloneASTNodeSubtree(payload.variable_substitutes[var->bound_index]);
+			e = cloneASTNodeSubtree(payload.variable_substitutes[var->arg_index]);
 
 			payload.tree_changed = true;
 		}
-		else if(var->vartype == Variable::CapturedVariable)
-		{
-			// If this variable is bound to a captured var, and that captured var in turn is bound to an argument that we are substituting, then substitute the value for the variable.
-			const CapturedVar& captured_var = var->bound_function->captured_vars[var->bound_index];
-			if(captured_var.vartype == CapturedVar::Arg)// && captured_var.bound_function == payload.func_args_to_sub)
-			{
-				// If the captured variable was capturing an argument of the function body we were inlining, then use the substituted value:
-				if(captured_var.bound_function == payload.func_args_to_sub)
-					e = cloneASTNodeSubtree(payload.variable_substitutes[captured_var.index]);
-				else
-				{
-					var->vartype = Variable::ArgumentVariable;
-					var->bound_function = captured_var.bound_function;
-					var->bound_index = captured_var.index;
-				}
-			}
-			else if(captured_var.vartype == CapturedVar::Let)
-			{
-				e = cloneASTNodeSubtree(captured_var.bound_let_node->expr);
-			}
-			else if(captured_var.vartype == CapturedVar::Captured)
-			{
-				//CapturedVar& bound_cap_var = captured_var.bound_function->captured_vars[captured_var.index];
-				//e = cloneASTNodeSubtree(captured_var.bound_let_node->expr);
-				// The variable was bound to a captured var, which in turn was bound to another captured var.
-				// We want to bind the variable directly to the second captured var.
-				var->bound_function = captured_var.bound_function; // payload.func_args_to_sub;
-				var->bound_index = captured_var.index;
-			}
-		}
 	}
-	else if(e->nodeType() == ASTNode::FunctionDefinitionType)
+}
+
+
+void doDeadCodeElimination(Reference<ASTNode>& e, TraversalPayload& payload, std::vector<ASTNode*>& stack)
+{
+	if(e->nodeType() == ASTNode::LetBlockType)
 	{
-		Reference<FunctionDefinition> def = e.downcast<FunctionDefinition>();
-
-		//std::vector<CapturedVar> updated_captured_vars;
-		for(size_t i=0; i<def->captured_vars.size(); ++i)
+		LetBlock* letblock = e.downcastToPtr<LetBlock>();
+		if(letblock->lets.empty())
 		{
-			CapturedVar& captured_var = def->captured_vars[i];
+			// The letblock has no let variables.  So replace it with the value expression.
+			// e.g
+			// let in x    =>   x
+			e = letblock->expr;
 
-			if(captured_var.vartype == CapturedVar::Arg && captured_var.bound_function == payload.func_args_to_sub)
-			{
-				//e = payload.variable_substitutes[var->bound_index]->clone(); // Replace the variable with the argument value.	
-				/*if(captured_var.index >= payload.variable_substitutes.size())
-					continue; // May be out of bounds for invalid programs.
-				e = cloneASTNodeSubtree(payload.variable_substitutes[var->bound_index]);*/
-
-				captured_var.vartype = CapturedVar::Removed;
-
-				payload.tree_changed = true;
-			}
-			else if(captured_var.vartype == CapturedVar::Captured)
-			{
-				//TEMP HACK:
-				captured_var.vartype = CapturedVar::Removed;
-
-				payload.tree_changed = true;
-
-				// If this variable is bound to a captured var, and that captured var in turn is bound to an argument that we are substituting, then substitute the value for the variable.
-				/*const CapturedVar& captured_var = var->bound_function->captured_vars[var->bound_index];
-				if(captured_var.vartype == CapturedVar::Arg && captured_var.bound_function == payload.func_args_to_sub)
-				{
-					e = cloneASTNodeSubtree(payload.variable_substitutes[captured_var.index]);
-				}
-				else if(captured_var.vartype == CapturedVar::Let)
-				{
-					e = cloneASTNodeSubtree(captured_var.bound_let_node->expr);
-				}
-				else if(captured_var.vartype == CapturedVar::Captured)
-				{
-					//CapturedVar& bound_cap_var = captured_var.bound_function->captured_vars[captured_var.index];
-					//e = cloneASTNodeSubtree(captured_var.bound_let_node->expr);
-					// The variable was bound to a captured var, which in turn was bound to another captured var.
-					// We want to bind the variable directly to the second captured var.
-					var->bound_function = captured_var.bound_function; // payload.func_args_to_sub;
-					var->bound_index = captured_var.index;
-				}*/
-			}
+			payload.tree_changed = true;
 		}
 	}
 }
@@ -764,16 +762,16 @@ bool expressionsHaveSameValue(const ASTNodeRef& a, const ASTNodeRef& b)
 		const Variable* avar = static_cast<const Variable*>(a.getPointer());
 		const Variable* bvar = static_cast<const Variable*>(b.getPointer());
 
-		if(avar->vartype != bvar->vartype)
+		if(avar->binding_type != bvar->binding_type)
 			return false;
 
-		if(avar->vartype == Variable::ArgumentVariable)
+		if(avar->binding_type == Variable::ArgumentVariable)
 		{
 			return 
 				avar->bound_function == bvar->bound_function && 
-				avar->bound_index == bvar->bound_index;
+				avar->arg_index == bvar->arg_index;
 		}
-		else if(avar->vartype == Variable::LetVariable)
+		else if(avar->binding_type == Variable::LetVariable)
 		{
 			return 
 				avar->bound_let_node == bvar->bound_let_node && 
@@ -1870,6 +1868,11 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 		this->can_maybe_constant_fold = a_is_literal && b_is_literal;
 		//}
 	}
+	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
+	{
+		doDeadCodeElimination(a, payload, stack);
+		doDeadCodeElimination(b, payload, stack);
+	}
 
 	stack.pop_back();
 }
@@ -2133,6 +2136,11 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 			
 		this->can_maybe_constant_fold = a_is_literal && b_is_literal;
 	}
+	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
+	{
+		doDeadCodeElimination(a, payload, stack);
+		doDeadCodeElimination(b, payload, stack);
+	}
 
 	stack.pop_back();
 }
@@ -2369,6 +2377,11 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 		const bool b_is_literal = checkFoldExpression(b, payload);
 			
 		this->can_maybe_constant_fold = a_is_literal && b_is_literal;
+	}
+	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
+	{
+		doDeadCodeElimination(a, payload, stack);
+		doDeadCodeElimination(b, payload, stack);
 	}
 
 	stack.pop_back();
@@ -2776,6 +2789,11 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 		const bool b_is_literal = checkFoldExpression(b, payload);
 			
 		this->can_maybe_constant_fold = a_is_literal && b_is_literal;
+	}
+	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
+	{
+		doDeadCodeElimination(a, payload, stack);
+		doDeadCodeElimination(b, payload, stack);
 	}
 
 	stack.pop_back();
@@ -3190,6 +3208,11 @@ void BinaryBooleanExpr::traverse(TraversalPayload& payload, std::vector<ASTNode*
 			
 		this->can_maybe_constant_fold = a_is_literal && b_is_literal;
 	}
+	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
+	{
+		doDeadCodeElimination(a, payload, stack);
+		doDeadCodeElimination(b, payload, stack);
+	}
 
 	stack.pop_back();
 }
@@ -3360,6 +3383,10 @@ void UnaryMinusExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 		//this->can_constant_fold = expr->can_constant_fold && expressionIsWellTyped(*this, payload);
 		const bool is_literal = checkFoldExpression(expr, payload);
 		this->can_maybe_constant_fold = is_literal;
+	}
+	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
+	{
+		doDeadCodeElimination(expr, payload, stack);
 	}
 
 	stack.pop_back();
@@ -3692,6 +3719,10 @@ void LetASTNode::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 		for(size_t i=0; i<vars.size(); ++i)
 			payload.used_names->insert(vars[i].name);
 	}
+	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
+	{
+		doDeadCodeElimination(expr, payload, stack);
+	}
 
 	stack.pop_back();
 }
@@ -3963,6 +3994,11 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 			
 		this->can_maybe_constant_fold = a_is_literal && b_is_literal;
 	}
+	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
+	{
+		doDeadCodeElimination(a, payload, stack);
+		doDeadCodeElimination(b, payload, stack);
+	}
 
 	stack.pop_back();
 }
@@ -4152,7 +4188,7 @@ std::string LetBlock::emitOpenCLC(EmitOpenCLCodeParams& params) const
 		if(this->lets[i]->vars.size() == 1)
 		{
 			// If let expression is a pass-by-pointer argument, need to dereference it.
-			if(this->lets[i]->expr->type()->OpenCLPassByPointer() && (this->lets[i]->expr->nodeType() == ASTNode::VariableASTNodeType) && (this->lets[i]->expr.downcastToPtr<Variable>()->vartype == Variable::ArgumentVariable))
+			if(this->lets[i]->expr->type()->OpenCLPassByPointer() && (this->lets[i]->expr->nodeType() == ASTNode::VariableASTNodeType) && (this->lets[i]->expr.downcastToPtr<Variable>()->binding_type == Variable::ArgumentVariable))
 				let_expression = "*" + let_expression;
 
 			s += "\t" + this->lets[i]->type()->OpenCLCType() + " " + this->lets[i]->vars[0].name + " = " + let_expression + ";\n";
@@ -4239,6 +4275,7 @@ void LetBlock::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 			{
 				// std::cout << "Removing unused let node '" + node->vars[0].name + "'.\n";
 				i = lets.erase(i); // Remove it
+				payload.tree_changed = true;
 			}
 			else
 				i++;
@@ -4300,7 +4337,13 @@ void LetBlock::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 			const bool let_is_literal = checkFoldExpression(lets[i]->expr, payload); // NOTE: this correct?
 			this->can_maybe_constant_fold = this->can_maybe_constant_fold && let_is_literal;
 		}
+	}
+	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
+	{
+		for(unsigned int i=0; i<lets.size(); ++i)
+			doDeadCodeElimination(lets[i]->expr, payload, stack);
 
+		doDeadCodeElimination(expr, payload, stack);
 	}
 
 	stack.pop_back();
@@ -4539,6 +4582,10 @@ void ArraySubscript::traverse(TraversalPayload& payload, std::vector<ASTNode*>& 
 		const bool is_literal = checkFoldExpression(subscript_expr, payload);
 		this->can_maybe_constant_fold = is_literal;
 	}
+	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
+	{
+		doDeadCodeElimination(subscript_expr, payload, stack);
+	}
 
 	stack.pop_back();
 }
@@ -4684,6 +4731,10 @@ void NamedConstant::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 		ValueRef retval = this->value_expr->exec(vmstate);
 
 		this->value_expr = makeLiteralASTNodeFromValue(retval, this->srcLocation(), this->type());*/
+	}
+	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
+	{
+		doDeadCodeElimination(value_expr, payload, stack);
 	}
 
 	stack.pop_back();

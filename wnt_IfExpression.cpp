@@ -143,6 +143,12 @@ void IfExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 			
 		this->can_maybe_constant_fold = a_is_literal && b_is_literal && c_is_literal;
 	}
+	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
+	{
+		doDeadCodeElimination(condition, payload, stack);
+		doDeadCodeElimination(then_expr, payload, stack);
+		doDeadCodeElimination(else_expr, payload, stack);
+	}
 	
 	stack.pop_back();
 }
@@ -201,7 +207,7 @@ std::string IfExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 	params.blocks.pop_back();
 
 	// If then expression is a pass-by-pointer argument, need to dereference it.
-	if(then_expr->type()->OpenCLPassByPointer() && (then_expr->nodeType() == ASTNode::VariableASTNodeType) && (then_expr.downcastToPtr<Variable>()->vartype == Variable::ArgumentVariable))
+	if(then_expr->type()->OpenCLPassByPointer() && (then_expr->nodeType() == ASTNode::VariableASTNodeType) && (then_expr.downcastToPtr<Variable>()->binding_type == Variable::ArgumentVariable))
 		then_code = "*" + then_code;
 
 	s += "\t" + result_var_name + " = " + then_code + ";\n";
@@ -215,7 +221,7 @@ std::string IfExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 	params.blocks.pop_back();
 
 	// If else expression is a pass-by-pointer argument, need to dereference it.
-	if(else_expr->type()->OpenCLPassByPointer() && (else_expr->nodeType() == ASTNode::VariableASTNodeType) && (else_expr.downcastToPtr<Variable>()->vartype == Variable::ArgumentVariable))
+	if(else_expr->type()->OpenCLPassByPointer() && (else_expr->nodeType() == ASTNode::VariableASTNodeType) && (else_expr.downcastToPtr<Variable>()->binding_type == Variable::ArgumentVariable))
 		else_code = "*" + else_code;
 
 	s += "\t" + result_var_name + " = " + else_code + ";\n";

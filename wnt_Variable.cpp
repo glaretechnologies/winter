@@ -47,13 +47,15 @@ namespace Winter
 
 Variable::Variable(const std::string& name_, const SrcLocation& loc)
 :	ASTNode(VariableASTNodeType, loc),
-	vartype(UnboundVariable),
+	binding_type(UnboundVariable),
 	name(name_),
 	bound_function(NULL),
 	bound_let_node(NULL),
 	bound_named_constant(NULL),
-	bound_index(-1),
-	let_var_index(-1)
+	arg_index(-1),
+	let_var_index(-1),
+	free_index(-1),
+	enclosing_lambda(NULL)
 {
 	this->can_maybe_constant_fold = false;
 }
@@ -71,8 +73,6 @@ inline static const std::string varType(Variable::BindingType t)
 		return "BoundToGlobalDef";
 	else if(t == Variable::BoundToNamedConstant)
 		return "BoundToNamedConstant";
-	else if(t == Variable::CapturedVariable)
-		return "Captured";
 	else
 	{
 		assert(!"invalid var type");
@@ -83,16 +83,18 @@ inline static const std::string varType(Variable::BindingType t)
 
 struct BindInfo
 {
-	BindInfo() : root_bound_node(NULL), bound_function(NULL), bound_let_node(NULL) {}
+	BindInfo() : root_bound_node(NULL), bound_function(NULL), bound_let_node(NULL), enclosing_lambda(NULL), free_index(-1) {}
 
 	Variable::BindingType vartype;
 
 	ASTNode* root_bound_node; // Node furthest up the node stack that we are bound to, if the variable is bound through one or more captured vars.
 	FunctionDefinition* bound_function; // Function for which the variable is an argument of,
 	LetASTNode* bound_let_node;
+	FunctionDefinition* enclosing_lambda;
 
-	int bound_index;
+	int arg_index;
 	int let_var_index; // Index of the let variable bound to, for destructing assignment case may be > 0.
+	int free_index;
 };
 
 
@@ -113,7 +115,7 @@ BindInfo doBind(const std::vector<ASTNode*>& stack, int s, const std::string& na
 					// Bind this variable to the argument.
 					BindInfo bindinfo;
 					bindinfo.vartype = Variable::ArgumentVariable;
-					bindinfo.bound_index = i;
+					bindinfo.arg_index = i;
 					bindinfo.bound_function = def;
 					bindinfo.root_bound_node = def;
 					//std::cout << "Bound '" + name + "' to function arg, bound_index = " << bindinfo.bound_index << ", def = " << def->sig.toString() << std::endl;
@@ -125,36 +127,41 @@ BindInfo doBind(const std::vector<ASTNode*>& stack, int s, const std::string& na
 				assert(def->is_anon_func);
 
 				// We have reached a lambda expression.
-				// This means that the target of the current variable we are trying to bind must lie in the local environment, e.g. this is a captured var.
+				// This means that the target of the current variable we are trying to bind must lie in the local environment, e.g. this is a free var.
 				// So the variable we are trying to bind will be bound to capture result.  Now we need to determine what the capture result binds to.
-				BindInfo cap_var_bindinfo = doBind(stack, s - 1, name);
+				BindInfo bindinfo = doBind(stack, s - 1, name);
 
-				if(cap_var_bindinfo.vartype == Variable::UnboundVariable) // If binding failed:
-					return cap_var_bindinfo;
+				if(bindinfo.vartype == Variable::UnboundVariable) // If binding failed:
+					return bindinfo;
 
 				// Add this variable to the list of captured vars for this function
-				CapturedVar var;
-				if(cap_var_bindinfo.vartype == Variable::ArgumentVariable)
-					var.vartype = CapturedVar::Arg;
-				else if(cap_var_bindinfo.vartype == Variable::LetVariable)
-					var.vartype = CapturedVar::Let;
-				else if(cap_var_bindinfo.vartype == Variable::CapturedVariable)
-					var.vartype = CapturedVar::Captured;
+				CapturedVar captured_var;
+				if(bindinfo.vartype == Variable::ArgumentVariable)
+					captured_var.vartype = CapturedVar::Arg;
+				else if(bindinfo.vartype == Variable::LetVariable)
+					captured_var.vartype = CapturedVar::Let;
 				else
 				{
 					assert(0);
 				}
-				var.index = cap_var_bindinfo.bound_index;
-				var.bound_let_node = cap_var_bindinfo.bound_let_node;
-				var.bound_function = cap_var_bindinfo.bound_function;
-				def->captured_vars.push_back(var);
+				if(bindinfo.free_index >= 0)
+				{
+					captured_var.bound_function = bindinfo.enclosing_lambda;
+					captured_var.vartype = CapturedVar::Captured;
+				}
 
-				BindInfo bindinfo;
-				bindinfo.vartype = Variable::CapturedVariable;
-				bindinfo.bound_index = (int)def->captured_vars.size() - 1;
-				bindinfo.root_bound_node = cap_var_bindinfo.root_bound_node;
-				bindinfo.bound_function = def;
-				//std::cout << "Bound '" + name + "' to captured var, bound_index = " << bindinfo.bound_index << ", captured var type = " << varType(cap_var_bindinfo.vartype) << std::endl;
+
+				captured_var.arg_index = bindinfo.arg_index;
+				captured_var.let_var_index = bindinfo.let_var_index;
+				captured_var.bound_let_node = bindinfo.bound_let_node;
+				captured_var.bound_function = bindinfo.bound_function;
+				captured_var.enclosing_lambda = bindinfo.enclosing_lambda;
+				captured_var.free_index = bindinfo.free_index;
+
+				def->captured_vars.push_back(captured_var);
+				
+				bindinfo.free_index = (int)def->captured_vars.size() - 1;
+				bindinfo.enclosing_lambda = def;
 				return bindinfo;
 			}
 		}
@@ -198,7 +205,7 @@ BindInfo doBind(const std::vector<ASTNode*>& stack, int s, const std::string& na
 							BindInfo bindinfo;
 							bindinfo.vartype = Variable::LetVariable;
 							bindinfo.bound_let_node = let_block->lets[i].getPointer();
-							bindinfo.bound_index = i;
+							bindinfo.arg_index = -1;
 							bindinfo.let_var_index = (int)v;
 							//std::cout << "Bound '" + name + "' to let variable, bound_index = " << bindinfo.bound_index << std::endl;
 							return bindinfo;
@@ -218,7 +225,7 @@ BindInfo doBind(const std::vector<ASTNode*>& stack, int s, const std::string& na
 void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNode*>& stack)
 {
 	// Don't try and do the binding process again if already bound.
-	if(this->vartype != UnboundVariable)
+	if(this->binding_type != UnboundVariable)
 		return;
 
 	try
@@ -226,11 +233,13 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 		BindInfo bindinfo = doBind(stack, (int)stack.size() - 1, name);
 		if(bindinfo.vartype != UnboundVariable)
 		{
-			this->vartype = bindinfo.vartype;
-			this->bound_index = bindinfo.bound_index;
+			this->binding_type = bindinfo.vartype;
+			this->arg_index = bindinfo.arg_index;
 			this->let_var_index = bindinfo.let_var_index;
 			this->bound_function = bindinfo.bound_function;
 			this->bound_let_node = bindinfo.bound_let_node;
+			this->enclosing_lambda = bindinfo.enclosing_lambda;
+			this->free_index = bindinfo.free_index;
 			return;
 		}
 	}
@@ -256,7 +265,7 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 		if((!payload.current_named_constant || target_func_def->order_num < payload.current_named_constant->order_num) &&
 			isTargetDefinedBeforeAllInStack(payload.func_def_stack, target_func_def->order_num) && !target_func_def->isGenericFunction())
 		{
-			this->vartype = BoundToGlobalDefVariable;
+			this->binding_type = BoundToGlobalDefVariable;
 			this->bound_function = target_func_def;
 
 			// As the target function is being passed as an argument, we need a closure version of it.
@@ -275,7 +284,7 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 		if((!payload.current_named_constant || target_named_constant->order_num < payload.current_named_constant->order_num) &&
 			isTargetDefinedBeforeAllInStack(payload.func_def_stack, target_named_constant->order_num))
 		{
-			this->vartype = BoundToNamedConstant;
+			this->binding_type = BoundToNamedConstant;
 			this->bound_named_constant = name_res->second.getPointer();
 			return;
 		}
@@ -292,19 +301,19 @@ void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 		this->bindVariables(payload, stack);
 	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
-		assert(this->vartype != UnboundVariable);
-		if(this->vartype == UnboundVariable)
+		assert(this->binding_type != UnboundVariable);
+		if(this->binding_type == UnboundVariable)
 			BaseException("No such function, function argument, named constant or let definition '" + this->name + "'." + errorContext(*this, payload));
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
-		if(this->vartype == LetVariable)
+		if(this->binding_type == LetVariable)
 		{
 			const bool let_val_is_literal = checkFoldExpression(this->bound_let_node->expr, payload);
 			
 			this->can_maybe_constant_fold = let_val_is_literal;
 		}
-		else if(this->vartype == BoundToNamedConstant)
+		else if(this->binding_type == BoundToNamedConstant)
 		{
 			const bool let_val_is_literal = checkFoldExpression(this->bound_named_constant->value_expr, payload);
 			this->can_maybe_constant_fold = let_val_is_literal;
@@ -313,7 +322,7 @@ void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 	else if(payload.operation == TraversalPayload::UpdateUpRefs)
 	{
 		// When cloning a subtree of nodes, we will need to update upwards pointers to point into the new subtree.
-		switch(vartype)
+		switch(binding_type)
 		{
 		case UnboundVariable:
 			break;
@@ -335,26 +344,19 @@ void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 					bound_let_node = (LetASTNode*)updated_node;
 				break;
 			}
-		case CapturedVariable:
-			{
-				ASTNode* updated_node = payload.clone_map[bound_function];
-				if(updated_node)
-					bound_function = (FunctionDefinition*)updated_node;
-				break;
-			}
 		}
 	}
 	else if(payload.operation == TraversalPayload::DeadFunctionElimination)
 	{
 		// If this variable refers to a global function, then we will consider the global function reachable from this function.
 		// This is conservative.
-		if(this->vartype == BoundToGlobalDefVariable)
+		if(this->binding_type == BoundToGlobalDefVariable)
 		{
 			payload.reachable_nodes.insert(this->bound_function);
 			if(payload.processed_nodes.find(this->bound_function) == payload.processed_nodes.end()) // If has not been processed yet:
 				payload.nodes_to_process.push_back(this->bound_function);
 		}
-		else if(this->vartype == BoundToNamedConstant) // Similarly for named constants.
+		else if(this->binding_type == BoundToNamedConstant) // Similarly for named constants.
 		{
 			payload.reachable_nodes.insert(this->bound_named_constant);
 			if(payload.processed_nodes.find(this->bound_named_constant) == payload.processed_nodes.end()) // If has not been processed yet:
@@ -363,7 +365,7 @@ void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 	}
 	else if(payload.operation == TraversalPayload::DeadCodeElimination_ComputeAlive)
 	{
-		if(vartype == LetVariable)
+		if(binding_type == LetVariable)
 		{
 			payload.reachable_nodes.insert(this->bound_let_node); // Mark as alive
 			if(payload.processed_nodes.find(this->bound_let_node) == payload.processed_nodes.end()) // If has not been processed yet:
@@ -372,7 +374,7 @@ void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 	}
 	else if(payload.operation == TraversalPayload::SubstituteVariables)
 	{
-		if(vartype == LetVariable)
+		if(binding_type == LetVariable)
 		{
 			// Handle renaming of let variables in the cloned sub-tree.
 			const auto res = payload.new_let_var_name_map.find(std::make_pair(this->bound_let_node, this->let_var_index));
@@ -384,19 +386,46 @@ void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 	{
 		payload.used_names->insert(this->name);
 	}
+	else if(payload.operation == TraversalPayload::UnbindVariables)
+	{
+		if(this->binding_type == BoundToGlobalDefVariable || this->binding_type == BoundToNamedConstant)
+		{
+			// These bindings shouldn't change, so just leave them
+		}
+		else
+		{
+			// Set the vartype to unbound so that it can be rebound
+			this->binding_type = UnboundVariable;
+		}
+	}
+	
 }
 
 
 ValueRef Variable::exec(VMState& vmstate)
 {
-	if(this->vartype == ArgumentVariable)
+	if(this->free_index >= 0)
 	{
-		if(vmstate.func_args_start.empty() || (vmstate.func_args_start.back() + bound_index >= vmstate.argument_stack.size()))
+		// Get from closure
+
+		// Get ref to capturedVars structure of values, will be passed in as last arg to function
+		if(vmstate.argument_stack.empty())
+			throw BaseException("out of bounds");
+		ValueRef captured_struct = vmstate.argument_stack.back();
+		const StructureValue* s = checkedCast<StructureValue>(captured_struct.getPointer());
+
+		return s->fields[this->free_index];
+	}
+
+
+	if(this->binding_type == ArgumentVariable)
+	{
+		if(vmstate.func_args_start.empty() || (vmstate.func_args_start.back() + arg_index >= vmstate.argument_stack.size()))
 			throw BaseException("out of bounds");
 
-		return vmstate.argument_stack[vmstate.func_args_start.back() + bound_index];
+		return vmstate.argument_stack[vmstate.func_args_start.back() + arg_index];
 	}
-	else if(this->vartype == LetVariable)
+	else if(this->binding_type == LetVariable)
 	{
 		// Instead of computing the values and placing on let stack, let's just execute the let expressions directly.
 		// NOTE: this can be very inefficient!
@@ -414,24 +443,14 @@ ValueRef Variable::exec(VMState& vmstate)
 			return t->e[this->let_var_index];
 		}
 	}
-	else if(this->vartype == BoundToGlobalDefVariable)
+	else if(this->binding_type == BoundToGlobalDefVariable)
 	{
 		StructureValueRef captured_vars = new StructureValue(vector<ValueRef>());
 		return new FunctionValue(this->bound_function, captured_vars);
 	}
-	else if(this->vartype == BoundToNamedConstant)
+	else if(this->binding_type == BoundToNamedConstant)
 	{
 		return bound_named_constant->exec(vmstate);
-	}
-	else if(this->vartype == CapturedVariable)
-	{
-		// Get ref to capturedVars structure of values, will be passed in as last arg to function
-		if(vmstate.argument_stack.empty())
-			throw BaseException("out of bounds");
-		ValueRef captured_struct = vmstate.argument_stack.back();
-		const StructureValue* s = checkedCast<StructureValue>(captured_struct.getPointer());
-
-		return s->fields[this->bound_index];
 	}
 	else
 	{
@@ -443,7 +462,7 @@ ValueRef Variable::exec(VMState& vmstate)
 
 TypeRef Variable::type() const
 {
-	if(this->vartype == LetVariable)
+	if(this->binding_type == LetVariable)
 	{
 		const TypeRef let_var_type = this->bound_let_node->type();
 		if(this->bound_let_node->vars.size() == 1)
@@ -459,14 +478,12 @@ TypeRef Variable::type() const
 				return NULL;
 		}
 	}
-	else if(this->vartype == ArgumentVariable)
-		return this->bound_function->args[this->bound_index].type;
-	else if(this->vartype == BoundToGlobalDefVariable)
+	else if(this->binding_type == ArgumentVariable)
+		return this->bound_function->args[this->arg_index].type;
+	else if(this->binding_type == BoundToGlobalDefVariable)
 		return this->bound_function->type();
-	else if(this->vartype == BoundToNamedConstant)
+	else if(this->binding_type == BoundToNamedConstant)
 		return this->bound_named_constant->type();
-	else if(this->vartype == CapturedVariable)
-		return this->bound_function->captured_vars[this->bound_index].type();
 	else
 	{
 		//assert(!"invalid vartype.");
@@ -479,9 +496,9 @@ void Variable::print(int depth, std::ostream& s) const
 {
 	printMargin(depth, s);
 
-	s << "Var '" << this->name << "' (" + toHexString((uint64)this) + "), ";
+	s << "Var '" << this->name << "' (" + toHexString((uint64)this) + "), free_index: " << free_index << " ";
 
-	switch(vartype)
+	switch(binding_type)
 	{
 	case UnboundVariable:
 		s << "unbound\n";
@@ -490,16 +507,13 @@ void Variable::print(int depth, std::ostream& s) const
 		s << "bound to let node: " << toHexString((uint64)this->bound_let_node) + ", let_var_index=" << let_var_index << "\n";
 		break;
 	case ArgumentVariable:
-		s << "bound to arg, function: " << toHexString((uint64)this->bound_function) + " (" + this->bound_function->sig.name + "), index=" << bound_index << "\n";
+		s << "bound to arg, function: " << toHexString((uint64)this->bound_function) + " (" + this->bound_function->sig.name + "), index=" << arg_index << "\n";
 		break;
 	case BoundToGlobalDefVariable:
 		s << "bound to global function: " << toHexString((uint64)this->bound_function) + " (" + this->bound_function->sig.name + ")" << "\n";
 		break;
 	case BoundToNamedConstant:
 		s << "bound to named constant: " << toHexString((uint64)this->bound_named_constant) << "\n";
-		break;
-	case CapturedVariable:
-		s << "captured, function: " << toHexString((uint64)this->bound_function) + " (" + this->bound_function->sig.name + "), index: " << this->bound_index << "\n";
 		break;
 	};
 }
@@ -519,7 +533,39 @@ std::string Variable::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
-	if(vartype == LetVariable)
+	if(free_index >= 0)
+	{
+		// Get pointer to captured variables. structure.
+		// This pointer will be passed after the normal arguments to the function.
+
+		llvm::Value* base_cap_var_structure = LLVMTypeUtils::getNthArg(
+			params.currently_building_func,
+			params.currently_building_func_def->getCapturedVarStructLLVMArgIndex()
+		);
+
+		llvm::Type* full_cap_var_type = LLVMTypeUtils::pointerType(
+			*params.currently_building_func_def->getCapturedVariablesStructType()->LLVMType(*params.module)
+		);
+
+		llvm::Value* cap_var_structure = params.builder->CreateBitCast(
+			base_cap_var_structure,
+			full_cap_var_type, // destination type
+			"cap_var_structure" // name
+		);
+
+		// Load the value from the correct field.
+		llvm::Value* field_ptr = params.builder->CreateStructGEP(cap_var_structure, this->free_index);
+
+		llvm::Value* field = params.builder->CreateLoad(field_ptr);
+
+		// Increment reference count
+		if(params.emit_refcounting_code && shouldRefCount(params, *this))
+			this->type()->emitIncrRefCount(params, field, "Variable::emitLLVMCode for captured var " + this->name);
+
+		return field;
+	}
+
+	if(binding_type == LetVariable)
 	{
 		assert(params.let_values.find(this->bound_let_node) != params.let_values.end());
 
@@ -559,17 +605,17 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 			}
 		}
 	}
-	else if(vartype == ArgumentVariable)
+	else if(binding_type == ArgumentVariable)
 	{
 		assert(this->bound_function);
 
 		// See if we should use the overriden argument values (used for function specialisation in array fold etc..)
 		if(!params.argument_values.empty())
-			return params.argument_values[this->bound_index];
+			return params.argument_values[this->arg_index];
 
 		llvm::Value* arg = LLVMTypeUtils::getNthArg(
 			params.currently_building_func,
-			params.currently_building_func_def->getLLVMArgIndex(this->bound_index)
+			params.currently_building_func_def->getLLVMArgIndex(this->arg_index)
 		);
 
 		// Increment reference count
@@ -579,44 +625,13 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 
 		return arg;
 	}
-	else if(vartype == BoundToGlobalDefVariable)
+	else if(binding_type == BoundToGlobalDefVariable)
 	{
 		return this->bound_function->emitLLVMCode(params, ret_space_ptr);
 	}
-	else if(vartype == BoundToNamedConstant)
+	else if(binding_type == BoundToNamedConstant)
 	{
 		return this->bound_named_constant->emitLLVMCode(params, ret_space_ptr);
-	}
-	else if(vartype == CapturedVariable)
-	{
-		// Get pointer to captured variables. structure.
-		// This pointer will be passed after the normal arguments to the function.
-
-		llvm::Value* base_cap_var_structure = LLVMTypeUtils::getNthArg(
-			params.currently_building_func,
-			params.currently_building_func_def->getCapturedVarStructLLVMArgIndex()
-		);
-
-		llvm::Type* full_cap_var_type = LLVMTypeUtils::pointerType(
-			*params.currently_building_func_def->getCapturedVariablesStructType()->LLVMType(*params.module)
-		);
-
-		llvm::Value* cap_var_structure = params.builder->CreateBitCast(
-			base_cap_var_structure,
-			full_cap_var_type, // destination type
-			"cap_var_structure" // name
-		);
-
-		// Load the value from the correct field.
-		llvm::Value* field_ptr = params.builder->CreateStructGEP(cap_var_structure, this->bound_index);
-
-		llvm::Value* field = params.builder->CreateLoad(field_ptr);
-
-		// Increment reference count
-		if(params.emit_refcounting_code && shouldRefCount(params, *this))
-			this->type()->emitIncrRefCount(params, field, "Variable::emitLLVMCode for captured var " + this->name);
-
-		return field;
 	}
 	else
 	{
@@ -629,11 +644,12 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 Reference<ASTNode> Variable::clone(CloneMapType& clone_map)
 {
 	Variable* v = new Variable(name, srcLocation());
-	v->vartype = vartype;
+	v->binding_type = binding_type;
 	v->bound_function = bound_function;
 	v->bound_let_node = bound_let_node;
 	v->bound_named_constant = bound_named_constant;
-	v->bound_index = bound_index;
+	v->arg_index = arg_index;
+	v->free_index = free_index;
 	v->let_var_index = let_var_index;
 
 	clone_map.insert(std::make_pair(this, v));
@@ -643,7 +659,7 @@ Reference<ASTNode> Variable::clone(CloneMapType& clone_map)
 
 bool Variable::isConstant() const
 {
-	switch(vartype)
+	switch(binding_type)
 	{
 	case UnboundVariable:
 		return false;

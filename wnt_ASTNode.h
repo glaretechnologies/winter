@@ -92,7 +92,8 @@ public:
 		DeadCodeElimination_RemoveDead,
 		CountFunctionCalls,
 		AddAnonFuncsToLinker,
-		GetAllNamesInScope
+		GetAllNamesInScope,
+		UnbindVariables
 	};
 
 	TraversalPayload(Operation e) : 
@@ -123,6 +124,7 @@ public:
 	FunctionDefinition* func_args_to_sub; // This is the function whose body is getting inlined into the call site.
 	std::vector<Reference<ASTNode> > variable_substitutes; // Used in SubstituteVariables pass
 	std::map<std::pair<ASTNode*, int>, std::string> new_let_var_name_map;
+	int new_order_num;
 
 	Reference<ASTNodeVisitor> custom_visitor;
 
@@ -135,9 +137,9 @@ public:
 	CloneMapType clone_map;
 
 	// Used in DeadFunctionElimination and DeadCodeElimination:
-	std::set<ASTNode*> reachable_nodes;
+	std::unordered_set<ASTNode*> reachable_nodes;
 	std::vector<ASTNode*> nodes_to_process;
-	std::set<ASTNode*> processed_nodes;
+	std::unordered_set<ASTNode*> processed_nodes;
 
 	std::map<FunctionDefinition*, int> calls_to_func_count;
 
@@ -164,6 +166,7 @@ void addMetaDataCommentToInstruction(EmitLLVMCodeParams& params, llvm::Instructi
 void emitDestructorOrDecrCall(EmitLLVMCodeParams& params, const ASTNode& e, llvm::Value* value, const std::string& comment);
 bool mayEscapeCurrentlyBuildingFunction(EmitLLVMCodeParams& params, const TypeRef& type);
 void replaceAllUsesWith(Reference<ASTNode>& old_node, Reference<ASTNode>& new_node);
+void doDeadCodeElimination(Reference<ASTNode>& e, TraversalPayload& payload, std::vector<ASTNode*>& stack);
 
 // Clones sub-tree, and updates up-refs to point into new subtree where possible.
 Reference<ASTNode> cloneASTNodeSubtree(Reference<ASTNode>& n);

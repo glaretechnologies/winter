@@ -31,20 +31,22 @@ public:
 	{
 		Let,
 		Arg,
-		Captured, // we are capturing a captured var from an enclosing lambda expression :)
-		Removed // deleted. Left in the vector so that indices don't change.
+		Captured // we are capturing a captured var from an enclosing lambda expression :)
 	};
 
 	TypeRef type() const;
 
 
 	CapturedVarType vartype;
-	int index; // Argument index, or index of let variable inside let block, or index of captured var.
+	int arg_index; // Argument index
 	//int let_frame_offset; // how many let blocks we need to ignore before we get to the let block with the var we are bound to.
+	int free_index;
+	int let_var_index;
 
 
 	FunctionDefinition* bound_function; // Function for which the variable is an argument of,
 	LetASTNode* bound_let_node;
+	FunctionDefinition* enclosing_lambda;
 };
 
 

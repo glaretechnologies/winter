@@ -181,6 +181,11 @@ void VArrayLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 		//FunctionDefinitionRef def = payload.linker->findMatchingFunctionSimple(FunctionSignature("allocateVArray", vector<TypeRef>(2, new Int(64))));
 		//payload.reachable_defs.insert(def.getPointer());
 	}
+	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
+	{
+		for(size_t i=0; i<elements.size(); ++i)
+			doDeadCodeElimination(elements[i], payload, stack);
+	}
 }
 
 
