@@ -20,7 +20,7 @@ class ExternalFunction;
 class Linker
 {
 public:
-	Linker(bool hidden_voidptr_arg, void* env);
+	Linker(bool hidden_voidptr_arg, bool try_coerce_int_to_double_first, void* env);
 	~Linker();
 
 
@@ -72,6 +72,7 @@ public:
 	ExternalFuncMapType external_functions;
 
 	bool hidden_voidptr_arg;
+	bool try_coerce_int_to_double_first;
 	void* env;
 };
 

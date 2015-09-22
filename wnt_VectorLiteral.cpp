@@ -258,8 +258,8 @@ void VectorLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 			if(*elem_type != *this->elements[i]->type())
 				throw BaseException("Vector element did not have required type " + elem_type->toString() + "." + errorContext(*this->elements[i], payload));
 
-		if(!(elem_type->getType() == Type::IntType || elem_type->getType() == Type::FloatType))
-			throw BaseException("Vector types can only contain float or int elements." + errorContext(*this, payload));
+		if(!(elem_type->getType() == Type::IntType || elem_type->getType() == Type::FloatType || elem_type->getType() == Type::DoubleType))
+			throw BaseException("Vector types can only contain float, double or int elements." + errorContext(*this, payload));
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{

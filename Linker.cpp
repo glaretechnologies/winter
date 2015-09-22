@@ -17,8 +17,9 @@ namespace Winter
 {
 
 
-Linker::Linker(bool hidden_voidptr_arg_, void* env_)
+Linker::Linker(bool hidden_voidptr_arg_, bool try_coerce_int_to_double_first_, void* env_)
 :	hidden_voidptr_arg(hidden_voidptr_arg_),
+	try_coerce_int_to_double_first(try_coerce_int_to_double_first_),
 	env(env_)
 {}
 
@@ -290,9 +291,10 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 	// Handle float->float, or vector<float, N> -> vector<float, N> functions
 	if(sig.param_types.size() == 1)
 	{
-		if(
-			(sig.param_types[0]->getType() == Type::FloatType || // If float
-			(sig.param_types[0]->getType() == Type::VectorTypeType && static_cast<const VectorType*>(sig.param_types[0].getPointer())->elem_type->getType() == Type::FloatType))) // or vector of floats
+		if(sig.param_types[0]->getType() == Type::FloatType || sig.param_types[0]->getType() == Type::DoubleType || // if float or double
+			(sig.param_types[0]->getType() == Type::VectorTypeType && static_cast<const VectorType*>(sig.param_types[0].getPointer())->elem_type->getType() == Type::FloatType) || // or vector of floats
+			(sig.param_types[0]->getType() == Type::VectorTypeType && static_cast<const VectorType*>(sig.param_types[0].getPointer())->elem_type->getType() == Type::DoubleType) // or vector of doubles
+			)
 		{
 
 			if(sig.name == "floor")
@@ -644,7 +646,8 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 			}
 		}
 
-		if(sig.param_types[0]->getType() == Type::FloatType && sig.param_types[1]->getType() == Type::FloatType)
+		if(	(sig.param_types[0]->getType() == Type::FloatType && sig.param_types[1]->getType() == Type::FloatType) ||
+			(sig.param_types[0]->getType() == Type::DoubleType && sig.param_types[1]->getType() == Type::DoubleType))
 		{
 			// There is a problem with LLVM 3.3 and earlier with the pow intrinsic getting turned into exp2f() when the first argument is 2.
 			// So for now just use our own pow() external function.
@@ -760,7 +763,8 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 			}
 
 
-			if(static_cast<const VectorType*>(sig.param_types[0].getPointer())->elem_type->getType() == Type::FloatType && // vector of floats
+			if((static_cast<const VectorType*>(sig.param_types[0].getPointer())->elem_type->getType() == Type::FloatType || // vector of floats
+				static_cast<const VectorType*>(sig.param_types[0].getPointer())->elem_type->getType() == Type::DoubleType) && // or vector of doubles
 				(*sig.param_types[0] == *sig.param_types[1])) // and argument types are the same
 			{
 				if(sig.name == "pow")
@@ -798,7 +802,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 						"dot", // name
 						args, // args
 						NULL, // body expr
-						new Float(), // return type
+						static_cast<const VectorType*>(sig.param_types[0].getPointer())->elem_type, // return type
 						new DotProductBuiltInFunc(sig.param_types[0].downcast<VectorType>()) // built in impl.
 					);
 

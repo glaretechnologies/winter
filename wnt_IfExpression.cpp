@@ -88,6 +88,12 @@ void IfExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 				doImplicitIntToFloatTypeCoercionForFloatReturn(this->then_expr, payload);
 				doImplicitIntToFloatTypeCoercionForFloatReturn(this->else_expr, payload);
 			}
+
+			if(f->declared_return_type.nonNull() && f->declared_return_type->getType() == Type::DoubleType)
+			{
+				doImplicitIntToDoubleTypeCoercionForDoubleReturn(this->then_expr, payload);
+				doImplicitIntToDoubleTypeCoercionForDoubleReturn(this->else_expr, payload);
+			}
 		}
 	}
 	

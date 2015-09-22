@@ -33,6 +33,7 @@ public:
 	{
 		GenericTypeType,
 		FloatType,
+		DoubleType,
 		IntType,
 		StringType,
 		CharTypeType,
@@ -97,6 +98,20 @@ class Float : public Type
 public:
 	Float() : Type(FloatType) {}
 	virtual const std::string toString() const { return "float"; }
+	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
+	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
+	virtual llvm::Type* LLVMType(llvm::Module& module) const;
+	virtual const std::string OpenCLCType() const;
+	virtual llvm::Value* getInvalidLLVMValue(llvm::Module& module) const; // For array out-of-bounds
+	virtual Reference<Value> getInvalidValue() const; // For array out-of-bounds
+};
+
+
+class Double : public Type
+{
+public:
+	Double() : Type(DoubleType) {}
+	virtual const std::string toString() const { return "double"; }
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 	virtual llvm::Type* LLVMType(llvm::Module& module) const;

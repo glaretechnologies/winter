@@ -233,7 +233,11 @@ void Lexer::parseNumericLiteral(const SourceBufferRef& buffer, Parser& parser, s
 		if(!parser.parseDouble(x))
 			throw LexerExcep("Failed to parse real." + errorPosition(buffer, parser.currentPos()));
 
-		tokens_out.push_back(Reference<TokenBase>(new FloatLiteralToken((float)x, char_index)));
+		const char lastchar = parser.prev();
+		char suffix = 0;
+		if(lastchar == 'f' || lastchar == 'd')
+			suffix = lastchar;
+		tokens_out.push_back(Reference<TokenBase>(new FloatLiteralToken(x, suffix, char_index)));
 	}
 	else
 	{
@@ -541,7 +545,7 @@ void Lexer::test()
 	testAssert(t.size() == 8);
 
 	testAssert(t[0]->getType() == FLOAT_LITERAL_TOKEN);
-	testAssert(::epsEqual(t[0]->getFloatLiteralValue(), -34.546e2f));
+	testAssert(::epsEqual(t[0]->getFloatLiteralValue(), -34.546e2));
 
 	testAssert(t[1]->getType() == STRING_LITERAL_TOKEN);
 	testAssert(t[1]->getStringLiteralValue() == "hello");

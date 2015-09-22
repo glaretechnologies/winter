@@ -56,6 +56,12 @@ static bool epsEqual(float x, float y)
 }
 
 
+static bool epsEqual(double x, double y)
+{
+	return std::fabs(x - y) < 1.0e-5;
+}
+
+
 struct TestEnv
 {
 	float val;
@@ -119,6 +125,8 @@ static TestResults testMainFloat(const std::string& src, float target_return_val
 		VMConstructionArgs vm_args;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
 		vm_args.env = &test_env;
+		vm_args.floating_point_literals_default_to_double = false;
+		vm_args.real_is_double = false;
 
 		{
 			ExternalFunctionRef f(new ExternalFunction());
@@ -214,6 +222,7 @@ static void testMainFloatArgInvalidProgram(const std::string& src)
 		VMConstructionArgs vm_args;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
 		vm_args.env = &test_env;
+		vm_args.real_is_double = false;
 
 		const FunctionSignature mainsig("main", std::vector<TypeRef>(1, TypeRef(new Float())));
 
@@ -256,6 +265,9 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
 		vm_args.env = &test_env;
 		vm_args.allow_unsafe_operations = (test_flags & ALLOW_UNSAFE) != 0;
+		vm_args.floating_point_literals_default_to_double = false;
+		vm_args.try_coerce_int_to_double_first = false;
+		vm_args.real_is_double = false;
 
 		{
 			ExternalFunctionRef f(new ExternalFunction());
@@ -462,9 +474,238 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 }
 
 
+static TestResults doTestMainDoubleArg(const std::string& src, double argument, double target_return_val, bool check_constant_folded_to_literal, uint32 test_flags)
+{
+	std::cout << "===================== Winter doTestMainDoubleArg() =====================" << std::endl;
+	try
+	{
+		TestEnv test_env;
+		test_env.val = 10;
+
+		VMConstructionArgs vm_args;
+		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
+		vm_args.env = &test_env;
+		vm_args.allow_unsafe_operations = (test_flags & ALLOW_UNSAFE) != 0;
+		vm_args.floating_point_literals_default_to_double = true;
+		vm_args.real_is_double = true;
+
+		{
+			ExternalFunctionRef f(new ExternalFunction());
+			f->func = (void*)testExternalFunc;
+			f->interpreted_func = testExternalFuncInterpreted;
+			f->return_type = TypeRef(new Float());
+			f->sig = FunctionSignature("testExternalFunc", std::vector<TypeRef>(1, TypeRef(new Float())));
+			vm_args.external_functions.push_back(f);
+		}
+		const FunctionSignature mainsig("main", std::vector<TypeRef>(1, TypeRef(new Double())));
+
+		vm_args.entry_point_sigs.push_back(mainsig);
+
+		VirtualMachine vm(vm_args);
+
+		// Get main function
+		
+		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
+		if(maindef.isNull())
+			throw BaseException("Failed to find function " + mainsig.toString());
+		if(maindef->returnType()->getType() != Type::DoubleType)
+			throw BaseException("main did not return double.");
+
+		//if(check_constant_folded_to_literal)
+		//	if(maindef->body.isNull() || maindef->body->nodeType() != ASTNode::DoubleLiteralType) // body may be null if it is a built-in function (e.g. elem())
+		//		throw BaseException("main was not folded to a float literal.");
+
+		double(WINTER_JIT_CALLING_CONV*f)(double, void*) = (double(WINTER_JIT_CALLING_CONV*)(double, void*))vm.getJittedFunction(mainsig);
+
+
+
+		// Call the JIT'd function
+		const double jitted_result = f(argument, &test_env);
+
+		// Check JIT'd result.
+		if(!epsEqual(jitted_result, target_return_val))
+		{
+			std::cerr << "Test failed: JIT'd main returned " << jitted_result << ", target was " << target_return_val << std::endl;
+			assert(0);
+			exit(1);
+		}
+
+		VMState vmstate;
+		vmstate.func_args_start.push_back(0);
+		vmstate.argument_stack.push_back(new DoubleValue(argument));
+		//vmstate.argument_stack.push_back(new VoidPtrValue(&test_env));
+
+		ValueRef retval = maindef->invoke(vmstate);
+
+		vmstate.func_args_start.pop_back();
+		DoubleValue* val = dynamic_cast<DoubleValue*>(retval.getPointer());
+		if(!val)
+		{
+			std::cerr << "main() Return value was of unexpected type." << std::endl;
+			assert(0);
+			exit(1);
+		}
+
+		if(!epsEqual(val->value, target_return_val))
+		{
+			std::cerr << "Test failed: main returned " << val->value << ", target was " << target_return_val << std::endl;
+			assert(0);
+			exit(1);
+		}
+
+		//delete retval;
+
+
+
+
+		//============================= New: test with OpenCL ==============================
+		const bool TEST_OPENCL = false;
+		if(!(test_flags & INVALID_OPENCL) && TEST_OPENCL)
+		{
+#if USE_OPENCL
+			OpenCL* opencl = getGlobalOpenCL();
+
+			const gpuDeviceInfo& gpu_device = opencl->getDeviceInfo()[0];
+
+			cl_context context;
+			cl_command_queue command_queue;
+			opencl->deviceInit(
+				gpu_device,
+				/*enable_profiling=*/false, 
+				context,
+				command_queue
+			);
+
+			Winter::VirtualMachine::BuildOpenCLCodeArgs opencl_args;
+			std::string opencl_code = vm.buildOpenCLCodeCombined(opencl_args);
+
+			// OpenCL keeps complaining about 'main must return type int', so rename main to main_.
+			//opencl_code = StringUtils::replaceAll(opencl_code, "main", "main_"); // NOTE: slightly dodgy string-based renaming.
+
+			const std::string extended_source = opencl_code + "\n" + "__kernel void main_kernel(float x, __global double * const restrict output_buffer) { \n" + 
+				"	output_buffer[0] = main_double_(x);		\n" + 
+				" }";
+
+			//std::cout << extended_source << std::endl;
+			{
+				std::ofstream f("opencl_source.c");
+				f << extended_source;
+			}
+
+			OpenCLBuffer output_buffer(context, sizeof(float), CL_MEM_READ_WRITE);
+
+			std::vector<std::string> program_lines = ::split(extended_source, '\n');
+			for(size_t i=0; i<program_lines.size(); ++i)
+				program_lines[i].push_back('\n');
+
+			std::string options;
+			//std::string options = "-save-temps";
+			//options += " -fbin-llvmir";//TEMP
+
+			// Compile and build program.
+			cl_program program = opencl->buildProgram(
+				program_lines,
+				context,
+				gpu_device.opencl_device,
+				options
+			);
+
+
+			opencl->dumpBuildLog(program, gpu_device.opencl_device); 
+
+			// Create kernel
+			cl_int result;
+			cl_kernel kernel = opencl->clCreateKernel(program, "main_kernel", &result);
+
+			if(!kernel)
+				throw Indigo::Exception("clCreateKernel failed");
+
+
+			if(opencl->clSetKernelArg(kernel, 0, sizeof(cl_double), &argument) != CL_SUCCESS) throw Indigo::Exception("clSetKernelArg failed 0");
+			if(opencl->clSetKernelArg(kernel, 1, sizeof(cl_mem), &output_buffer.getDevicePtr()) != CL_SUCCESS) throw Indigo::Exception("clSetKernelArg failed 1");
+
+			// Launch the kernel
+			const size_t block_size = 1;
+			const size_t global_work_size = 1;
+
+			result = opencl->clEnqueueNDRangeKernel(
+				command_queue,
+				kernel,
+				1,					// dimension
+				NULL,				// global_work_offset
+				&global_work_size,	// global_work_size
+				&block_size,		// local_work_size
+				0,					// num_events_in_wait_list
+				NULL,				// event_wait_list
+				NULL				// event
+			);
+			if(result != CL_SUCCESS)
+				throw Indigo::Exception("clEnqueueNDRangeKernel failed: " + OpenCL::errorString(result));
+
+
+			SSE_ALIGN double host_output_buffer[1];
+
+			// Read back result
+			result = opencl->clEnqueueReadBuffer(
+				command_queue,
+				output_buffer.getDevicePtr(), // buffer
+				CL_TRUE, // blocking read
+				0, // offset
+				sizeof(double), // size in bytes
+				host_output_buffer, // host buffer pointer
+				0, // num events in wait list
+				NULL, // wait list
+				NULL //&readback_event // event
+			);
+			if(result != CL_SUCCESS)
+				throw Indigo::Exception("clEnqueueReadBuffer failed: " + OpenCL::errorString(result));
+
+			// Free the context and command queue for this device.
+			opencl->deviceFree(context, command_queue);
+
+			const double opencl_result = host_output_buffer[0];
+
+			if(!epsEqual(opencl_result, target_return_val))
+			{
+				std::cerr << "Test failed: OpenCL returned " << opencl_result << ", target was " << target_return_val << std::endl;
+				assert(0);
+				exit(1);
+			}
+#endif // #if USE_OPENCL
+		}
+
+		TestResults res;
+		res.stats = vm.getProgramStats();
+		res.maindef = maindef;
+		return res;
+	}
+	catch(Winter::BaseException& e)
+	{
+		std::cerr << e.what() << std::endl;
+		assert(0);
+		exit(1);
+	}
+	catch(Indigo::Exception& e)
+	{
+		std::cerr << e.what() << std::endl;
+		assert(0);
+		exit(1);
+	}
+}
+
+
 static TestResults testMainFloatArg(const std::string& src, float argument, float target_return_val, uint32 test_flags = 0)
 {
 	return doTestMainFloatArg(src, argument, target_return_val,
+		false, // check constant-folded to literal
+		test_flags
+	);
+}
+
+
+static TestResults testMainDoubleArg(const std::string& src, double argument, double target_return_val, uint32 test_flags = 0)
+{
+	return doTestMainDoubleArg(src, argument, target_return_val,
 		false, // check constant-folded to literal
 		test_flags
 	);
@@ -1300,6 +1541,8 @@ static void testFloat4StructPairRetFloat(const std::string& src, const Float4Str
 	{
 		VMConstructionArgs vm_args;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
+		vm_args.floating_point_literals_default_to_double = false;
+		vm_args.real_is_double = false;
 
 
 		// Create Float4Struct type
@@ -1488,6 +1731,7 @@ static void testFloat4Struct(const std::string& src, const Float4Struct& a, cons
 	{
 		VMConstructionArgs vm_args;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
+		vm_args.floating_point_literals_default_to_double = false;
 
 		std::vector<std::string> field_names;
 		field_names.push_back("v");
@@ -1673,6 +1917,7 @@ static void testFloatArray(const std::string& src, const float* a, const float* 
 	{
 		VMConstructionArgs vm_args;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
+		vm_args.floating_point_literals_default_to_double = false;
 
 		// Get main function
 		const FunctionSignature mainsig(

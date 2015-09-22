@@ -150,11 +150,13 @@ public:
 
 void printMargin(int depth, std::ostream& s);
 bool isIntExactlyRepresentableAsFloat(int64 x);
+bool isIntExactlyRepresentableAsDouble(int64 x);
 bool checkFoldExpression(Reference<ASTNode>& e, TraversalPayload& payload); // Returns true if folding took place or e is already a literal.
 void checkSubstituteVariable(Reference<ASTNode>& e, TraversalPayload& payload);
 void checkInlineExpression(Reference<ASTNode>& e, TraversalPayload& payload, std::vector<ASTNode*>& stack);
 void convertOverloadedOperators(Reference<ASTNode>& e, TraversalPayload& payload, std::vector<ASTNode*>& stack);
 void doImplicitIntToFloatTypeCoercionForFloatReturn(Reference<ASTNode>& expr, TraversalPayload& payload);
+void doImplicitIntToDoubleTypeCoercionForDoubleReturn(Reference<ASTNode>& expr, TraversalPayload& payload);
 const std::string errorContext(const ASTNode* n);
 const std::string errorContext(const ASTNode& n);
 const std::string errorContext(const ASTNode& n, TraversalPayload& payload);
@@ -279,6 +281,7 @@ public:
 		FunctionExpressionType,
 		VariableASTNodeType,
 		FloatLiteralType,
+		DoubleLiteralType,
 		IntLiteralType,
 		BoolLiteralType,
 		StringLiteralType,
@@ -426,6 +429,24 @@ public:
 	virtual bool isConstant() const { return true; }
 
 	float value;
+};
+
+
+class DoubleLiteral : public ASTNode
+{
+public:
+	DoubleLiteral(double v, const SrcLocation& loc) : ASTNode(DoubleLiteralType, loc), value(v) { this->can_maybe_constant_fold = true; }
+
+	virtual ValueRef exec(VMState& vmstate);
+	virtual TypeRef type() const { return TypeRef(new Double()); }
+	virtual void print(int depth, std::ostream& s) const;
+	virtual std::string sourceString() const;
+	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
+	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
+	virtual bool isConstant() const { return true; }
+
+	double value;
 };
 
 

@@ -57,6 +57,18 @@ public:
 typedef Reference<FloatValue> FloatValueRef;
 
 
+class DoubleValue : public Value
+{
+public:
+	DoubleValue(double v) : value(v) {}
+	virtual Value* clone() const { return new DoubleValue(value); }
+	virtual const std::string toString() const;
+	virtual llvm::Constant* getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const;
+	double value;
+};
+typedef Reference<DoubleValue> DoubleValueRef;
+
+
 class BoolValue : public Value
 {
 public:

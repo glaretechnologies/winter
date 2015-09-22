@@ -594,6 +594,7 @@ public:
 VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 :	linker(
 		true, // hidden_voidptr_arg
+		args.try_coerce_int_to_double_first,
 		args.env
 	),
 	env(args.env),
@@ -1103,7 +1104,7 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 
 	linker.addExternalFunctions(this->external_functions);
 
-	LangParser parser;
+	LangParser parser(args.floating_point_literals_default_to_double, args.real_is_double);
 	for(size_t i=0; i<source_buffers.size(); ++i)
 	{
 		std::vector<Reference<TokenBase> > tokens;

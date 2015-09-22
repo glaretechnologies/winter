@@ -182,12 +182,10 @@ void LanguageTests::run()
 
 	//useKnownReturnRefCountOptimsiation(3);
 
-
 	//fuzzTests();
 	//////////////////
 
 
-	
 	// ===================================================================
 	// Check equality for types, and that they work in sets etc.. correctly.
 	// ===================================================================
@@ -336,6 +334,15 @@ void LanguageTests::run()
 	//testMainFloatArg("def main(float x) float : let a = [1.0, 2.0, 3.0, 4.0]a in a[truncateToInt(x)]", 2.1f, 3.0f, ALLOW_UNSAFE);
 
 
+	// ===================================================================
+	// Test 'real' type.
+	// Will be aliased to 'float' for float tests, and to 'double'
+	// for double tests.
+	// ===================================================================
+	testMainFloatArg("def main(real x) real :  x", 1.0f, 1.0f);
+	testMainDoubleArg("def main(real x) real :  x", 1.0f, 1.0f);
+
+
 
 	// ===================================================================
 	// Test variable shadowing
@@ -377,7 +384,8 @@ void LanguageTests::run()
 	// ===================================================================
 	// Test function inlining
 	// ===================================================================
-	testMainIntegerArg("def f(int y) : y + 1    def main(int x) int : f(x)", 1, 2); // f should be inlined.
+	results = testMainIntegerArg("def f(int y) : y + 1    def main(int x) int : f(x)", 1, 2); // f should be inlined.
+	testAssert(results.maindef->body->nodeType() == ASTNode::AdditionExpressionType);
 
 	testMainFloatArg("def f(float b) float : let x = b in x					\n\
 		def main(float x) float : f(x * 10)									\n\
@@ -1954,6 +1962,12 @@ void LanguageTests::run()
 	testMainFloatArg("def main(float x) float : pow(x, 3)", 2.0f, 8.f);
 	testMainFloatArg("def main(float x) float : pow(2, x)", 2.0f, 4.f);
 
+	// Test double->float coercion for an argument to a built-in function like sqrt
+	testMainDoubleArg("def main(double x) double : sqrt(4)",   2.0, 2.0);
+	testMainDoubleArg("def main(double x) double : pow(2, 3)", 2.0, 8.0);
+	testMainDoubleArg("def main(double x) double : pow(x, 3)", 2.0, 8.0);
+	testMainDoubleArg("def main(double x) double : pow(2, x)", 2.0, 4.0);
+
 	// Test int->float coercion for an argument to a function
 	testMainFloatArg("def f(float x) float : x*x                   def main(float x) float : f(3)", 2.0f, 9.f);
 	testMainFloatArg("def f(float x) float : x*x                   def main(float x) float : f(x + 1)", 2.0f, 9.f);
@@ -1965,19 +1979,30 @@ void LanguageTests::run()
 	testMainFloatArg("def f(float x, float y) float : x + y        def main(float x) float : f(1, x)", 2.0f, 3.f);
 	testMainFloatArg("def f(float x, float y) float : x + y        def main(float x) float : f(x, 1)", 2.0f, 3.f);
 
+	testMainDoubleArg("def f(double x) double : x*x                   def main(double x) double : f(3)", 2.0f, 9.f);
+	testMainDoubleArg("def f(double x) double : x*x                   def main(double x) double : f(x + 1)", 2.0f, 9.f);
+
 	testMainFloatArg("def main(float x) float : sqrt(2 + x)", 2.0f, 2.0f);
 
 	// Test int->float coercion in an if statement as the function body.
 	testMainFloatArg("def main(float x) float : if(true, 3, 4)", 2.0f, 3.0f);
 	testMainFloatArg("def main(float x) float : if(x < 10.0, 3, 4)", 2.0f, 3.0f);
+
+	testMainDoubleArg("def main(double x) double : if(true, 3, 4)", 2.0f, 3.0f);
+	testMainDoubleArg("def main(double x) double : if(x < 10.0, 3, 4)", 2.0f, 3.0f);
 	
 	testMainFloatArg("def main(float x) float : 3", 2.0f, 3.0f);
-	testMainFloatArg("def main(float x) float : 3", 2.0f, 3.0f);
+	testMainDoubleArg("def main(double x) double : 3", 2.0f, 3.0f);
 
 	testMainFloatArg("def main(float x) float : x + 1", 2.0f, 3.0f);
 	testMainFloatArg("def main(float x) float : 1 + x", 2.0f, 3.0f);
 	testMainFloatArg("def main(float x) float : 2 * (x + 1)", 2.0f, 6.0f);
 	testMainFloatArg("def main(float x) float : 2 * (1 + x)", 2.0f, 6.0f);
+
+	testMainDoubleArg("def main(double x) double : x + 1", 2.0f, 3.0f);
+	testMainDoubleArg("def main(double x) double : 1 + x", 2.0f, 3.0f);
+	testMainDoubleArg("def main(double x) double : 2 * (x + 1)", 2.0f, 6.0f);
+	testMainDoubleArg("def main(double x) double : 2 * (1 + x)", 2.0f, 6.0f);
 
 	testMainFloatArg("def main(float x) float : (1 + x) + (2 + x) * 3", 2.0f, 15.0f);
 
@@ -2950,9 +2975,13 @@ TEMP OPENCL
 		10.0f, 12.0f);
 
 
+
 	// abs
 	testMainFloatArg("def main(float x) float : abs(x)", 9.0f, 9.0f);
 	testMainFloatArg("def main(float x) float : abs(x)", -9.0f, 9.0f);
+
+	testMainDoubleArg("def main(double x) double : abs(x)", 9.0, 9.0);
+	testMainDoubleArg("def main(double x) double : abs(x)", -9.0, 9.0);
 
 
 	// Test abs on vector
@@ -3003,6 +3032,8 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 	testMainFloatArgCheckConstantFolded("def main(float x) float : sqrt(9)", 9.0f, std::sqrt(9.0f));
 	testMainFloatArgCheckConstantFolded("def main(float x) float : sqrt(9.0)", 9.0f, std::sqrt(9.0f));
 
+	testMainDoubleArg("def main(double x) double : sqrt(x)", 9.0, 3.0);
+
 	// Test sqrt on vector
 	{
 		Float4Struct a(1.0f, 2.0f, 3.0f, 4.0f);
@@ -3021,6 +3052,8 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 	testMainFloatArg("def main(float x) float : pow(2.4, x)", 3.0f, std::pow(2.4f, 3.0f));
 	testMainFloatArg("def main(float x) float : pow(2.0, x)", 3.0f, std::pow(2.0f, 3.0f));
 	testMainFloatArgCheckConstantFolded("def main(float x) float : pow(2.0, 3.0)", 3.0f, std::pow(2.0f, 3.0f));
+
+	testMainDoubleArg("def main(double x) double : pow(2.0, x)", 3.0, std::pow(2.0, 3.0));
 
 	// Test pow on vector
 	{
@@ -3041,6 +3074,8 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 	testMainFloatArg("def main(float x) float : sin(x)", 1.0f, std::sin(1.0f));
 	testMainFloatArgCheckConstantFolded("def main(float x) float : sin(1.0)", 1.0f, std::sin(1.0f));
 
+	testMainDoubleArg("def main(double x) double : sin(x)", 1.0, std::sin(1.0));
+
 	// Test sin on vector
 	{
 		Float4Struct a(1.0f, 2.0f, 3.0f, 4.0f);
@@ -3058,6 +3093,8 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 	// exp
 	testMainFloatArg("def main(float x) float : exp(x)", 3.0f, std::exp(3.0f));
 	testMainFloatArgCheckConstantFolded("def main(float x) float : exp(3.0)", 3.0f, std::exp(3.0f));
+
+	testMainDoubleArg("def main(double x) double : exp(x)", 3.0, std::exp(3.0));
 
 	// Test exp on vector
 	{
@@ -3077,6 +3114,8 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 	testMainFloatArg("def main(float x) float : log(x)", 3.0f, std::log(3.0f));
 	testMainFloatArgCheckConstantFolded("def main(float x) float : log(3.0)", 3.0f, std::log(3.0f));
 
+	testMainDoubleArg("def main(double x) double : log(x)", 3.0, std::log(3.0));
+
 	// Test exp on vector
 	{
 		Float4Struct a(1.0f, 2.0f, 3.0f, 4.0f);
@@ -3094,6 +3133,8 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 	// cos
 	testMainFloatArg("def main(float x) float : cos(x)", 1.0f, std::cos(1.0f));
 	testMainFloatArgCheckConstantFolded("def main(float x) float : cos(1.0)", 1.0f, std::cos(1.0f));
+
+	testMainDoubleArg("def main(double x) double : cos(x)", 1.0, std::cos(1.0));
 
 	// Test cos on vector
 	{
@@ -3116,6 +3157,9 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 	testMainFloatArg("def main(float x) float : floor(x)", -2.3f, -3.0f);
 	testMainFloatArgCheckConstantFolded("def main(float x) float : floor(-2.3)", -2.3f, -3.0f);
 
+	testMainDoubleArg("def main(double x) double : floor(x)", 2.3, 2.0);
+	testMainDoubleArg("def main(double x) double : floor(x)", -2.3, -3.0);
+
 	// Test floor on vector
 	{
 		Float4Struct a(-1.2f, -0.2f, 0.2f, 1.2f);
@@ -3134,6 +3178,9 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 	testMainFloatArg("def main(float x) float : ceil(x)", 2.3f, 3.0f);
 	testMainFloatArg("def main(float x) float : ceil(x)", -2.3f, -2.0f);
 	testMainFloatArgCheckConstantFolded("def main(float x) float : ceil(-2.3)", -2.3f, -2.0f);
+
+	testMainDoubleArg("def main(double x) double : ceil(x)", 2.3, 3.0);
+	testMainDoubleArg("def main(double x) double : ceil(x)", -2.3, -2.0);
 
 	// Test ceil on vector
 	{
@@ -3289,7 +3336,9 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 					 let v = [x, x, x, x]v in\
 					 dot(v, v)", 2.0f, 16.0f);
 
-
+	testMainDoubleArg("	def main(double x) double : \
+					 let v = [x, x, x, x]v in\
+					 dot(v, v)", 4.0, 64.0);
 	
 
 	// Test avoidance of circular variable definition: 
@@ -4585,6 +4634,12 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 	// Test vector being returned from a function
 	testMainFloat("	def f() vector<float, 4> : [1.0, 2.0, 3.0, 4.0]v \
 					def main() float : e2(f())", 3.0f);
+
+	testMainDoubleArg("def f() vector<double, 4> : [1.0, 2.0, 3.0, 4.0]v \
+					def main(double x) double : e2(f())", 3.0f, 3.0f);
+
+	testMainDoubleArg("def f(double x) vector<double, 4> : [x + 1.0, x + 2.0, x + 3.0, x + 4.0]v \
+					def main(double x) double : e2(f(x))", 3.0f, 6.0f);
 
 	// Test vector addition
 	testMainFloat("	def main() float : \

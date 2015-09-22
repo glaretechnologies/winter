@@ -102,6 +102,20 @@ bool isIntExactlyRepresentableAsFloat(int64 x)
 }
 
 
+bool isIntExactlyRepresentableAsDouble(int64 x)
+{
+	//return ((int64)((float)x)) == x;
+
+	// Make the floating point value pass through an SSE register so it gets rounded to 64-bits.
+	// Otherwise it may just get stored in a higher-precision float register.
+	const double y = (double)x;
+	double y2;
+	_mm_store_sd(&y2, _mm_load_sd(&y));
+
+	return (int64)y2 == x;
+}
+
+
 bool expressionIsWellTyped(ASTNode& e, TraversalPayload& payload_)
 {
 	// NOTE: do this without exceptions?
@@ -153,6 +167,7 @@ bool shouldFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
 		const TypeRef e_type = e->type();
 		return expr_is_well_typed && e_type.nonNull() && 
 			(	(e_type->getType() == Type::FloatType && (e->nodeType() != ASTNode::FloatLiteralType)) ||
+				(e_type->getType() == Type::DoubleType && (e->nodeType() != ASTNode::DoubleLiteralType)) ||
 				(e_type->getType() == Type::BoolType &&	(e->nodeType() != ASTNode::BoolLiteralType)) ||
 				(e_type->getType() == Type::IntType && (e->nodeType() != ASTNode::IntLiteralType)) ||
 				(e_type->getType() == Type::VectorTypeType && (e->nodeType() != ASTNode::VectorLiteralType)) ||
@@ -188,6 +203,13 @@ static ASTNodeRef makeLiteralASTNodeFromValue(const ValueRef& value, const SrcLo
 			throw BaseException("invalid type");
 
 		return new FloatLiteral(value.downcastToPtr<FloatValue>()->value, src_location);
+	}
+	else if(dynamic_cast<DoubleValue*>(value.getPointer()))
+	{
+		if(type->getType() != Type::DoubleType)
+			throw BaseException("invalid type");
+
+		return new DoubleLiteral(value.downcastToPtr<DoubleValue>()->value, src_location);
 	}
 	else if(dynamic_cast<IntValue*>(value.getPointer())) // e->type()->getType() == Type::IntType)
 	{
@@ -284,6 +306,7 @@ bool checkFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
 	const TypeRef e_type = e->type();
 	const bool e_is_literal = e_type.nonNull() && 
 		(	(e_type->getType() == Type::FloatType && (e->nodeType() == ASTNode::FloatLiteralType)) ||
+			(e_type->getType() == Type::DoubleType && (e->nodeType() == ASTNode::DoubleLiteralType)) ||
 			(e_type->getType() == Type::BoolType &&	(e->nodeType() == ASTNode::BoolLiteralType)) ||
 			(e_type->getType() == Type::IntType && (e->nodeType() == ASTNode::IntLiteralType)) ||
 			(e_type->getType() == Type::VectorTypeType && (e->nodeType() == ASTNode::VectorLiteralType)) ||
@@ -661,6 +684,36 @@ static void doImplicitIntToFloatTypeCoercion(ASTNodeRef& a, ASTNodeRef& b, Trave
 }
 
 
+static void doImplicitIntToDoubleTypeCoercion(ASTNodeRef& a, ASTNodeRef& b, TraversalPayload& payload)
+{
+	// Type may be null if 'a' is a variable node that has not been bound yet.
+	const TypeRef a_type = a->type(); 
+	const TypeRef b_type = b->type();
+
+	// 3.0 > 4		=>		3.0 > 4.0
+	if(a_type.nonNull() && a_type->getType() == Type::DoubleType && b->nodeType() == ASTNode::IntLiteralType)
+	{
+		const IntLiteral* b_lit = b.downcastToPtr<IntLiteral>();
+		if(isIntExactlyRepresentableAsDouble(b_lit->value))
+		{
+			b = new DoubleLiteral((double)b_lit->value, b->srcLocation());
+			payload.tree_changed = true;
+		}
+	}
+
+	// 3 > 4.0      =>        3.0 > 4.0
+	if(b_type.nonNull() && b_type->getType() == Type::DoubleType && a->nodeType() == ASTNode::IntLiteralType)
+	{
+		const IntLiteral* a_lit = a.downcastToPtr<IntLiteral>();
+		if(isIntExactlyRepresentableAsFloat(a_lit->value))
+		{
+			a = new DoubleLiteral((double)a_lit->value, a->srcLocation());
+			payload.tree_changed = true;
+		}
+	}
+}
+
+
 static void doImplicitIntTypeCoercion(ASTNodeRef& a, ASTNodeRef& b, TraversalPayload& payload)
 {
 	// Type may be null if 'a' is a variable node that has not been bound yet.
@@ -723,6 +776,27 @@ static bool canDoImplicitIntToFloatTypeCoercion(const ASTNodeRef& a, const ASTNo
 }
 
 
+static bool canDoImplicitIntToDoubleTypeCoercion(const ASTNodeRef& a, const ASTNodeRef& b)
+{
+	// Type may be null if 'a' is a variable node that has not been bound yet.
+	const TypeRef a_type = a->type(); 
+	const TypeRef b_type = b->type();
+
+	if(a_type.nonNull() && b_type.nonNull())
+	{
+		// 3.0 > 4		=>		3.0 > 4.0
+		if(a_type->getType() == Type::DoubleType && b_type->getType() == Type::IntType)
+			return true;
+
+		// 3 > 4.0      =>        3.0 > 4.0
+		if(a_type->getType() == Type::IntType && b_type->getType() == Type::DoubleType)
+			return true;
+	}
+
+	return false;
+}
+
+
 void doImplicitIntToFloatTypeCoercionForFloatReturn(ASTNodeRef& expr, TraversalPayload& payload)
 {
 	const FunctionDefinition* current_func = payload.func_def_stack.back();
@@ -735,6 +809,24 @@ void doImplicitIntToFloatTypeCoercionForFloatReturn(ASTNodeRef& expr, TraversalP
 		if(isIntExactlyRepresentableAsFloat(body_lit->value))
 		{
 			expr = new FloatLiteral((float)body_lit->value, body_lit->srcLocation());
+			payload.tree_changed = true;
+		}
+	}
+}
+
+
+void doImplicitIntToDoubleTypeCoercionForDoubleReturn(ASTNodeRef& expr, TraversalPayload& payload)
+{
+	const FunctionDefinition* current_func = payload.func_def_stack.back();
+
+	if(expr->nodeType() == ASTNode::IntLiteralType && 
+		current_func->declared_return_type.nonNull() && current_func->declared_return_type->getType() == Type::DoubleType
+		)
+	{
+		const IntLiteral* body_lit = expr.downcastToPtr<IntLiteral>();
+		if(isIntExactlyRepresentableAsDouble(body_lit->value))
+		{
+			expr = new DoubleLiteral((double)body_lit->value, body_lit->srcLocation());
 			payload.tree_changed = true;
 		}
 	}
@@ -1069,6 +1161,51 @@ llvm::Value* FloatLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 Reference<ASTNode> FloatLiteral::clone(CloneMapType& clone_map)
 {
 	FloatLiteral* res = new FloatLiteral(value, srcLocation());
+	clone_map.insert(std::make_pair(this, res));
+	return res;
+}
+
+
+//------------------------------------------------------------------------------------
+
+
+ValueRef DoubleLiteral::exec(VMState& vmstate)
+{
+	return new DoubleValue(value);
+}
+
+
+void DoubleLiteral::print(int depth, std::ostream& s) const
+{
+	printMargin(depth, s);
+	s << "Double literal: " + doubleLiteralString(this->value) + "\n";
+}
+
+
+std::string DoubleLiteral::sourceString() const
+{
+	return doubleLiteralString(this->value);
+}
+
+
+std::string DoubleLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
+{
+	return doubleLiteralString(this->value);
+}
+
+
+llvm::Value* DoubleLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
+{
+	return llvm::ConstantFP::get(
+		*params.context, 
+		llvm::APFloat(this->value)
+	);
+}
+
+
+Reference<ASTNode> DoubleLiteral::clone(CloneMapType& clone_map)
+{
+	DoubleLiteral* res = new DoubleLiteral(value, srcLocation());
 	clone_map.insert(std::make_pair(this, res));
 	return res;
 }
@@ -1547,6 +1684,7 @@ class AddOp
 {
 public:
 	float operator() (float x, float y) { return x + y; }
+	double operator() (double x, double y) { return x + y; }
 	int64 operator() (int64 x, int64 y) { return x + y; }
 };
 
@@ -1555,6 +1693,7 @@ class SubOp
 {
 public:
 	float operator() (float x, float y) { return x - y; }
+	double operator() (double x, double y) { return x - y; }
 	int64 operator() (int64 x, int64 y) { return x - y; }
 };
 
@@ -1563,6 +1702,7 @@ class MulOp
 {
 public:
 	float operator() (float x, float y) { return x * y; }
+	double operator() (double x, double y) { return x * y; }
 	int64 operator() (int64 x, int64 y) { return x * y; }
 };
 
@@ -1577,7 +1717,7 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 	{
 	case Type::FloatType:
 		{
-			if(b->type()->getType() == Type::VectorTypeType) // float * vector
+			if(b->type()->getType() == Type::VectorTypeType) // float * vector<float, N>
 			{
 				const VectorValue* bval_vec = checkedCast<VectorValue>(bval);
 
@@ -1594,6 +1734,30 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 				return new FloatValue(op(
 					checkedCast<FloatValue>(aval)->value,
 					checkedCast<FloatValue>(bval)->value
+				));
+			}
+			else
+				throw BaseException("Invalid types to binary op.");
+		}
+	case Type::DoubleType:
+		{
+			if(b->type()->getType() == Type::VectorTypeType) // double * vector<double, N>
+			{
+				const VectorValue* bval_vec = checkedCast<VectorValue>(bval);
+
+				vector<ValueRef> elem_values(bval_vec->e.size());
+				for(unsigned int i=0; i<elem_values.size(); ++i)
+					elem_values[i] = new DoubleValue(op(
+						checkedCast<DoubleValue>(aval)->value,
+						checkedCast<DoubleValue>(bval_vec->e[i])->value
+					));
+				return new VectorValue(elem_values);
+			}
+			else if(b->type()->getType() == Type::DoubleType) // Else double * double
+			{
+				return new DoubleValue(op(
+					checkedCast<DoubleValue>(aval)->value,
+					checkedCast<DoubleValue>(bval)->value
 				));
 			}
 			else
@@ -1632,11 +1796,11 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 			const VectorValue* aval_vec = checkedCast<VectorValue>(aval);
 		
 			vector<ValueRef> elem_values(aval_vec->e.size());
-			switch(vectype->elem_type->getType())
+			switch(vectype->elem_type->getType()) // Swith on 'a' element type:
 			{
 			case Type::FloatType:
 				{
-					if(b->type()->getType() == Type::VectorTypeType) // Vector * vector
+					if(b->type()->getType() == Type::VectorTypeType) // Vector<float, N> * vector<float, N>
 					{
 						if(b->type().downcast<VectorType>()->num != vectype->num)
 							throw BaseException("Invalid types to binary op.");
@@ -1648,7 +1812,7 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 								checkedCast<FloatValue>(bval_vec->e[i])->value
 							));
 					}
-					else if(b->type()->getType() == Type::FloatType) // Vector * float
+					else if(b->type()->getType() == Type::FloatType) // Vector<float, N> * float
 					{
 						for(unsigned int i=0; i<elem_values.size(); ++i)
 							elem_values[i] = new FloatValue(op(
@@ -1662,9 +1826,37 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 					}
 					break;
 				}
+			case Type::DoubleType:
+				{
+					if(b->type()->getType() == Type::VectorTypeType) // Vector<double, N> * vector<double, N>
+					{
+						if(b->type().downcast<VectorType>()->num != vectype->num)
+							throw BaseException("Invalid types to binary op.");
+
+						const VectorValue* bval_vec = checkedCast<VectorValue>(bval);
+						for(unsigned int i=0; i<elem_values.size(); ++i)
+							elem_values[i] = new DoubleValue(op(
+								checkedCast<DoubleValue>(aval_vec->e[i])->value,
+								checkedCast<DoubleValue>(bval_vec->e[i])->value
+							));
+					}
+					else if(b->type()->getType() == Type::DoubleType) // Vector<double, N> * double
+					{
+						for(unsigned int i=0; i<elem_values.size(); ++i)
+							elem_values[i] = new DoubleValue(op(
+								checkedCast<DoubleValue>(aval_vec->e[i])->value,
+								checkedCast<DoubleValue>(bval)->value
+							));
+					}
+					else
+					{
+						throw BaseException("Invalid types to binary op.");
+					}
+					break;
+				}
 			case Type::IntType:
 				{
-					if(b->type()->getType() == Type::VectorTypeType) // Vector * vector
+					if(b->type()->getType() == Type::VectorTypeType) // Vector<int, N> * vector<int, N>
 					{
 						const VectorValue* bval_vec = checkedCast<VectorValue>(bval);
 
@@ -1677,7 +1869,7 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 								checkedCast<IntValue>(bval_vec->e[i])->value
 							));
 					}
-					else if(b->type()->getType() == Type::IntType) // Vector * int
+					else if(b->type()->getType() == Type::IntType) // Vector<int, N> * int
 					{
 						for(unsigned int i=0; i<elem_values.size(); ++i)
 							elem_values[i] = new IntValue(op(
@@ -1751,6 +1943,8 @@ TypeRef AdditionExpression::type() const
 	{
 		if(canDoImplicitIntToFloatTypeCoercion(a, b))
 			expr_type = new Float();
+		else if(canDoImplicitIntToDoubleTypeCoercion(a, b))
+			expr_type = new Double();
 		else
 			expr_type = a->type();
 	}
@@ -1790,6 +1984,7 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 	else if(payload.operation == TraversalPayload::TypeCoercion)
 	{
 		doImplicitIntToFloatTypeCoercion(a, b, payload);
+		doImplicitIntToDoubleTypeCoercion(a, b, payload);
 
 		// implicit conversion from int to float in addition operation:
 		// 3.0 + 4
@@ -1825,7 +2020,7 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 		if(a_type.isNull() || b_type.isNull())
 			throw BaseException("Unknown operand type." + errorContext(*this, payload));
 
-		if(this_type->getType() == Type::GenericTypeType || this_type->getType() == Type::IntType || this_type->getType() == Type::FloatType)
+		if(this_type->getType() == Type::GenericTypeType || this_type->getType() == Type::IntType || this_type->getType() == Type::FloatType || this_type->getType() == Type::DoubleType)
 		{
 			if(*a_type != *b_type)
 				throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
@@ -1836,7 +2031,7 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 				throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
 
 			// Check element type is int or float
-			if(!(a_type.downcast<VectorType>()->elem_type->getType() == Type::IntType || a_type.downcast<VectorType>()->elem_type->getType() == Type::FloatType))
+			if(!(a_type.downcast<VectorType>()->elem_type->getType() == Type::IntType || a_type.downcast<VectorType>()->elem_type->getType() == Type::FloatType || a_type.downcast<VectorType>()->elem_type->getType() == Type::DoubleType))
 				throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
 		}
 		else
@@ -1936,7 +2131,7 @@ llvm::Value* AdditionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			return NULL;
 		}
 	}
-	else if(this->type()->getType() == Type::FloatType)
+	else if(this->type()->getType() == Type::FloatType || this->type()->getType() == Type::DoubleType)
 	{
 		return params.builder->CreateFAdd(
 			a->emitLLVMCode(params), 
@@ -2023,6 +2218,8 @@ TypeRef SubtractionExpression::type() const
 	{
 		if(canDoImplicitIntToFloatTypeCoercion(a, b))
 			expr_type = new Float();
+		else if(canDoImplicitIntToDoubleTypeCoercion(a, b))
+			expr_type = new Double();
 		else
 			expr_type = a->type();
 	}
@@ -2062,6 +2259,7 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 	else if(payload.operation == TraversalPayload::TypeCoercion)
 	{
 		doImplicitIntToFloatTypeCoercion(a, b, payload);
+		doImplicitIntToDoubleTypeCoercion(a, b, payload);
 
 		// implicit conversion from int to float
 		// 3.0 - 4
@@ -2098,7 +2296,7 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 		if(a_type.isNull() || b_type.isNull())
 			throw BaseException("Unknown operand type." + errorContext(*this, payload));
 
-		if(this_type->getType() == Type::GenericTypeType || this_type->getType() == Type::IntType || this_type->getType() == Type::FloatType)
+		if(this_type->getType() == Type::GenericTypeType || this_type->getType() == Type::IntType || this_type->getType() == Type::FloatType || this_type->getType() == Type::DoubleType)
 		{
 			if(*a_type != *b_type)
 				throw BaseException("AdditionExpression: Binary operator '-' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
@@ -2109,7 +2307,7 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 				throw BaseException("AdditionExpression: Binary operator '-' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
 
 			// Check element type is int or float
-			if(!(a_type.downcast<VectorType>()->elem_type->getType() == Type::IntType || a_type.downcast<VectorType>()->elem_type->getType() == Type::FloatType))
+			if(!(a_type.downcast<VectorType>()->elem_type->getType() == Type::IntType || a_type.downcast<VectorType>()->elem_type->getType() == Type::FloatType || a_type.downcast<VectorType>()->elem_type->getType() == Type::DoubleType))
 				throw BaseException("AdditionExpression: Binary operator '-' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
 		}
 		else
@@ -2180,7 +2378,9 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 
 llvm::Value* SubtractionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
-	if(this->type()->getType() == Type::FloatType || (this->type()->getType() == Type::VectorTypeType && this->type().downcastToPtr<VectorType>()->elem_type->getType() == Type::FloatType))
+	if(this->type()->getType() == Type::FloatType || this->type()->getType() == Type::DoubleType || 
+		(this->type()->getType() == Type::VectorTypeType && this->type().downcastToPtr<VectorType>()->elem_type->getType() == Type::FloatType) ||
+		(this->type()->getType() == Type::VectorTypeType && this->type().downcastToPtr<VectorType>()->elem_type->getType() == Type::DoubleType))
 	{
 		return params.builder->CreateBinOp(
 			llvm::Instruction::FSub, 
@@ -2241,6 +2441,8 @@ TypeRef MulExpression::type() const
 		{
 			if(canDoImplicitIntToFloatTypeCoercion(a, b))
 				expr_type = new Float();
+			else if(canDoImplicitIntToDoubleTypeCoercion(a, b))
+				expr_type = new Double();
 			else
 				expr_type = a->type();
 		}
@@ -2289,6 +2491,7 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	else if(payload.operation == TraversalPayload::TypeCoercion)
 	{
 		doImplicitIntToFloatTypeCoercion(a, b, payload);
+		doImplicitIntToDoubleTypeCoercion(a, b, payload);
 
 		// implicit conversion from int to float
 		// 3.0 * 4
@@ -2324,7 +2527,7 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 		if(a_type.isNull() || b_type.isNull())
 			throw BaseException("Unknown operand type." + errorContext(*this, payload));
 
-		if(this_type->getType() == Type::GenericTypeType || this_type->getType() == Type::IntType || this_type->getType() == Type::FloatType)
+		if(this_type->getType() == Type::GenericTypeType || this_type->getType() == Type::IntType || this_type->getType() == Type::FloatType || this_type->getType() == Type::DoubleType)
 		{
 			if(*a_type != *b_type)
 				throw BaseException("AdditionExpression: Binary operator '*' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
@@ -2335,7 +2538,7 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 				throw BaseException("AdditionExpression: Binary operator '*' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
 
 			// Check element type is int or float
-			if(!(a_type.downcast<VectorType>()->elem_type->getType() == Type::IntType || a_type.downcast<VectorType>()->elem_type->getType() == Type::FloatType))
+			if(!(a_type.downcast<VectorType>()->elem_type->getType() == Type::IntType || a_type.downcast<VectorType>()->elem_type->getType() == Type::FloatType || a_type.downcast<VectorType>()->elem_type->getType() == Type::DoubleType))
 				throw BaseException("AdditionExpression: Binary operator '*' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
 		}
 		else if(a_type->getType() == Type::VectorTypeType && *b_type == *a_type.downcast<VectorType>()->elem_type)
@@ -2343,7 +2546,7 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 			// A is a vector<T>, and B is of type T
 
 			// Check element type is int or float
-			if(!(a_type.downcast<VectorType>()->elem_type->getType() == Type::IntType || a_type.downcast<VectorType>()->elem_type->getType() == Type::FloatType))
+			if(!(a_type.downcast<VectorType>()->elem_type->getType() == Type::IntType || a_type.downcast<VectorType>()->elem_type->getType() == Type::FloatType || a_type.downcast<VectorType>()->elem_type->getType() == Type::DoubleType))
 				throw BaseException("AdditionExpression: Binary operator '*' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
 		}
 		else if(b_type->getType() == Type::VectorTypeType && *a_type == *b_type.downcast<VectorType>()->elem_type)
@@ -2351,7 +2554,7 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 			// B is a vector<T>, and A is of type T
 
 			// Check element type is int or float
-			if(!(b_type.downcast<VectorType>()->elem_type->getType() == Type::IntType || b_type.downcast<VectorType>()->elem_type->getType() == Type::FloatType))
+			if(!(b_type.downcast<VectorType>()->elem_type->getType() == Type::IntType || b_type.downcast<VectorType>()->elem_type->getType() == Type::FloatType || b_type.downcast<VectorType>()->elem_type->getType() == Type::DoubleType))
 				throw BaseException("AdditionExpression: Binary operator '*' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
 		}
 		else
@@ -2472,7 +2675,7 @@ llvm::Value* MulExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 {
 	if(this->type()->getType() == Type::VectorTypeType)
 	{
-		if(a->type()->getType() == Type::FloatType)
+		if(a->type()->getType() == Type::FloatType || a->type()->getType() == Type::DoubleType)
 		{
 			// float * vector<float>
 			assert(b->type()->getType() == Type::VectorTypeType);
@@ -2489,7 +2692,7 @@ llvm::Value* MulExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 				b->emitLLVMCode(params)
 			);
 		}
-		else if(b->type()->getType() == Type::FloatType)
+		else if(b->type()->getType() == Type::FloatType || b->type()->getType() == Type::DoubleType)
 		{
 			// vector<float> * float
 			assert(a->type()->getType() == Type::VectorTypeType);
@@ -2545,7 +2748,7 @@ llvm::Value* MulExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 			assert(b->type()->getType() == Type::VectorTypeType);
 
 			const TypeRef elem_type = a->type().downcast<VectorType>()->elem_type;
-			if(elem_type->getType() == Type::FloatType)
+			if(elem_type->getType() == Type::FloatType || elem_type->getType() == Type::DoubleType)
 			{
 				return params.builder->CreateFMul(
 					a->emitLLVMCode(params), 
@@ -2566,7 +2769,7 @@ llvm::Value* MulExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 			}
 		}
 	}
-	else if(this->type()->getType() == Type::FloatType)
+	else if(this->type()->getType() == Type::FloatType || this->type()->getType() == Type::DoubleType)
 	{
 		return params.builder->CreateFMul(
 			a->emitLLVMCode(params), 
@@ -2614,6 +2817,13 @@ ValueRef DivExpression::exec(VMState& vmstate)
 	{
 		if(a->type()->getType() == Type::FloatType && b->type()->getType() == Type::FloatType)
 			return new FloatValue(checkedCast<FloatValue>(aval)->value / checkedCast<FloatValue>(bval)->value);
+		else
+			throw BaseException("invalid types for div op.");
+	}
+	if(this->type()->getType() == Type::DoubleType)
+	{
+		if(a->type()->getType() == Type::DoubleType && b->type()->getType() == Type::DoubleType)
+			return new DoubleValue(checkedCast<DoubleValue>(aval)->value / checkedCast<DoubleValue>(bval)->value);
 		else
 			throw BaseException("invalid types for div op.");
 	}
@@ -2668,6 +2878,8 @@ TypeRef DivExpression::type() const
 	{
 		if(canDoImplicitIntToFloatTypeCoercion(a, b))
 			expr_type = new Float();
+		else if(canDoImplicitIntToDoubleTypeCoercion(a, b))
+			expr_type = new Double();
 		else
 			expr_type = a->type();
 	}
@@ -2711,27 +2923,61 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 		// Only do this if b is != 0.  Otherwise we are messing with divide by zero semantics.
 
 		// Type may be null if 'a' is a variable node that has not been bound yet.
-		const TypeRef a_type = a->type(); 
-		const TypeRef b_type = b->type();
-
-		if(a_type.nonNull() && a_type->getType() == Type::FloatType && b->nodeType() == ASTNode::IntLiteralType)
 		{
-			IntLiteral* b_lit = static_cast<IntLiteral*>(b.getPointer());
-			if(isIntExactlyRepresentableAsFloat(b_lit->value) && (b_lit->value != 0))
+			const TypeRef a_type = a->type(); 
+			const TypeRef b_type = b->type();
+
+			if(a_type.nonNull() && a_type->getType() == Type::FloatType && b->nodeType() == ASTNode::IntLiteralType)
 			{
-				b = new FloatLiteral((float)b_lit->value, b->srcLocation());
-				payload.tree_changed = true;
+				IntLiteral* b_lit = static_cast<IntLiteral*>(b.getPointer());
+				if(isIntExactlyRepresentableAsFloat(b_lit->value) && (b_lit->value != 0))
+				{
+					b = new FloatLiteral((float)b_lit->value, b->srcLocation());
+					payload.tree_changed = true;
+				}
+			}
+
+			// 3 / 4.0 => 3.0 / 4.0
+			if(b_type.nonNull() && b_type->getType() == Type::FloatType && a->nodeType() == ASTNode::IntLiteralType)
+			{
+				IntLiteral* a_lit = static_cast<IntLiteral*>(a.getPointer());
+				if(isIntExactlyRepresentableAsFloat(a_lit->value))
+				{
+					a = new FloatLiteral((float)a_lit->value, a->srcLocation());
+					payload.tree_changed = true;
+				}
 			}
 		}
 
-		// 3 / 4.0 => 3.0 / 4.0
-		if(b_type.nonNull() && b_type->getType() == Type::FloatType && a->nodeType() == ASTNode::IntLiteralType)
+
+		// implicit conversion from int to double
+		// 3.0 / 4
+		// Only do this if b is != 0.  Otherwise we are messing with divide by zero semantics.
+
+		// Type may be null if 'a' is a variable node that has not been bound yet.
 		{
-			IntLiteral* a_lit = static_cast<IntLiteral*>(a.getPointer());
-			if(isIntExactlyRepresentableAsFloat(a_lit->value))
+			const TypeRef a_type = a->type(); 
+			const TypeRef b_type = b->type();
+
+			if(a_type.nonNull() && a_type->getType() == Type::DoubleType && b->nodeType() == ASTNode::IntLiteralType)
 			{
-				a = new FloatLiteral((float)a_lit->value, a->srcLocation());
-				payload.tree_changed = true;
+				IntLiteral* b_lit = static_cast<IntLiteral*>(b.getPointer());
+				if(isIntExactlyRepresentableAsDouble(b_lit->value) && (b_lit->value != 0))
+				{
+					b = new DoubleLiteral((double)b_lit->value, b->srcLocation());
+					payload.tree_changed = true;
+				}
+			}
+
+			// 3 / 4.0 => 3.0 / 4.0
+			if(b_type.nonNull() && b_type->getType() == Type::DoubleType && a->nodeType() == ASTNode::IntLiteralType)
+			{
+				IntLiteral* a_lit = static_cast<IntLiteral*>(a.getPointer());
+				if(isIntExactlyRepresentableAsDouble(a_lit->value))
+				{
+					a = new DoubleLiteral((float)a_lit->value, a->srcLocation());
+					payload.tree_changed = true;
+				}
 			}
 		}
 	}
@@ -2746,7 +2992,7 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 		if(a_type.isNull() || b_type.isNull())
 			throw BaseException("Unknown operand type." + errorContext(*this, payload));
 
-		if(this_type->getType() == Type::GenericTypeType || *this_type == Int() || *this_type == Float())
+		if(this_type->getType() == Type::GenericTypeType || this_type->getType() == Type::IntType || this_type->getType() == Type::FloatType || this_type->getType() == Type::DoubleType)
 		{
 			// Make sure both operands have the same type
 			if(*a->type() != *b->type())
@@ -3080,7 +3326,7 @@ std::string DivExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 llvm::Value* DivExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
-	if(this->type()->getType() == Type::FloatType)
+	if(this->type()->getType() == Type::FloatType || this->type()->getType() == Type::DoubleType)
 	{
 		return params.builder->CreateBinOp(
 			llvm::Instruction::FDiv, 
@@ -3296,6 +3542,10 @@ ValueRef UnaryMinusExpression::exec(VMState& vmstate)
 	{
 		return new FloatValue(-checkedCast<FloatValue>(aval)->value);
 	}
+	else if(this->type()->getType() == Type::DoubleType)
+	{
+		return new DoubleValue(-checkedCast<DoubleValue>(aval)->value);
+	}
 	else if(this->type()->getType() == Type::IntType)
 	{
 		return new IntValue(-checkedCast<IntValue>(aval)->value);
@@ -3363,10 +3613,10 @@ void UnaryMinusExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 		if(this_type.isNull())
 			throw BaseException("Unknown operand type." + errorContext(*this, payload));
 
-		if(this_type->getType() == Type::GenericTypeType || this_type->getType() == Type::IntType || this_type->getType() == Type::FloatType)
+		if(this_type->getType() == Type::GenericTypeType || this_type->getType() == Type::IntType || this_type->getType() == Type::FloatType || this_type->getType() == Type::DoubleType)
 		{}
 		else if(this_type->getType() == Type::VectorTypeType && 
-			(static_cast<VectorType*>(this_type.getPointer())->elem_type->getType() == Type::FloatType || static_cast<VectorType*>(this_type.getPointer())->elem_type->getType() == Type::IntType))
+			(static_cast<VectorType*>(this_type.getPointer())->elem_type->getType() == Type::FloatType || static_cast<VectorType*>(this_type.getPointer())->elem_type->getType() == Type::DoubleType || static_cast<VectorType*>(this_type.getPointer())->elem_type->getType() == Type::IntType))
 		{
 		}
 		else
@@ -3415,7 +3665,7 @@ std::string UnaryMinusExpression::emitOpenCLC(EmitOpenCLCodeParams& params) cons
 
 llvm::Value* UnaryMinusExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
-	if(this->type()->getType() == Type::FloatType)
+	if(this->type()->getType() == Type::FloatType || this->type()->getType() == Type::DoubleType)
 	{
 		return params.builder->CreateFNeg(
 			expr->emitLLVMCode(params)
@@ -3694,9 +3944,10 @@ void LetASTNode::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 	}
 	else if(payload.operation == TraversalPayload::TypeCoercion)
 	{
-		// Do int -> float coercion
+		
 		for(size_t i=0; i<vars.size(); ++i)
 		{
+			// Do int -> float coercion
 			if(expr->nodeType() == ASTNode::IntLiteralType && vars[i].declared_type.nonNull() && vars[i].declared_type->getType() == Type::FloatType)
 			{
 				IntLiteral* body_lit = static_cast<IntLiteral*>(expr.getPointer());
@@ -3705,6 +3956,14 @@ void LetASTNode::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 					expr = new FloatLiteral((float)body_lit->value, body_lit->srcLocation());
 					payload.tree_changed = true;
 				}
+			}
+
+			// Do int -> double coercion
+			if(expr->nodeType() == ASTNode::IntLiteralType && vars[i].declared_type.nonNull() && vars[i].declared_type->getType() == Type::DoubleType)
+			{
+				IntLiteral* body_lit = static_cast<IntLiteral*>(expr.getPointer());
+				expr = new DoubleLiteral((double)body_lit->value, body_lit->srcLocation());
+				payload.tree_changed = true;
 			}
 		}
 	}
@@ -3848,6 +4107,9 @@ ValueRef ComparisonExpression::exec(VMState& vmstate)
 	case Type::FloatType:
 		retval = compare<FloatValue>(this->token->getType(), aval.getPointer(), bval.getPointer());
 		break;
+	case Type::DoubleType:
+		retval = compare<DoubleValue>(this->token->getType(), aval.getPointer(), bval.getPointer());
+		break;
 	case Type::IntType:
 		retval = compare<IntValue>(this->token->getType(), aval.getPointer(), bval.getPointer());
 		break;
@@ -3938,6 +4200,7 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 	else if(payload.operation == TraversalPayload::TypeCoercion)
 	{
 		doImplicitIntToFloatTypeCoercion(a, b, payload);
+		doImplicitIntToDoubleTypeCoercion(a, b, payload);
 
 		doImplicitIntTypeCoercion(a, b, payload);
 
@@ -3976,7 +4239,7 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 		if(a_type.isNull() || b_type.isNull())
 			throw BaseException("Unknown type");
 
-		if(a_type->getType() == Type::GenericTypeType || a_type->getType() == Type::IntType || a_type->getType() == Type::FloatType || a_type->getType() == Type::BoolType)
+		if(a_type->getType() == Type::GenericTypeType || a_type->getType() == Type::IntType || a_type->getType() == Type::FloatType || a_type->getType() == Type::DoubleType || a_type->getType() == Type::BoolType)
 		{
 			if(*a_type != *b_type)
 				throw BaseException("Comparison operand types must be the same.  Left operand type: " + a_type->toString() + ", right operand type: " + b_type->toString() + "." + errorContext(*this, payload));
@@ -4012,6 +4275,7 @@ llvm::Value* ComparisonExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm
 	switch(a->type()->getType())
 	{
 	case Type::FloatType:
+	case Type::DoubleType:
 		{
 			switch(this->token->getType())
 			{

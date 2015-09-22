@@ -514,6 +514,20 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 				payload.tree_changed = true;
 			}
 		}
+		else if(this->declared_return_type.nonNull() &&
+			this->declared_return_type->getType() == Type::DoubleType && 
+			this->body.nonNull() && 
+			this->body->nodeType() == ASTNode::IntLiteralType)
+		{
+			IntLiteral* body_lit = static_cast<IntLiteral*>(this->body.getPointer());
+			if(isIntExactlyRepresentableAsDouble(body_lit->value))
+			{
+				ASTNodeRef new_body(new DoubleLiteral((double)body_lit->value, body_lit->srcLocation()));
+
+				this->body = new_body;
+				payload.tree_changed = true;
+			}
+		}
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{

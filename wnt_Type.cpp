@@ -98,6 +98,45 @@ llvm::Value* Float::getInvalidLLVMValue(llvm::Module& module) const // For array
 //==========================================================================
 
 
+bool Double::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
+{
+	return this->getType() == b.getType();
+}
+
+
+llvm::Type* Double::LLVMType(llvm::Module& module) const
+{ 
+	return llvm::Type::getDoubleTy(module.getContext());
+}
+
+
+const std::string Double::OpenCLCType() const
+{ 
+	if(address_space.empty())
+		return "double";
+	else
+		return address_space + " double";
+}
+
+
+Reference<Value> Double::getInvalidValue() const // For array out-of-bounds
+{
+	return new DoubleValue(std::numeric_limits<double>::quiet_NaN());
+}
+
+
+llvm::Value* Double::getInvalidLLVMValue(llvm::Module& module) const // For array out-of-bounds
+{
+	return llvm::ConstantFP::get(
+		module.getContext(), 
+		llvm::APFloat::getSNaN(llvm::APFloat::IEEEdouble)
+	);
+}
+
+
+//==========================================================================
+
+
 bool GenericType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
 {
 	if(this->genericTypeParamIndex() < (int)type_mapping.size() && 

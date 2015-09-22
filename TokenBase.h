@@ -55,7 +55,7 @@ public:
 	virtual int precedence() const { throw TokenBaseExcep("precedence()"); }
 
 	virtual const std::string& getIdentifierValue() const { throw TokenBaseExcep("getIdentifierValue()"); }
-	virtual float getFloatLiteralValue() const { throw TokenBaseExcep("getRealLiteralValue()"); }
+	virtual double getFloatLiteralValue() const { throw TokenBaseExcep("getRealLiteralValue()"); }
 	virtual int64 getIntLiteralValue() const { throw TokenBaseExcep("getIntLiteralValue()"); }
 	virtual bool getBoolLiteralValue() const { throw TokenBaseExcep("getBoolLiteralValue()"); }
 	virtual const std::string& getStringLiteralValue() const { throw TokenBaseExcep("getStringLiteralValue()"); }
@@ -86,15 +86,17 @@ private:
 class FloatLiteralToken : public TokenBase
 {
 public:
-	FloatLiteralToken(float x, unsigned int char_index) : TokenBase(char_index, FLOAT_LITERAL_TOKEN), val(x) {}
+	FloatLiteralToken(double x, char suffix_, unsigned int char_index) : TokenBase(char_index, FLOAT_LITERAL_TOKEN), val(x), suffix(suffix_) {}
 	
 	virtual bool isLiteral() const { return true; }
 	virtual bool isParanthesis() const { return false; }
 	virtual bool isBinaryInfixOp() const { return false; }
 
-	virtual float getFloatLiteralValue() const { return val; }
+	virtual double getFloatLiteralValue() const { return val; }
+
+	char suffix; // 'f' or 'd' or 0 if not present.
 private:
-	float val;
+	double val;
 };
 
 

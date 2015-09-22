@@ -229,6 +229,84 @@ bool FunctionExpression::doesFunctionTypeMatch(const TypeRef& type)
 }*/
 
 
+void FunctionExpression::tryCoerceIntArgsToDoubles(Linker& linker, const std::vector<TypeRef>& argtypes, int effective_callsite_order_num)
+{
+	if(this->static_target_function)
+		return;
+
+	vector<TypeRef> coerced_argtypes = argtypes;
+
+	for(size_t i=0; i<argtypes.size(); ++i)
+	{
+		if(	argument_expressions[i]->nodeType() == ASTNode::IntLiteralType &&
+			isIntExactlyRepresentableAsDouble(static_cast<IntLiteral*>(argument_expressions[i].getPointer())->value))
+		{
+			coerced_argtypes[i] = new Double();
+		}
+	}
+
+	// Try again with our coerced arguments
+	const FunctionSignature coerced_sig(this->static_function_name, coerced_argtypes);
+
+	this->static_target_function = linker.findMatchingFunction(coerced_sig, this->srcLocation(), effective_callsite_order_num/*&payload.func_def_stack*/).getPointer();
+	if(this->static_target_function/* && isTargetDefinedBeforeAllInStack(payload.func_def_stack, target_function)*/) // Disallow recursion for now: Check the linked function is not the current function.
+	{
+		// Success!  We need to actually change the argument expressions now
+		for(size_t i=0; i<argument_expressions.size(); ++i)
+		{
+			if(	argument_expressions[i]->nodeType() == ASTNode::IntLiteralType &&
+				isIntExactlyRepresentableAsDouble(static_cast<IntLiteral*>(argument_expressions[i].getPointer())->value))
+			{
+				// Replace int literal with double literal
+				this->argument_expressions[i] = new DoubleLiteral(
+					(float)static_cast<IntLiteral*>(argument_expressions[i].getPointer())->value,
+					argument_expressions[i]->srcLocation()
+					);
+			}
+		}
+	}
+}
+
+
+void FunctionExpression::tryCoerceIntArgsToFloats(Linker& linker, const std::vector<TypeRef>& argtypes, int effective_callsite_order_num)
+{
+	if(this->static_target_function)
+		return;
+
+	vector<TypeRef> coerced_argtypes = argtypes;
+
+	for(size_t i=0; i<argtypes.size(); ++i)
+	{
+		if(	argument_expressions[i]->nodeType() == ASTNode::IntLiteralType &&
+			isIntExactlyRepresentableAsFloat(static_cast<IntLiteral*>(argument_expressions[i].getPointer())->value))
+		{
+			coerced_argtypes[i] = new Float();
+		}
+	}
+
+	// Try again with our coerced arguments
+	const FunctionSignature coerced_sig(this->static_function_name, coerced_argtypes);
+
+	this->static_target_function = linker.findMatchingFunction(coerced_sig, this->srcLocation(), effective_callsite_order_num/*&payload.func_def_stack*/).getPointer();
+	if(this->static_target_function/* && isTargetDefinedBeforeAllInStack(payload.func_def_stack, target_function)*/) // Disallow recursion for now: Check the linked function is not the current function.
+	{
+		// Success!  We need to actually change the argument expressions now
+		for(size_t i=0; i<argument_expressions.size(); ++i)
+		{
+			if(	argument_expressions[i]->nodeType() == ASTNode::IntLiteralType &&
+				isIntExactlyRepresentableAsFloat(static_cast<IntLiteral*>(argument_expressions[i].getPointer())->value))
+			{
+				// Replace int literal with float literal
+				this->argument_expressions[i] = new FloatLiteral(
+					(float)static_cast<IntLiteral*>(argument_expressions[i].getPointer())->value,
+					argument_expressions[i]->srcLocation()
+					);
+			}
+		}
+	}
+}
+
+
 // Statically bind to global function definition.
 void FunctionExpression::bindFunction(Linker& linker, TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
@@ -266,42 +344,20 @@ void FunctionExpression::bindFunction(Linker& linker, TraversalPayload& payload,
 			}
 			else
 			{
-				// Try and promote integer args to float args.
+				// Try and promote integer args to double args.
 				// TODO: try all possible coercion combinations.
 				// This is not really the best way of doing this type coercion, the old approach of matching by name is better.
-				
-				vector<TypeRef> coerced_argtypes = argtypes;
 
-				for(size_t i=0; i<argtypes.size(); ++i)
+				if(linker.try_coerce_int_to_double_first)
 				{
-					if(	argument_expressions[i]->nodeType() == ASTNode::IntLiteralType &&
-						isIntExactlyRepresentableAsFloat(static_cast<IntLiteral*>(argument_expressions[i].getPointer())->value))
-					{
-						coerced_argtypes[i] = new Float();
-					}
+					tryCoerceIntArgsToDoubles(linker, argtypes, effective_callsite_order_num);
+					tryCoerceIntArgsToFloats(linker, argtypes, effective_callsite_order_num);
 				}
-
-				// Try again with our coerced arguments
-				const FunctionSignature coerced_sig(this->static_function_name, coerced_argtypes);
-
-				this->static_target_function = linker.findMatchingFunction(coerced_sig, this->srcLocation(), effective_callsite_order_num/*&payload.func_def_stack*/).getPointer();
-				if(this->static_target_function/* && isTargetDefinedBeforeAllInStack(payload.func_def_stack, target_function)*/) // Disallow recursion for now: Check the linked function is not the current function.
+				else
 				{
-					// Success!  We need to actually change the argument expressions now
-					for(size_t i=0; i<argument_expressions.size(); ++i)
-					{
-						if(	argument_expressions[i]->nodeType() == ASTNode::IntLiteralType &&
-							isIntExactlyRepresentableAsFloat(static_cast<IntLiteral*>(argument_expressions[i].getPointer())->value))
-						{
-							// Replace int literal with float literal
-							this->argument_expressions[i] = new FloatLiteral(
-								(float)static_cast<IntLiteral*>(argument_expressions[i].getPointer())->value,
-								argument_expressions[i]->srcLocation()
-								);
-						}
-					}
+					tryCoerceIntArgsToFloats(linker, argtypes, effective_callsite_order_num);
+					tryCoerceIntArgsToDoubles(linker, argtypes, effective_callsite_order_num);
 				}
-
 
 				/*vector<FunctionDefinitionRef> funcs;
 				linker.getFuncsWithMatchingName(sig.name, funcs);

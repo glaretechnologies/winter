@@ -2364,12 +2364,20 @@ ValueRef DotProductBuiltInFunc::invoke(VMState& vmstate)
 	const VectorValue* a = checkedCast<const VectorValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 0].getPointer());
 	const VectorValue* b = checkedCast<const VectorValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
 
-	FloatValueRef res = new FloatValue(0.0f);
-
-	for(unsigned int i=0; i<vector_type->num; ++i)
-		res->value += checkedCast<const FloatValue>(a->e[i].getPointer())->value * checkedCast<const FloatValue>(b->e[i].getPointer())->value;
-
-	return res;
+	if(vector_type->elem_type->getType() == Type::FloatType)
+	{
+		FloatValueRef res = new FloatValue(0.0f);
+		for(unsigned int i=0; i<vector_type->num; ++i)
+			res->value += checkedCast<const FloatValue>(a->e[i].getPointer())->value * checkedCast<const FloatValue>(b->e[i].getPointer())->value;
+		return res;
+	}
+	else
+	{
+		DoubleValueRef res = new DoubleValue(0.0f);
+		for(unsigned int i=0; i<vector_type->num; ++i)
+			res->value += checkedCast<const DoubleValue>(a->e[i].getPointer())->value * checkedCast<const DoubleValue>(b->e[i].getPointer())->value;
+		return res;
+	}
 }
 
 
@@ -2379,7 +2387,7 @@ llvm::Value* DotProductBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) con
 	llvm::Value* b = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
 
 	// If have SSE4.1 and this is a 4-vector, using DPPS instruction
-	if(this->vector_type->num == 4 && params.cpu_info->sse4_1)
+	if(vector_type->elem_type->getType() == Type::FloatType && this->vector_type->num == 4 && params.cpu_info->sse4_1)
 	{
 		// Emit dot product intrinsic
 		vector<llvm::Value*> args;
@@ -2728,10 +2736,18 @@ PowBuiltInFunc::PowBuiltInFunc(const TypeRef& type_)
 
 ValueRef PowBuiltInFunc::invoke(VMState& vmstate)
 {
-	const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 0].getPointer());
-	const FloatValue* b = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
-
-	return new FloatValue(std::pow(a->value, b->value));
+	if(type->getType() == Type::FloatType)
+	{
+		const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 0].getPointer());
+		const FloatValue* b = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
+		return new FloatValue(std::pow(a->value, b->value));
+	}
+	else
+	{
+		const DoubleValue* a = checkedCast<const DoubleValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 0].getPointer());
+		const DoubleValue* b = checkedCast<const DoubleValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
+		return new DoubleValue(std::pow(a->value, b->value));
+	}
 }
 
 
@@ -2760,7 +2776,7 @@ llvm::Value* PowBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 static llvm::Value* emitUnaryIntrinsic(EmitLLVMCodeParams& params, const TypeRef& type, llvm::Intrinsic::ID id)
 {
-	assert(type->getType() == Type::FloatType || (type->getType() == Type::VectorTypeType));
+	assert(type->getType() == Type::FloatType || type->getType() == Type::DoubleType || (type->getType() == Type::VectorTypeType));
 
 	vector<llvm::Value*> args(1, LLVMTypeUtils::getNthArg(params.currently_building_func, 0));
 
@@ -2786,6 +2802,11 @@ ValueRef SqrtBuiltInFunc::invoke(VMState& vmstate)
 	{
 		const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 		return new FloatValue(std::sqrt(a->value));
+	}
+	else if(type->getType() == Type::DoubleType)
+	{
+		const DoubleValue* a = checkedCast<const DoubleValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+		return new DoubleValue(std::sqrt(a->value));
 	}
 	else
 	{
@@ -2824,9 +2845,16 @@ ExpBuiltInFunc::ExpBuiltInFunc(const TypeRef& type_)
 
 ValueRef ExpBuiltInFunc::invoke(VMState& vmstate)
 {
-	const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
-
-	return new FloatValue(std::exp(a->value));
+	if(type->getType() == Type::FloatType)
+	{
+		const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+		return new FloatValue(std::exp(a->value));
+	}
+	else
+	{
+		const DoubleValue* a = checkedCast<const DoubleValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+		return new DoubleValue(std::exp(a->value));
+	}
 }
 
 
@@ -2846,9 +2874,16 @@ LogBuiltInFunc::LogBuiltInFunc(const TypeRef& type_)
 
 ValueRef LogBuiltInFunc::invoke(VMState& vmstate)
 {
-	const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
-
-	return new FloatValue(std::log(a->value));
+	if(type->getType() == Type::FloatType)
+	{
+		const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+		return new FloatValue(std::log(a->value));
+	}
+	else
+	{
+		const DoubleValue* a = checkedCast<const DoubleValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+		return new DoubleValue(std::log(a->value));
+	}
 }
 
 
@@ -2868,9 +2903,16 @@ SinBuiltInFunc::SinBuiltInFunc(const TypeRef& type_)
 
 ValueRef SinBuiltInFunc::invoke(VMState& vmstate)
 {
-	const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
-
-	return new FloatValue(std::sin(a->value));
+	if(type->getType() == Type::FloatType)
+	{
+		const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+		return new FloatValue(std::sin(a->value));
+	}
+	else
+	{
+		const DoubleValue* a = checkedCast<const DoubleValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+		return new DoubleValue(std::sin(a->value));
+	}
 }
 
 
@@ -2890,9 +2932,16 @@ CosBuiltInFunc::CosBuiltInFunc(const TypeRef& type_)
 
 ValueRef CosBuiltInFunc::invoke(VMState& vmstate)
 {
-	const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
-
-	return new FloatValue(std::cos(a->value));
+	if(type->getType() == Type::FloatType)
+	{
+		const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+		return new FloatValue(std::cos(a->value));
+	}
+	else
+	{
+		const DoubleValue* a = checkedCast<const DoubleValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+		return new DoubleValue(std::cos(a->value));
+	}
 }
 
 
@@ -2912,9 +2961,21 @@ AbsBuiltInFunc::AbsBuiltInFunc(const TypeRef& type_)
 
 ValueRef AbsBuiltInFunc::invoke(VMState& vmstate)
 {
-	const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
-
-	return new FloatValue(std::fabs(a->value));
+	if(type->getType() == Type::FloatType)
+	{
+		const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+		return new FloatValue(std::fabs(a->value));
+	}
+	else if(type->getType() == Type::DoubleType)
+	{
+		const DoubleValue* a = checkedCast<const DoubleValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+		return new DoubleValue(std::fabs(a->value));
+	}
+	else
+	{
+		assert(type->getType() == Type::VectorTypeType);
+		throw BaseException("AbsBuiltInFunc vector type");
+	}
 }
 
 
@@ -2938,6 +2999,11 @@ ValueRef FloorBuiltInFunc::invoke(VMState& vmstate)
 	{
 		const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 		return new FloatValue(std::floor(a->value));
+	}
+	else if(type->getType() == Type::DoubleType)
+	{
+		const DoubleValue* a = checkedCast<const DoubleValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+		return new DoubleValue(std::floor(a->value));
 	}
 	else
 	{
@@ -2980,6 +3046,11 @@ ValueRef CeilBuiltInFunc::invoke(VMState& vmstate)
 		const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 		return new FloatValue(std::ceil(a->value));
 	}
+	else if(type->getType() == Type::DoubleType)
+	{
+		const DoubleValue* a = checkedCast<const DoubleValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+		return new DoubleValue(std::ceil(a->value));
+	}
 	else
 	{
 		assert(type->getType() == Type::VectorTypeType);
@@ -3020,6 +3091,11 @@ ValueRef SignBuiltInFunc::invoke(VMState& vmstate)
 	{
 		const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 		return new FloatValue(a->value >= 0 ? 1.0f : -1.0f);
+	}
+	else if(type->getType() == Type::DoubleType)
+	{
+		const DoubleValue* a = checkedCast<const DoubleValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+		return new DoubleValue(a->value >= 0 ? 1.0 : -1.0);
 	}
 	else
 	{
@@ -3084,6 +3160,8 @@ TypeRef TruncateToIntBuiltInFunc::getReturnType(const TypeRef& arg_type)
 {
 	if(arg_type->getType() == Type::FloatType)
 		return new Int();
+	else if(arg_type->getType() == Type::DoubleType)
+		return new Int();
 	else if(arg_type->getType() == Type::VectorTypeType) // If vector of floats
 		return new VectorType(new Int(), arg_type.downcast<VectorType>()->num);
 	else
@@ -3096,9 +3174,18 @@ TypeRef TruncateToIntBuiltInFunc::getReturnType(const TypeRef& arg_type)
 
 ValueRef TruncateToIntBuiltInFunc::invoke(VMState& vmstate)
 {
-	const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
-
-	return new IntValue((int)a->value);
+	if(type->getType() == Type::FloatType)
+	{
+		const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+		return new IntValue((int)a->value);
+	}
+	else if(type->getType() == Type::DoubleType)
+	{
+		const DoubleValue* a = checkedCast<const DoubleValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+		return new IntValue((int)a->value);
+	}
+	else
+		throw BaseException("TruncateToIntBuiltInFunc todo");
 }
 
 
@@ -3142,7 +3229,6 @@ TypeRef ToFloatBuiltInFunc::getReturnType(const TypeRef& arg_type)
 ValueRef ToFloatBuiltInFunc::invoke(VMState& vmstate)
 {
 	const IntValue* a = checkedCast<const IntValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
-
 	return new FloatValue((float)a->value);
 }
 

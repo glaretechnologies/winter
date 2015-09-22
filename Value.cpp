@@ -55,6 +55,24 @@ llvm::Constant* FloatValue::getConstantLLVMValue(EmitLLVMCodeParams& params, con
 //------------------------------------------------------------------------------------------
 
 
+const std::string DoubleValue::toString() const
+{
+	return ::doubleLiteralString(this->value);
+}
+
+
+llvm::Constant* DoubleValue::getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const
+{
+	return llvm::ConstantFP::get(
+		*params.context, 
+		llvm::APFloat(this->value)
+	);
+}
+
+
+//------------------------------------------------------------------------------------------
+
+
 llvm::Constant* BoolValue::getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const
 {
 	return llvm::ConstantInt::get(

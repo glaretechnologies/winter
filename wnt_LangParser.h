@@ -61,7 +61,7 @@ LangParser
 class LangParser
 {
 public:
-	LangParser();
+	LangParser(bool floating_point_literals_default_to_double, bool real_is_double);
 
 	~LangParser();
 
@@ -132,7 +132,8 @@ private:
 	bool isKeyword(const std::string& name);
 private:
 	std::vector<unsigned int> comparison_tokens;
-
+	bool floating_point_literals_default_to_double;
+	bool real_is_double;
 };
 
 

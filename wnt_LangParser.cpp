@@ -36,7 +36,9 @@ namespace Winter
 {
 
 
-LangParser::LangParser()
+LangParser::LangParser(bool floating_point_literals_default_to_double_, bool real_is_double_)
+:	floating_point_literals_default_to_double(floating_point_literals_default_to_double_),
+	real_is_double(real_is_double_)
 {
 	comparison_tokens.push_back(DOUBLE_EQUALS_TOKEN);
 	comparison_tokens.push_back(NOT_EQUALS_TOKEN);
@@ -665,7 +667,18 @@ ASTNodeRef LangParser::parseLiteral(ParseInfo& p)
 	}
 	else if(p.tokens[p.i]->getType() == FLOAT_LITERAL_TOKEN)
 	{
-		return new FloatLiteral(p.tokens[p.i++]->getFloatLiteralValue(), loc);
+		if(static_cast<FloatLiteralToken*>(p.tokens[p.i].getPointer())->suffix == 'f')
+			return new FloatLiteral(p.tokens[p.i++]->getFloatLiteralValue(), loc);
+		else if(static_cast<FloatLiteralToken*>(p.tokens[p.i].getPointer())->suffix == 'd')
+			return new DoubleLiteral(p.tokens[p.i++]->getFloatLiteralValue(), loc);
+		else
+		{
+			// no suffix:
+			if(floating_point_literals_default_to_double)
+				return new DoubleLiteral(p.tokens[p.i++]->getFloatLiteralValue(), loc);
+			else
+				return new FloatLiteral(p.tokens[p.i++]->getFloatLiteralValue(), loc);
+		}
 	}
 	else if(p.tokens[p.i]->getType() == STRING_LITERAL_TOKEN)
 	{
@@ -865,8 +878,17 @@ TypeRef LangParser::parseElementaryType(ParseInfo& p)
 		t = parseIdentifier("type", p);
 	}
 
-	if(t == "float" || t == "real")
+	if(t == "float")
 		return new Float();
+	else if(t == "double")
+		return new Double();
+	else if(t == "real")
+	{
+		if(real_is_double)
+			return new Double();
+		else
+			return new Float();
+	}
 	else if(t == "int")
 		return new Int();
 	else if(t == "int64")
@@ -1762,7 +1784,7 @@ void LangParser::test()
 	Lexer::process(buffer, tokens);
 	try
 	{
-		LangParser lp;
+		LangParser lp(true, true);
 //		Reference<ASTNode> root = lp.parseBuffer(tokens, s.c_str());
 	
 //		testAssert(root->nodeType() == ASTNode::BufferRootType);

@@ -56,7 +56,8 @@ public:
 class VMConstructionArgs
 {
 public:
-	VMConstructionArgs() : env(NULL), allow_unsafe_operations(false), emit_trace_code(false), build_llvm_code(true) /*, add_opaque_env_arg(false)*/ {}
+	VMConstructionArgs() : env(NULL), allow_unsafe_operations(false), emit_trace_code(false), build_llvm_code(true), floating_point_literals_default_to_double(true), 
+		try_coerce_int_to_double_first(true), real_is_double(true) /*, add_opaque_env_arg(false)*/ {}
 	std::vector<ExternalFunctionRef> external_functions;
 	std::vector<SourceBufferRef> source_buffers;
 	std::vector<FunctionSignature> entry_point_sigs;
@@ -68,6 +69,15 @@ public:
 	std::vector<Reference<FunctionRewriter> > function_rewriters;
 
 	bool build_llvm_code; // JIT compile executable code with LLVM.  Can be set to false when e.g. you just want OpenCL code.
+
+	// If true, literals like "1.2" are interpreted as doubles.  Otherwise they are interpreted as floats.
+	bool floating_point_literals_default_to_double; // true by default.
+
+	// If true, an expression like sqrt(9) will call the sqrt(double), otherwise it will call sqrt(float)
+	bool try_coerce_int_to_double_first; // true by default
+
+	// If true, 'real' is treated as an alias for double, otherwise as an alias for 'float'.
+	bool real_is_double; // True by default.
 };
 
 
