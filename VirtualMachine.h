@@ -70,7 +70,7 @@ public:
 
 	bool build_llvm_code; // JIT compile executable code with LLVM.  Can be set to false when e.g. you just want OpenCL code.
 
-	// If true, literals like "1.2" are interpreted as doubles.  Otherwise they are interpreted as floats.
+	// If true, literals like "1.2" (without an 'f' suffix) are interpreted as doubles.  Otherwise they are interpreted as floats.
 	bool floating_point_literals_default_to_double; // true by default.
 
 	// If true, an expression like sqrt(9) will call the sqrt(double), otherwise it will call sqrt(float)

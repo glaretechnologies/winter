@@ -528,11 +528,24 @@ public:
 			return (uint64_t)logf;
 		else if(name == "_memcpy")
 			return (uint64_t)memcpy;
+		// OS X double precision functions:
+		else if(name == "_sin")
+			return (uint64_t)static_cast<double(*)(double)>(sin); // Use static_cast to pick the correct overload.
+		else if(name == "_cos")
+			return (uint64_t)static_cast<double(*)(double)>(cos);
+		else if(name == "_pow")
+			return (uint64_t)static_cast<double(*)(double, double)>(pow);
+		else if(name == "_exp")
+			return (uint64_t)static_cast<double(*)(double)>(exp);
+		else if(name == "_log")
+			return (uint64_t)static_cast<double(*)(double)>(log);
 #if defined(OSX)
 		else if(name == "_memset_pattern16")
 			return (uint64_t)memset_pattern16;
 		else if(name == "_exp2f")
 			return (uint64_t)exp2f;
+		else if(name == "_exp2")
+			return (uint64_t)static_cast<double(*)(double)>(exp2);
 #endif
 
 		// If function was not in func_map (i.e. was not an 'external' function), then use normal symbol resolution, for functions like sinf, cosf etc..
