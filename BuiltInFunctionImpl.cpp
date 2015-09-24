@@ -2500,6 +2500,15 @@ ValueRef VectorMinBuiltInFunc::invoke(VMState& vmstate)
 			res_values[i] = new FloatValue(x < y ? x : y);
 		}
 	}
+	else if(this->vector_type->elem_type->getType() == Type::DoubleType)
+	{
+		for(unsigned int i=0; i<vector_type->num; ++i)
+		{
+			const float x = checkedCast<const DoubleValue>(a->e[i].getPointer())->value;
+			const float y = checkedCast<const DoubleValue>(b->e[i].getPointer())->value;
+			res_values[i] = new DoubleValue(x < y ? x : y);
+		}
+	}
 	else if(this->vector_type->elem_type->getType() == Type::IntType)
 	{
 		for(unsigned int i=0; i<vector_type->num; ++i)
@@ -2525,7 +2534,7 @@ llvm::Value* VectorMinBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 
 	llvm::Value* condition;
 	
-	if(this->vector_type->elem_type->getType() == Type::FloatType)
+	if(this->vector_type->elem_type->getType() == Type::FloatType || this->vector_type->elem_type->getType() == Type::DoubleType)
 	{
 		condition = params.builder->CreateFCmpOLT(a, b);
 	}
@@ -2603,6 +2612,15 @@ ValueRef VectorMaxBuiltInFunc::invoke(VMState& vmstate)
 			res_values[i] = new FloatValue(x > y ? x : y);
 		}
 	}
+	else if(this->vector_type->elem_type->getType() == Type::DoubleType)
+	{
+		for(unsigned int i=0; i<vector_type->num; ++i)
+		{
+			const float x = checkedCast<const DoubleValue>(a->e[i].getPointer())->value;
+			const float y = checkedCast<const DoubleValue>(b->e[i].getPointer())->value;
+			res_values[i] = new DoubleValue(x > y ? x : y);
+		}
+	}
 	else if(this->vector_type->elem_type->getType() == Type::IntType)
 	{
 		for(unsigned int i=0; i<vector_type->num; ++i)
@@ -2628,7 +2646,7 @@ llvm::Value* VectorMaxBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 	llvm::Value* b = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
 
 	llvm::Value* condition;
-	if(this->vector_type->elem_type->getType() == Type::FloatType)
+	if(this->vector_type->elem_type->getType() == Type::FloatType || this->vector_type->elem_type->getType() == Type::DoubleType)
 	{
 		condition = params.builder->CreateFCmpOGT(a, b);
 	}

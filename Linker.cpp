@@ -713,6 +713,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 
 			if((
 				(static_cast<const VectorType*>(sig.param_types[0].getPointer())->elem_type->getType() == Type::FloatType) || // if vector of floats
+				(static_cast<const VectorType*>(sig.param_types[0].getPointer())->elem_type->getType() == Type::DoubleType) || // or vector of doubles
 				(static_cast<const VectorType*>(sig.param_types[0].getPointer())->elem_type->getType() == Type::IntType)  // or vector of ints
 				) && (*sig.param_types[0] == *sig.param_types[1])) // and argument types are the same
 			{

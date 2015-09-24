@@ -4703,6 +4703,8 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 				  b = [11.0, 12.0, 13.0, 14.0]v in \
 				  e2(min(b, a))", 3.0);
 
+	testMainDoubleArg("def main(double x) double : min([1.0, 2.0]v, [3.0, x]v)[1]", 1.5, 1.5);
+
 	// Test vector max
 	testMainFloat("	def main() float : \
 				  let a = [1.0, 2.0, 3.0, 4.0]v \
@@ -4712,7 +4714,9 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 				  let a = [1.0, 2.0, 3.0, 4.0]v \
 				  b = [11.0, 12.0, 13.0, 14.0]v in \
 				  e2(max(b, a))", 13.0);
-				  
+	
+	testMainDoubleArg("def main(double x) double : max([1.0, 2.0]v, [3.0, x]v)[1]", 1.5, 2.0);
+
 
 	testMainFloat("	def clamp(vector<float, 4> x, vector<float, 4> lowerbound, vector<float, 4> upperbound) vector<float, 4> : max(lowerbound, min(upperbound, x))  \n\
 					def make_v4f(float x) vector<float, 4> : [x, x, x, x]v  \n\
