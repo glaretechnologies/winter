@@ -2504,8 +2504,8 @@ ValueRef VectorMinBuiltInFunc::invoke(VMState& vmstate)
 	{
 		for(unsigned int i=0; i<vector_type->num; ++i)
 		{
-			const float x = checkedCast<const DoubleValue>(a->e[i].getPointer())->value;
-			const float y = checkedCast<const DoubleValue>(b->e[i].getPointer())->value;
+			const double x = checkedCast<const DoubleValue>(a->e[i].getPointer())->value;
+			const double y = checkedCast<const DoubleValue>(b->e[i].getPointer())->value;
 			res_values[i] = new DoubleValue(x < y ? x : y);
 		}
 	}
@@ -2616,8 +2616,8 @@ ValueRef VectorMaxBuiltInFunc::invoke(VMState& vmstate)
 	{
 		for(unsigned int i=0; i<vector_type->num; ++i)
 		{
-			const float x = checkedCast<const DoubleValue>(a->e[i].getPointer())->value;
-			const float y = checkedCast<const DoubleValue>(b->e[i].getPointer())->value;
+			const double x = checkedCast<const DoubleValue>(a->e[i].getPointer())->value;
+			const double y = checkedCast<const DoubleValue>(b->e[i].getPointer())->value;
 			res_values[i] = new DoubleValue(x > y ? x : y);
 		}
 	}

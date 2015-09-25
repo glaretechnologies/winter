@@ -668,7 +668,7 @@ ASTNodeRef LangParser::parseLiteral(ParseInfo& p)
 	else if(p.tokens[p.i]->getType() == FLOAT_LITERAL_TOKEN)
 	{
 		if(static_cast<FloatLiteralToken*>(p.tokens[p.i].getPointer())->suffix == 'f')
-			return new FloatLiteral(p.tokens[p.i++]->getFloatLiteralValue(), loc);
+			return new FloatLiteral((float)p.tokens[p.i++]->getFloatLiteralValue(), loc);
 		else if(static_cast<FloatLiteralToken*>(p.tokens[p.i].getPointer())->suffix == 'd')
 			return new DoubleLiteral(p.tokens[p.i++]->getFloatLiteralValue(), loc);
 		else
@@ -677,7 +677,7 @@ ASTNodeRef LangParser::parseLiteral(ParseInfo& p)
 			if(floating_point_literals_default_to_double)
 				return new DoubleLiteral(p.tokens[p.i++]->getFloatLiteralValue(), loc);
 			else
-				return new FloatLiteral(p.tokens[p.i++]->getFloatLiteralValue(), loc);
+				return new FloatLiteral((float)p.tokens[p.i++]->getFloatLiteralValue(), loc);
 		}
 	}
 	else if(p.tokens[p.i]->getType() == STRING_LITERAL_TOKEN)
