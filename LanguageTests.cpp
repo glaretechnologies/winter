@@ -4647,6 +4647,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 					y = [10.0, 20.0, 30.0, 40.0]v in\
 					e1(x + y)", 22.0f);
 
+	testMainFloatArg("def main(float x) float :  ([1.0, 2.0, 3.0, 4.0]v + [x, x, x, x]v)[1]", 20.0, 22.0);
 	testMainDoubleArg("def main(double x) double :  ([1.0, 2.0, 3.0, 4.0]v + [x, x, x, x]v)[1]", 20.0, 22.0);
 
 
@@ -4655,7 +4656,8 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 					let x = [1.0, 2.0, 3.0, 4.0]v \
 					y = [10.0, 20.0, 30.0, 40.0]v in \
 					e1(x - y)", -18.0f);
-
+	
+	testMainFloatArg("def main(float x) float :  ([1.0, 2.0, 3.0, 4.0]v - [x, x, x, x]v)[1]", 20.0, -18);
 	testMainDoubleArg("def main(double x) double :  ([1.0, 2.0, 3.0, 4.0]v - [x, x, x, x]v)[1]", 20.0, -18);
 
 
@@ -4664,6 +4666,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 				  let x = [1.0, 2.0, 3.0, 4.0]v in \
 			  e1(x * 10.0)", 2.0f * 10.0f);
 
+	testMainFloatArg("def main(float x) float :  ([1.0, 2.0, 3.0, 4.0]v * x)[1]", 10.0, 20.0);
 	testMainDoubleArg("def main(double x) double :  ([1.0, 2.0, 3.0, 4.0]v * x)[1]", 10.0, 20.0);
 
 
@@ -4673,6 +4676,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 				  y = [10.0, 20.0, 30.0, 40.0]v in\
 				e1(x * y)", 2.0f * 20.0f);
 
+	testMainFloatArg("def main(float x) float :  ([1.0, 2.0, 3.0, 4.0]v * [x, x, x, x]v)[1]", 10.0, 20.0);
 	testMainDoubleArg("def main(double x) double :  ([1.0, 2.0, 3.0, 4.0]v * [x, x, x, x]v)[1]", 10.0, 20.0);
 
 
@@ -4715,6 +4719,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 				  b = [11.0, 12.0, 13.0, 14.0]v in \
 				  e2(min(b, a))", 3.0);
 
+	testMainFloatArg("def main(float x) float : min([1.0, 2.0]v, [3.0, x]v)[1]", 1.5, 1.5);
 	testMainDoubleArg("def main(double x) double : min([1.0, 2.0]v, [3.0, x]v)[1]", 1.5, 1.5);
 
 	// Test vector max
@@ -4727,6 +4732,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 				  b = [11.0, 12.0, 13.0, 14.0]v in \
 				  e2(max(b, a))", 13.0);
 	
+	testMainFloatArg("def main(float x) float : max([1.0, 2.0]v, [3.0, x]v)[1]", 1.5, 2.0);
 	testMainDoubleArg("def main(double x) double : max([1.0, 2.0]v, [3.0, x]v)[1]", 1.5, 2.0);
 
 

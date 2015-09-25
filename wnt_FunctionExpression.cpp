@@ -1377,7 +1377,7 @@ static bool isCallToBuiltInOpenCLFunction(const FunctionDefinition* func)
 {
 	// See if the arguments are all basic types.  If not, this isn't a call to a basic OpenCL function
 	for(size_t i=0; i<func->sig.param_types.size(); ++i)
-		if(!(func->sig.param_types[i]->getType() == Type::FloatType || func->sig.param_types[i]->getType() == Type::IntType || func->sig.param_types[i]->getType() == Type::VectorTypeType))
+		if(!(func->sig.param_types[i]->getType() == Type::FloatType || func->sig.param_types[i]->getType() == Type::DoubleType || func->sig.param_types[i]->getType() == Type::IntType || func->sig.param_types[i]->getType() == Type::VectorTypeType))
 			return false;
 
 	for(size_t i=0; opencl_built_in_func_names[i] != NULL; ++i)
@@ -1567,19 +1567,25 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 	}
 	else if(static_function_name == "abs" && (argument_expressions.size() == 1) && 
 		(argument_expressions[0]->type()->getType() == Type::FloatType || 
-		(argument_expressions[0]->type()->getType() == Type::VectorTypeType && argument_expressions[0]->type().downcastToPtr<VectorType>()->elem_type->getType() == Type::FloatType)))
+		argument_expressions[0]->type()->getType() == Type::DoubleType ||
+		(argument_expressions[0]->type()->getType() == Type::VectorTypeType && argument_expressions[0]->type().downcastToPtr<VectorType>()->elem_type->getType() == Type::FloatType) ||
+		(argument_expressions[0]->type()->getType() == Type::VectorTypeType && argument_expressions[0]->type().downcastToPtr<VectorType>()->elem_type->getType() == Type::DoubleType)))
 	{
 		return "fabs(" + argument_expressions[0]->emitOpenCLC(params) + ")";
 	}
 	else if(static_function_name == "min" && (argument_expressions.size() == 2) && 
 		(argument_expressions[0]->type()->getType() == Type::FloatType || 
-		(argument_expressions[0]->type()->getType() == Type::VectorTypeType && argument_expressions[0]->type().downcastToPtr<VectorType>()->elem_type->getType() == Type::FloatType)))
+		argument_expressions[0]->type()->getType() == Type::DoubleType ||
+		(argument_expressions[0]->type()->getType() == Type::VectorTypeType && argument_expressions[0]->type().downcastToPtr<VectorType>()->elem_type->getType() == Type::FloatType) ||
+		(argument_expressions[0]->type()->getType() == Type::VectorTypeType && argument_expressions[0]->type().downcastToPtr<VectorType>()->elem_type->getType() == Type::DoubleType)))
 	{
 		return "fmin(" + argument_expressions[0]->emitOpenCLC(params) + ", " + argument_expressions[1]->emitOpenCLC(params) + ")";
 	}
 	else if(static_function_name == "max" && (argument_expressions.size() == 2) && 
 		(argument_expressions[0]->type()->getType() == Type::FloatType || 
-		(argument_expressions[0]->type()->getType() == Type::VectorTypeType && argument_expressions[0]->type().downcastToPtr<VectorType>()->elem_type->getType() == Type::FloatType)))
+		argument_expressions[0]->type()->getType() == Type::DoubleType ||
+		(argument_expressions[0]->type()->getType() == Type::VectorTypeType && argument_expressions[0]->type().downcastToPtr<VectorType>()->elem_type->getType() == Type::FloatType) ||
+		(argument_expressions[0]->type()->getType() == Type::VectorTypeType && argument_expressions[0]->type().downcastToPtr<VectorType>()->elem_type->getType() == Type::DoubleType)))
 	{
 		return "fmax(" + argument_expressions[0]->emitOpenCLC(params) + ", " + argument_expressions[1]->emitOpenCLC(params) + ")";
 	}
