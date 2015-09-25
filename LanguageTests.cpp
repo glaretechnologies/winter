@@ -4647,22 +4647,34 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 					y = [10.0, 20.0, 30.0, 40.0]v in\
 					e1(x + y)", 22.0f);
 
+	testMainDoubleArg("def main(double x) double :  ([1.0, 2.0, 3.0, 4.0]v + [x, x, x, x]v)[1]", 20.0, 22.0);
+
+
 	// Test vector subtraction
 	testMainFloat("	def main() float : \
 					let x = [1.0, 2.0, 3.0, 4.0]v \
 					y = [10.0, 20.0, 30.0, 40.0]v in \
 					e1(x - y)", -18.0f);
 
+	testMainDoubleArg("def main(double x) double :  ([1.0, 2.0, 3.0, 4.0]v - [x, x, x, x]v)[1]", 20.0, -18);
+
+
 	// Test vector * float multiplication
 	testMainFloat("	def main() float : \
 				  let x = [1.0, 2.0, 3.0, 4.0]v in \
 			  e1(x * 10.0)", 2.0f * 10.0f);
+
+	testMainDoubleArg("def main(double x) double :  ([1.0, 2.0, 3.0, 4.0]v * x)[1]", 10.0, 20.0);
+
 
 	// Test vector * vector multiplication
 	testMainFloat("	def main() float : \
 				  let x = [1.0, 2.0, 3.0, 4.0]v \
 				  y = [10.0, 20.0, 30.0, 40.0]v in\
 				e1(x * y)", 2.0f * 20.0f);
+
+	testMainDoubleArg("def main(double x) double :  ([1.0, 2.0, 3.0, 4.0]v * [x, x, x, x]v)[1]", 10.0, 20.0);
+
 
 	// Test vector<int> * vector<int> multiplication
 	testMainInteger("	def main() int : \

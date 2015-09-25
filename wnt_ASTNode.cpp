@@ -2111,7 +2111,7 @@ llvm::Value* AdditionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 	if(this->type()->getType() == Type::VectorTypeType)
 	{
 		const TypeRef elem_type = this->type().downcast<VectorType>()->elem_type;
-		if(elem_type->getType() == Type::FloatType)
+		if(elem_type->getType() == Type::FloatType || elem_type->getType() == Type::DoubleType)
 		{
 			return params.builder->CreateFAdd(
 				a->emitLLVMCode(params), 
