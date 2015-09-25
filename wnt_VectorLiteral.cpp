@@ -83,6 +83,9 @@ TypeRef VectorLiteral::type() const
 				if(cur_elem_type.isNull())
 					return NULL;
 
+				if(cur_elem_type->getType() == Type::DoubleType)
+					return new VectorType(new Double(), (int)elements.size()); // double vector type
+
 				if(cur_elem_type->getType() == Type::FloatType)
 					return new VectorType(new Float(), (int)elements.size()); // float vector type
 			}
@@ -156,10 +159,10 @@ std::string VectorLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 	// TODO: check vector width
 
-	if(!(this->elements[0]->type()->getType() == Type::FloatType || (this->elements[0]->type()->getType() == Type::IntType && this->elements[0]->type().downcastToPtr<Int>()->numBits() == 32)))
+	if(!(this->elements[0]->type()->getType() == Type::FloatType || this->elements[0]->type()->getType() == Type::DoubleType || (this->elements[0]->type()->getType() == Type::IntType && this->elements[0]->type().downcastToPtr<Int>()->numBits() == 32)))
 		throw BaseException("Only vectors of float or int32 supported for OpenCL currently.");
 
-	const std::string elem_typename = this->elements[0]->type()->getType() == Type::FloatType ? "float" : "int";
+	const std::string elem_typename = this->elements[0]->type()->OpenCLCType(); //this->elements[0]->type()->getType() == Type::FloatType ? "float" : "int";
 	if(has_int_suffix)
 	{
 		// "(float4)(1.0f, 2.0f, 3.0f, 4.0)"
@@ -206,12 +209,30 @@ void VectorLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 		// A vector of elements that contains one or more float-typed elements will be considered to be a float-typed vector.
 		// Either all integer elements will be succesfully constant-folded and coerced to a float literal, or type checking will fail.
 
+		// Do we have any double literals in this vector?
+		bool have_double = false;
+		for(size_t i=0; i<elements.size(); ++i)
+			have_double = have_double || (elements[i]->type().nonNull() && elements[i]->type()->getType() == Type::DoubleType);
+
 		// Do we have any float literals in this vector?
 		bool have_float = false;
 		for(size_t i=0; i<elements.size(); ++i)
 			have_float = have_float || (elements[i]->type().nonNull() && elements[i]->type()->getType() == Type::FloatType);
 
-		if(have_float)
+		if(have_double)
+		{
+			for(size_t i=0; i<elements.size(); ++i)
+				if(elements[i]->nodeType() == ASTNode::IntLiteralType)
+				{
+					const IntLiteral* int_lit = static_cast<const IntLiteral*>(elements[i].getPointer());
+					if(isIntExactlyRepresentableAsDouble(int_lit->value))
+					{
+						elements[i] = new DoubleLiteral((double)int_lit->value, int_lit->srcLocation());
+						payload.tree_changed = true;
+					}
+				}
+		}
+		else if(have_float)
 		{
 			for(size_t i=0; i<elements.size(); ++i)
 				if(elements[i]->nodeType() == ASTNode::IntLiteralType)
