@@ -613,7 +613,8 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 	env(args.env),
 	llvm_context(NULL),
 	llvm_module(NULL),
-	llvm_exec_engine(NULL)
+	llvm_exec_engine(NULL),
+	vm_args(args)
 {
 	assert(string_count == 0 && varray_count == 0 && closure_count == 0);
 
@@ -1890,20 +1891,26 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 		}
 
 		// Add some Winter built-in functions.  TODO: move this stuff some place better?
-	const std::string built_in_func_code = 
+	std::string built_in_func_code = 
 "// Winter built-in functions \n\
 float toFloat_int_(int x) { return (float)x; } \n\
-double toDouble_int_(int x) { return (double)x; } \n\
 int truncateToInt_float_(float x) { return (int)x; } \n\
-int truncateToInt_double_(double x) { return (int)x; } \n\
 int8 truncateToInt_vector_float__8__(float8 v) { return convert_int8(v); }  \n\
-int8 truncateToInt_vector_double__8__(float8 v) { return convert_int8(v); }  \n\
 long toInt_opaque_(void* p) { return (long)p; }  \n\
 float print_float_(float x) { printf((__constant char *)\"%f\\n\", x); return x; }    \n\
-double print_double_(double x) { printf((__constant char *)\"%f\\n\", x); return x; }    \n\
 int toInt32_int64_(long x) { return (int)x; }		\n\
 long toInt64_int_(int x) { return (long)x; }		\n\
 \n";
+
+	if(vm_args.opencl_double_support)
+	{
+		built_in_func_code +=
+"double toDouble_int_(int x) { return (double)x; } \n\
+int truncateToInt_double_(double x) { return (int)x; } \n\
+int8 truncateToInt_vector_double__8__(float8 v) { return convert_int8(v); }  \n\
+double print_double_(double x) { printf((__constant char *)\"%f\\n\", x); return x; }    \n\
+\n";
+	}
 
 	res.struct_def_code = struct_def_code;
 	res.function_code = constructor_code + "\n\n" + built_in_func_code + "\n\n" + params.file_scope_code + "\n\n" + top_level_def_src;
