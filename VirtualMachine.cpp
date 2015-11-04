@@ -1900,7 +1900,7 @@ int8 truncateToInt_vector_float__8__(float8 v) { return convert_int8(v); }  \n\
 int8 truncateToInt_vector_double__8__(float8 v) { return convert_int8(v); }  \n\
 long toInt_opaque_(void* p) { return (long)p; }  \n\
 float print_float_(float x) { printf((__constant char *)\"%f\\n\", x); return x; }    \n\
-float print_double_(double x) { printf((__constant char *)\"%f\\n\", x); return x; }    \n\
+double print_double_(double x) { printf((__constant char *)\"%f\\n\", x); return x; }    \n\
 int toInt32_int64_(long x) { return (int)x; }		\n\
 long toInt64_int_(int x) { return (long)x; }		\n\
 \n";
