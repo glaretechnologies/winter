@@ -480,17 +480,22 @@ FunctionDefinitionRef LangParser::parseFunctionDefinitionGivenName(const std::st
 		SrcLocation loc = prevTokenLoc(p);
 
 		// Parse generic parameters, if present
+		std::vector<std::string> generic_type_param_names;
 		p.generic_type_params.resize(0);
 		if(isTokenCurrent(LEFT_ANGLE_BRACKET_TOKEN, p))
 		{
 			parseToken(LEFT_ANGLE_BRACKET_TOKEN, p);
 
-			p.generic_type_params.push_back(parseIdentifier("type parameter", p));
+			const std::string type_param_name = parseIdentifier("type parameter", p);
+			generic_type_param_names.push_back(type_param_name);
+			p.generic_type_params.push_back(type_param_name);
 
 			while(isTokenCurrent(COMMA_TOKEN, p))
 			{
 				parseToken(COMMA_TOKEN, p);
-				p.generic_type_params.push_back(parseIdentifier("type parameter", p));
+				const std::string type_param_name = parseIdentifier("type parameter", p);
+				generic_type_param_names.push_back(type_param_name);
+				p.generic_type_params.push_back(type_param_name);
 			}
 
 			parseToken(RIGHT_ANGLE_BRACKET_TOKEN, p);
@@ -529,6 +534,7 @@ FunctionDefinitionRef LangParser::parseFunctionDefinitionGivenName(const std::st
 			return_type, // declared return type
 			NULL // built in func impl
 		);
+		def->generic_type_param_names = generic_type_param_names;
 
 		return def;
 	}
@@ -933,10 +939,13 @@ TypeRef LangParser::parseElementaryType(ParseInfo& p)
 			// Not a named type, maybe it is a type parameter
 			for(unsigned int i=0; i<p.generic_type_params.size(); ++i)
 				if(t == p.generic_type_params[i])
-					return TypeRef(new GenericType(i));
+					return new GenericType(t, i);
 
 			// If it wasn't a generic type, then it's completely unknown, like a rolling stone.
-			throw LangParserExcep("Unknown type '" + t + "'." + errorPositionPrevToken(p));
+			//throw LangParserExcep("Unknown type '" + t + "'." + errorPositionPrevToken(p));
+			TypeRef the_type = new OpaqueStructureType(t);
+			the_type->address_space = address_space;
+			return the_type;
 		}
 		else
 		{

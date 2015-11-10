@@ -57,7 +57,7 @@ class VMConstructionArgs
 {
 public:
 	VMConstructionArgs() : env(NULL), allow_unsafe_operations(false), emit_trace_code(false), build_llvm_code(true), floating_point_literals_default_to_double(true), 
-		try_coerce_int_to_double_first(true), real_is_double(true), opencl_double_support(true) /*, add_opaque_env_arg(false)*/ {}
+		try_coerce_int_to_double_first(true), real_is_double(true), opencl_double_support(true), comments_in_opencl_output(true) /*, add_opaque_env_arg(false)*/ {}
 	std::vector<ExternalFunctionRef> external_functions;
 	std::vector<SourceBufferRef> source_buffers;
 	std::vector<FunctionSignature> entry_point_sigs;
@@ -81,6 +81,9 @@ public:
 
 	// If true, some built-in OpenCL support functions that use double, such as print(double), are compiled.
 	bool opencl_double_support; // True by default.
+
+	// If true, some (hopefully) helpful comments are added to to OpenCL C output.
+	bool comments_in_opencl_output; // True by default.
 };
 
 

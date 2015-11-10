@@ -140,6 +140,8 @@ std::string VectorLiteral::sourceString() const
 			s += ", ";
 	}
 	s += "]v";
+	if(has_int_suffix)
+		s += toString(int_suffix);
 	return s;
 }
 

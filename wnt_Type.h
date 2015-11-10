@@ -47,7 +47,8 @@ public:
 		OpaqueTypeType,
 		SumTypeType,
 		ErrorTypeType,
-		TupleTypeType
+		TupleTypeType,
+		OpaqueStructureTypeType
 	};
 
 	Type(TypeType t) : type(t) {}
@@ -124,14 +125,15 @@ public:
 class GenericType : public Type
 {
 public:
-	GenericType(int generic_type_param_index_) : Type(GenericTypeType), generic_type_param_index(generic_type_param_index_) {}
-	virtual const std::string toString() const { return "generic"; }
+	GenericType(const std::string& name_, int generic_type_param_index_) : Type(GenericTypeType), name(name_), generic_type_param_index(generic_type_param_index_) {}
+	virtual const std::string toString() const { return name; }
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 	virtual llvm::Type* LLVMType(llvm::Module& module) const;
-	virtual const std::string OpenCLCType() const { return "generic"; }
+	virtual const std::string OpenCLCType() const { return name; }
 	const int genericTypeParamIndex() const { return generic_type_param_index; }
 private:
+	std::string name;
 	int generic_type_param_index;
 };
 
@@ -177,18 +179,6 @@ public:
 	virtual llvm::Type* LLVMType(llvm::Module& module) const;
 	virtual const std::string OpenCLCType() const { return "bool"; }
 };
-
-
-/*class Tuple : public Type
-{
-	std::vector<TypeRef> types;
-};
-
-class TupleN : public Type
-{
-	TypeRef t;
-	int n;
-};*/
 
 
 class String : public Type
@@ -422,7 +412,7 @@ class StructureType : public Type
 public:
 	StructureType(const std::string& name_, const std::vector<TypeRef>& component_types_, const std::vector<std::string>& component_names_);
 
-	virtual const std::string toString() const { return /*"struct " + */name; }
+	virtual const std::string toString() const;
 	virtual bool lessThan(const Type& b) const
 	{
 		if(getType() < b.getType())
@@ -452,8 +442,9 @@ public:
 	virtual void getContainedTypesWithDestructors(std::set<ConstTypeRef, ConstTypeRefLessThan>& types) const;
 	virtual bool containsType(const Type& other_type) const;
 
-	const std::string getOpenCLCDefinition() const; // Get full definition string, e.g. struct a { float b; };
-	const std::string getOpenCLCConstructor() const; // Emit constructor for type
+	const std::string definitionString() const; // Winter definition string, e.g "struct a { float b }"
+	const std::string getOpenCLCDefinition(bool emit_comments) const; // Get full definition string, e.g. "struct a { float b; };"
+	const std::string getOpenCLCConstructor(bool emit_comments) const; // Emit constructor for type
 
 	std::vector<Reference<TupleType> > getElementTupleTypes() const;
 
@@ -505,8 +496,8 @@ public:
 	virtual bool OpenCLPassByPointer() const { return true; }
 	virtual bool passByValue() const { return false; }
 
-	const std::string getOpenCLCDefinition() const; // Get full definition string, e.g. struct a { float b; };
-	const std::string getOpenCLCConstructor() const; // Emit constructor for type
+	const std::string getOpenCLCDefinition(bool emit_comments) const; // Get full definition string, e.g. struct a { float b; };
+	const std::string getOpenCLCConstructor(bool emit_comments) const; // Emit constructor for type
 
 	virtual void emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const;
 	virtual void emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const;
@@ -648,6 +639,35 @@ public:
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 	virtual llvm::Type* LLVMType(llvm::Module& module) const;
 	virtual const std::string OpenCLCType() const;
+};
+
+
+// An unknown named type.  Useful for parsing an isolated piece of source code where not all types are known.
+class OpaqueStructureType : public Type
+{
+public:
+	OpaqueStructureType(const std::string& name_);
+
+	virtual const std::string toString() const;
+	virtual bool lessThan(const Type& b) const
+	{
+		if(getType() < b.getType())
+			return true;
+		else if(b.getType() < getType())
+			return false;
+		else
+		{
+			// else b is a OpaqueStructureType as well
+			const OpaqueStructureType& b_struct = static_cast<const OpaqueStructureType&>(b);
+
+			return this->name < b_struct.name;
+		}
+	}
+	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
+	virtual llvm::Type* LLVMType(llvm::Module& module) const;
+	virtual const std::string OpenCLCType() const;
+
+	std::string name;
 };
 
 

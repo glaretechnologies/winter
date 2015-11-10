@@ -398,7 +398,11 @@ void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 			this->binding_type = UnboundVariable;
 		}
 	}
-	
+	else if(payload.operation == TraversalPayload::CustomVisit)
+	{
+		if(payload.custom_visitor.nonNull())
+			payload.custom_visitor->visit(*this, payload);
+	}
 }
 
 

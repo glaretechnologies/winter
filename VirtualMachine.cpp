@@ -1017,6 +1017,10 @@ void VirtualMachine::doDeadFunctionEliminationPass(const VMConstructionArgs& arg
 			payload.reachable_nodes.insert(f.getPointer()); // Mark as reachable
 			payload.nodes_to_process.push_back(f.getPointer()); // Add to to-process set.
 		}
+		else
+		{
+			//std::cout << "!!!!!!!!!!!!!!!!!!! Warning: failed to find entry point function " << args.entry_point_sigs[i].toString() << std::endl;
+		}
 	}
 
 	while(!payload.nodes_to_process.empty())
@@ -1817,6 +1821,7 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 
 	EmitOpenCLCodeParams params;
 	params.uid = 0;
+	params.emit_comments = vm_args.comments_in_opencl_output;
 
 	std::string top_level_def_src;
 	for(size_t i=0; i<linker.top_level_defs.size(); ++i)
@@ -1849,7 +1854,7 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 	// TODO: Will need to handle dependecies between tuples here as well.
 
 	std::set<TupleTypeRef, TypeRefLessThan> emitted_tuples;
-	std::string struct_def_code = "// OpenCL structure definitions for Winter structs and tuples, from VirtualMachine::buildOpenCLCode()\n";
+	std::string struct_def_code = this->vm_args.comments_in_opencl_output ? "// OpenCL structure definitions for Winter structs and tuples, from VirtualMachine::buildOpenCLCode()\n" : "";
 	std::string constructor_code;
 
 	// Spit out structure definitions and constructors
@@ -1864,29 +1869,29 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 			{
 				if(!ContainerUtils::contains(emitted_tuples, used_tuples[z])) // If not emitted yet:
 				{
-					struct_def_code += used_tuples[z]->getOpenCLCDefinition();
+					struct_def_code += used_tuples[z]->getOpenCLCDefinition(vm_args.comments_in_opencl_output);
 					emitted_tuples.insert(used_tuples[z]); // Add to set of emitted tuples
 				}
 			}
 
-			struct_def_code += struct_type->getOpenCLCDefinition(); // Emit structure definition
-			constructor_code += struct_type->getOpenCLCConstructor();
+			struct_def_code += struct_type->getOpenCLCDefinition(vm_args.comments_in_opencl_output); // Emit structure definition
+			constructor_code += struct_type->getOpenCLCConstructor(vm_args.comments_in_opencl_output);
 		}
 
 	// Spit out any remaining tuple definitions
 	for(auto i = params.tuple_types_used.begin(); i != params.tuple_types_used.end(); ++i)
 		if(!ContainerUtils::contains(emitted_tuples, *i)) // If not emitted yet:
 		{
-			struct_def_code += (*i)->getOpenCLCDefinition();
-			constructor_code += (*i)->getOpenCLCConstructor();
+			struct_def_code += (*i)->getOpenCLCDefinition(vm_args.comments_in_opencl_output);
+			constructor_code += (*i)->getOpenCLCConstructor(vm_args.comments_in_opencl_output);
 			emitted_tuples.insert(*i); // Add to set of emitted tuples
 		}
 
 	for(auto i = args.tuple_types_used.begin(); i != args.tuple_types_used.end(); ++i)
 		if(!ContainerUtils::contains(emitted_tuples, *i)) // If not emitted yet:
 		{
-			struct_def_code += (*i)->getOpenCLCDefinition();
-			constructor_code += (*i)->getOpenCLCConstructor();
+			struct_def_code += (*i)->getOpenCLCDefinition(vm_args.comments_in_opencl_output);
+			constructor_code += (*i)->getOpenCLCConstructor(vm_args.comments_in_opencl_output);
 			emitted_tuples.insert(*i); // Add to set of emitted tuples
 		}
 

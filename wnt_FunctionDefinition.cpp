@@ -268,7 +268,7 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 	if(is_anon_func && stack.empty() && (payload.operation != TraversalPayload::UpdateUpRefs))
 		return;
 
-	if(this->isGenericFunction())
+	if(this->isGenericFunction() && (payload.operation != TraversalPayload::CustomVisit))
 		return;
 
 
@@ -616,7 +616,25 @@ void FunctionDefinition::print(int depth, std::ostream& s) const
 
 std::string FunctionDefinition::sourceString() const
 {
-	std::string s = "def " + sig.name + "(";
+	std::string s;
+
+	if(is_anon_func)
+	{
+		s += "\\";
+	}
+	else
+	{
+		s += "def " + sig.name;
+	}
+
+	if(!generic_type_param_names.empty())
+	{
+		s += "<";
+		s += StringUtils::join(generic_type_param_names, ", ");
+		s += ">";
+	}
+	
+	s += "(";
 	for(unsigned int i=0; i<args.size(); ++i)
 	{
 		s += args[i].type->toString() + " " + args[i].name;
@@ -1469,10 +1487,11 @@ Reference<ASTNode> FunctionDefinition::clone(CloneMapType& clone_map)
 
 bool FunctionDefinition::isGenericFunction() const // true if it is parameterised by type.
 {
-	for(size_t i=0; i<this->args.size(); ++i)
-		if(this->args[i].type->getType() == Type::GenericTypeType)
-			return true;
-	return false;
+	return !generic_type_param_names.empty();
+	//for(size_t i=0; i<this->args.size(); ++i)
+	//	if(this->args[i].type->getType() == Type::GenericTypeType)
+	//		return true;
+	//return false;
 }
 
 

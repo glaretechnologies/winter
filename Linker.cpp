@@ -180,6 +180,7 @@ const std::string Linker::buildOpenCLCode()
 
 	EmitOpenCLCodeParams params;
 	params.uid = 0;
+	params.emit_comments = true;
 
 	for(Linker::SigToFuncMapType::iterator it = sig_to_function_map.begin(); it != sig_to_function_map.end(); ++it)
 	{

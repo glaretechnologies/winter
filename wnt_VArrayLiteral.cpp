@@ -115,7 +115,7 @@ std::string VArrayLiteral::sourceString() const
 		if(i + 1 < elements.size())
 			s += ", ";
 	}
-	s += "]a";
+	s += "]va";
 	return s;
 }
 

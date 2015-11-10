@@ -3869,8 +3869,22 @@ void LetASTNode::print(int depth, std::ostream& s) const
 
 std::string LetASTNode::sourceString() const
 {
-	assert(0);
-	return "";
+	if(vars.size() == 1)
+	{
+		return vars[0].name + " = " + expr->sourceString();
+	}
+	else
+	{
+		std::string s;
+		for(size_t i=0; i<vars.size(); ++i)
+		{
+			s += vars[i].name;
+			if(i + 1 < vars.size())
+				s += ", ";
+		}
+		s += " = " + expr->sourceString();
+		return s;
+	}
 }
 
 
@@ -3981,6 +3995,11 @@ void LetASTNode::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
 	{
 		doDeadCodeElimination(expr, payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::CustomVisit)
+	{
+		if(payload.custom_visitor.nonNull())
+			payload.custom_visitor->visit(*this, payload);
 	}
 
 	stack.pop_back();
@@ -4388,8 +4407,13 @@ void LetBlock::print(int depth, std::ostream& s) const
 
 std::string LetBlock::sourceString() const
 {
-	assert(0);
-	return "";
+	std::string s;
+	s += "let\n";
+	for(size_t i=0; i<lets.size(); ++i)
+		s += "\t" + lets[i]->sourceString() + "\n";
+	s += "in\n\t";
+	s += expr->sourceString();
+	return s;
 }
 
 
@@ -5000,6 +5024,12 @@ void NamedConstant::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	{
 		doDeadCodeElimination(value_expr, payload, stack);
 	}
+	else if(payload.operation == TraversalPayload::CustomVisit)
+	{
+		if(payload.custom_visitor.nonNull())
+			payload.custom_visitor->visit(*this, payload);
+	}
+
 
 	stack.pop_back();
 	//payload.named_constant_stack.pop_back();

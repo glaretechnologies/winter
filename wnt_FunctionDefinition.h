@@ -99,6 +99,8 @@ public:
 	//TypeRef function_type;
 	//vector<Reference<LetASTNode> > lets;
 
+	std::vector<std::string> generic_type_param_names;
+
 	FunctionSignature sig;
 	BuiltInFunctionImplRef built_in_func_impl;
 	ExternalFunctionRef external_function;

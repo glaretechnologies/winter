@@ -570,7 +570,7 @@ bool Function::containsType(const Type& other_type) const
 
 const std::string ArrayType::toString() const
 { 
-	return "array<" + elem_type->toString() + ", " + ::toString(num_elems) + ">";
+	return (address_space.empty() ? "" : address_space + " ") + "array<" + elem_type->toString() + ", " + ::toString(num_elems) + ">";
 }
 
 
@@ -839,6 +839,12 @@ StructureType::StructureType(const std::string& name_, const std::vector<TypeRef
 }
 
 
+const std::string StructureType::toString() const 
+{ 
+	return (address_space.empty() ? "" : address_space + " ") + name;
+}
+
+
 bool StructureType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
 {
 	if(this->getType() != b.getType())
@@ -903,7 +909,24 @@ llvm::Type* StructureType::LLVMType(llvm::Module& module) const
 }*/
 
 
-const std::string StructureType::getOpenCLCDefinition() const // Get full definition string, e.g. struct a { float b; };
+const std::string StructureType::definitionString() const // Winter definition string, e.g "struct a { float b }"
+{
+	std::string s = "struct " + name + "\n{\n";
+
+	for(size_t i=0; i<component_types.size(); ++i)
+	{
+		s += "\t" + component_types[i]->toString() + " " + component_names[i];
+		if(i + 1 < component_types.size())
+			s += ",";
+		s += "\n";
+	}
+
+	s += "}\n";
+	return s;
+}
+
+
+const std::string StructureType::getOpenCLCDefinition(bool emit_comments) const // Get full definition string, e.g. struct a { float b; };
 {
 	std::string s = "typedef struct " + name + "\n{\n";
 
@@ -945,14 +968,15 @@ const std::string StructureType::getOpenCLCDefinition() const // Get full defini
 }
 
 
-const std::string StructureType::getOpenCLCConstructor() const // Emit constructor for type
+const std::string StructureType::getOpenCLCConstructor(bool emit_comments) const // Emit constructor for type
 {
 	std::string s;
 
 	// FunctionDefinition::Funct
 	FunctionSignature sig(name, component_types);
 
-	s += "// Constructor for " + toString() + "\n";
+	if(emit_comments)
+		s += "// Constructor for " + toString() + "\n";
 	s += name + " " + sig.typeMangledName() + "(";
 
 	for(size_t i=0; i<component_types.size(); ++i)
@@ -1190,9 +1214,11 @@ const std::string TupleType::OpenCLCType() const
 }
 
 
-const std::string TupleType::getOpenCLCDefinition() const // Get full definition string, e.g. struct a { float b; };
+const std::string TupleType::getOpenCLCDefinition(bool emit_comments) const // Get full definition string, e.g. struct a { float b; };
 {
-	std::string s = "// Definition of tuple " + toString() + "\n";
+	std::string s;
+	if(emit_comments) 
+		s += "// Definition of tuple " + toString() + "\n";
 	s += "typedef struct\n{\n";
 
  	const std::string tuple_typename = OpenCLCType(); // makeSafeStringForFunctionName(this->toString());
@@ -1238,7 +1264,7 @@ const std::string TupleType::getOpenCLCDefinition() const // Get full definition
 }
 
 
-const std::string TupleType::getOpenCLCConstructor() const
+const std::string TupleType::getOpenCLCConstructor(bool emit_comments) const
 {
 	std::string s;
 
@@ -1254,7 +1280,8 @@ const std::string TupleType::getOpenCLCConstructor() const
 
 	const std::string constructor_name = makeSafeStringForFunctionName(this->toString()) + "_cnstr";
 
-	s += "// Constructor for " + toString() + "\n";
+	if(emit_comments)
+		s += "// Constructor for " + toString() + "\n";
 	s += tuple_typename + " " + constructor_name + "(";
 
 	for(size_t i=0; i<component_types.size(); ++i)
@@ -1391,7 +1418,7 @@ llvm::Type* VectorType::LLVMType(llvm::Module& module) const
 
 const std::string OpaqueType::toString() const
 {
-	return "opaque";
+	return (address_space.empty() ? "" : address_space + " ") + "opaque";
 }
 
 
@@ -1494,6 +1521,42 @@ bool ErrorType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) co
 
 
 llvm::Type* ErrorType::LLVMType(llvm::Module& module) const
+{
+	return llvm::Type::getVoidTy(module.getContext());
+}
+
+//===============================================================================
+
+
+OpaqueStructureType::OpaqueStructureType(const std::string& name_)
+:	Type(StructureTypeType), name(name_)
+{}
+
+
+const std::string OpaqueStructureType::toString() const
+{
+	return (address_space.empty() ? "" : address_space + " ") + name;
+}
+
+
+const std::string OpaqueStructureType::OpenCLCType() const
+{
+	return name;
+}
+
+
+bool OpaqueStructureType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
+{
+	if(this->getType() != b.getType())
+		return false;
+	// So b is a StructureType as well.
+	const OpaqueStructureType* b_ = static_cast<const OpaqueStructureType*>(&b);
+
+	return this->name == b_->name;
+}
+
+
+llvm::Type* OpaqueStructureType::LLVMType(llvm::Module& module) const
 {
 	return llvm::Type::getVoidTy(module.getContext());
 }

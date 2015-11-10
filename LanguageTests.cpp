@@ -3456,6 +3456,80 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 				  def op_unary_minus(s a) : s(-a.x, -a.y) \n\
 				  def main() float : x(-s(2, 3))", -2.0f);
 
+	
+	// op_eq
+	testMainFloatArg("struct s { float x }					\n\
+					 def op_eq(s a, s b) : a.x == b.x		\n\
+					 def main(float x) float : (s(4.0f) == s(x)) ? 1.0 : 0.0", 4.0f, 1.0f);
+
+	testMainFloatArg("struct s { float x }					\n\
+					 def op_eq(s a, s b) : a.x == b.x		\n\
+					 def main(float x) float : (s(4.0f) == s(x)) ? 1.0 : 0.0", 5.0f, 0.0f);
+
+	// op_neq
+	testMainFloatArg("struct s { float x }					\n\
+					 def op_neq(s a, s b) : a.x != b.x		\n\
+					 def main(float x) float : (s(4.0f) != s(x)) ? 1.0 : 0.0", 4.0f, 0.0f);
+
+	testMainFloatArg("struct s { float x }					\n\
+					 def op_neq(s a, s b) : a.x != b.x		\n\
+					 def main(float x) float : (s(4.0f) != s(x)) ? 1.0 : 0.0", 5.0f, 1.0f);
+
+	// op_lt
+	testMainFloatArg("struct s { float x }					\n\
+					 def op_lt(s a, s b) : a.x < b.x		\n\
+					 def main(float x) float : (s(4.0f) < s(x)) ? 1.0 : 0.0", 5.0f, 1.0f);
+
+	testMainFloatArg("struct s { float x }					\n\
+					 def op_lt(s a, s b) : a.x < b.x		\n\
+					 def main(float x) float : (s(4.0f) < s(x)) ? 1.0 : 0.0", 4.0f, 0.0f);
+
+	testMainFloatArg("struct s { float x }					\n\
+					 def op_lt(s a, s b) : a.x < b.x		\n\
+					 def main(float x) float : (s(4.0f) < s(x)) ? 1.0 : 0.0", 2.0f, 0.0f);
+
+	// op_gt
+	testMainFloatArg("struct s { float x }					\n\
+					 def op_gt(s a, s b) : a.x > b.x		\n\
+					 def main(float x) float : (s(4.0f) > s(x)) ? 1.0 : 0.0", 5.0f, 0.0f);
+
+	testMainFloatArg("struct s { float x }					\n\
+					 def op_gt(s a, s b) : a.x > b.x		\n\
+					 def main(float x) float : (s(4.0f) > s(x)) ? 1.0 : 0.0", 4.0f, 0.0f);
+
+	testMainFloatArg("struct s { float x }					\n\
+					 def op_gt(s a, s b) : a.x > b.x		\n\
+					 def main(float x) float : (s(4.0f) > s(x)) ? 1.0 : 0.0", 2.0f, 1.0f);
+
+
+	// op_lte
+	testMainFloatArg("struct s { float x }					\n\
+					 def op_lte(s a, s b) : a.x <= b.x		\n\
+					 def main(float x) float : (s(4.0f) <= s(x)) ? 1.0 : 0.0", 5.0f, 1.0f);
+
+	testMainFloatArg("struct s { float x }					\n\
+					 def op_lte(s a, s b) : a.x <= b.x		\n\
+					 def main(float x) float : (s(4.0f) <= s(x)) ? 1.0 : 0.0", 4.0f, 1.0f);
+
+	testMainFloatArg("struct s { float x }					\n\
+					 def op_lte(s a, s b) : a.x <= b.x		\n\
+					 def main(float x) float : (s(4.0f) <= s(x)) ? 1.0 : 0.0", 2.0f, 0.0f);
+
+	// op_gte
+	testMainFloatArg("struct s { float x }					\n\
+					 def op_gte(s a, s b) : a.x >= b.x		\n\
+					 def main(float x) float : (s(4.0f) >= s(x)) ? 1.0 : 0.0", 5.0f, 0.0f);
+
+	testMainFloatArg("struct s { float x }					\n\
+					 def op_gte(s a, s b) : a.x >= b.x		\n\
+					 def main(float x) float : (s(4.0f) >= s(x)) ? 1.0 : 0.0", 4.0f, 1.0f);
+
+	testMainFloatArg("struct s { float x }					\n\
+					 def op_gte(s a, s b) : a.x >= b.x		\n\
+					 def main(float x) float : (s(4.0f) >= s(x)) ? 1.0 : 0.0", 2.0f, 1.0f);
+
+
+
 	// ===================================================================
 	// Test Operator Overloading with two different structures
 	// ===================================================================

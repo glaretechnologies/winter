@@ -1334,7 +1334,18 @@ void FunctionExpression::print(int depth, std::ostream& s) const
 
 std::string FunctionExpression::sourceString() const
 {
-	std::string s = this->functionName() + "("; // TODO: fix
+	std::string s;
+	if(!this->static_function_name.empty())
+		s += this->static_function_name;
+	else if(this->get_func_expr.nonNull())
+	{
+		if(this->get_func_expr->nodeType() == ASTNode::VariableASTNodeType)
+			s += this->get_func_expr.downcastToPtr<Variable>()->name;
+		else
+			s += "(" + this->get_func_expr->sourceString() + ")"; // Wrap parens around the 'get func' expression if needed. (needed currently for lambdas etc..)
+	}
+		
+	s += "(";
 	for(unsigned int i=0; i<argument_expressions.size(); ++i)
 	{
 		s += argument_expressions[i]->sourceString();
@@ -1674,7 +1685,11 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 		}
 
 		if(!arg_eval_s.empty())
-			params.blocks.back() += "// args for " + this->static_target_function->sig.toString() + ":\n" + arg_eval_s;
+		{
+			if(params.emit_comments)
+				params.blocks.back() += "// args for " + this->static_target_function->sig.toString() + ":\n";
+			params.blocks.back() += arg_eval_s;
+		}
 
 		return s + ")";
 	}

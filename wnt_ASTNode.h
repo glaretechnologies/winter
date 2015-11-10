@@ -245,6 +245,8 @@ public:
 	std::set<TupleTypeRef, TypeRefLessThan> tuple_types_used;
 
 	int uid;
+
+	bool emit_comments;
 };
 
 
