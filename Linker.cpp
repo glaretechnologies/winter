@@ -8,6 +8,7 @@
 #include "wnt_ExternalFunction.h"
 #include "wnt_LLVMVersion.h"
 #include "wnt_RefCounting.h"
+#include <limits>
 
 
 using std::vector;
