@@ -17,13 +17,6 @@ File created by ClassTemplate on Wed Jun 11 03:55:25 2008
 #include <utils/Reference.h>
 #include <utils/RefCounted.h>
 #include <utils/Platform.h>
-#ifdef _MSC_VER // If compiling with Visual C++
-#pragma warning(push, 0) // Disable warnings
-#endif
-#include <llvm/IR/IRBuilder.h>
-#ifdef _MSC_VER
-#pragma warning(pop) // Re-enable warnings
-#endif
 #include <string>
 #include <vector>
 #include <set>
@@ -33,6 +26,11 @@ namespace llvm { class Value; };
 namespace llvm { class Module; };
 namespace llvm { class LLVMContext; };
 namespace llvm { class TargetData; };
+namespace llvm { class Instruction; };
+namespace llvm { class ConstantFolder; };
+namespace llvm { class DataLayout; };
+namespace llvm { template<bool preserveNames> class IRBuilderDefaultInserter; };
+namespace llvm { template<bool preserveNames, typename T, typename Inserter > class IRBuilder; };
 namespace PlatformUtils { class CPUInfo; }
 
 
@@ -208,7 +206,9 @@ public:
 	const PlatformUtils::CPUInfo* cpu_info;
 	//bool hidden_voidptr_arg;
 	
-	llvm::IRBuilder<>* builder;
+	// These template arguments are the defaults from IRBuilder.h.  Written explicitly here so we can forwards declare this type.
+	llvm::IRBuilder<true, llvm::ConstantFolder, llvm::IRBuilderDefaultInserter<true> >* builder; 
+
 	llvm::Module* module;
 	llvm::Function* currently_building_func;
 	llvm::LLVMContext* context;

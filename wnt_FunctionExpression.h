@@ -18,19 +18,14 @@ Generated at 2011-04-30 18:53:38 +0100
 #include "BaseException.h"
 #include "TokenBase.h"
 #include "Value.h"
-#ifdef _MSC_VER // If compiling with Visual C++
-#pragma warning(push, 0) // Disable warnings
-#endif
-#include <llvm/IR/IRBuilder.h>
-#ifdef _MSC_VER
-#pragma warning(pop) // Re-enable warnings
-#endif
 #include <string>
 #include <vector>
 namespace llvm { class Function; };
 namespace llvm { class Value; };
 namespace llvm { class Module; };
 namespace llvm { class LLVMContext; };
+namespace llvm { template<bool preserveNames> class IRBuilderDefaultInserter; };
+namespace llvm { template<bool preserveNames, typename T, typename Inserter > class IRBuilder; };
 namespace PlatformUtils { class CPUInfo; }
 
 
