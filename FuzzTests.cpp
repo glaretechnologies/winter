@@ -27,6 +27,7 @@ Copyright Glare Technologies Limited 2015 -
 #include <Vector.h>
 #include <unordered_set>
 #include <fstream>
+#include <xxhash.h>
 #if USE_OPENCL
 #include "../../indigo/trunk/opencl/OpenCL.h"
 #include "../../indigo/trunk/opencl/OpenCLBuffer.h"
@@ -635,16 +636,17 @@ public:
 			);
 
 			const std::string src = def->sourceString();
+			const uint64 src_hash = XXH64(src.data(), src.size(), 0);
 		
 			bool already_tested;
 			size_t num_tested;
 			{
 				Lock lock(*tested_programs_mutex);
-				num_tested = tested_programs->size();
-				already_tested = tested_programs->find(src) != tested_programs->end();
+				num_tested = tested_program_hashes->size();
+				already_tested = tested_program_hashes->find(src_hash) != tested_program_hashes->end();
 
 				if(!already_tested)
-					tested_programs->insert(src);
+					tested_program_hashes->insert(src_hash);
 			}
 
 			if(!already_tested)
@@ -674,7 +676,7 @@ public:
 	int rng_seed;
 	std::vector<Choice> choices;
 	Mutex* tested_programs_mutex;
-	std::unordered_set<std::string>* tested_programs;
+	std::unordered_set<uint64>* tested_program_hashes;
 	std::vector<std::string>* fuzzer_input;
 };
 
@@ -690,8 +692,12 @@ public:
 
 		std::ofstream outfile("D:/fuzz_output/fuzz_thread_" + toString(thread_index) + ".txt"); // TEMP HACK HARD CODED PATH
 		
-		// We want to N to be quite large, but not so large that the tested_programs set uses up all our RAM.
-		const int N = 5000000;
+		// We want to N to be quite large, but not so large that the tested_program_hashes set uses up all our RAM.
+		// Lets say each of T threads generates N strings, and they happen to be disjoint.
+		// Then we have N * T * sizeof(uint64) direct item mem usage in tested_program_hashes.
+		// Lets say we want to use 4 GB for this with 4 threads.
+		// This gives N * 4 * 8 = 4 GB, so N = 134217728.
+		const int N = 134217728;
 		for(int i=0; i<N; ++i)
 		{
 			// Pick a random program to get started
@@ -781,15 +787,17 @@ done:
 
 			//s = "def main(float x) float : x + 1.0";
 
+			const uint64 src_hash = XXH64(s.data(), s.size(), 0);
+
 			bool already_tested;
 			size_t num_tested;
 			{
 				Lock lock(*tested_programs_mutex);
-				num_tested = tested_programs->size();
-				already_tested = tested_programs->find(s) != tested_programs->end();
+				num_tested = tested_program_hashes->size();
+				already_tested = tested_program_hashes->find(src_hash) != tested_program_hashes->end();
 
 				if(!already_tested)
-					tested_programs->insert(s);
+					tested_program_hashes->insert(src_hash);
 			}
 
 			if(!already_tested)
@@ -813,7 +821,7 @@ done:
 	int rng_seed;
 	std::vector<Choice> choices;
 	Mutex* tested_programs_mutex;
-	std::unordered_set<std::string>* tested_programs;
+	std::unordered_set<uint64>* tested_program_hashes;
 	std::vector<std::string>* fuzzer_input;
 };
 
@@ -899,7 +907,7 @@ static void doASTFuzzTests()
 			std::cout << "=========================== Stage " << stage << "===========================================" << std::endl;
 
 			Mutex tested_programs_mutex;
-			std::unordered_set<std::string> tested_programs;
+			std::unordered_set<uint64> tested_program_hashes;
 
 			const int NUM_THREADS = 4;
 			Indigo::TaskManager manager(NUM_THREADS);
@@ -909,7 +917,7 @@ static void doASTFuzzTests()
 				t->rng_seed = rng_seed;
 				t->choices = choices;
 				t->tested_programs_mutex = &tested_programs_mutex;
-				t->tested_programs = &tested_programs;
+				t->tested_program_hashes = &tested_program_hashes;
 				t->fuzzer_input = &fuzzer_input;
 				manager.addTask(t);
 
@@ -1001,7 +1009,7 @@ void fuzzTests()
 			std::cout << "=========================== Stage " << stage << "===========================================" << std::endl;
 
 			Mutex tested_programs_mutex;
-			std::unordered_set<std::string> tested_programs;
+			std::unordered_set<uint64> tested_program_hashes;
 
 			const int NUM_THREADS = 4;
 			Indigo::TaskManager manager(NUM_THREADS);
@@ -1011,7 +1019,7 @@ void fuzzTests()
 				t->rng_seed = rng_seed;
 				t->choices = choices;
 				t->tested_programs_mutex = &tested_programs_mutex;
-				t->tested_programs = &tested_programs;
+				t->tested_program_hashes = &tested_program_hashes;
 				t->fuzzer_input = &fuzzer_input;
 				manager.addTask(t);
 
