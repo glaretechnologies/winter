@@ -28,6 +28,8 @@ extern "C"
 #include <Lock.h>
 #include <Exception.h>
 #include <Vector.h>
+//#include "utils/Obfuscator.h"
+
 
 // OpenCL:
 #if USE_OPENCL
@@ -261,6 +263,21 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 		TestEnv test_env;
 		test_env.val = 10;
 
+		/*Obfuscator obfusctor(
+			true, // collapse_whitespace
+			true, // remove_comments
+			true, // change tokens
+			Obfuscator::Lang_Winter
+		);
+		
+		const std::string obfuscated_src = obfusctor.obfuscateWinterSource(src);
+
+		std::cout << "==================== original src: =====================" << std::endl;
+		std::cout << src << std::endl;
+		std::cout << "==================== obfuscated_src: =====================" << std::endl;
+		std::cout << obfuscated_src << std::endl;
+		std::cout << "==========================================================" << std::endl;*/
+
 		VMConstructionArgs vm_args;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
 		vm_args.env = &test_env;
@@ -374,17 +391,13 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 
 			OpenCLBuffer output_buffer(context, sizeof(float), CL_MEM_READ_WRITE);
 
-			std::vector<std::string> program_lines = ::split(extended_source, '\n');
-			for(size_t i=0; i<program_lines.size(); ++i)
-				program_lines[i].push_back('\n');
-
 			std::string options;
 			//std::string options = "-save-temps";
 			//options += " -fbin-llvmir";//TEMP
 
 			// Compile and build program.
 			cl_program program = opencl->buildProgram(
-				program_lines,
+				extended_source,
 				context,
 				gpu_device.opencl_device,
 				options
@@ -582,7 +595,7 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 			// OpenCL keeps complaining about 'main must return type int', so rename main to main_.
 			//opencl_code = StringUtils::replaceAll(opencl_code, "main", "main_"); // NOTE: slightly dodgy string-based renaming.
 
-			const std::string extended_source = opencl_code + "\n" + "__kernel void main_kernel(float x, __global double * const restrict output_buffer) { \n" + 
+			const std::string extended_source = opencl_code + "\n" + "__kernel void main_kernel(double x, __global double * const restrict output_buffer) { \n" + 
 				"	output_buffer[0] = main_double_(x);		\n" + 
 				" }";
 
@@ -592,11 +605,7 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 				f << extended_source;
 			}
 
-			OpenCLBuffer output_buffer(context, sizeof(float), CL_MEM_READ_WRITE);
-
-			std::vector<std::string> program_lines = ::split(extended_source, '\n');
-			for(size_t i=0; i<program_lines.size(); ++i)
-				program_lines[i].push_back('\n');
+			OpenCLBuffer output_buffer(context, sizeof(double), CL_MEM_READ_WRITE);
 
 			std::string options;
 			//std::string options = "-save-temps";
@@ -604,7 +613,7 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 
 			// Compile and build program.
 			cl_program program = opencl->buildProgram(
-				program_lines,
+				extended_source,
 				context,
 				gpu_device.opencl_device,
 				options
@@ -1004,15 +1013,11 @@ static TestResults testMainIntegerArg(const std::string& src, int x, int target_
 
 			OpenCLBuffer output_buffer(context, sizeof(float), CL_MEM_READ_WRITE);
 
-			std::vector<std::string> program_lines = ::split(extended_source, '\n');
-			for(size_t i=0; i<program_lines.size(); ++i)
-				program_lines[i].push_back('\n');
-
 			std::string options = "";
 
 			// Compile and build program.
 			cl_program program = opencl->buildProgram(
-				program_lines,
+				extended_source,
 				context,
 				opencl->getDeviceInfo()[0].opencl_device,
 				options

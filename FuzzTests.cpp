@@ -20,6 +20,7 @@ Copyright Glare Technologies Limited 2015 -
 #include <utils/MemMappedFile.h>
 #include <utils/FileUtils.h>
 #include <utils/StringUtils.h>
+#include <utils/ConPrint.h>
 #include "../indigo/StandardPrintOutput.h"
 #include <Mutex.h>
 #include <Lock.h>
@@ -119,10 +120,12 @@ bool testFuzzProgram(const std::string& src)
 #if USE_OPENCL
 			OpenCL* opencl = getGlobalOpenCL();
 
+			const int device_index = 0;
+
 			cl_context context;
 			cl_command_queue command_queue;
 			opencl->deviceInit(
-				opencl->getDeviceInfo()[0],
+				opencl->getDeviceInfo()[device_index],
 				/*enable_profiling=*/false, 
 				context,
 				command_queue
@@ -142,22 +145,18 @@ bool testFuzzProgram(const std::string& src)
 
 			OpenCLBuffer output_buffer(context, sizeof(float), CL_MEM_READ_WRITE);
 
-			std::vector<std::string> program_lines = ::split(extended_source, '\n');
-			for(size_t i=0; i<program_lines.size(); ++i)
-				program_lines[i].push_back('\n');
-
-			std::string options = "-save-temps";
+			std::string options = "";//"-cl-opt-disable";//"-save-temps";
 
 			// Compile and build program.
 			cl_program program = opencl->buildProgram(
-				program_lines,
+				extended_source,
 				context,
-				opencl->getDeviceInfo()[0].opencl_device,
+				opencl->getDeviceInfo()[device_index].opencl_device,
 				options
 			);
 
 
-			opencl->dumpBuildLog(program, opencl->getDeviceInfo()[0].opencl_device); 
+			opencl->dumpBuildLog(program, opencl->getDeviceInfo()[device_index].opencl_device); 
 
 			// Create kernel
 			cl_int result;
@@ -211,9 +210,9 @@ bool testFuzzProgram(const std::string& src)
 
 			const float opencl_result = host_output_buffer[0];
 
-			if(!epsEqual(opencl_result, jitted_result))
+			if(!((opencl_result == jitted_result) || epsEqual(opencl_result, jitted_result))) // opencl_result == jitted_result handles Inf == Inf case.
 			{
-				std::cerr << "Test failed: OpenCL returned " << val->value << ", jitted_result was " << jitted_result << std::endl;
+				std::cerr << "Test failed: OpenCL returned " << opencl_result << ", jitted_result was " << jitted_result << std::endl;
 				assert(0);
 				exit(1);
 			}
@@ -244,18 +243,23 @@ bool testFuzzProgram(const std::string& src)
 
 
 // Returns true if valid program, false otherwise.
-static bool testFuzzASTProgram(const FunctionDefinitionRef& func)
+static bool testFuzzASTProgram(Reference<BufferRoot>& root)//const std::vector<FunctionDefinitionRef>& funcs)
 {
 	try
 	{
 		//TestEnv test_env;
 		//test_env.val = 10;
 
+		//const std::string src_string = func->sourceString();
+
 		VMConstructionArgs vm_args;
 		//vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
 		//vm_args.env = &test_env;
 
-		vm_args.preconstructed_func_defs.push_back(func);
+		vm_args.comments_in_opencl_output = false;
+		for(size_t i=0; i<root->top_level_defs.size(); ++i)
+			vm_args.preconstructed_func_defs.push_back(root->top_level_defs[i].downcast<FunctionDefinition>());
+
 		
 		const FunctionSignature mainsig("main", std::vector<TypeRef>(1, TypeRef(new Float())));
 
@@ -296,7 +300,7 @@ static bool testFuzzASTProgram(const FunctionDefinitionRef& func)
 			exit(1);
 		}
 
-		if(!epsEqual(val->value, jitted_result))
+		if(!((val->value == jitted_result) || epsEqual(val->value, jitted_result))) // val->value == jitted_result handles Inf == Inf case.
 		{
 			std::cerr << "Test failed: main returned " << val->value << ", jitted_result was " << jitted_result << std::endl;
 			assert(0);
@@ -309,6 +313,8 @@ static bool testFuzzASTProgram(const FunctionDefinitionRef& func)
 		if(TEST_OPENCL)
 		{
 #if USE_OPENCL
+			conPrint("Program was valid, testing in OpenCL.");
+			//std::cout << "testing opencl prog: " + src_string << std::endl;
 			OpenCL* opencl = getGlobalOpenCL();
 
 			cl_context context;
@@ -330,28 +336,24 @@ static bool testFuzzASTProgram(const FunctionDefinitionRef& func)
 				"	output_buffer[0] = main_float_(x);		\n" + 
 				" }";
 
-			std::cout << extended_source << std::endl;
+			//std::cout << "---------------------\n" << extended_source << "\n-------------------" << std::endl;
 
 			OpenCLBuffer output_buffer(context, sizeof(float), CL_MEM_READ_WRITE);
 
-			std::vector<std::string> program_lines = ::split(extended_source, '\n');
-			for(size_t i=0; i<program_lines.size(); ++i)
-				program_lines[i].push_back('\n');
-
-			std::string options = "-save-temps";
+			std::string options = "";//"-save-temps";
 
 			StandardPrintOutput print_output;
 
 			// Compile and build program.
 			cl_program program = opencl->buildProgram(
-				program_lines,
+				extended_source,
 				context,
 				opencl->getDeviceInfo()[0].opencl_device,
 				options
 			);
 
 
-			opencl->dumpBuildLog(program, opencl->getDeviceInfo()[0].opencl_device); 
+			//opencl->dumpBuildLog(program, opencl->getDeviceInfo()[0].opencl_device); 
 
 			// Create kernel
 			cl_int result;
@@ -405,7 +407,7 @@ static bool testFuzzASTProgram(const FunctionDefinitionRef& func)
 
 			const float opencl_result = host_output_buffer[0];
 
-			if(!epsEqual(opencl_result, jitted_result))
+			if(!((opencl_result == jitted_result) || epsEqual(opencl_result, jitted_result))) // opencl_result == jitted_result handles Inf == Inf case.
 			{
 				std::cerr << "Test failed: OpenCL returned " << val->value << ", jitted_result was " << jitted_result << std::endl;
 				assert(0);
@@ -423,7 +425,7 @@ static bool testFuzzASTProgram(const FunctionDefinitionRef& func)
 			exit(1);
 		}
 		// Compile failure when fuzzing is alright.
-		//std::cerr << e.what() << std::endl;
+		std::cerr << e.what() << std::endl;
 		return false;
 	}
 	catch(Indigo::Exception& )
@@ -448,7 +450,8 @@ struct Choice
 		Action_CopyFromOtherProgram,
 		Action_Remove,
 
-		Action_AddASTNode
+		Action_AddASTNode,
+		Action_AddStructConstructorCall
 	};
 
 	Choice() {}
@@ -493,18 +496,30 @@ static std::string readRandomProgramFromFuzzerInput(const std::vector<std::strin
 }
 
 
-static ASTNodeRef buildRandomASSubTree(MTwister& rng, const std::vector<Choice>& choices, int depth)
+struct BuildRandomSubTreeArgs
+{
+	bool allow_func_calls;
+};
+
+
+static ASTNodeRef buildRandomASSubTree(BuildRandomSubTreeArgs& args, MTwister& rng, const std::vector<Choice>& choices, int depth)
 {
 	const float r = rng.unitRandom();
 
 	if(depth > 3)
 	{
-		if(r < 0.33f)
+		if(rng.unitRandom() < 0.3f)
+			return new Variable("x", SrcLocation::invalidLocation());
+		else
+			return new FloatLiteral(rng.unitRandom() < 0.25f ? 0.f : (int)(-10.f + rng.unitRandom() * 20.f), SrcLocation::invalidLocation());
+		//return new FloatLiteral(1.0f, SrcLocation::invalidLocation());
+
+		/*if(r < 0.33f)
 			return new FloatLiteral(1.0f, SrcLocation::invalidLocation());
 		else if(r < 0.66f)
 			return new IntLiteral(1, 32, SrcLocation::invalidLocation());
 		else
-			return new BoolLiteral(rng.unitRandom() < 0.5f, SrcLocation::invalidLocation());
+			return new BoolLiteral(rng.unitRandom() < 0.5f, SrcLocation::invalidLocation());*/
 	}
 
 	float probability_sum = 0;
@@ -513,13 +528,25 @@ static ASTNodeRef buildRandomASSubTree(MTwister& rng, const std::vector<Choice>&
 		probability_sum += choices[z].probability;
 		if(r < probability_sum)
 		{
-			if(choices[z].action == Choice::Action_AddASTNode) // If this is the 'stop-appending tokens' token:
+			if(choices[z].action == Choice::Action_AddASTNode)
 			{
 				const ASTNode::ASTNodeType node_type = choices[z].ast_node_type;
 				switch(node_type)
 				{
+				case ASTNode::VariableASTNodeType:
+					return new Variable("x", SrcLocation::invalidLocation());
+				case ASTNode::FunctionExpressionType:
+					{
+						if(args.allow_func_calls)
+							return new FunctionExpression(SrcLocation::invalidLocation(), "f", buildRandomASSubTree(args, rng, choices, depth + 1));
+						else
+							return new FloatLiteral(1.f, SrcLocation::invalidLocation());
+					}
 				case ASTNode::FloatLiteralType:
-					return new FloatLiteral(rng.unitRandom() < 0.25f ? 0.f : (-10.f + rng.unitRandom() * 20.f), SrcLocation::invalidLocation());
+					{
+						return new FloatLiteral(rng.unitRandom() < 0.25f ? 0.f : (int)(-10.f + rng.unitRandom() * 20.f), SrcLocation::invalidLocation());
+						//return new FloatLiteral(2.0f, SrcLocation::invalidLocation());//rng.unitRandom() < 0.25f ? 0.f : (-10.f + rng.unitRandom() * 20.f), SrcLocation::invalidLocation());
+					}
 				case ASTNode::IntLiteralType:
 					return new IntLiteral(-2 + (int)(rng.unitRandom() * 4.0f), 32, SrcLocation::invalidLocation());
 				case ASTNode::BoolLiteralType:
@@ -530,7 +557,7 @@ static ASTNodeRef buildRandomASSubTree(MTwister& rng, const std::vector<Choice>&
 						std::vector<ASTNodeRef> elems;
 						do 
 						{
-							elems.push_back(buildRandomASSubTree(rng, choices, depth + 1));
+							elems.push_back(buildRandomASSubTree(args, rng, choices, depth + 1));
 						}
 						while(rng.unitRandom() < 0.5f);
 						return new ArrayLiteral(elems, SrcLocation::invalidLocation(), false, 0);
@@ -540,7 +567,7 @@ static ASTNodeRef buildRandomASSubTree(MTwister& rng, const std::vector<Choice>&
 						std::vector<ASTNodeRef> elems;
 						do 
 						{
-							elems.push_back(buildRandomASSubTree(rng, choices, depth + 1));
+							elems.push_back(buildRandomASSubTree(args, rng, choices, depth + 1));
 						}
 						while(rng.unitRandom() < 0.5f);
 						return new VectorLiteral(elems, SrcLocation::invalidLocation(), false, 0);
@@ -550,25 +577,25 @@ static ASTNodeRef buildRandomASSubTree(MTwister& rng, const std::vector<Choice>&
 						std::vector<ASTNodeRef> elems;
 						do 
 						{
-							elems.push_back(buildRandomASSubTree(rng, choices, depth + 1));
+							elems.push_back(buildRandomASSubTree(args, rng, choices, depth + 1));
 						}
 						while(rng.unitRandom() < 0.5f);
 						return new TupleLiteral(elems, SrcLocation::invalidLocation());
 					}
 
 				case ASTNode::AdditionExpressionType:
-					return new AdditionExpression(SrcLocation::invalidLocation(), buildRandomASSubTree(rng, choices, depth + 1), buildRandomASSubTree(rng, choices, depth + 1));
+					return new AdditionExpression(SrcLocation::invalidLocation(), buildRandomASSubTree(args, rng, choices, depth + 1), buildRandomASSubTree(args, rng, choices, depth + 1));
 				case ASTNode::SubtractionExpressionType:
-					return new SubtractionExpression(SrcLocation::invalidLocation(), buildRandomASSubTree(rng, choices, depth + 1), buildRandomASSubTree(rng, choices, depth + 1));
+					return new SubtractionExpression(SrcLocation::invalidLocation(), buildRandomASSubTree(args, rng, choices, depth + 1), buildRandomASSubTree(args, rng, choices, depth + 1));
 				case ASTNode::MulExpressionType:
-					return new MulExpression(SrcLocation::invalidLocation(), buildRandomASSubTree(rng, choices, depth + 1), buildRandomASSubTree(rng, choices, depth + 1));
+					return new MulExpression(SrcLocation::invalidLocation(), buildRandomASSubTree(args, rng, choices, depth + 1), buildRandomASSubTree(args, rng, choices, depth + 1));
 				case ASTNode::DivExpressionType:
-					return new DivExpression(SrcLocation::invalidLocation(), buildRandomASSubTree(rng, choices, depth + 1), buildRandomASSubTree(rng, choices, depth + 1));
+					return new DivExpression(SrcLocation::invalidLocation(), buildRandomASSubTree(args, rng, choices, depth + 1), buildRandomASSubTree(args, rng, choices, depth + 1));
 
 				case ASTNode::BinaryBooleanType:
-					return new BinaryBooleanExpr(rng.unitRandom() < 0.5f ? BinaryBooleanExpr::AND : BinaryBooleanExpr::OR, buildRandomASSubTree(rng, choices, depth + 1), buildRandomASSubTree(rng, choices, depth + 1), SrcLocation::invalidLocation());
+					return new BinaryBooleanExpr(rng.unitRandom() < 0.5f ? BinaryBooleanExpr::AND : BinaryBooleanExpr::OR, buildRandomASSubTree(args, rng, choices, depth + 1), buildRandomASSubTree(args, rng, choices, depth + 1), SrcLocation::invalidLocation());
 				case ASTNode::UnaryMinusExpressionType:
-					return new UnaryMinusExpression(SrcLocation::invalidLocation(), buildRandomASSubTree(rng, choices, depth + 1));
+					return new UnaryMinusExpression(SrcLocation::invalidLocation(), buildRandomASSubTree(args, rng, choices, depth + 1));
 		
 				case ASTNode::ComparisonExpressionType:
 					{
@@ -586,22 +613,68 @@ static ASTNodeRef buildRandomASSubTree(MTwister& rng, const std::vector<Choice>&
 							token = new LESS_EQUAL_Token(0);
 						else
 							token = new GREATER_EQUAL_Token(0);
-						return new ComparisonExpression(token, buildRandomASSubTree(rng, choices, depth + 1), buildRandomASSubTree(rng, choices, depth + 1), SrcLocation::invalidLocation());
+						return new ComparisonExpression(token, buildRandomASSubTree(args, rng, choices, depth + 1), buildRandomASSubTree(args, rng, choices, depth + 1), SrcLocation::invalidLocation());
 					}
 				case ASTNode::ArraySubscriptType:
 					{
-						//return new ArrayS(token, buildRandomASSubTree(rng, choices, depth + 1), buildRandomASSubTree(rng, choices, depth + 1), SrcLocation::invalidLocation());
-						return new FunctionExpression(SrcLocation::invalidLocation(), "elem", buildRandomASSubTree(rng, choices, depth + 1), buildRandomASSubTree(rng, choices, depth + 1));
+						//return new ArrayS(token, buildRandomASSubTree(args, rng, choices, depth + 1), buildRandomASSubTree(args, rng, choices, depth + 1), SrcLocation::invalidLocation());
+						return new FunctionExpression(SrcLocation::invalidLocation(), "elem", buildRandomASSubTree(args, rng, choices, depth + 1), buildRandomASSubTree(args, rng, choices, depth + 1));
 					}
 				case ASTNode::IfExpressionType:
-						return new IfExpression(SrcLocation::invalidLocation(), buildRandomASSubTree(rng, choices, depth + 1), buildRandomASSubTree(rng, choices, depth + 1), buildRandomASSubTree(rng, choices, depth + 1));
+						return new IfExpression(SrcLocation::invalidLocation(), buildRandomASSubTree(args, rng, choices, depth + 1), buildRandomASSubTree(args, rng, choices, depth + 1), buildRandomASSubTree(args, rng, choices, depth + 1));
 				case ASTNode::LogicalNegationExprType:
-					return new LogicalNegationExpr(SrcLocation::invalidLocation(), buildRandomASSubTree(rng, choices, depth + 1));
-
+					return new LogicalNegationExpr(SrcLocation::invalidLocation(), buildRandomASSubTree(args, rng, choices, depth + 1));
 				default:
 					assert(0);
 					return NULL;
 				}
+			}
+			else if(choices[z].action == Choice::Action_AddStructConstructorCall)
+			{
+				// returns some code like, for struct s { float x, float y }
+				/*
+				let
+					s_1 = s(EXPR, EXPR)
+				in
+					s_1.x
+
+				*/
+				//return new FunctionExpression(SrcLocation::invalidLocation(), "s", buildRandomASSubTree(rng, choices, depth + 1), buildRandomASSubTree(rng, choices, depth + 1));
+				/*ASTNodeRef constructor_call = new FunctionExpression(SrcLocation::invalidLocation(), "s", buildRandomASSubTree(rng, choices, depth + 1), buildRandomASSubTree(rng, choices, depth + 1));
+				ASTNodeRef member_access = new FunctionExpression(SrcLocation::invalidLocation(), "x", new Variable("s_1", SrcLocation::invalidLocation()));
+				Reference<LetASTNode> let_node = new LetASTNode(std::vector<LetNodeVar>(1, LetNodeVar("s_1")), constructor_call, SrcLocation::invalidLocation());
+				ASTNodeRef let_block = new LetBlock(
+					member_access, // expr
+					std::vector<Reference<LetASTNode> >(1, let_node), // lets
+					SrcLocation::invalidLocation()
+				);*/
+
+
+				/*
+				let
+					t = [EXPR, EXPR]t
+				in
+					elem(t, 0)
+				*/
+				const int tuple_size = 1 + (int)(rng.unitRandom() * 4.0);
+				std::vector<ASTNodeRef> tuple_elems;
+				for(int i=0; i<tuple_size; ++i)
+					tuple_elems.push_back(buildRandomASSubTree(args, rng, choices, depth + 1));
+				ASTNodeRef tuple_literal = new TupleLiteral(tuple_elems, SrcLocation::invalidLocation());
+
+				ASTNodeRef field_access = new FunctionExpression(SrcLocation::invalidLocation(), "elem", 
+					new Variable("t", SrcLocation::invalidLocation()), 
+					new IntLiteral(myClamp((int)(rng.unitRandom() * tuple_size), 0, tuple_size-1), 32, SrcLocation::invalidLocation()));
+
+				Reference<LetASTNode> let_node = new LetASTNode(std::vector<LetNodeVar>(1, LetNodeVar("t")), tuple_literal, SrcLocation::invalidLocation());
+
+				ASTNodeRef let_block = new LetBlock(
+					field_access, // expr
+					std::vector<Reference<LetASTNode> >(1, let_node), // lets
+					SrcLocation::invalidLocation()
+				);
+
+				return let_block;
 			}
 		}
 	}
@@ -621,21 +694,47 @@ public:
 
 		std::ofstream outfile("D:/fuzz_output/fuzz_thread_" + toString(thread_index) + ".txt"); // TEMP HACK HARD CODED PATH
 		
-		// We want to N to be quite large, but not so large that the tested_programs set uses up all our RAM.
-		const int N = 5000000;
+		// See comment in FuzzTask below about this number.
+		const int N = 134217728;
 		int num_valid_programs = 0;
 		for(int i=0; i<N; ++i)
 		{
 			// Pick a random program to get started
 
-			FunctionDefinitionRef def = new FunctionDefinition(SrcLocation::invalidLocation(), -1, "main",
-				std::vector<FunctionDefinition::FunctionArg>(1, FunctionDefinition::FunctionArg(new Float(), "x")),
-				buildRandomASSubTree(rng, choices, 0),// body ast node
-				new Float(), // declared ret type
-				NULL // built in func-impl
-			);
+			Reference<BufferRoot> root = new BufferRoot(SrcLocation::invalidLocation());
 
-			const std::string src = def->sourceString();
+			{
+				BuildRandomSubTreeArgs args;
+				args.allow_func_calls = false;
+
+				// Define function 'f'
+				FunctionDefinitionRef def = new FunctionDefinition(SrcLocation::invalidLocation(), 0, "f",
+					std::vector<FunctionDefinition::FunctionArg>(1, FunctionDefinition::FunctionArg(new Float(), "x")),
+					buildRandomASSubTree(args, rng, choices, 0),// body ast node
+					new Float(), // declared ret type
+					NULL // built in func-impl
+				);
+				root->top_level_defs.push_back(def);
+			}
+
+			{
+				BuildRandomSubTreeArgs args;
+				args.allow_func_calls = true;
+
+				FunctionDefinitionRef def = new FunctionDefinition(SrcLocation::invalidLocation(), 1, "main",
+					std::vector<FunctionDefinition::FunctionArg>(1, FunctionDefinition::FunctionArg(new Float(), "x")),
+					buildRandomASSubTree(args, rng, choices, 0),// body ast node
+					new Float(), // declared ret type
+					NULL // built in func-impl
+				);
+				root->top_level_defs.push_back(def);
+			}
+			
+
+			const std::string src = root->sourceString();
+
+			conPrint("-------------------------------\n" + src + "\n-------------------------------");//TEMP
+
 			const uint64 src_hash = XXH64(src.data(), src.size(), 0);
 		
 			bool already_tested;
@@ -659,7 +758,7 @@ public:
 				//def->print(0, std::cout);
 				//std::cout << src << std::endl;
 
-				const bool valid_program = testFuzzASTProgram(def);
+				const bool valid_program = testFuzzASTProgram(root);
 				if(valid_program) num_valid_programs++;
 			}
 			
@@ -861,29 +960,34 @@ static void doASTFuzzTests()
 	{
 		std::vector<Choice> choices;
 		
+		choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::VariableASTNodeType, 2.0f));
+
+		choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::FunctionExpressionType, 2.0f));
 
 		choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::FloatLiteralType, 2.0f));
-		choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::IntLiteralType, 2.0f));
-		choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::BoolLiteralType, 2.0f));
+	//	choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::IntLiteralType, 2.0f));
+	//	choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::BoolLiteralType, 2.0f));
 
-		choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::ArrayLiteralType, 1.0f));
-		choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::VectorLiteralType, 1.0f));
-		choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::TupleLiteralType, 1.0f));
+	//	choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::ArrayLiteralType, 1.0f));
+	//	choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::VectorLiteralType, 1.0f));
+	//	choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::TupleLiteralType, 1.0f));
 
 		choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::AdditionExpressionType, 1.0f));
 		choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::MulExpressionType, 1.0f));
-		choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::SubtractionExpressionType, 1.0f));
-		choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::DivExpressionType, 1.0f));
+	//	choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::SubtractionExpressionType, 1.0f));
+	//	choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::DivExpressionType, 1.0f));
 
-		choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::BinaryBooleanType, 1.0f));
+	//	choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::BinaryBooleanType, 1.0f));
 
-		choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::UnaryMinusExpressionType, 1.0f));
+	//	choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::UnaryMinusExpressionType, 1.0f));
 		//choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::LetType, 1.0f));
 		
-		choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::ComparisonExpressionType, 1.0f));
-		choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::ArraySubscriptType, 1.0f));
-		choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::IfExpressionType, 1.0f));
-		choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::LogicalNegationExprType, 1.0f));
+	//	choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::ComparisonExpressionType, 1.0f));
+	//	choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::ArraySubscriptType, 1.0f));
+	//	choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::IfExpressionType, 1.0f));
+	//	choices.push_back(Choice(Choice::Action_AddASTNode, ASTNode::LogicalNegationExprType, 1.0f));
+
+		choices.push_back(Choice(Choice::Action_AddStructConstructorCall, 1.0f));
 
 		
 
@@ -909,7 +1013,7 @@ static void doASTFuzzTests()
 			Mutex tested_programs_mutex;
 			std::unordered_set<uint64> tested_program_hashes;
 
-			const int NUM_THREADS = 4;
+			const int NUM_THREADS = 1;
 			Indigo::TaskManager manager(NUM_THREADS);
 			for(int i=0; i<NUM_THREADS; ++i)
 			{
@@ -936,7 +1040,7 @@ static void doASTFuzzTests()
 
 void fuzzTests()
 {
-	//doASTFuzzTests();
+	doASTFuzzTests();
 
 	try
 	{
