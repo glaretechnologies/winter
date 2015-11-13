@@ -1635,11 +1635,9 @@ Reference<LetASTNode> LangParser::parseLet(ParseInfo& p)
 
 	parseToken(EQUALS_TOKEN, p);
 
-	Reference<LetASTNode> letnode = new LetASTNode(vars, loc);
-
 	ASTNodeRef expr = parseExpression(p);
 
-	letnode->expr = expr;
+	Reference<LetASTNode> letnode = new LetASTNode(vars, expr, loc);
 
 	return letnode;
 }

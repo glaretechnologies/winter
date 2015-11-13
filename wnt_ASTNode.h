@@ -738,6 +738,8 @@ Then 'a = f()' and 'b, c = g()' are nodes of type LetASTNode.
 class LetNodeVar
 {
 public:
+	LetNodeVar() {}
+	LetNodeVar(const std::string& name_) : name(name_) {}
 	std::string name;
 	TypeRef declared_type; // may be NULL
 };
@@ -746,7 +748,7 @@ public:
 class LetASTNode : public ASTNode
 {
 public:
-	LetASTNode(const std::vector<LetNodeVar>& vars, const SrcLocation& loc);
+	LetASTNode(const std::vector<LetNodeVar>& vars, const ASTNodeRef& expr, const SrcLocation& loc);
 
 	virtual ValueRef exec(VMState& vmstate);
 	virtual TypeRef type() const { return expr->type(); }

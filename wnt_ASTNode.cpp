@@ -1022,7 +1022,29 @@ std::string BufferRoot::sourceString() const
 	std::string s;
 	for(unsigned int i=0; i<top_level_defs.size(); ++i)
 	{
-		s += top_level_defs[i]->sourceString();
+		//s += top_level_defs[i]->sourceString();
+
+		switch(top_level_defs[i]->nodeType())
+		{
+		case Winter::ASTNode::FunctionDefinitionType:
+			{
+				if(top_level_defs[i].downcastToPtr<Winter::FunctionDefinition>()->body.nonNull()) // If not a built-in function:
+				{
+					std::string func_src = top_level_defs[i]->sourceString();
+					s += func_src;
+					s += "\n";
+				}
+				break;
+			}
+		default:
+			{
+				std::string node_src = top_level_defs[i]->sourceString();
+				s += s;
+				s += "\n";
+				break;
+			}
+		};
+
 		s += "\n";
 	}
 	return s;
@@ -3836,8 +3858,9 @@ bool LogicalNegationExpr::isConstant() const
 //----------------------------------------------------------------------------------------
 
 
-LetASTNode::LetASTNode(const std::vector<LetNodeVar>& vars_, const SrcLocation& loc)
+LetASTNode::LetASTNode(const std::vector<LetNodeVar>& vars_, const ASTNodeRef& expr_, const SrcLocation& loc)
 :	ASTNode(LetType, loc), 
+	expr(expr_),
 	vars(vars_),
 	traced(false)
 {
@@ -4038,8 +4061,7 @@ llvm::Value* LetASTNode::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* r
 
 Reference<ASTNode> LetASTNode::clone(CloneMapType& clone_map)
 {
-	LetASTNode* e = new LetASTNode(this->vars, this->srcLocation());
-	e->expr = this->expr->clone(clone_map);
+	LetASTNode* e = new LetASTNode(this->vars, this->expr->clone(clone_map), this->srcLocation());
 	clone_map.insert(std::make_pair(this, e));
 	return e;
 }
