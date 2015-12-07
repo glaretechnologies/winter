@@ -1118,7 +1118,7 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 	int function_order_num = 0;
 
 	for(size_t i=0; i<preconstructed_func_defs.size(); ++i)
-		linker.top_level_defs.push_back(preconstructed_func_defs[i]);
+		linker.addFunction(preconstructed_func_defs[i]);
 
 	linker.addExternalFunctions(this->external_functions);
 
@@ -1895,17 +1895,18 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 			emitted_tuples.insert(*i); // Add to set of emitted tuples
 		}
 
-		// Add some Winter built-in functions.  TODO: move this stuff some place better?
+	// Add some Winter built-in functions.  TODO: move this stuff some place better?
 	std::string built_in_func_code = 
 "// Winter built-in functions \n\
 float toFloat_int_(int x) { return (float)x; } \n\
 int truncateToInt_float_(float x) { return (int)x; } \n\
 int8 truncateToInt_vector_float__8__(float8 v) { return convert_int8(v); }  \n\
 long toInt_opaque_(void* p) { return (long)p; }  \n\
-float print_float_(float x) { printf((__constant char *)\"%f\\n\", x); return x; }    \n\
+float print_bool_(bool x) { if(x) { printf(\"true\\n\"); } else { printf(\"false\\n\"); } return x; }    \n\
+float print_float_(float x) { printf((__constant char *)\"%1.7f\\n\", x); return x; }    \n\
 int toInt32_int64_(long x) { return (int)x; }		\n\
 long toInt64_int_(int x) { return (long)x; }		\n\
-\n";
+";
 
 	if(vm_args.opencl_double_support)
 	{
