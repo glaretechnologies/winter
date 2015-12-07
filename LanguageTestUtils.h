@@ -31,8 +31,11 @@ extern "C"
 //#include "utils/Obfuscator.h"
 
 
+//#define WINTER_OPENCL_TESTS
+
+
 // OpenCL:
-#if USE_OPENCL
+#if WINTER_OPENCL_TESTS
 #include "../../indigo/trunk/opencl/OpenCL.h"
 #include "../../indigo/trunk/opencl/OpenCLBuffer.h"
 #endif
@@ -359,7 +362,7 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 		const bool TEST_OPENCL = false;
 		if(!(test_flags & INVALID_OPENCL) && TEST_OPENCL)
 		{
-#if USE_OPENCL
+#if WINTER_OPENCL_TESTS
 			OpenCL* opencl = getGlobalOpenCL();
 
 			const gpuDeviceInfo& gpu_device = opencl->getDeviceInfo()[0];
@@ -464,7 +467,7 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 				assert(0);
 				exit(1);
 			}
-#endif // #if USE_OPENCL
+#endif // #if WINTER_OPENCL_TESTS
 		}
 
 		TestResults res;
@@ -575,7 +578,7 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 		const bool TEST_OPENCL = false;
 		if(!(test_flags & INVALID_OPENCL) && TEST_OPENCL)
 		{
-#if USE_OPENCL
+#if WINTER_OPENCL_TESTS
 			OpenCL* opencl = getGlobalOpenCL();
 
 			const gpuDeviceInfo& gpu_device = opencl->getDeviceInfo()[0];
@@ -680,7 +683,7 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 				assert(0);
 				exit(1);
 			}
-#endif // #if USE_OPENCL
+#endif // #if WINTER_OPENCL_TESTS
 		}
 
 		TestResults res;
@@ -978,7 +981,7 @@ static TestResults testMainIntegerArg(const std::string& src, int x, int target_
 		const bool TEST_OPENCL = false;
 		if(!(test_flags & INVALID_OPENCL) && TEST_OPENCL)
 		{
-#if USE_OPENCL
+#if WINTER_OPENCL_TESTS
 			OpenCL* opencl = getGlobalOpenCL();
 
 			cl_context context;
@@ -1084,7 +1087,7 @@ static TestResults testMainIntegerArg(const std::string& src, int x, int target_
 				assert(0);
 				exit(1);
 			}
-#endif // #if USE_OPENCL
+#endif // #if WINTER_OPENCL_TESTS
 		}
 
 		TestResults res;

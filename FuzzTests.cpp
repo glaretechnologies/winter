@@ -29,7 +29,8 @@ Copyright Glare Technologies Limited 2015 -
 #include <unordered_set>
 #include <fstream>
 #include <xxhash.h>
-#if USE_OPENCL
+
+#if FUZZING_USE_OPENCL
 #include "../../indigo/trunk/opencl/OpenCL.h"
 #include "../../indigo/trunk/opencl/OpenCLBuffer.h"
 #endif
@@ -114,10 +115,10 @@ bool testFuzzProgram(const std::string& src)
 
 
 		//============================= New: test with OpenCL ==============================
-		const bool TEST_OPENCL = false;
+		const bool TEST_OPENCL = true;
 		if(TEST_OPENCL)
 		{
-#if USE_OPENCL
+#if FUZZING_USE_OPENCL
 			OpenCL* opencl = getGlobalOpenCL();
 
 			const int device_index = 0;
@@ -145,7 +146,7 @@ bool testFuzzProgram(const std::string& src)
 
 			OpenCLBuffer output_buffer(context, sizeof(float), CL_MEM_READ_WRITE);
 
-			std::string options = "";//"-cl-opt-disable";//"-save-temps";
+			std::string options = "-cl-opt-disable";//"-save-temps";
 
 			// Compile and build program.
 			cl_program program = opencl->buildProgram(
@@ -216,7 +217,7 @@ bool testFuzzProgram(const std::string& src)
 				assert(0);
 				exit(1);
 			}
-#endif // #if USE_OPENCL
+#endif // #if FUZZING_USE_OPENCL
 		}
 	}
 	catch(Winter::BaseException& e)
@@ -312,7 +313,7 @@ static bool testFuzzASTProgram(Reference<BufferRoot>& root)//const std::vector<F
 		const bool TEST_OPENCL = false;
 		if(TEST_OPENCL)
 		{
-#if USE_OPENCL
+#if FUZZING_USE_OPENCL
 			conPrint("Program was valid, testing in OpenCL.");
 			//std::cout << "testing opencl prog: " + src_string << std::endl;
 			OpenCL* opencl = getGlobalOpenCL();
@@ -413,7 +414,7 @@ static bool testFuzzASTProgram(Reference<BufferRoot>& root)//const std::vector<F
 				assert(0);
 				exit(1);
 			}
-#endif // #if USE_OPENCL
+#endif // #if FUZZING_USE_OPENCL
 		}
 	}
 	catch(Winter::BaseException& e)
