@@ -454,7 +454,6 @@ void LanguageTests::run()
 			in																	\n\
 				a", 1, 2); // f should be inlined.
 
-
 	// ===================================================================
 	// Test dead code elimination
 	// ===================================================================
@@ -466,6 +465,18 @@ void LanguageTests::run()
 		in													\n\
 			c + x			# c is alive						\n\
 		", 1, 6);
+
+
+	testMainIntegerArg("def main(int x) int :				\n\
+		let													\n\
+			a = 1 + x	# referred to by b, but still dead	\n\
+			b = 3 + a	# dead								\n\
+			c = 4 + x	# alive								\n\
+			d = c + x	# alive								\n\
+		in													\n\
+			d + x			# d is alive						\n\
+		", 1, 7);
+
 
 	// Test that a let block with no let vars is removed, and is replaced with the value expression (x var)
 	results = testMainIntegerArg("def main(int x) int :		\n\
@@ -481,6 +492,30 @@ void LanguageTests::run()
 	// Test dead function elimination
 	// ===================================================================
 	testMainInt64Arg("def func_1(float x) : x   def func_2(float x) : x    def main(int64 x) int64 : x", 1, 1);
+
+	try
+	{
+		const std::string src = "def func_1(int64 x) : x   def func_2(int64 x) : x    def main(int64 x) int64 : func_2(x)";
+		VMConstructionArgs vm_args;
+		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
+
+		const FunctionSignature mainsig("main", std::vector<TypeRef>(1, new Int(64)));
+		const FunctionSignature func_1_sig("func_1", std::vector<TypeRef>(1, new Int(64)));
+		const FunctionSignature func_2_sig("func_2", std::vector<TypeRef>(1, new Int(64)));
+
+		vm_args.entry_point_sigs.push_back(mainsig);
+		VirtualMachine vm(vm_args);
+
+		testAssert(vm.findMatchingFunction(mainsig).nonNull());
+		testAssert(vm.findMatchingFunction(func_1_sig).isNull()); // func_1 should be removed by dead code elim.
+		testAssert(vm.findMatchingFunction(func_2_sig).isNull()); // func_2 will be removed by inlining and then dead code elim.
+	}
+	catch(Winter::BaseException& e)
+	{
+		std::cerr << e.what() << std::endl;
+		assert(0);
+		exit(1);
+	}
 
 
 	// ===================================================================
@@ -3195,6 +3230,16 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 			a, a, target_result
 		);
 	}
+
+	// mod(float)
+/*	testMainFloatArg("def main(float x) float : mod(x, 4.0f)", -6.f, 2.f);
+	testMainFloatArg("def main(float x) float : mod(x, 4.0f)", -5.f, 3.f);
+	testMainFloatArg("def main(float x) float : mod(x, 4.0f)", -4.f, 0.f);
+	testMainFloatArg("def main(float x) float : mod(x, 4.0f)", -3.f, 1.f);
+	testMainFloatArg("def main(float x) float : mod(x, 4.0f)", 0.f, 0.f);
+	testMainFloatArg("def main(float x) float : mod(x, 4.0f)", 1.f, 1.f);
+	testMainFloatArg("def main(float x) float : mod(x, 1.0f)", 4.f, 0.f);
+	testMainFloatArg("def main(float x) float : mod(x, 1.0f)", 5.f, 1.f);*/
 
 	// Test using a let variable (y) before it is defined:
 	testMainFloatArgInvalidProgram("									\n\
