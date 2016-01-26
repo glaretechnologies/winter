@@ -551,7 +551,14 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 				ASTNode* n = payload.nodes_to_process.back();
 				payload.nodes_to_process.pop_back();
 
-				n->traverse(payload, stack); // stack will be wrong, but it shouldn't matter.
+				if(payload.processed_nodes.find(n) == payload.processed_nodes.end()) // If not already processed:
+				{
+					payload.processed_nodes.insert(n); // Mark node as processed.
+
+					//std::cout << "Processing node " << n << std::endl;
+
+					n->traverse(payload, stack); // stack will be wrong, but it shouldn't matter.
+				}
 			}
 		}
 		else

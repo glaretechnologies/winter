@@ -367,6 +367,7 @@ void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 	{
 		if(binding_type == LetVariable)
 		{
+			//std::cout << "Marking var " << this->name << " as alive." << std::endl;
 			payload.reachable_nodes.insert(this->bound_let_node); // Mark as alive
 			if(payload.processed_nodes.find(this->bound_let_node) == payload.processed_nodes.end()) // If has not been processed yet:
 				payload.nodes_to_process.push_back(this->bound_let_node); // Add to to-process list

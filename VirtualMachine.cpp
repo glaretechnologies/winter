@@ -16,6 +16,7 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "utils/ContainerUtils.h"
 #include "utils/TaskManager.h"
 #include "utils/Exception.h"
+#include "utils/Timer.h"
 #include "wnt_Lexer.h"
 #include "TokenBase.h"
 #include "wnt_LangParser.h"
@@ -967,21 +968,28 @@ bool VirtualMachine::doInliningPass()
 }
 
 
+// Dead code elimination pass.
+// Removes let variables that are not referenced.
+// This is an intra-function pass.
+// It works by traversing the AST, except we won't traverse to let variables, unless they are referenced by a variable in the let block expression.
 bool VirtualMachine::doDeadCodeEliminationPass()
 {
+	// Timer timer;
+
 	std::vector<ASTNode*> stack;
 	TraversalPayload payload(TraversalPayload::DeadCodeElimination_ComputeAlive);
 	for(size_t i=0; i<linker.top_level_defs.size(); ++i)
 	{
 		//std::cout << "\n=====DCE pass before:======\n";
 		//linker.top_level_defs[i]->print(0, std::cout);
+		//std::cout << "doing DCE on func " << i << std::endl;
 
 		// Do a pass to get the set of live LetASTNodes for this function
 		payload.operation = TraversalPayload::DeadCodeElimination_ComputeAlive;
 		linker.top_level_defs[i]->traverse(payload, stack);
 		assert(stack.size() == 0);
 
-		// The payload will now contain the alive/reachable set.
+		// The payload will now contain the alive/reachable set of let vars.
 
 		// Remove unused let vars.
 		payload.operation = TraversalPayload::DeadCodeElimination_RemoveDead;
@@ -992,6 +1000,7 @@ bool VirtualMachine::doDeadCodeEliminationPass()
 		//linker.top_level_defs[i]->print(0, std::cout);
 	}
 
+	// std::cout << "VirtualMachine::doDeadCodeEliminationPass() took " + timer.elapsedString() << std::endl;
 	return payload.tree_changed;
 }
 
@@ -1029,10 +1038,13 @@ void VirtualMachine::doDeadFunctionEliminationPass(const VMConstructionArgs& arg
 		ASTNode* def_to_process = payload.nodes_to_process.back();
 		payload.nodes_to_process.pop_back();
 
-		payload.processed_nodes.insert(def_to_process); // Mark node as processed
+		if(payload.processed_nodes.find(def_to_process) == payload.processed_nodes.end()) // If not already processed:
+		{
+			payload.processed_nodes.insert(def_to_process); // Mark node as processed
 
-		def_to_process->traverse(payload, stack); // Process it
-		assert(stack.size() == 0);
+			def_to_process->traverse(payload, stack); // Process it
+			assert(stack.size() == 0);
+		}
 	}
 
 
@@ -1413,10 +1425,13 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 			ASTNode* def_to_process = payload.nodes_to_process.back();
 			payload.nodes_to_process.pop_back();
 
-			payload.processed_nodes.insert(def_to_process); // Mark node as processed
+			if(payload.processed_nodes.find(def_to_process) == payload.processed_nodes.end()) // If not already processed:
+			{
+				payload.processed_nodes.insert(def_to_process); // Mark node as processed
 
-			def_to_process->traverse(payload, stack); // Process it
-			assert(stack.size() == 0);
+				def_to_process->traverse(payload, stack); // Process it
+				assert(stack.size() == 0);
+			}
 		}
 
 
