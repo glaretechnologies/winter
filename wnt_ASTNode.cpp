@@ -379,9 +379,36 @@ void checkInlineExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector
 			
 			const int call_count = payload.calls_to_func_count[target_func];
 			
-			if(verbose) std::cout << "target: " + target_func->sig.toString() + ", call_count=" << call_count << ", beta reduction=" << boolToString(is_beta_reduction) << "\n";
+			
+			// Work out if the argument expressions are 'expensive' to evaluate.
+			// If they are, don't inline this function expression, because the argument expression *may* be duplicated.
+			// e.g. def f(float x) : x + x + x + x, 
+			// main(float x) : f(sin(x))    would get inlined to      main(float x) : sin(x) + sin(x) + sin(x) + sin(x)
+			//
+			// This is very crude, and should be improved in the following way:
+			// Instead of not inlining, inline to a let expression, e.g. to
+			//
+			// let f_arg0 = sin(x) in f(f_arg0)
+			//
+			// Also it doesn't matter if the argument expression is expensive, if it will only be substituted 0 or 1 times.
 
-			const bool should_inline = is_beta_reduction || (call_count <= 1);
+			bool are_arg_expressions_expensive = false;
+			for(size_t i=0; i<func_expr->argument_expressions.size(); ++i)
+			{
+				if(!(func_expr->argument_expressions[i]->nodeType() == ASTNode::VariableASTNodeType || func_expr->argument_expressions[i]->nodeType() == ASTNode::IntLiteralType ||
+					func_expr->argument_expressions[i]->nodeType() == ASTNode::FloatLiteralType || func_expr->argument_expressions[i]->nodeType() == ASTNode::DoubleLiteralType ||
+					func_expr->argument_expressions[i]->nodeType() == ASTNode::BoolLiteralType || func_expr->argument_expressions[i]->nodeType() == ASTNode::CharLiteralType))
+				{
+					// This argument expression is expensive to evaluate.
+					are_arg_expressions_expensive = true;
+				}
+			}
+
+			if(verbose) std::cout << "target: " + target_func->sig.toString() + ", call_count=" << call_count << ", beta reduction=" << boolToString(is_beta_reduction) << 
+				", are_arg_expressions_expensive: " << boolToString(are_arg_expressions_expensive) << "\n";
+
+
+			const bool should_inline = (is_beta_reduction || (call_count <= 1)) && !are_arg_expressions_expensive;
 			if(should_inline)
 			{
 				if(verbose) std::cout << "------------original expr----------: " << std::endl;

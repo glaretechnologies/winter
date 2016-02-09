@@ -1476,27 +1476,34 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 	}
 	else if(this->static_function_name == "shuffle")
 	{
-		if(argument_expressions.size() != 2)
-			throw BaseException("Error while emitting OpenCL C: shuffle() function with != 2 args.");
-
-		if(argument_expressions[1]->nodeType() != ASTNode::VectorLiteralType)
-			throw BaseException("Error while emitting OpenCL C: shuffle() function with 2nd arg that is not a Vector literal.");
-
-		const VectorLiteral* vec_literal = static_cast<const VectorLiteral*>(argument_expressions[1].getPointer());
-
-		std::string s = argument_expressions[0]->emitOpenCLC(params) + ".s";
-
-		for(size_t i=0; i<vec_literal->getElements().size(); ++i)
+		try
 		{
-			if(vec_literal->getElements()[i]->nodeType() != ASTNode::IntLiteralType)
-				throw BaseException("Error while emitting OpenCL C: shuffle() function with 2nd arg that does not have an int literal in the vector literal.");
+			if(argument_expressions.size() != 2)
+				throw BaseException("Error while emitting OpenCL C: shuffle() function with != 2 args.");
 
-			const int64 index = static_cast<const IntLiteral*>(vec_literal->getElements()[i].getPointer())->value;
+			if(argument_expressions[1]->nodeType() != ASTNode::VectorLiteralType)
+				throw BaseException("Error while emitting OpenCL C: shuffle() function with 2nd arg that is not a Vector literal.");
 
-			s.push_back(::intToHexChar((int)index));
+			const VectorLiteral* vec_literal = static_cast<const VectorLiteral*>(argument_expressions[1].getPointer());
+
+			std::string s = argument_expressions[0]->emitOpenCLC(params) + ".s";
+
+			for(size_t i=0; i<vec_literal->getElements().size(); ++i)
+			{
+				if(vec_literal->getElements()[i]->nodeType() != ASTNode::IntLiteralType)
+					throw BaseException("Error while emitting OpenCL C: shuffle() function with 2nd arg that does not have an int literal in the vector literal.");
+
+				const int64 index = static_cast<const IntLiteral*>(vec_literal->getElements()[i].getPointer())->value;
+
+				s.push_back(::intToHexChar((int)index));
+			}
+
+			return s;
 		}
-
-		return s;
+		catch(StringUtilsExcep& e)
+		{
+			throw BaseException("Error while emitting shuffle function: " + e.what());
+		}
 	}
 	else if(isENFunctionName(static_function_name) && 
 		(this->argument_expressions[0]->type()->getType() == Type::VectorTypeType ||
