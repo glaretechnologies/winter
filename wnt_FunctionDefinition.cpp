@@ -118,8 +118,9 @@ FunctionDefinition::FunctionDefinition(const SrcLocation& src_loc, int order_num
 	num_uses(0)
 {
 	sig.name = name;
+	sig.param_types.resize(args_.size());
 	for(unsigned int i=0; i<args_.size(); ++i)
-		sig.param_types.push_back(args_[i].type);
+		sig.param_types[i] = args_[i].type;
 
 	// TODO: fix this, make into method
 	//function_type = TypeRef(new Function(sig.param_types, declared_rettype));
