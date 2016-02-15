@@ -6,8 +6,6 @@ Copyright Glare Technologies Limited 2014 -
 #pragma once
 
 
-#include <utils/Reference.h>
-#include <utils/RefCounted.h>
 #include "wnt_Type.h"
 #include "wnt_ASTNode.h"
 #include "wnt_FunctionSignature.h"
@@ -16,6 +14,8 @@ Copyright Glare Technologies Limited 2014 -
 #include "BaseException.h"
 #include "TokenBase.h"
 #include "Value.h"
+#include <utils/Reference.h>
+#include <utils/RefCounted.h>
 #ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
 #endif
@@ -55,7 +55,6 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
 	//virtual void emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* string_val) const;
-	//virtual llvm::Value* getConstantLLVMValue(EmitLLVMCodeParams& params) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual bool provenDefined() const;

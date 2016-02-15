@@ -200,15 +200,6 @@ static llvm::Value* makeForLoop(llvm::IRBuilder<>& builder, llvm::Module* module
 }
 #endif
 
-//----------------------------------------------------------------------------------------------
-
-
-//llvm::Value* BuiltInFunctionImpl::getConstantLLVMValue(EmitLLVMCodeParams& params) const
-//{
-//	assert(0);
-//	return NULL;
-//}
-
 
 //----------------------------------------------------------------------------------------------
 
@@ -290,25 +281,6 @@ llvm::Value* Constructor::emitLLVMCode(EmitLLVMCodeParams& params) const
 		return NULL;
 	}
 }
-
-
-/*llvm::Value* Constructor::getConstantLLVMValue(EmitLLVMCodeParams& params) const
-{
-	const int arg_offset = this->struct_type->passByValue() ? 0 : 1;
-
-	vector<llvm::Constant*> vals;
-	for(size_t i=0; i<this->struct_type->component_types.size(); ++i)
-	{
-		//LLVMTypeUtils::getNthArg(params.currently_building_func, arg_offset + i)->dump();
-
-		vals.push_back((llvm::Constant*)LLVMTypeUtils::getNthArg(params.currently_building_func, i + 1));
-	}
-
-	return llvm::ConstantStruct::get(
-		(llvm::StructType*)this->struct_type->LLVMType(*params.context),
-		vals
-	);
-}*/
 
 
 ValueRef GetField::invoke(VMState& vmstate)

@@ -17,6 +17,8 @@ File created by ClassTemplate on Wed Jun 11 02:56:20 2008
 #include "wnt_TupleLiteral.h"
 #include "wnt_VArrayLiteral.h"
 #include "wnt_Variable.h"
+#include "wnt_LetASTNode.h"
+#include "wnt_LetBlock.h"
 #include "BuiltInFunctionImpl.h"
 #include "indigo/TestUtils.h"
 #include "indigo/globals.h"

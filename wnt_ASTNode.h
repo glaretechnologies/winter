@@ -319,10 +319,6 @@ public:
 
 	virtual TypeRef type() const = 0;
 
-	//virtual linearise(std::vector<Reference<ASTNode> >& nodes_out) = 0;
-
-	//virtual void linkFunctions(Linker& linker){}
-	//virtual void bindVariables(const std::vector<ASTNode*>& stack){}
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack) {}
 
 	// Emit LLVM code to compute the value for this AST node.
@@ -335,10 +331,6 @@ public:
 	// Emit cleanup (ref count decrement and delete) code at the end of the function
 	//virtual void emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* val) const;
 
-	// For the global const array optimisation: Return the AST node as a LLVM value directly.
-	virtual llvm::Value* getConstantLLVMValue(EmitLLVMCodeParams& params) const;
-
-	
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map) = 0; // clone_map will map from old node to new node.
 	
 	virtual void print(int depth, std::ostream& s) const = 0;
@@ -367,13 +359,9 @@ public:
 protected:
 	static llvm::Value* emitExternalLinkageCall(const std::string& target_name, EmitLLVMCodeParams& params);
 
-	//ASTNode* getParent() { return parent; }
-	//void setParent(ASTNode* p) { parent = p; }
-
 private:
 //	INDIGO_DISABLE_COPY(ASTNode)
 
-	//ASTNode* parent;
 	ASTNodeType node_type;
 	SrcLocation location;
 };
@@ -403,8 +391,6 @@ public:
 	virtual ValueRef exec(VMState& vmstate){ return ValueRef(); }
 	virtual TypeRef type() const { throw BaseException("root has no type."); }
 
-	//virtual void linkFunctions(Linker& linker);
-	//virtual void bindVariables(const std::vector<ASTNode*>& stack);
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual void print(int depth, std::ostream& s) const;
 	virtual std::string sourceString() const;
@@ -537,8 +523,6 @@ public:
 	virtual void print(int depth, std::ostream& s) const;
 	virtual std::string sourceString() const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
-	//virtual void linkFunctions(Linker& linker);
-	//virtual void bindVariables(const std::vector<ASTNode*>& stack);
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
@@ -561,8 +545,6 @@ public:
 	virtual void print(int depth, std::ostream& s) const;
 	virtual std::string sourceString() const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
-	//virtual void linkFunctions(Linker& linker);
-	//virtual void bindVariables(const std::vector<ASTNode*>& stack);
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
@@ -587,8 +569,6 @@ public:
 	virtual void print(int depth, std::ostream& s) const;
 	virtual std::string sourceString() const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
-	//virtual void linkFunctions(Linker& linker);
-	//virtual void bindVariables(const std::vector<ASTNode*>& stack);
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
@@ -613,8 +593,6 @@ public:
 	virtual void print(int depth, std::ostream& s) const;
 	virtual std::string sourceString() const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
-	//virtual void linkFunctions(Linker& linker);
-	//virtual void bindVariables(const std::vector<ASTNode*>& stack);
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
@@ -724,81 +702,6 @@ public:
 };
 
 
-/*
-In a let block,
-like:
-	let
-		a = f()
-		b, c = g()
-	in
-		a + b + c
-
-Then 'a = f()' and 'b, c = g()' are nodes of type LetASTNode.
-*/
-class LetNodeVar
-{
-public:
-	LetNodeVar() {}
-	LetNodeVar(const std::string& name_) : name(name_) {}
-	std::string name;
-	TypeRef declared_type; // may be NULL
-};
-
-
-class LetASTNode : public ASTNode
-{
-public:
-	LetASTNode(const std::vector<LetNodeVar>& vars, const ASTNodeRef& expr, const SrcLocation& loc);
-
-	virtual ValueRef exec(VMState& vmstate);
-	virtual TypeRef type() const { return expr->type(); }
-	virtual void print(int depth, std::ostream& s) const;
-	virtual std::string sourceString() const;
-	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
-	//virtual void linkFunctions(Linker& linker);
-	//virtual void bindVariables(const std::vector<ASTNode*>& stack);
-	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
-	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
-	//virtual void emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* val) const;
-	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
-	virtual bool isConstant() const;
-
-	ASTNodeRef expr;
-	std::vector<LetNodeVar> vars; // One or more variable names (And possible associated declared types).  Will be more than one in the case of destructuring assignment.
-	//mutable llvm::Value* llvm_value;
-	bool traced;
-};
-
-
-class LetBlock : public ASTNode
-{
-public:
-	LetBlock(const ASTNodeRef& e, const std::vector<Reference<LetASTNode> > lets_, const SrcLocation& loc) : 
-	  ASTNode(LetBlockType, loc), expr(e), lets(lets_) 
-	{
-		//let_exprs_llvm_value = vector<llvm::Value*>(lets_.size(), NULL); 
-	}
-
-	virtual ValueRef exec(VMState& vmstate);
-	virtual TypeRef type() const { return expr->type(); }
-	virtual void print(int depth, std::ostream& s) const;
-	virtual std::string sourceString() const;
-	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
-	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
-	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
-	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
-	virtual bool isConstant() const;
-
-	std::vector<Reference<LetASTNode> > lets;
-
-	//llvm::Value* getLetExpressionLLVMValue(EmitLLVMCodeParams& params, unsigned int let_index, llvm::Value* ret_space_ptr);
-
-	//std::vector<llvm::Value*> let_exprs_llvm_value;
-
-	ASTNodeRef expr;
-};
-
-
 class ComparisonExpression : public ASTNode
 {
 public:
@@ -883,8 +786,6 @@ public:
 	virtual ASTNodeType nodeType() const { return AnonFunctionType; }
 	virtual TypeRef type() const { return thetype; }
 	virtual void print(int depth, std::ostream& s) const;
-	//virtual void linkFunctions(Linker& linker);
-	//virtual void bindVariables(const std::vector<ASTNode*>& stack);
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 

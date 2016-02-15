@@ -211,13 +211,6 @@ const std::string Linker::buildOpenCLCode()
 }
 
 
-/*
-void Linker::linkFunctions(BufferRoot& root)
-{
-	root.linkFunctions(*this);
-}*/
-
-
 /*ExternalFunctionRef Linker::findMatchingExternalFunction(const FunctionSignature& sig)
 {
 	ExternalFuncMapType::iterator res = external_functions.find(sig);
@@ -1018,7 +1011,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 			const int index = ::stringToInt(::eatPrefix(sig.name, "e"));
 
 			if(sig.param_types.size() != 1)
-				throw BaseException("eN() functions must take one argument.");
+				throw BaseException("eN() functions must take one argument.  (While trying to find function " + sig.toString() + ")");
 
 			//if(sig.param_types[0]->getType() != Type::VectorTypeType)
 			//	throw BaseException("eN() functions must take a vector as their argument.  Call: " + sig.name + ", found arg type: " + sig.param_types[0]->toString());

@@ -1,10 +1,8 @@
 /*=====================================================================
 FunctionSignature.cpp
 ---------------------
+Copyright Glare Technologies Limited 2016 -
 File created by ClassTemplate on Tue Jun 17 05:29:02 2008
-Code By Nicholas Chapman.
-
-Copyright 2009 Nicholas Chapman
 =====================================================================*/
 #include "wnt_FunctionSignature.h"
 

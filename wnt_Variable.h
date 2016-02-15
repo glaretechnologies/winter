@@ -38,12 +38,14 @@ public:
 	virtual void print(int depth, std::ostream& s) const;
 	virtual std::string sourceString() const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
-	void bindVariables(TraversalPayload& payload, const std::vector<ASTNode*>& stack);
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 
+private:
+	void bindVariables(TraversalPayload& payload, const std::vector<ASTNode*>& stack);
+public:
 
 
 	std::string name; // variable name.

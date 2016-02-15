@@ -30,7 +30,6 @@ public:
 
 	void addTopLevelDefs(const std::vector<ASTNodeRef>& defs);
 
-	//void linkFunctions(BufferRoot& root);
 
 	//ExternalFunctionRef findMatchingExternalFunction(const FunctionSignature& sig);
 

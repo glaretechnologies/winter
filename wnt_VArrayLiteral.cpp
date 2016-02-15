@@ -380,13 +380,6 @@ void VArrayLiteral::emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 }
 
 
-llvm::Value* VArrayLiteral::getConstantLLVMValue(EmitLLVMCodeParams& params) const
-{
-	assert(0);
-	return NULL;
-}
-
-
 Reference<ASTNode> VArrayLiteral::clone(CloneMapType& clone_map)
 {
 	std::vector<ASTNodeRef> elems(this->elements.size());

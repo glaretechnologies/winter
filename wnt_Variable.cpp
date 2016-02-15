@@ -8,6 +8,8 @@ Copyright Glare Technologies Limited 2015 -
 
 #include "wnt_SourceBuffer.h"
 #include "wnt_RefCounting.h"
+#include "wnt_LetASTNode.h"
+#include "wnt_LetBlock.h"
 #include "VMState.h"
 #include "Value.h"
 #include "Linker.h"
@@ -654,6 +656,7 @@ Reference<ASTNode> Variable::clone(CloneMapType& clone_map)
 	v->bound_let_node = bound_let_node;
 	v->bound_named_constant = bound_named_constant;
 	v->arg_index = arg_index;
+	v->enclosing_lambda = enclosing_lambda;
 	v->free_index = free_index;
 	v->let_var_index = let_var_index;
 

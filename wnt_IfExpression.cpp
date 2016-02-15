@@ -373,12 +373,6 @@ llvm::Value* IfExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 //}
 
 
-//llvm::Value* IfExpression::getConstantLLVMValue(EmitLLVMCodeParams& params) const
-//{
-//	return this->target_function->getConstantLLVMValue(params);
-//}
-
-
 Reference<ASTNode> IfExpression::clone(CloneMapType& clone_map)
 {
 	IfExpression* res = new IfExpression(this->srcLocation(), this->condition->clone(clone_map), this->then_expr->clone(clone_map), this->else_expr->clone(clone_map));

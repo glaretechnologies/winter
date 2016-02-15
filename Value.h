@@ -19,15 +19,12 @@ class EmitLLVMCodeParams;
 class Value : public RefCounted
 {
 public:
-	Value() {} // : refcount(1) {}
+	Value() {}
 	virtual ~Value() {}
-	//TypeRef type;
-	//int refcount;
+	
 	virtual Value* clone() const = 0;
 	
 	virtual const std::string toString() const { return "Value"; }
-
-	virtual llvm::Constant* getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const = 0;
 };
 
 
@@ -40,7 +37,6 @@ public:
 	IntValue(int64 v) : value(v) { /*std::cout << "IntValue(), this=" << this << ", value = " << value << "\n";*/ }
 	~IntValue() { /*std::cout << "~IntValue(), this=" << this << ", value = " << value << "\n";*/ }
 	virtual Value* clone() const { return new IntValue(value); }
-	virtual llvm::Constant* getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const;
 	int64 value;
 };
 
@@ -51,7 +47,6 @@ public:
 	FloatValue(float v) : value(v) {}
 	virtual Value* clone() const { return new FloatValue(value); }
 	virtual const std::string toString() const;
-	virtual llvm::Constant* getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const;
 	float value;
 };
 typedef Reference<FloatValue> FloatValueRef;
@@ -63,7 +58,6 @@ public:
 	DoubleValue(double v) : value(v) {}
 	virtual Value* clone() const { return new DoubleValue(value); }
 	virtual const std::string toString() const;
-	virtual llvm::Constant* getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const;
 	double value;
 };
 typedef Reference<DoubleValue> DoubleValueRef;
@@ -74,7 +68,6 @@ class BoolValue : public Value
 public:
 	BoolValue(bool v) : value(v) {}
 	virtual Value* clone() const { return new BoolValue(value); }
-	virtual llvm::Constant* getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const;
 	bool value;
 };
 
@@ -85,7 +78,6 @@ class StringValue : public Value
 public:
 	StringValue(const std::string& v) : value(v) {}
 	virtual Value* clone() const { return new StringValue(value); }
-	virtual llvm::Constant* getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const;
 
 	std::string value;
 	//StringRep* string_rep;
@@ -97,7 +89,6 @@ class CharValue : public Value
 public:
 	CharValue(const std::string& v) : value(v) {}
 	virtual Value* clone() const { return new CharValue(value); }
-	virtual llvm::Constant* getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const;
 
 	std::string value;
 };
@@ -108,7 +99,6 @@ class MapValue : public Value
 public:
 	MapValue(const std::map<ValueRef, ValueRef>& v) : value(v) {}
 	virtual Value* clone() const { return new MapValue(value); }
-	virtual llvm::Constant* getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const;
 	std::map<ValueRef, ValueRef> value;
 };
 
@@ -120,7 +110,6 @@ public:
 	~StructureValue();
 	virtual Value* clone() const;
 	virtual const std::string toString() const;
-	virtual llvm::Constant* getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const;
 
 	std::vector<ValueRef> fields;
 };
@@ -137,7 +126,6 @@ public:
 	virtual Value* clone() const { return new FunctionValue(func_def, captured_vars); }
 
 	virtual const std::string toString() const { return "Function"; }
-	virtual llvm::Constant* getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const;
 
 	FunctionDefinition* func_def;
 
@@ -154,7 +142,6 @@ public:
 	~ArrayValue();
 	virtual Value* clone() const;
 	virtual const std::string toString() const;
-	virtual llvm::Constant* getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const;
 
 	std::vector<ValueRef> e;
 };
@@ -169,7 +156,6 @@ public:
 	~VArrayValue();
 	virtual Value* clone() const;
 	virtual const std::string toString() const;
-	virtual llvm::Constant* getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const;
 
 	std::vector<ValueRef> e;
 };
@@ -184,7 +170,6 @@ public:
 	~VectorValue();
 	virtual Value* clone() const;
 	virtual const std::string toString() const;
-	virtual llvm::Constant* getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const;
 
 	std::vector<ValueRef> e;
 };
@@ -198,7 +183,6 @@ public:
 	~TupleValue();
 	virtual Value* clone() const;
 	virtual const std::string toString() const;
-	virtual llvm::Constant* getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const;
 
 	std::vector<ValueRef> e;
 };
@@ -210,7 +194,6 @@ public:
 	VoidPtrValue(void* v) : value(v) {}
 	virtual Value* clone() const { return new VoidPtrValue(value); }
 	virtual const std::string toString() const;
-	virtual llvm::Constant* getConstantLLVMValue(EmitLLVMCodeParams& params, const Reference<Type>& type) const;
 
 	void* value;
 };

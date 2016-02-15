@@ -1919,6 +1919,7 @@ int8 truncateToInt_vector_float__8__(float8 v) { return convert_int8(v); }  \n\
 long toInt_opaque_(void* p) { return (long)p; }  \n\
 float print_bool_(bool x) { if(x) { printf(\"true\\n\"); } else { printf(\"false\\n\"); } return x; }    \n\
 float print_float_(float x) { printf((__constant char *)\"%1.7f\\n\", x); return x; }    \n\
+int print_int_(int x) { printf((__constant char *)\"%i\\n\", x); return x; }    \n\
 int toInt32_int64_(long x) { return (int)x; }		\n\
 long toInt64_int_(int x) { return (long)x; }		\n\
 ";

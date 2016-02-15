@@ -90,7 +90,6 @@ ValueRef ArrayLiteral::exec(VMState& vmstate)
 	}
 	else
 	{
-
 		vector<ValueRef> elem_values(elements.size());
 
 		for(unsigned int i=0; i<this->elements.size(); ++i)
@@ -236,10 +235,28 @@ void ArrayLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 }
 
 
-bool ArrayLiteral::areAllElementsConstant() const
+static bool areAllElementsIntLiterals(const std::vector<ASTNodeRef>& elements)
 {
-	for(size_t i=0; i<this->elements.size(); ++i)
-		if(!this->elements[i]->isConstant())
+	for(size_t i=0; i<elements.size(); ++i)
+		if(elements[i]->nodeType() != ASTNode::IntLiteralType)
+			return false;
+	return true;
+}
+
+
+static bool areAllElementsFloatLiterals(const std::vector<ASTNodeRef>& elements)
+{
+	for(size_t i=0; i<elements.size(); ++i)
+		if(elements[i]->nodeType() != ASTNode::FloatLiteralType)
+			return false;
+	return true;
+}
+
+
+static bool areAllElementsDoubleLiterals(const std::vector<ASTNodeRef>& elements)
+{
+	for(size_t i=0; i<elements.size(); ++i)
+		if(elements[i]->nodeType() != ASTNode::DoubleLiteralType)
 			return false;
 	return true;
 }
@@ -250,23 +267,21 @@ llvm::Value* ArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 	//if(!ret_space_ptr)
 	//{
 
-	// Check if all elements in the array are constant.  If so, use a constant global array.
-	if(this->areAllElementsConstant())
+	// Check if all elements in the array are literals, of a type that LLVM supports in constant global arrays.  If so, use a constant global array.
+	// TODO: can probably allow more types here.
+	if(areAllElementsIntLiterals(this->elements) || areAllElementsFloatLiterals(this->elements) || areAllElementsDoubleLiterals(this->elements))
 	{
 		vector<llvm::Constant*> array_llvm_values;
 
 		if(has_int_suffix)
 		{
+			llvm::Value* element_0_value = this->elements[0]->emitLLVMCode(params);
+			if(!llvm::isa<llvm::Constant>(element_0_value))
+				throw BaseException("Internal error: expected constant.");
+
 			array_llvm_values.resize(int_suffix);
-
-			VMState vm_state; // hidden_voidptr_arg
-			vm_state.func_args_start.push_back(0);
-			vm_state.argument_stack.push_back(new VoidPtrValue(NULL));
-			ValueRef value = this->elements[0]->exec(vm_state);
-			llvm::Constant* llvm_val = value->getConstantLLVMValue(params, this->type().downcast<ArrayType>()->elem_type);
-
 			for(size_t i=0; i<int_suffix; ++i)
-				array_llvm_values[i] = llvm_val;
+				array_llvm_values[i] = static_cast<llvm::Constant*>(element_0_value);
 		}
 		else
 		{
@@ -274,11 +289,11 @@ llvm::Value* ArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 
 			for(size_t i=0; i<elements.size(); ++i)
 			{
-				VMState vm_state; // hidden_voidptr_arg
-				vm_state.func_args_start.push_back(0);
-				vm_state.argument_stack.push_back(new VoidPtrValue(NULL));
-				ValueRef value = this->elements[i]->exec(vm_state);
-				array_llvm_values[i] = value->getConstantLLVMValue(params, this->type().downcast<ArrayType>()->elem_type);
+				llvm::Value* element_value = this->elements[i]->emitLLVMCode(params);
+				if(!llvm::isa<llvm::Constant>(element_value))
+					throw BaseException("Internal error: expected constant.");
+
+				array_llvm_values[i] = static_cast<llvm::Constant*>(element_value);
 			}
 		}
 
@@ -298,8 +313,6 @@ llvm::Value* ArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 
 		return global;
 	}
-	//}
-
 
 
 	llvm::Value* array_addr;
@@ -374,13 +387,6 @@ llvm::Value* ArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 	}
 
 	return array_addr;//NOTE: this correct?
-}
-
-
-llvm::Value* ArrayLiteral::getConstantLLVMValue(EmitLLVMCodeParams& params) const
-{
-	assert(0);
-	return NULL;
 }
 
 

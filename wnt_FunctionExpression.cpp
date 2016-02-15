@@ -1,7 +1,7 @@
 /*=====================================================================
 FunctionExpression.cpp
--------------------
-Copyright Nicholas Chapman
+----------------------
+Copyright Glare Technologies Limited 2016 -
 Generated at 2011-04-30 18:53:38 +0100
 =====================================================================*/
 #include "wnt_FunctionExpression.h"
@@ -14,6 +14,8 @@ Generated at 2011-04-30 18:53:38 +0100
 #include "wnt_FunctionDefinition.h"
 #include "wnt_VArrayLiteral.h"
 #include "wnt_Variable.h"
+#include "wnt_LetASTNode.h"
+#include "wnt_LetBlock.h"
 #include "VMState.h"
 #include "Value.h"
 #include "Linker.h"
@@ -22,6 +24,7 @@ Generated at 2011-04-30 18:53:38 +0100
 #include "ProofUtils.h"
 #include "wnt_IfExpression.h"
 #include "utils/StringUtils.h"
+#include "utils/ConPrint.h"
 #include "utils/ContainerUtils.h"
 #include "maths/mathstypes.h"
 #ifdef _MSC_VER // If compiling with Visual C++
@@ -41,7 +44,6 @@ Generated at 2011-04-30 18:53:38 +0100
 #ifdef _MSC_VER
 #pragma warning(pop) // Re-enable warnings
 #endif
-#include <iostream>
 
 
 using std::vector;
@@ -88,7 +90,7 @@ FunctionExpression::FunctionExpression(const SrcLocation& src_loc, const std::st
 
 ValueRef FunctionExpression::exec(VMState& vmstate)
 {
-	if(VERBOSE_EXEC) std::cout << vmstate.indent() << "FunctionExpression, target_name=" << this->functionName() << "\n";
+	if(VERBOSE_EXEC) conPrint(vmstate.indent() + "FunctionExpression, target_name=" + this->functionName() + "\n");
 
 	if(vmstate.func_args_start.size() > 1000)
 		throw BaseException("Function call level too deep, aborting.");
@@ -153,7 +155,7 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 	vmstate.func_args_start.push_back(initial_arg_stack_size);
 
 	if(VERBOSE_EXEC)
-		std::cout << vmstate.indent() << "Calling " << use_target_func->sig.toString() << ", func_args_start: " << vmstate.func_args_start.back() << "\n";
+		conPrint(vmstate.indent() + "Calling " + use_target_func->sig.toString() + ", func_args_start: " + toString(vmstate.func_args_start.back()) + "\n");
 
 	ValueRef ret = use_target_func->invoke(vmstate);
 	vmstate.func_args_start.pop_back();
@@ -1933,12 +1935,6 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 //{
 ////	RefCounting::emitCleanupLLVMCode(params, this->type(), val);
 //}
-
-
-llvm::Value* FunctionExpression::getConstantLLVMValue(EmitLLVMCodeParams& params) const
-{
-	return this->static_target_function->getConstantLLVMValue(params);
-}
 
 
 Reference<ASTNode> FunctionExpression::clone(CloneMapType& clone_map)

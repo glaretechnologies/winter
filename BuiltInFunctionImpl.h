@@ -26,7 +26,6 @@ public:
 
 	virtual ValueRef invoke(VMState& vmstate) = 0;
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const = 0;
-	//virtual llvm::Value* getConstantLLVMValue(EmitLLVMCodeParams& params) const;
 };
 
 
@@ -41,7 +40,6 @@ public:
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
-	//virtual llvm::Value* getConstantLLVMValue(EmitLLVMCodeParams& params) const;
 
 private:
 	Reference<StructureType> struct_type;

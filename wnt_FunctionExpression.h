@@ -1,7 +1,7 @@
 /*=====================================================================
 FunctionExpression.h
--------------------
-Copyright Nicholas Chapman
+--------------------
+Copyright Glare Technologies Limited 2016 -
 Generated at 2011-04-30 18:53:38 +0100
 =====================================================================*/
 #pragma once
@@ -65,18 +65,13 @@ public:
 
 	virtual ValueRef exec(VMState& vmstate);
 	virtual TypeRef type() const;
-
-	
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual void print(int depth, std::ostream& s) const;
 	virtual std::string sourceString() const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
-	//virtual void emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* string_val) const;
-	virtual llvm::Value* getConstantLLVMValue(EmitLLVMCodeParams& params) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
-	FunctionDefinition* runtimeBind(VMState& vmstate, const FunctionValue*& function_value_out);
 	virtual bool provenDefined() const;
 
 	///////
@@ -97,7 +92,7 @@ public:
 	std::vector<ASTNodeRef> argument_expressions;
 
 	std::string static_function_name;
-	FunctionDefinition* static_target_function; // May be NULL.  For statically bound function applucation
+	FunctionDefinition* static_target_function; // May be NULL.  For statically bound function application
 
 private:
 	bool proven_defined;

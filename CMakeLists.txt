@@ -224,6 +224,10 @@ set(WINTER_FILES
 "${winterdir}/winter.cpp"
 "${winterdir}/notes.txt"
 "${winterdir}/todo.txt"
+"${winterdir}/wnt_LetASTNode.cpp"
+"${winterdir}/wnt_LetASTNode.h"
+"${winterdir}/wnt_LetBlock.cpp"
+"${winterdir}/wnt_LetBlock.h"
 )
 
 
@@ -299,6 +303,11 @@ ${INDIGO_TRUNK_DIR}/double-conversion/strtod.h
 ${INDIGO_TRUNK_DIR}/double-conversion/utils.h
 )
 
+SET(xxhash_files
+${INDIGO_TRUNK_DIR}/xxHash-r39/xxhash.c
+${INDIGO_TRUNK_DIR}/xxHash-r39/xxhash.h
+)
+
 
 if(WINTER_USE_OPENCL)
 	SET(glare_opencl_files
@@ -316,6 +325,7 @@ SOURCE_GROUP(winter FILES ${WINTER_FILES})
 SOURCE_GROUP(utils FILES ${util_files})
 SOURCE_GROUP(double_conversion FILES ${double_conversion_files})
 SOURCE_GROUP(opencl FILES ${glare_opencl_files})
+SOURCE_GROUP(xxhash FILES ${xxhash_files})
 
 
 include_directories(
@@ -323,6 +333,7 @@ ${llvmdir}/include
 ${INDIGO_TRUNK_DIR}
 ${INDIGO_TRUNK_DIR}/utils
 ${INDIGO_TRUNK_DIR}/maths
+${INDIGO_TRUNK_DIR}/xxHash-r39
 ${WINTER_INCLUDE_DIRS}
 )
 
@@ -333,6 +344,7 @@ ${util_files}
 ${maths_files}
 ${double_conversion_files}
 ${glare_opencl_files}
+${xxhash_files}
 )
 
 

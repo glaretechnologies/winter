@@ -11,9 +11,6 @@ namespace Winter
 {
 
 
-
-
-
 class ProofUtils
 {
 public:

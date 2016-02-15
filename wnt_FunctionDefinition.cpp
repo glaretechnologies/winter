@@ -1,7 +1,7 @@
 /*=====================================================================
 FunctionDefinition.cpp
 -------------------
-Copyright Nicholas Chapman
+Copyright Glare Technologies Limited 2016 -
 Generated at 2011-04-25 19:15:40 +0100
 =====================================================================*/
 #include "wnt_FunctionDefinition.h"
@@ -12,6 +12,7 @@ Generated at 2011-04-25 19:15:40 +0100
 #include "wnt_SourceBuffer.h"
 #include "wnt_RefCounting.h"
 #include "wnt_Variable.h"
+#include "wnt_LetASTNode.h"
 #include "VirtualMachine.h"
 #include "VMState.h"
 #include "Value.h"
@@ -38,7 +39,6 @@ Generated at 2011-04-25 19:15:40 +0100
 #ifdef _MSC_VER
 #pragma warning(pop) // Re-enable warnings
 #endif
-#include <iostream>
 
 
 using std::vector;
@@ -53,7 +53,6 @@ CapturedVar::CapturedVar()
 :	bound_function(NULL),
 	bound_let_node(NULL),
 	enclosing_lambda(NULL)
-	//substituted_expr(NULL)
 {}
 
 
@@ -109,11 +108,8 @@ FunctionDefinition::FunctionDefinition(const SrcLocation& src_loc, int order_num
 	declared_return_type(declared_rettype),
 	built_in_func_impl(impl),
 	built_llvm_function(NULL),
-	jitted_function(NULL),
 	//use_captured_vars(false),
 	need_to_emit_captured_var_struct_version(false),
-	closure_type(NULL),
-	alloc_func(NULL),
 	is_anon_func(false),
 	num_uses(0)
 {
@@ -342,26 +338,6 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 	//	if(this->use_captured_vars) // if we are an anon function...
 	//		payload.capture_variables = true; // Tell varables in function expression tree to capture
 	//}
-
-	/*TEMP if(payload.operation == TraversalPayload::BindVariables)
-	{
-		// We want to bind to allocateRefCountedStructure()
-		const FunctionSignature sig("allocateRefCountedStructure", std::vector<TypeRef>(1, TypeRef(new Int())));
-
-		FunctionDefinitionRef the_alloc_func = payload.linker->findMatchingFunction(sig);
-
-		assert(the_alloc_func.nonNull());
-
-		this->alloc_func = the_alloc_func.getPointer();
-
-		payload.all_variables_bound = true; // Assume true until we find an unbound variable during the body traversal.
-
-		// Zero all arg ref counts.
-		for(size_t i=0; i<args.size(); ++i)
-			args[i].ref_count = 0;
-	}*/
-
-
 
 	payload.func_def_stack.push_back(this);
 	stack.push_back(this);
@@ -1013,19 +989,6 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		"base_closure_ptr"
 	);
 }
-
-
-//llvm::Value* FunctionDefinition::getConstantLLVMValue(EmitLLVMCodeParams& params) const
-//{
-//	if(this->built_in_func_impl)
-//	{
-//		return this->built_in_func_impl->getConstantLLVMValue(params);
-//	}
-//	else
-//	{
-//		return this->body->getConstantLLVMValue(params);
-//	}
-//}
 
 
 llvm::Function* FunctionDefinition::getOrInsertFunction(
