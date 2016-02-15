@@ -13,6 +13,10 @@ Copyright Glare Technologies Limited 2015 -
 #include "wnt_TupleLiteral.h"
 #include "wnt_IfExpression.h"
 #include "wnt_FunctionExpression.h"
+#include "wnt_Lexer.h"
+#include "wnt_LangParser.h"
+#include "wnt_LetASTNode.h"
+#include "wnt_LetBlock.h"
 #include <utils/Timer.h>
 #include <utils/MTwister.h>
 #include <utils/Task.h>
@@ -259,7 +263,8 @@ static bool testFuzzASTProgram(Reference<BufferRoot>& root)//const std::vector<F
 
 		vm_args.comments_in_opencl_output = false;
 		for(size_t i=0; i<root->top_level_defs.size(); ++i)
-			vm_args.preconstructed_func_defs.push_back(root->top_level_defs[i].downcast<FunctionDefinition>());
+			if(root->top_level_defs[i]->nodeType() == ASTNode::FunctionDefinitionType)
+				vm_args.preconstructed_func_defs.push_back(root->top_level_defs[i].downcast<FunctionDefinition>());
 
 		
 		const FunctionSignature mainsig("main", std::vector<TypeRef>(1, TypeRef(new Float())));
@@ -701,10 +706,55 @@ public:
 		for(int i=0; i<N; ++i)
 		{
 			// Pick a random program to get started
-
-			Reference<BufferRoot> root = new BufferRoot(SrcLocation::invalidLocation());
-
+			SourceBufferRef source_buffer;
+			FunctionDefinitionRef main_def;
+			Reference<BufferRoot> root;// = new BufferRoot(SrcLocation::invalidLocation());
+			if(true)
 			{
+				try
+				{
+					const std::string start_string = readRandomProgramFromFuzzerInput(fuzzer_input, rng);
+
+					source_buffer = new SourceBuffer("source", start_string);
+					std::vector<Reference<TokenBase> > tokens;
+					Lexer::process(source_buffer, tokens);
+				
+					LangParser lang_parser(
+						false, // floating_point_literals_default_to_double
+						false // real_is_double
+					);
+
+					std::map<std::string, TypeRef> named_types;
+					std::vector<TypeRef> named_types_ordered;
+					int function_order_num = 0;
+
+					root = lang_parser.parseBuffer(tokens,
+						source_buffer,
+						named_types,
+						named_types_ordered,
+						function_order_num
+					);
+
+					// Try and find function 'main'
+					for(size_t i=0; i<root->top_level_defs.size(); ++i)
+					{
+						if(root->top_level_defs[i]->nodeType() == ASTNode::FunctionDefinitionType)
+						{
+							if(root->top_level_defs[i].downcastToPtr<FunctionDefinition>()->sig.name == "main")
+								main_def = root->top_level_defs[i].downcast<FunctionDefinition>();
+						}
+					}
+				}
+				catch(BaseException& )
+				{
+				}
+			}
+			//TEMP
+
+
+			//Reference<BufferRoot> root = new BufferRoot(SrcLocation::invalidLocation());
+
+			/*{
 				BuildRandomSubTreeArgs args;
 				args.allow_func_calls = false;
 
@@ -729,10 +779,10 @@ public:
 					NULL // built in func-impl
 				);
 				root->top_level_defs.push_back(def);
-			}
+			}*/
 			
 
-			const std::string src = root->sourceString();
+			const std::string src = root.nonNull() ? root->sourceString() : "";
 
 			conPrint("-------------------------------\n" + src + "\n-------------------------------");//TEMP
 
@@ -742,11 +792,13 @@ public:
 			size_t num_tested;
 			{
 				Lock lock(*tested_programs_mutex);
-				num_tested = tested_program_hashes->size();
+
 				already_tested = tested_program_hashes->find(src_hash) != tested_program_hashes->end();
 
 				if(!already_tested)
 					tested_program_hashes->insert(src_hash);
+
+				num_tested = tested_program_hashes->size();
 			}
 
 			if(!already_tested)
@@ -759,7 +811,7 @@ public:
 				//def->print(0, std::cout);
 				//std::cout << src << std::endl;
 
-				const bool valid_program = testFuzzASTProgram(root);
+				const bool valid_program =  root.nonNull() ? testFuzzASTProgram(root) : false;
 				if(valid_program) num_valid_programs++;
 			}
 			
