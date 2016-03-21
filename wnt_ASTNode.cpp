@@ -1040,7 +1040,7 @@ std::string BufferRoot::sourceString() const
 		default:
 			{
 				std::string node_src = top_level_defs[i]->sourceString();
-				s += s;
+				s += node_src;
 				s += "\n";
 				break;
 			}
