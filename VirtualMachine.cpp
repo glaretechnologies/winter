@@ -792,7 +792,13 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 #endif
 			}
 
+			// OSX_DEPLOYMENT_TARGET should correspond to the version number in the -mmacosx-version-min
+			// flag passed to the compiler.
+#if defined(OSX_DEPLOYMENT_TARGET)
+			this->triple = "x86_64-apple-macosx" + std::string(OSX_DEPLOYMENT_TARGET);
+#else
 			this->triple = llvm::sys::getProcessTriple();
+#endif
 			if(USE_MCJIT) this->triple.append("-elf"); // MCJIT requires the -elf suffix currently, see https://groups.google.com/forum/#!topic/llvm-dev/DOmHEXhNNWw
 
 			// Select the host computer architecture as the target.
