@@ -713,8 +713,20 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 				argtypes.push_back(this->argument_expressions[i]->type()); // may be NULL
 
 			const FunctionSignature sig(this->static_function_name, argtypes);
-		
-			throw BaseException("Failed to find function '" + sig.toString() + "'." + errorContext(*this));
+
+			std::string msg = "Failed to find function '" + sig.toString() + "'." + errorContext(*this);
+
+			// Print out signatures of other functions with the same name
+			std::vector<FunctionDefinitionRef> funcs_same_name;
+			payload.linker->getFuncsWithMatchingName(this->static_function_name, funcs_same_name);
+			if(!funcs_same_name.empty())
+			{
+				msg += "\nOther functions with the same name: \n";
+				for(size_t i=0; i<funcs_same_name.size(); ++i)
+					msg += funcs_same_name[i]->sig.toString() + "\n";
+			}
+
+			throw BaseException(msg);
 		}
 	}
 	else if(payload.operation == TraversalPayload::CheckInDomain)
