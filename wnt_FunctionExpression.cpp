@@ -1455,7 +1455,16 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 			//const int64 index = static_cast<const IntLiteral*>(argument_expressions[1].getPointer())->value;
 
 			//return argument_expressions[0]->emitOpenCLC(params) + "[" + ::intToHexChar((int)index) + "]";
-			return argument_expressions[0]->emitOpenCLC(params) + "[" + argument_expressions[1]->emitOpenCLC(params) + "]";
+			
+			const std::string index_expr = argument_expressions[1]->emitOpenCLC(params);
+
+			if(params.emit_in_bound_asserts)
+			{
+				std::string assert_s = "winterAssert((" + index_expr + ") >= 0 && (" + index_expr + ") < " + toString(this->argument_expressions[0]->type().downcastToPtr<ArrayType>()->num_elems) + ");\n";
+				params.blocks.back() += assert_s;
+			}
+
+			return argument_expressions[0]->emitOpenCLC(params) + "[" + index_expr + "]";
 		}
 		else if(this->argument_expressions[0]->type()->getType() == Type::TupleTypeType)
 		{

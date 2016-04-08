@@ -20,7 +20,7 @@ class ExternalFunction;
 class Linker
 {
 public:
-	Linker(bool hidden_voidptr_arg, bool try_coerce_int_to_double_first, void* env);
+	Linker(bool hidden_voidptr_arg, bool try_coerce_int_to_double_first, bool emit_in_bound_asserts, void* env);
 	~Linker();
 
 
@@ -72,6 +72,7 @@ public:
 
 	bool hidden_voidptr_arg;
 	bool try_coerce_int_to_double_first;
+	bool emit_in_bound_asserts;
 	void* env;
 };
 

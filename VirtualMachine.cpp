@@ -609,6 +609,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 :	linker(
 		true, // hidden_voidptr_arg
 		args.try_coerce_int_to_double_first,
+		args.emit_in_bound_asserts,
 		args.env
 	),
 	env(args.env),
@@ -1843,6 +1844,7 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 	EmitOpenCLCodeParams params;
 	params.uid = 0;
 	params.emit_comments = vm_args.comments_in_opencl_output;
+	params.emit_in_bound_asserts = vm_args.emit_in_bound_asserts;
 
 	std::string top_level_def_src;
 	for(size_t i=0; i<linker.top_level_defs.size(); ++i)
@@ -1938,6 +1940,19 @@ int truncateToInt_double_(double x) { return (int)x; } \n\
 int8 truncateToInt_vector_double__8__(float8 v) { return convert_int8(v); }  \n\
 double print_double_(double x) { printf((__constant char *)\"%f\\n\", x); return x; }    \n\
 \n";
+	}
+
+	if(vm_args.emit_in_bound_asserts)
+	{
+		built_in_func_code += 
+"#define winterAssert(expr) doWinterAssert(expr, #expr, __FILE__, __LINE__)		\n\
+\n\
+inline void doWinterAssert(bool val, const __constant char* message, const __constant char* file, unsigned int line)	\n\
+{\n\
+	if(!val)	\n\
+		printf(\"!!! winter assert failed: %s, file %s, line %i\\n\", message, file, line);	\n\
+}\n\
+";
 	}
 
 	res.struct_def_code = struct_def_code;

@@ -238,6 +238,8 @@ public:
 class EmitOpenCLCodeParams
 {
 public:
+	EmitOpenCLCodeParams() : emit_in_bound_asserts(false) {}
+
 	std::string file_scope_code;
 
 	std::vector<std::string> blocks;
@@ -247,6 +249,7 @@ public:
 	int uid;
 
 	bool emit_comments;
+	bool emit_in_bound_asserts;
 };
 
 

@@ -18,9 +18,10 @@ namespace Winter
 {
 
 
-Linker::Linker(bool hidden_voidptr_arg_, bool try_coerce_int_to_double_first_, void* env_)
+Linker::Linker(bool hidden_voidptr_arg_, bool try_coerce_int_to_double_first_, bool emit_in_bound_asserts_, void* env_)
 :	hidden_voidptr_arg(hidden_voidptr_arg_),
 	try_coerce_int_to_double_first(try_coerce_int_to_double_first_),
+	emit_in_bound_asserts(emit_in_bound_asserts_),
 	env(env_)
 {}
 
@@ -182,6 +183,7 @@ const std::string Linker::buildOpenCLCode()
 	EmitOpenCLCodeParams params;
 	params.uid = 0;
 	params.emit_comments = true;
+	params.emit_in_bound_asserts = emit_in_bound_asserts;
 
 	for(Linker::SigToFuncMapType::iterator it = sig_to_function_map.begin(); it != sig_to_function_map.end(); ++it)
 	{
