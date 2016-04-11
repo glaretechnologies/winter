@@ -114,7 +114,6 @@ int let_result_xx;
 for destructuring assignment:
 ----------------------------
 
-/*
 let
 	x, y = (1, 2)
 in

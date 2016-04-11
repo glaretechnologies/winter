@@ -2419,7 +2419,7 @@ llvm::Value* DotProductBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) con
 //----------------------------------------------------------------------------------------------
 
 
-class VectorMin_CreateLoopBodyCallBack : public CreateLoopBodyCallBack
+/*class VectorMin_CreateLoopBodyCallBack : public CreateLoopBodyCallBack
 {
 public:
 	virtual llvm::Value* emitLoopBody(EmitLLVMCodeParams& params, llvm::Value* loop_value_var, llvm::Value* i)
@@ -2453,7 +2453,7 @@ public:
 	llvm::Value* vec_a;
 	llvm::Value* vec_b;
 	//llvm::Value* vec_result;
-};
+};*/
 
 
 ValueRef VectorMinBuiltInFunc::invoke(VMState& vmstate)

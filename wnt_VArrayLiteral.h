@@ -45,7 +45,7 @@ private:
 	bool has_int_suffix;
 	int int_suffix; // e.g. number of elements
 
-	mutable llvm::Value* ptr_alloca;
+	//mutable llvm::Value* ptr_alloca;
 };
 
 

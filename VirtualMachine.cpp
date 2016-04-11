@@ -612,7 +612,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 		args.emit_in_bound_asserts,
 		args.env
 	),
-	env(args.env),
+	//env(args.env),
 	llvm_context(NULL),
 	llvm_module(NULL),
 	llvm_exec_engine(NULL),

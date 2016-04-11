@@ -60,9 +60,6 @@ using std::vector;
 using std::string;
 
 
-static const bool VERBOSE_EXEC = false;
-
-
 namespace Winter
 {
 

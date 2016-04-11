@@ -335,10 +335,10 @@ void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 					bound_function = (FunctionDefinition*)updated_node;
 				break;
 			}
+		case BoundToGlobalDefVariable:
+			break;
 		case BoundToNamedConstant:
-			{
-				break;
-			}
+			break;
 		case LetVariable:
 			{
 				ASTNode* updated_node = payload.clone_map[bound_let_node];

@@ -146,7 +146,7 @@ private:
 	llvm::ExecutionEngine* llvm_exec_engine;
 	llvm::TargetMachine* target_machine;
 	bool hidden_voidptr_arg;
-	void* env;
+	//void* env;
 	std::string triple;
 	std::map<std::string, void*> func_map;
 
