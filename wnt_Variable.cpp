@@ -63,6 +63,7 @@ Variable::Variable(const std::string& name_, const SrcLocation& loc)
 }
 
 
+/*
 inline static const std::string varType(Variable::BindingType t)
 {
 	if(t == Variable::UnboundVariable)
@@ -81,6 +82,7 @@ inline static const std::string varType(Variable::BindingType t)
 		return "";
 	}
 }
+*/
 
 
 struct BindInfo

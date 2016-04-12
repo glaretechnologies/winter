@@ -508,6 +508,7 @@ struct BuildRandomSubTreeArgs
 };
 
 
+// Build random abstract-syntax sub-tree
 static ASTNodeRef buildRandomASSubTree(BuildRandomSubTreeArgs& args, MTwister& rng, const std::vector<Choice>& choices, int depth)
 {
 	const float r = rng.unitRandom();
