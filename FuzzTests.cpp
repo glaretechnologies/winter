@@ -750,7 +750,12 @@ public:
 				{
 				}
 			}
+
+
 			//TEMP
+			BuildRandomSubTreeArgs args;
+			args.allow_func_calls = false;
+			buildRandomASSubTree(args, rng, choices, 0);// body ast node
 
 
 			//Reference<BufferRoot> root = new BufferRoot(SrcLocation::invalidLocation());
