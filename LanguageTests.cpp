@@ -172,9 +172,6 @@ void LanguageTests::doLLVMInit()
 }
 
 
-static const bool DO_OPENCL_TESTS = false;
-
-
 void LanguageTests::run()
 {
 	Timer timer;
