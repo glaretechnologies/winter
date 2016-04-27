@@ -444,7 +444,7 @@ public:
 class IntLiteral : public ASTNode
 {
 public:
-	IntLiteral(int64 v, int num_bits_, const SrcLocation& loc) : ASTNode(IntLiteralType, loc), value(v), num_bits(num_bits_) { assert(num_bits == 32 || num_bits == 64); this->can_maybe_constant_fold = true; }
+	IntLiteral(int64 v, int num_bits_, const SrcLocation& loc) : ASTNode(IntLiteralType, loc), value(v), num_bits(num_bits_) { assert(num_bits == 16 || num_bits == 32 || num_bits == 64); this->can_maybe_constant_fold = true; }
 	int64 value;
 	int num_bits;
 

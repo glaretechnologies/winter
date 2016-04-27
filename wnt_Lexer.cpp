@@ -266,8 +266,8 @@ void Lexer::parseNumericLiteral(const SourceBufferRef& buffer, Parser& parser, s
 			}
 		}
 
-		if(!(num_bits == 32 || num_bits == 64))
-			throw LexerExcep("Integer must have 32 or 64 bits." + errorPosition(buffer, suffix_pos));
+		if(!(num_bits == 16 || num_bits == 32 || num_bits == 64))
+			throw LexerExcep("Integer must have 16, 32 or 64 bits." + errorPosition(buffer, suffix_pos));
 
 		tokens_out.push_back(Reference<TokenBase>(new IntLiteralToken(x, num_bits, char_index)));
 	}

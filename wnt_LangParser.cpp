@@ -899,6 +899,8 @@ TypeRef LangParser::parseElementaryType(ParseInfo& p)
 	}
 	else if(t == "int")
 		return new Int();
+	else if(t == "int16")
+		return new Int(16);
 	else if(t == "int64")
 		return new Int(64);
 	else if(t == "string")

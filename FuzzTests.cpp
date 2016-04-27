@@ -1073,7 +1073,7 @@ static void doASTFuzzTests()
 			std::unordered_set<uint64> tested_program_hashes;
 
 			const int NUM_THREADS = 1;
-			Indigo::TaskManager manager(NUM_THREADS);
+			Indigo::TaskManager manager("Fuzz thread manager", NUM_THREADS);
 			for(int i=0; i<NUM_THREADS; ++i)
 			{
 				Reference<ASTFuzzTask> t = new ASTFuzzTask();
@@ -1175,7 +1175,7 @@ void fuzzTests()
 			std::unordered_set<uint64> tested_program_hashes;
 
 			const int NUM_THREADS = 4;
-			Indigo::TaskManager manager(NUM_THREADS);
+			Indigo::TaskManager manager("fuzz thread manager", NUM_THREADS);
 			for(int i=0; i<NUM_THREADS; ++i)
 			{
 				Reference<FuzzTask> t = new FuzzTask();

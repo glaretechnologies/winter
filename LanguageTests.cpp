@@ -333,6 +333,20 @@ void LanguageTests::run()
 
 	//testMainFloatArg("def main(float x) float : let a = [1.0, 2.0, 3.0, 4.0]a in a[truncateToInt(x)]", 2.1f, 3.0f, ALLOW_UNSAFE);
 
+	// ===================================================================
+	// Test 16-bit integers
+	// ===================================================================
+	testMainInt16Arg("def main(int16 x) : x + 5i16", 1, 6);
+	
+	// TODO: need to add i32 -> i16 implicit conversions.
+
+	testMainInt16Arg("def main(int16 x) : [10i16, 11i16]a[0]", 1, 10);
+	//testMainInt16Arg("def main(int16 x) : [65535i16, 11i16]a[0]", 1, 65535);
+	
+
+	// Test toFloat(int16)
+	//testMainInt16Arg("def main(int16 x) int16 : toInt16(1.0f + toFloat(x))", 2, 3); // TODO: add truncateToInt16
+	testMainFloatArg("def main(float x) float : x + toFloat(4i16)", 2.0f, 6.0f);
 
 	// ===================================================================
 	// Test 'real' type.

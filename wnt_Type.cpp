@@ -183,7 +183,9 @@ llvm::Type* Int::LLVMType(llvm::Module& module) const
 
 const std::string Int::OpenCLCType() const
 {
-	if(num_bits == 32)
+	if(num_bits == 16)
+		return "short";
+	else if(num_bits == 32)
 		return "int";
 	else if(num_bits == 64)
 		return "long";

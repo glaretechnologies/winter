@@ -141,7 +141,7 @@ private:
 class Int : public Type
 {
 public:
-	Int(int num_bits_ = 32) : Type(IntType), num_bits(num_bits_) { assert(num_bits == 32 || num_bits == 64); }
+	Int(int num_bits_ = 32) : Type(IntType), num_bits(num_bits_) { assert(num_bits == 16 || num_bits == 32 || num_bits == 64); }
 	virtual const std::string toString() const;
 	virtual bool lessThan(const Type& b) const
 	{ 
@@ -165,7 +165,7 @@ public:
 
 	int numBits() const { return num_bits; }
 private:
-	int num_bits; // Should be 32 or 64
+	int num_bits; // Should be 16, 32 or 64
 };
 
 
