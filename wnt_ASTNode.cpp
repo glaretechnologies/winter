@@ -3908,6 +3908,18 @@ llvm::Value* UnaryMinusExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm
 				neg_one_vec
 			);
 		}
+		else if(vec_type->elem_type->getType() == Type::DoubleType)
+		{
+			llvm::Value* neg_one_vec = llvm::ConstantVector::getSplat(
+				vec_type->num,
+				llvm::ConstantFP::get(*params.context, llvm::APFloat(-1.0))
+			);
+
+			return params.builder->CreateFMul(
+				expr->emitLLVMCode(params), 
+				neg_one_vec
+			);
+		}
 		else if(vec_type->elem_type->getType() == Type::IntType)
 		{
 			llvm::Value* neg_one_vec = llvm::ConstantVector::getSplat(
@@ -3920,12 +3932,11 @@ llvm::Value* UnaryMinusExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm
 				neg_one_vec
 			);
 		}
+	}
 
-	}
-	{
-		assert(!"UnaryMinusExpression type invalid!");
-		return NULL;
-	}
+	assert(!"UnaryMinusExpression type invalid!");
+	throw BaseException("UnaryMinusExpression type invalid!");
+	
 }
 
 
