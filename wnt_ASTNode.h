@@ -300,6 +300,7 @@ public:
 		SubtractionExpressionType,
 		MulExpressionType,
 		DivExpressionType,
+		BinaryBitwiseExpressionType,
 		BinaryBooleanType,
 		UnaryMinusExpressionType,
 		LetType,
@@ -444,12 +445,13 @@ public:
 class IntLiteral : public ASTNode
 {
 public:
-	IntLiteral(int64 v, int num_bits_, const SrcLocation& loc) : ASTNode(IntLiteralType, loc), value(v), num_bits(num_bits_) { assert(num_bits == 16 || num_bits == 32 || num_bits == 64); this->can_maybe_constant_fold = true; }
+	IntLiteral(int64 v, int num_bits_, bool is_signed_, const SrcLocation& loc) : ASTNode(IntLiteralType, loc), value(v), num_bits(num_bits_), is_signed(is_signed_) { assert(num_bits == 16 || num_bits == 32 || num_bits == 64); this->can_maybe_constant_fold = true; }
 	int64 value;
 	int num_bits;
+	bool is_signed;
 
 	virtual ValueRef exec(VMState& vmstate);
-	virtual TypeRef type() const { return TypeRef(new Int(num_bits)); }
+	virtual TypeRef type() const { return TypeRef(new Int(num_bits, is_signed)); }
 	virtual void print(int depth, std::ostream& s) const;
 	virtual std::string sourceString() const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
@@ -636,6 +638,38 @@ public:
 	ASTNodeRef b;
 	bool proven_defined;
 	mutable TypeRef expr_type; // cached;
+};
+
+
+class BinaryBitwiseExpression : public ASTNode
+{
+public:
+	enum BitwiseType
+	{
+		BITWISE_AND,
+		BITWISE_OR,
+		BITWISE_XOR,
+		BITWISE_LEFT_SHIFT,
+		BITWISE_RIGHT_SHIFT
+	};
+
+	BinaryBitwiseExpression(BitwiseType t, const ASTNodeRef& a, const ASTNodeRef& b, const SrcLocation& loc);
+
+	virtual ValueRef exec(VMState& vmstate);
+	virtual TypeRef type() const;
+	virtual void print(int depth, std::ostream& s) const;
+	virtual std::string sourceString() const;
+	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
+	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
+	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
+	virtual bool isConstant() const;
+
+private:
+	const std::string opToken() const;
+	BitwiseType t;
+	ASTNodeRef a;
+	ASTNodeRef b;
 };
 
 

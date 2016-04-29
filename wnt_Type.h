@@ -141,7 +141,7 @@ private:
 class Int : public Type
 {
 public:
-	Int(int num_bits_ = 32) : Type(IntType), num_bits(num_bits_) { assert(num_bits == 16 || num_bits == 32 || num_bits == 64); }
+	Int(int num_bits_ = 32, bool is_signed_ = true) : Type(IntType), num_bits(num_bits_), is_signed(is_signed_) { assert(num_bits == 16 || num_bits == 32 || num_bits == 64); }
 	virtual const std::string toString() const;
 	virtual bool lessThan(const Type& b) const
 	{ 
@@ -153,7 +153,13 @@ public:
 		{
 			// else b is an Int as well.
 			const Int& b_int = static_cast<const Int&>(b);
-			return num_bits < b_int.num_bits;
+
+			if((int)is_signed < (int)b_int.is_signed)
+				return true;
+			else if((int)b_int.is_signed < (int)is_signed)
+				return false;
+			else
+				return num_bits < b_int.num_bits;
 		}
 	}
 
@@ -164,8 +170,9 @@ public:
 	virtual Reference<Value> getInvalidValue() const; // For array out-of-bounds
 
 	int numBits() const { return num_bits; }
-private:
+//private:
 	int num_bits; // Should be 16, 32 or 64
+	bool is_signed;
 };
 
 

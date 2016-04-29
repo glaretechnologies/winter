@@ -1999,7 +1999,7 @@ ValueRef IterateBuiltInFunc::invoke(VMState& vmstate)
 		// Set up arg stack
 		vmstate.func_args_start.push_back((unsigned int)vmstate.argument_stack.size());
 		vmstate.argument_stack.push_back(running_val); // Push value arg
-		vmstate.argument_stack.push_back(new IntValue(iteration)); // Push iteration
+		vmstate.argument_stack.push_back(new IntValue(iteration, true)); // Push iteration
 		for(size_t i=0; i<invariant_data_types.size(); ++i)
 			vmstate.argument_stack.push_back(invariant_data[i]);
 		
@@ -2487,7 +2487,7 @@ ValueRef VectorMinBuiltInFunc::invoke(VMState& vmstate)
 		{
 			const int64 x = checkedCast<const IntValue>(a->e[i].getPointer())->value;
 			const int64 y = checkedCast<const IntValue>(b->e[i].getPointer())->value;
-			res_values[i] = new IntValue(x > y ? x : y);
+			res_values[i] = new IntValue(x > y ? x : y, checkedCast<const IntValue>(a->e[i].getPointer())->is_signed);
 		}
 	}
 	else
@@ -2599,7 +2599,7 @@ ValueRef VectorMaxBuiltInFunc::invoke(VMState& vmstate)
 		{
 			const int64 x = checkedCast<const IntValue>(a->e[i].getPointer())->value;
 			const int64 y = checkedCast<const IntValue>(b->e[i].getPointer())->value;
-			res_values[i] = new IntValue(x > y ? x : y);
+			res_values[i] = new IntValue(x > y ? x : y, checkedCast<const IntValue>(a->e[i].getPointer())->is_signed);
 		}
 	}
 	else
@@ -3167,12 +3167,12 @@ ValueRef TruncateToIntBuiltInFunc::invoke(VMState& vmstate)
 	if(type->getType() == Type::FloatType)
 	{
 		const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
-		return new IntValue((int)a->value);
+		return new IntValue((int)a->value, /*is_signed=*/true);
 	}
 	else if(type->getType() == Type::DoubleType)
 	{
 		const DoubleValue* a = checkedCast<const DoubleValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
-		return new IntValue((int)a->value);
+		return new IntValue((int)a->value, /*is_signed=*/true);
 	}
 	else
 		throw BaseException("TruncateToIntBuiltInFunc todo");
@@ -3278,7 +3278,7 @@ ValueRef ToInt32BuiltInFunc::invoke(VMState& vmstate)
 {
 	const IntValue* a = checkedCast<const IntValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 	if(a->value >= -2147483648LL && a->value <= 2147483647LL)
-		return new IntValue(a->value);
+		return new IntValue(a->value, /*is_signed=*/true);
 	else
 		throw BaseException("argument for toInt32 is out of domain.");
 }
@@ -3309,13 +3309,13 @@ ValueRef VoidPtrToInt64BuiltInFunc::invoke(VMState& vmstate)
 {
 	const VoidPtrValue* a = checkedCast<const VoidPtrValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 
-	return new IntValue((int64)a->value);
+	return new IntValue((int64)a->value, /*is_signed*/true);
 }
 
 
 llvm::Value* VoidPtrToInt64BuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
-	TypeRef int_type = new Int(64);
+	TypeRef int_type = new Int(64, true);
 	return params.builder->CreatePtrToInt(
 		LLVMTypeUtils::getNthArg(params.currently_building_func, 0), 
 		int_type->LLVMType(*params.module) // dest type
@@ -3336,13 +3336,13 @@ ValueRef LengthBuiltInFunc::invoke(VMState& vmstate)
 	switch(type->getType())
 	{
 	case Type::ArrayTypeType:
-		return new IntValue(checkedCast<const ArrayValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer())->e.size());
+		return new IntValue(checkedCast<const ArrayValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer())->e.size(), /*is_signed=*/true);
 	case Type::VArrayTypeType:
-		return new IntValue(checkedCast<const VArrayValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer())->e.size());
+		return new IntValue(checkedCast<const VArrayValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer())->e.size(), /*is_signed=*/true);
 	case Type::TupleTypeType:
-		return new IntValue(checkedCast<const TupleValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer())->e.size());
+		return new IntValue(checkedCast<const TupleValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer())->e.size(), /*is_signed=*/true);
 	case Type::VectorTypeType:
-		return new IntValue(checkedCast<const VectorValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer())->e.size());
+		return new IntValue(checkedCast<const VectorValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer())->e.size(), /*is_signed=*/true);
 	default:
 		throw BaseException("unhandled type.");
 	}

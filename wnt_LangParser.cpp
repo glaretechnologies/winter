@@ -669,7 +669,7 @@ ASTNodeRef LangParser::parseLiteral(ParseInfo& p)
 	if(p.tokens[p.i]->getType() == INT_LITERAL_TOKEN)
 	{
 		const IntLiteralToken* token = static_cast<const IntLiteralToken*>(p.tokens[p.i].getPointer());
-		ASTNodeRef n = new IntLiteral(token->getIntLiteralValue(), token->num_bits, loc);
+		ASTNodeRef n = new IntLiteral(token->getIntLiteralValue(), token->num_bits, token->is_signed, loc);
 		p.i++;
 		return n;
 	}
@@ -717,7 +717,7 @@ Reference<IntLiteral> LangParser::parseIntLiteral(ParseInfo& p)
 	if(p.tokens[p.i]->getType() == INT_LITERAL_TOKEN)
 	{
 		const IntLiteralToken* token = static_cast<const IntLiteralToken*>(p.tokens[p.i].getPointer());
-		Reference<IntLiteral> n = new IntLiteral(token->getIntLiteralValue(), token->num_bits, loc);
+		Reference<IntLiteral> n = new IntLiteral(token->getIntLiteralValue(), token->num_bits, token->is_signed, loc);
 		p.i++;
 		return n;
 	}
@@ -898,11 +898,23 @@ TypeRef LangParser::parseElementaryType(ParseInfo& p)
 			return new Float();
 	}
 	else if(t == "int")
-		return new Int();
+		return new Int(32);
 	else if(t == "int16")
 		return new Int(16);
+	else if(t == "int32")
+		return new Int(32);
 	else if(t == "int64")
 		return new Int(64);
+
+	else if(t == "uint")
+		return new Int(32, /*signed=*/false);
+	else if(t == "uint16")
+		return new Int(16, /*signed=*/false);
+	else if(t == "uint32")
+		return new Int(32, /*signed=*/false);
+	else if(t == "uint64")
+		return new Int(64, /*signed=*/false);
+
 	else if(t == "string")
 		return new String();
 	else if(t == "char")
@@ -1178,7 +1190,7 @@ ASTNodeRef LangParser::parseMulDivExpression(ParseInfo& p)
 
 ASTNodeRef LangParser::parseBinaryLogicalExpression(ParseInfo& p)
 {
-	ASTNodeRef left = parseComparisonExpression(p);
+	ASTNodeRef left = parseBinaryBitwiseExpression(p);
 	while(1)
 	{
 		SrcLocation loc = locationForParseInfo(p);
@@ -1190,7 +1202,7 @@ ASTNodeRef LangParser::parseBinaryLogicalExpression(ParseInfo& p)
 			left = new BinaryBooleanExpr(
 				BinaryBooleanExpr::AND,
 				left,
-				parseComparisonExpression(p),
+				parseBinaryBitwiseExpression(p),
 				loc
 			);
 		}
@@ -1200,6 +1212,88 @@ ASTNodeRef LangParser::parseBinaryLogicalExpression(ParseInfo& p)
 
 			left = new BinaryBooleanExpr(
 				BinaryBooleanExpr::OR,
+				left,
+				parseBinaryBitwiseExpression(p),
+				loc
+			);
+		}
+		else
+			return left;
+	}
+}
+
+
+ASTNodeRef LangParser::parseShiftExpression(ParseInfo& p)
+{
+	ASTNodeRef left = parseAddSubExpression(p);
+	while(1)
+	{
+		SrcLocation loc = locationForParseInfo(p);
+
+		if(isTokenCurrent(LEFT_SHIFT_TOKEN, p))
+		{
+			parseToken(LEFT_SHIFT_TOKEN, p);
+
+			left = new BinaryBitwiseExpression(
+				BinaryBitwiseExpression::BITWISE_LEFT_SHIFT,
+				left,
+				parseAddSubExpression(p),
+				loc
+			);
+		}
+		else if(isTokenCurrent(RIGHT_SHIFT_TOKEN, p))
+		{
+			parseToken(RIGHT_SHIFT_TOKEN, p);
+
+			left = new BinaryBitwiseExpression(
+				BinaryBitwiseExpression::BITWISE_RIGHT_SHIFT,
+				left,
+				parseAddSubExpression(p),
+				loc
+			);
+		}
+		else
+			return left;
+	}
+}
+
+
+
+ASTNodeRef LangParser::parseBinaryBitwiseExpression(ParseInfo& p)
+{
+	ASTNodeRef left = parseComparisonExpression(p);
+	while(1)
+	{
+		SrcLocation loc = locationForParseInfo(p);
+
+		if(isTokenCurrent(BITWISE_AND_TOKEN, p))
+		{
+			parseToken(BITWISE_AND_TOKEN, p);
+
+			left = new BinaryBitwiseExpression(
+				BinaryBitwiseExpression::BITWISE_AND,
+				left,
+				parseComparisonExpression(p),
+				loc
+			);
+		}
+		else if(isTokenCurrent(BITWISE_OR_TOKEN, p))
+		{
+			parseToken(BITWISE_OR_TOKEN, p);
+
+			left = new BinaryBitwiseExpression(
+				BinaryBitwiseExpression::BITWISE_OR,
+				left,
+				parseComparisonExpression(p),
+				loc
+			);
+		}
+		else if(isTokenCurrent(BITWISE_XOR_TOKEN, p))
+		{
+			parseToken(BITWISE_XOR_TOKEN, p);
+
+			left = new BinaryBitwiseExpression(
+				BinaryBitwiseExpression::BITWISE_XOR,
 				left,
 				parseComparisonExpression(p),
 				loc
@@ -1238,7 +1332,7 @@ ASTNodeRef LangParser::parseTernaryConditionalExpression(ParseInfo& p)
 
 ASTNodeRef LangParser::parseComparisonExpression(ParseInfo& p)
 {
-	ASTNodeRef left = parseAddSubExpression(p);
+	ASTNodeRef left = parseShiftExpression(p);
 
 	SrcLocation loc = locationForParseInfo(p);
 
@@ -1254,7 +1348,7 @@ ASTNodeRef LangParser::parseComparisonExpression(ParseInfo& p)
 			Reference<ComparisonExpression> expr = new ComparisonExpression(
 				token_ref,
 				left, 
-				parseAddSubExpression(p),
+				parseShiftExpression(p),
 				loc
 			);
 			return expr;

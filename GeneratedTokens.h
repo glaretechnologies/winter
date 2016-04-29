@@ -287,6 +287,61 @@ public:
  virtual bool isBinaryInfixOp() const { return false; }
 };
 
+// Added manually:
+const unsigned int BITWISE_AND_TOKEN = 36;
+class BITWISE_AND_Token : public TokenBase
+{
+public:
+ BITWISE_AND_Token(unsigned int char_index) : TokenBase(char_index, BITWISE_AND_TOKEN) {}
+ virtual bool isLiteral() const { return false; }
+ virtual bool isParanthesis() const { return false; }
+ virtual bool isBinaryInfixOp() const { return false; }
+};
+
+// Added manually:
+const unsigned int BITWISE_OR_TOKEN = 37;
+class BITWISE_OR_Token : public TokenBase
+{
+public:
+ BITWISE_OR_Token(unsigned int char_index) : TokenBase(char_index, BITWISE_OR_TOKEN) {}
+ virtual bool isLiteral() const { return false; }
+ virtual bool isParanthesis() const { return false; }
+ virtual bool isBinaryInfixOp() const { return false; }
+};
+
+// Added manually:
+const unsigned int BITWISE_XOR_TOKEN = 38;
+class BITWISE_XOR_Token : public TokenBase
+{
+public:
+ BITWISE_XOR_Token(unsigned int char_index) : TokenBase(char_index, BITWISE_XOR_TOKEN) {}
+ virtual bool isLiteral() const { return false; }
+ virtual bool isParanthesis() const { return false; }
+ virtual bool isBinaryInfixOp() const { return false; }
+};
+
+// Added manually:
+const unsigned int LEFT_SHIFT_TOKEN = 39;
+class LEFT_SHIFT_Token : public TokenBase
+{
+public:
+ LEFT_SHIFT_Token(unsigned int char_index) : TokenBase(char_index, LEFT_SHIFT_TOKEN) {}
+ virtual bool isLiteral() const { return false; }
+ virtual bool isParanthesis() const { return false; }
+ virtual bool isBinaryInfixOp() const { return false; }
+};
+
+// Added manually:
+const unsigned int RIGHT_SHIFT_TOKEN = 40;
+class RIGHT_SHIFT_Token : public TokenBase
+{
+public:
+ RIGHT_SHIFT_Token(unsigned int char_index) : TokenBase(char_index, RIGHT_SHIFT_TOKEN) {}
+ virtual bool isLiteral() const { return false; }
+ virtual bool isParanthesis() const { return false; }
+ virtual bool isBinaryInfixOp() const { return false; }
+};
+
 
 inline const std::string tokenName(unsigned int t)
 {
@@ -317,6 +372,11 @@ inline const std::string tokenName(unsigned int t)
 		case 33: return "EXCLAMATION_MARK";
 		case 34: return "DOT";
 		case 35: return "QUESTION_MARK_TOKEN";
+		case BITWISE_AND_TOKEN: return "BITWISE_AND_TOKEN";
+		case BITWISE_OR_TOKEN: return "BITWISE_OR_TOKEN";
+		case BITWISE_XOR_TOKEN: return "BITWISE_XOR_TOKEN";
+		case LEFT_SHIFT_TOKEN: return "LEFT_SHIFT_TOKEN";
+		case RIGHT_SHIFT_TOKEN: return "RIGHT_SHIFT_TOKEN";
 		default: return "[Unknown]";
 	}
 }
@@ -351,6 +411,11 @@ inline Reference<TokenBase> makeTokenObject(unsigned int token_type, unsigned in
 		case 33: return Reference<TokenBase>(new EXCLAMATION_MARK_Token(char_index));
 		case 34: return Reference<TokenBase>(new DOT_Token(char_index));
 		case 35: return Reference<TokenBase>(new QUESTION_MARK_Token(char_index));
+		case BITWISE_AND_TOKEN: return Reference<TokenBase>(new BITWISE_AND_Token(char_index));
+		case BITWISE_OR_TOKEN: return Reference<TokenBase>(new BITWISE_OR_Token(char_index));\
+		case BITWISE_XOR_TOKEN: return Reference<TokenBase>(new BITWISE_XOR_Token(char_index));
+		case LEFT_SHIFT_TOKEN: return Reference<TokenBase>(new LEFT_SHIFT_Token(char_index));
+		case RIGHT_SHIFT_TOKEN: return Reference<TokenBase>(new RIGHT_SHIFT_Token(char_index));
 		default: return  Reference<TokenBase>();
 	}
 }

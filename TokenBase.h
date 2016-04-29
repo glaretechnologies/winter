@@ -103,7 +103,7 @@ private:
 class IntLiteralToken : public TokenBase
 {
 public:
-	IntLiteralToken(int64 x, int num_bits_, unsigned int char_index) : TokenBase(char_index, INT_LITERAL_TOKEN), val(x), num_bits(num_bits_) {}
+	IntLiteralToken(int64 x, int num_bits_, bool is_signed_, unsigned int char_index) : TokenBase(char_index, INT_LITERAL_TOKEN), val(x), num_bits(num_bits_), is_signed(is_signed_) {}
 	
 	virtual bool isLiteral() const { return true; }
 	virtual bool isParanthesis() const { return false; }
@@ -113,6 +113,7 @@ public:
 //private:
 	int64 val;
 	int num_bits;
+	bool is_signed; // Literal is considered signed unless it has a 'u' suffix.
 };
 
 

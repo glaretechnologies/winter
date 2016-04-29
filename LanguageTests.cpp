@@ -331,6 +331,46 @@ void LanguageTests::run()
 	//testMainFloatArg("def main(float x) float : let a = [1.0, 2.0, 3.0, 4.0]a in a[truncateToInt(x)]", 2.1f, 3.0f, ALLOW_UNSAFE);
 
 	// ===================================================================
+	// Test unsigned integers
+	// ===================================================================
+	testMainUInt32Arg("def main(uint32 x) : x", 1, 1);
+
+	testMainUInt32Arg("def main(uint32 x) : 10u", 1, 10);
+
+	testMainUInt32Arg("def main(uint32 x) : 10u32", 1, 10);
+
+	testMainUInt32Arg("def main(uint32 x) : x + 10u32", 1, 11);
+
+	testMainUInt32Arg("def main(uint32 x) : x * 10u32", 2, 20);
+
+	// ===================================================================
+	// Test bitwise AND
+	// ===================================================================
+	testMainUInt32Arg("def main(uint32 x) : x & 7u", 0xFFFFFFFF, 7);
+
+	// ===================================================================
+	// Test bitwise OR
+	// ===================================================================
+	testMainUInt32Arg("def main(uint32 x) : x | 7u", 8, 15);
+
+	// ===================================================================
+	// Test bitwise XOR
+	// ===================================================================
+	testMainUInt32Arg("def main(uint32 x) : x ^ 15u", 7, 8);
+
+	// ===================================================================
+	// Test left shift
+	// ===================================================================
+	testMainUInt32Arg("def main(uint32 x) : x << 10u", 3, 3 << 10);
+
+	// ===================================================================
+	// Test right shift
+	// ===================================================================
+	testMainUInt32Arg("def main(uint32 x) : x >> 2u", 356, 356 >> 2);
+
+
+
+	// ===================================================================
 	// Test 16-bit integers
 	// ===================================================================
 	testMainInt16Arg("def main(int16 x) : x + 5i16", 1, 6);
@@ -1079,9 +1119,9 @@ void LanguageTests::run()
 	
 
 	//------------------------ VArrays in tuples --------------------------
-	testMainFloatArgAllowUnsafe("def f(varray<float> arg) tuple<varray<float>> : [arg]t      def main(float x) float : f([x]va)[0][0]", 10.f, 10.0f, INVALID_OPENCL);
+	testMainFloatArgAllowUnsafe("def f(varray<float> arg) tuple<varray<float> > : [arg]t      def main(float x) float : f([x]va)[0][0]", 10.f, 10.0f, INVALID_OPENCL);
 
-	testMainFloatArgAllowUnsafe("def f(varray<float> arg) tuple<varray<float>, varray<float>> : (arg, arg)      def main(float x) float : f([x]va)[0][0]", 10.f, 10.0f, INVALID_OPENCL);
+	testMainFloatArgAllowUnsafe("def f(varray<float> arg) tuple<varray<float>, varray<float> > : (arg, arg)      def main(float x) float : f([x]va)[0][0]", 10.f, 10.0f, INVALID_OPENCL);
 
 
 	//------------------------ Test a VArray in a VArray --------------------------
@@ -1895,7 +1935,7 @@ void LanguageTests::run()
 		def main(float x) float :  elem(f(x), 0)", 1.0f, 1.0f);
 
 	// Test nested tuples
-	testMainFloatArg("def f(float x) tuple<tuple<float, float>, tuple<float, float>> : [[x, x + 1.0]t, [x + 2.0, x + 3.0]t]t   \n\
+	testMainFloatArg("def f(float x) tuple<tuple<float, float>, tuple<float, float> > : [[x, x + 1.0]t, [x + 2.0, x + 3.0]t]t   \n\
 		def main(float x) float :  elem(elem(f(x), 1), 0)", 1.0f, 3.0f);
 
 	// Test a structure in a tuple
@@ -1966,7 +2006,7 @@ void LanguageTests::run()
 		def main(float x) float :  elem(f(x), 0)", 1.0f, 1.0f);
 
 	// Test nested tuples
-	testMainFloatArg("def f(float x) tuple<tuple<float, float>, tuple<float, float>> : ((x, x + 1.0), (x + 2.0, x + 3.0))   \n\
+	testMainFloatArg("def f(float x) tuple<tuple<float, float>, tuple<float, float> > : ((x, x + 1.0), (x + 2.0, x + 3.0))   \n\
 		def main(float x) float :  elem(elem(f(x), 1), 0)", 1.0f, 3.0f);
 
 	// Test a structure in a tuple

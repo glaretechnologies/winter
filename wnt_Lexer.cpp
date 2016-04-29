@@ -254,6 +254,7 @@ void Lexer::parseNumericLiteral(const SourceBufferRef& buffer, Parser& parser, s
 		// Parse suffix if present
 
 		const unsigned int suffix_pos = parser.currentPos(); // Suffix position (if present)
+		bool is_signed = true;
 		if(parser.currentIsChar('i'))
 		{
 			parser.advance();
@@ -265,11 +266,27 @@ void Lexer::parseNumericLiteral(const SourceBufferRef& buffer, Parser& parser, s
 				throw LexerExcep("Failed to parse integer suffix after 'i':.  (Next chars '" + next_token.to_string() + "')" + errorPosition(buffer, pos));
 			}
 		}
+		else if(parser.currentIsChar('u'))
+		{
+			is_signed = false;
+			parser.advance();
+			// If there is a number after the 'u', parse it, otherwise use default bitness (32).
+			if(parser.notEOF() && isNumeric(parser.current()))
+			{
+				if(!parser.parseInt(num_bits))
+				{
+					const unsigned int pos = parser.currentPos();
+					string_view next_token;
+					parser.parseNonWSToken(next_token);
+					throw LexerExcep("Failed to parse integer suffix after 'u':.  (Next chars '" + next_token.to_string() + "')" + errorPosition(buffer, pos));
+				}
+			}
+		}
 
 		if(!(num_bits == 16 || num_bits == 32 || num_bits == 64))
 			throw LexerExcep("Integer must have 16, 32 or 64 bits." + errorPosition(buffer, suffix_pos));
 
-		tokens_out.push_back(Reference<TokenBase>(new IntLiteralToken(x, num_bits, char_index)));
+		tokens_out.push_back(Reference<TokenBase>(new IntLiteralToken(x, num_bits, is_signed, char_index)));
 	}
 }
 
@@ -482,35 +499,62 @@ void Lexer::process(const SourceBufferRef& src, std::vector<Reference<TokenBase>
 		}
 		else if(parser.current() == '|')
 		{
-			tokens_out.push_back(Reference<TokenBase>(new OR_Token(parser.currentPos())));
-			if(!parser.parseString("||"))
-				throw LexerExcep("Error while parsing '||'" + errorPosition(src, parser.currentPos()));
+			parser.advance();
+			if(parser.currentIsChar('|'))
+			{
+				tokens_out.push_back(Reference<TokenBase>(new OR_Token(parser.currentPos() - 1)));
+				parser.advance();
+			}
+			else
+				tokens_out.push_back(Reference<TokenBase>(new BITWISE_OR_Token(parser.currentPos() - 1)));
 		}
 		else if(parser.current() == '&')
 		{
-			tokens_out.push_back(Reference<TokenBase>(new AND_Token(parser.currentPos())));
-			if(!parser.parseString("&&"))
-				throw LexerExcep("Error while parsing '&&'" + errorPosition(src, parser.currentPos()));
+			parser.advance();
+			if(parser.currentIsChar('&'))
+			{
+				tokens_out.push_back(Reference<TokenBase>(new AND_Token(parser.currentPos())));
+				parser.advance();
+			}
+			else
+				tokens_out.push_back(Reference<TokenBase>(new BITWISE_AND_Token(parser.currentPos())));
 		}
 		else if(parser.current() == '<')
 		{
-			if(parser.parseString("<="))
-				tokens_out.push_back(Reference<TokenBase>(new LESS_EQUAL_Token(parser.currentPos())));
-			else
+			parser.advance(); // Consume the '<'.
+			if(parser.currentIsChar('='))
 			{
-				tokens_out.push_back(Reference<TokenBase>(new LEFT_ANGLE_BRACKET_Token(parser.currentPos())));
 				parser.advance();
+				tokens_out.push_back(Reference<TokenBase>(new LESS_EQUAL_Token(parser.currentPos())));
 			}
+			else if(parser.currentIsChar('<'))
+			{
+				parser.advance();
+				tokens_out.push_back(Reference<TokenBase>(new LEFT_SHIFT_Token(parser.currentPos())));
+			}
+			else
+				tokens_out.push_back(Reference<TokenBase>(new LEFT_ANGLE_BRACKET_Token(parser.currentPos())));
 		}
 		else if(parser.current() == '>')
 		{
-			if(parser.parseString(">="))
-				tokens_out.push_back(Reference<TokenBase>(new GREATER_EQUAL_Token(parser.currentPos())));
-			else
+			parser.advance(); // Consume the '>'.
+			if(parser.currentIsChar('='))
 			{
-				tokens_out.push_back(Reference<TokenBase>(new RIGHT_ANGLE_BRACKET_Token(parser.currentPos())));
 				parser.advance();
+				tokens_out.push_back(Reference<TokenBase>(new GREATER_EQUAL_Token(parser.currentPos())));
 			}
+			else if(parser.currentIsChar('>'))
+			{
+				parser.advance();
+				tokens_out.push_back(Reference<TokenBase>(new RIGHT_SHIFT_Token(parser.currentPos())));
+			}
+			else
+				tokens_out.push_back(Reference<TokenBase>(new RIGHT_ANGLE_BRACKET_Token(parser.currentPos())));
+		}
+		else if(parser.current() == '^')
+		{
+			parser.advance();
+			tokens_out.push_back(Reference<TokenBase>(new BITWISE_XOR_Token(parser.currentPos())));
 		}
 		else if(parser.current() == '?')
 		{

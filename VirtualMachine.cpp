@@ -184,7 +184,7 @@ static int stringLength(StringRep* str)
 
 static ValueRef stringLengthInterpreted(const vector<ValueRef>& args)
 {
-	return new IntValue( (int)UTF8Utils::numCodePointsInString(getStringArg(args, 0)) );
+	return new IntValue( (int)UTF8Utils::numCodePointsInString(getStringArg(args, 0)), /*is_signed=*/true );
 }
 
 
@@ -240,7 +240,7 @@ static int codePoint(uint32 c, void* env)
 
 static ValueRef codePointInterpreted(const vector<ValueRef>& args)
 {
-	return new IntValue(UTF8Utils::codePointForUTF8CharString(getCharArg(args, 0)));
+	return new IntValue(UTF8Utils::codePointForUTF8CharString(getCharArg(args, 0)), /*is_signed=*/true);
 }
 
 

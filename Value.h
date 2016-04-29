@@ -34,10 +34,12 @@ typedef Reference<Value> ValueRef;
 class IntValue : public Value
 {
 public:
-	IntValue(int64 v) : value(v) { /*std::cout << "IntValue(), this=" << this << ", value = " << value << "\n";*/ }
+	IntValue(int64 v, bool is_signed_) : value(v), is_signed(is_signed_) { /*std::cout << "IntValue(), this=" << this << ", value = " << value << "\n";*/ }
 	~IntValue() { /*std::cout << "~IntValue(), this=" << this << ", value = " << value << "\n";*/ }
-	virtual Value* clone() const { return new IntValue(value); }
+	virtual Value* clone() const { return new IntValue(value, is_signed); }
+	
 	int64 value;
+	bool is_signed;
 };
 
 

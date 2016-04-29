@@ -54,7 +54,7 @@ MESSAGE("INDIGO_TRUNK_DIR: ${INDIGO_TRUNK_DIR}")
 
 
 
-set(LLVM_VERSION "3.6")
+set(LLVM_VERSION "3.4")
 # The llvm dirs use the version seperator "_" instead of "."
 string(REPLACE "." "_" LLVM_VERSION_PATH ${LLVM_VERSION})
 
@@ -386,6 +386,8 @@ if(WIN32)
 		add_definitions(/arch:SSE2)
 	endif()
 	
+	add_definitions(-D__SSE__ -D__SSE2__ -D__SSE3__ -D__SSSE3__ -D__SSE4_1__)
+	
 	# Consider some options.
 	if(NO_WHOLE_PROGRAM_OPT)
 		SET(GL_OPT)
@@ -461,7 +463,7 @@ if(WIN32)
 	
 	SET(LLVM_LIBS
 		LLVMAnalysis.lib LLVMAsmParser.lib LLVMAsmPrinter.lib LLVMBitReader.lib LLVMBitWriter.lib LLVMCodeGen.lib LLVMCore.lib LLVMExecutionEngine.lib LLVMInstCombine.lib LLVMInstrumentation.lib LLVMInterpreter.lib LLVMipa.lib LLVMipo.lib 
-		#LLVMJIT.lib 
+		LLVMJIT.lib 
 		LLVMLinker.lib LLVMMC.lib LLVMMCDisassembler.lib LLVMMCJIT.lib LLVMMCParser.lib LLVMObject.lib LLVMRuntimeDyld.lib LLVMScalarOpts.lib LLVMSelectionDAG.lib LLVMSupport.lib LLVMTarget.lib LLVMTransformUtils.lib LLVMVectorize.lib LLVMX86AsmParser.lib LLVMX86AsmPrinter.lib LLVMX86CodeGen.lib LLVMX86Desc.lib LLVMX86Disassembler.lib LLVMX86Info.lib LLVMX86Utils.lib
 	)
 		

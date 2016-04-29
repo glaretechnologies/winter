@@ -947,7 +947,7 @@ static TestResults testMainIntegerArg(const std::string& src, int x, int target_
 
 		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
-		vmstate.argument_stack.push_back(new IntValue(x));
+		vmstate.argument_stack.push_back(new IntValue(x, true));
 		//vmstate.argument_stack.push_back(new VoidPtrValue(&test_env));
 
 		ValueRef retval = maindef->invoke(vmstate);
@@ -1141,7 +1141,7 @@ static void testMainInt64Arg(const std::string& src, int64 x, int64 target_retur
 
 		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
-		vmstate.argument_stack.push_back(new IntValue(x));
+		vmstate.argument_stack.push_back(new IntValue(x, true));
 		//vmstate.argument_stack.push_back(new VoidPtrValue(&test_env));
 
 		ValueRef retval = maindef->invoke(vmstate);
@@ -1214,7 +1214,80 @@ static void testMainInt16Arg(const std::string& src, int16 x, int16 target_retur
 
 		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
-		vmstate.argument_stack.push_back(new IntValue(x));
+		vmstate.argument_stack.push_back(new IntValue(x, true));
+		//vmstate.argument_stack.push_back(new VoidPtrValue(&test_env));
+
+		ValueRef retval = maindef->invoke(vmstate);
+
+		vmstate.func_args_start.pop_back();
+		IntValue* val = dynamic_cast<IntValue*>(retval.getPointer());
+		if(!val)
+		{
+			std::cerr << "main() Return value was of unexpected type." << std::endl;
+			assert(0);
+			exit(1);
+		}
+
+		if(val->value != target_return_val)
+		{
+			std::cerr << "Test failed: main returned " << val->value << ", target was " << target_return_val << std::endl;
+			assert(0);
+			exit(1);
+		}
+	}
+	catch(Winter::BaseException& e)
+	{
+		std::cerr << e.what() << std::endl;
+		assert(0);
+		exit(1);
+	}
+	catch(Indigo::Exception& e)
+	{
+		std::cerr << e.what() << std::endl;
+		assert(0);
+		exit(1);
+	}
+}
+
+
+static void testMainUInt32Arg(const std::string& src, uint32 x, uint32 target_return_val, uint32 test_flags = 0)
+{
+	std::cout << "===================== Winter testMainUInt32Arg() =====================" << std::endl;
+	try
+	{
+		VMConstructionArgs vm_args;
+		vm_args.allow_unsafe_operations = (test_flags & ALLOW_UNSAFE) != 0;
+		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
+
+		const FunctionSignature mainsig("main", std::vector<TypeRef>(1, new Int(32, false)));
+
+		vm_args.entry_point_sigs.push_back(mainsig);
+
+		VirtualMachine vm(vm_args);
+
+		// Get main function
+		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
+
+		uint32 (WINTER_JIT_CALLING_CONV *f)(uint32, void*) = (uint32 (WINTER_JIT_CALLING_CONV *)(uint32, void*)) vm.getJittedFunction(mainsig);
+
+		TestEnv test_env;
+		test_env.val = 10;
+
+		// Call the JIT'd function
+		const uint32 jitted_result = f(x, &test_env);
+
+
+		// Check JIT'd result.
+		if(jitted_result != target_return_val)
+		{
+			std::cerr << "Test failed: JIT'd main returned " << jitted_result << ", target was " << target_return_val << std::endl;
+			assert(0);
+			exit(1);
+		}
+
+		VMState vmstate;
+		vmstate.func_args_start.push_back(0);
+		vmstate.argument_stack.push_back(new IntValue(x, false));
 		//vmstate.argument_stack.push_back(new VoidPtrValue(&test_env));
 
 		ValueRef retval = maindef->invoke(vmstate);

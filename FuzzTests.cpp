@@ -555,7 +555,7 @@ static ASTNodeRef buildRandomASSubTree(BuildRandomSubTreeArgs& args, MTwister& r
 						//return new FloatLiteral(2.0f, SrcLocation::invalidLocation());//rng.unitRandom() < 0.25f ? 0.f : (-10.f + rng.unitRandom() * 20.f), SrcLocation::invalidLocation());
 					}
 				case ASTNode::IntLiteralType:
-					return new IntLiteral(-2 + (int)(rng.unitRandom() * 4.0f), 32, SrcLocation::invalidLocation());
+					return new IntLiteral(-2 + (int)(rng.unitRandom() * 4.0f), 32, /*is_signed=*/(rng.unitRandom() < 0.5f), SrcLocation::invalidLocation());
 				case ASTNode::BoolLiteralType:
 					return new BoolLiteral(rng.unitRandom() < 0.5f, SrcLocation::invalidLocation());
 
@@ -671,7 +671,7 @@ static ASTNodeRef buildRandomASSubTree(BuildRandomSubTreeArgs& args, MTwister& r
 
 				ASTNodeRef field_access = new FunctionExpression(SrcLocation::invalidLocation(), "elem", 
 					new Variable("t", SrcLocation::invalidLocation()), 
-					new IntLiteral(myClamp((int)(rng.unitRandom() * tuple_size), 0, tuple_size-1), 32, SrcLocation::invalidLocation()));
+					new IntLiteral(myClamp((int)(rng.unitRandom() * tuple_size), 0, tuple_size-1), 32, true, SrcLocation::invalidLocation()));
 
 				Reference<LetASTNode> let_node = new LetASTNode(std::vector<LetNodeVar>(1, LetNodeVar("t")), tuple_literal, SrcLocation::invalidLocation());
 

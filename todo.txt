@@ -1,3 +1,25 @@
+TODO integer divison in Winter should use //
+
+TODO: Make a new AST Node for lambda expression, instead of just using a FunctionDefinition AST node.
+
+
+TODO: can remove UpdateUpRefs pass now?
+
+Test capturing of destructured lets
+
+checkSubstituteVariable probly has bugs.
+
+remove payload.func_def_stack, replace with stack?
+
+
+TODO: replace all (most?) set usage with unordered_set.
+
+TODO: problem with inlining and then OpenCL output - variables may clash.  Need to rename all variables when inlining a function?
+
+TODO: for tests that involve passing stuff to functions, need some kind of noinline attribute?  e.g. Test Refcounting optimisations: test that a argument variable used as a function argument is not incremented and decremented
+
+TODO: make LetNodeVar an ast node?
+
 TODO: check typechecking for function expressions with runtime get_func_expr's.
 
 TODO: need i32 -> i64 coercion

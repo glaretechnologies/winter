@@ -215,7 +215,7 @@ static ASTNodeRef makeLiteralASTNodeFromValue(const ValueRef& value, const SrcLo
 		if(type->getType() != Type::IntType)
 			throw BaseException("invalid type");
 
-		return new IntLiteral(value.downcastToPtr<IntValue>()->value, type.downcastToPtr<Int>()->numBits(), src_location);
+		return new IntLiteral(value.downcastToPtr<IntValue>()->value, type.downcastToPtr<Int>()->numBits(), value.downcastToPtr<IntValue>()->is_signed, src_location);
 	}
 	else if(dynamic_cast<BoolValue*>(value.getPointer())) // e->type()->getType() == Type::BoolType)
 	{
@@ -754,14 +754,14 @@ static void doImplicitIntTypeCoercion(ASTNodeRef& a, ASTNodeRef& b, TraversalPay
 		// 3i64 > 4i32		=>		3i64 > 4i64
 		if((a_int_type->numBits() == 64) && (b_int_type->numBits() == 32) && (b->nodeType() == ASTNode::IntLiteralType))
 		{
-			b = new IntLiteral(b.downcastToPtr<IntLiteral>()->value, 64, b->srcLocation());
+			b = new IntLiteral(b.downcastToPtr<IntLiteral>()->value, 64, b.downcastToPtr<IntLiteral>()->is_signed, b->srcLocation());
 			payload.tree_changed = true;
 		}
 
 		// 3i32 > 4i64      =>        3i64 > 4i64
 		if((b_int_type->numBits() == 64) && (a_int_type->numBits() == 32) && (a->nodeType() == ASTNode::IntLiteralType))
 		{
-			a = new IntLiteral(a.downcastToPtr<IntLiteral>()->value, 64, b->srcLocation());
+			a = new IntLiteral(a.downcastToPtr<IntLiteral>()->value, 64, a.downcastToPtr<IntLiteral>()->is_signed, b->srcLocation());
 			payload.tree_changed = true;
 		}
 	}
@@ -1236,26 +1236,26 @@ Reference<ASTNode> DoubleLiteral::clone(CloneMapType& clone_map)
 
 ValueRef IntLiteral::exec(VMState& vmstate)
 {
-	return new IntValue(value);
+	return new IntValue(value, is_signed);
 }
 
 
 void IntLiteral::print(int depth, std::ostream& s) const
 {
 	printMargin(depth, s);
-	s << "Int literal: " << this->value << "\n";
+	s << "Int literal: " << this->value << ", signed: " << is_signed << "\n";
 }
 
 
 std::string IntLiteral::sourceString() const
 {
-	return toString(this->value);
+	return toString(this->value); // TODO: handle bitness and is_signed suffix
 }
 
 
 std::string IntLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
-	return toString(this->value); // TODO: handle bitness suffix
+	return toString(this->value); // TODO: handle bitness and is_signed suffix
 }
 
 
@@ -1266,7 +1266,7 @@ llvm::Value* IntLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* r
 		llvm::APInt(
 			this->num_bits, // num bits
 			this->value, // value
-			true // signed
+			this->is_signed // signed
 		)
 	);
 }
@@ -1274,7 +1274,7 @@ llvm::Value* IntLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* r
 
 Reference<ASTNode> IntLiteral::clone(CloneMapType& clone_map)
 {
-	IntLiteral* res = new IntLiteral(value, num_bits, srcLocation());
+	IntLiteral* res = new IntLiteral(value, num_bits, is_signed, srcLocation());
 	clone_map.insert(std::make_pair(this, res));
 	return res;
 }
@@ -1792,17 +1792,21 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 				vector<ValueRef> elem_values(bval_vec->e.size());
 				for(unsigned int i=0; i<elem_values.size(); ++i)
 					elem_values[i] = new IntValue(op(
-						checkedCast<IntValue>(aval)->value,
-						checkedCast<IntValue>(bval_vec->e[i])->value
-					));
+							checkedCast<IntValue>(aval)->value,
+							checkedCast<IntValue>(bval_vec->e[i])->value
+						),
+						checkedCast<IntValue>(aval)->is_signed
+					);
 				return new VectorValue(elem_values);
 			}
 			else if(b->type()->getType() == Type::IntType) // Else int * int
 			{
 				return new IntValue(op(
-					checkedCast<IntValue>(aval)->value,
-					checkedCast<IntValue>(bval)->value
-				));
+						checkedCast<IntValue>(aval)->value,
+						checkedCast<IntValue>(bval)->value
+					),
+					checkedCast<IntValue>(aval)->is_signed
+				);
 			}
 			else
 				throw BaseException("Invalid types to binary op.");
@@ -1885,9 +1889,11 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 
 						for(unsigned int i=0; i<elem_values.size(); ++i)
 							elem_values[i] = new IntValue(op(
-								checkedCast<IntValue>(aval_vec->e[i])->value,
-								checkedCast<IntValue>(bval_vec->e[i])->value
-							));
+									checkedCast<IntValue>(aval_vec->e[i])->value,
+									checkedCast<IntValue>(bval_vec->e[i])->value
+								),
+								checkedCast<IntValue>(aval_vec->e[i])->is_signed
+							);
 					}
 					else if(b->type()->getType() == Type::IntType) // Vector<int, N> * int
 					{
@@ -1895,7 +1901,9 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 							elem_values[i] = new IntValue(op(
 								checkedCast<IntValue>(aval_vec->e[i])->value,
 								checkedCast<IntValue>(bval)->value
-							));
+								),
+								checkedCast<IntValue>(aval_vec->e[i])->is_signed
+							);
 					}
 					else
 					{
@@ -2405,7 +2413,7 @@ bool SubtractionExpression::isConstant() const
 }
 
 
-//-------------------------------------7------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------
 
 
 ValueRef MulExpression::exec(VMState& vmstate)
@@ -2820,7 +2828,9 @@ ValueRef DivExpression::exec(VMState& vmstate)
 		if(a_int_val == std::numeric_limits<int32>::min() && b_int_val == -1)
 			throw BaseException("Tried to compute -2147483648 / -1.");
 
-		return new IntValue(a_int_val / b_int_val);
+		// TODO: handle other bitness and signedness.
+
+		return new IntValue(a_int_val / b_int_val, checkedCast<IntValue>(aval)->is_signed);
 	}
 	else
 	{
@@ -3343,6 +3353,228 @@ bool DivExpression::isConstant() const
 }
 
 
+//-----------------------------------------------------------------------------------------------
+
+
+BinaryBitwiseExpression::BinaryBitwiseExpression(BitwiseType t_, const ASTNodeRef& a_, const ASTNodeRef& b_, const SrcLocation& loc_)
+:	ASTNode(BinaryBitwiseExpressionType, loc_),
+	t(t_),
+	a(a_),
+	b(b_)
+{}
+
+
+ValueRef BinaryBitwiseExpression::exec(VMState& vmstate)
+{
+	const ValueRef aval = a->exec(vmstate);
+	const ValueRef bval = b->exec(vmstate);
+
+	const IntValue* aint = checkedCast<IntValue>(aval);
+	const IntValue* bint = checkedCast<IntValue>(bval);
+
+	switch(t)
+	{
+	case BITWISE_AND: { return new IntValue(aint->value & bint->value, aint->is_signed); }
+	case BITWISE_OR: { return new IntValue(aint->value | bint->value, aint->is_signed); }
+	case BITWISE_XOR: { return new IntValue(aint->value ^ bint->value, aint->is_signed); }
+	case BITWISE_LEFT_SHIFT:
+		{
+			// TODO: handle a being negative, undefined?
+
+			if(bint->value < 0)
+				throw BaseException("left shift by negative value.");
+			if(bint->value >= a->type().downcastToPtr<Int>()->numBits())
+				throw BaseException("left shift by value >= bit width");
+
+			return new IntValue(aint->value << bint->value, aint->is_signed);
+		}
+	case BITWISE_RIGHT_SHIFT:
+		{
+			// TODO: handle a being negative, undefined?
+
+			if(bint->value < 0)
+				throw BaseException("right shift by negative value.");
+			if(bint->value >= a->type().downcastToPtr<Int>()->numBits())
+				throw BaseException("right shift by value >= bit width");
+
+			return new IntValue(aint->value >> bint->value, aint->is_signed);
+		}
+	default:
+		throw BaseException("Internal error in BinaryBitwiseExpression::exec()");
+	};
+}
+
+
+void BinaryBitwiseExpression::print(int depth, std::ostream& s) const
+{
+	printMargin(depth, s);
+	s << "Binary Bitwise Expression\n";
+	this->a->print(depth+1, s);
+	this->b->print(depth+1, s);
+}
+
+
+const std::string BinaryBitwiseExpression::opToken() const
+{
+	std::string op;
+	switch(t)
+	{
+	case BITWISE_AND: { op = "&"; break; }
+	case BITWISE_OR: { op = "|"; break; }
+	case BITWISE_XOR: { op = "^"; break; }
+	case BITWISE_LEFT_SHIFT: { op = "<<"; break; }
+	case BITWISE_RIGHT_SHIFT: { op = ">>"; break; }
+	};
+	return op;
+}
+
+
+std::string BinaryBitwiseExpression::sourceString() const
+{
+	return "(" + a->sourceString() + " " + opToken() + " " + b->sourceString() + ")";
+}
+
+
+std::string BinaryBitwiseExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
+{
+	return "(" + a->emitOpenCLC(params) + " " + opToken() + " " + b->emitOpenCLC(params) + ")";
+}
+
+
+TypeRef BinaryBitwiseExpression::type() const
+{
+	return a->type();
+}
+
+
+void BinaryBitwiseExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
+{
+	stack.push_back(this);
+	a->traverse(payload, stack);
+	b->traverse(payload, stack);
+	
+
+	if(payload.operation == TraversalPayload::BindVariables)
+	{
+		convertOverloadedOperators(a, payload, stack);
+		convertOverloadedOperators(b, payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::InlineFunctionCalls)
+	{
+		checkInlineExpression(a, payload, stack);
+		checkInlineExpression(b, payload, stack);
+	}
+	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	{
+		checkSubstituteVariable(a, payload);
+		checkSubstituteVariable(b, payload);
+	}
+	else if(payload.operation == TraversalPayload::TypeCoercion)
+	{
+	}
+	else if(payload.operation == TraversalPayload::TypeCheck)
+	{
+		const TypeRef& this_type = this->type();
+		if(this_type.isNull())
+			throw BaseException("Unknown operand type." + errorContext(*this, payload));
+
+		const TypeRef a_type = a->type();
+		const TypeRef b_type = b->type();
+		if(a_type.isNull() || b_type.isNull())
+			throw BaseException("Unknown operand type." + errorContext(*this, payload));
+
+		if(this_type->getType() == Type::GenericTypeType)
+		{
+			if(*a_type != *b_type)
+				throw BaseException("AdditionExpression: Binary operator '" + opToken() + "' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
+		}
+		else if(this_type->getType() == Type::IntType)
+		{
+			if(*a_type != *b_type)
+				throw BaseException("AdditionExpression: Binary operator '" + opToken() + "' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
+
+			//const Int* a_int_type = a_type.downcastToPtr<Int>();
+			//const Int* b_int_type = b_type.downcastToPtr<Int>();
+
+			//if(a_int_type->num_bits != b_int_type->num_bits)
+			//	throw BaseException("AdditionExpression: Binary operator '" + opToken() + "' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
+		}
+		//else if(a_type->getType() == Type::VectorTypeType && b_type->getType() == Type::VectorTypeType) // Vector + vector addition.
+		//{
+		//	if(*a_type != *b_type)
+		//		throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
+
+		//	// Check element type is int or float
+		//	if(!(a_type.downcast<VectorType>()->elem_type->getType() == Type::IntType || a_type.downcast<VectorType>()->elem_type->getType() == Type::FloatType || a_type.downcast<VectorType>()->elem_type->getType() == Type::DoubleType))
+		//		throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
+		//}
+		else
+		{
+			throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'." + errorContext(*this, payload));
+		}
+	}
+	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
+	{
+		const bool a_is_literal = checkFoldExpression(a, payload);
+		const bool b_is_literal = checkFoldExpression(b, payload);
+			
+		this->can_maybe_constant_fold = a_is_literal && b_is_literal;
+	}
+	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
+	{
+		doDeadCodeElimination(a, payload, stack);
+		doDeadCodeElimination(b, payload, stack);
+	}
+
+	stack.pop_back();
+}
+
+
+llvm::Value* BinaryBitwiseExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
+{
+	if(this->type()->getType() == Type::IntType)
+	{
+		llvm::Value* a_expr = a->emitLLVMCode(params);
+		llvm::Value* b_expr = b->emitLLVMCode(params);
+
+		switch(t)
+		{
+		case BITWISE_AND: return params.builder->CreateAnd(a_expr, b_expr);
+		case BITWISE_OR:  return params.builder->CreateOr(a_expr, b_expr);
+		case BITWISE_XOR:  return params.builder->CreateXor(a_expr, b_expr);
+		case BITWISE_LEFT_SHIFT:  return params.builder->CreateShl(a_expr, b_expr);
+		case BITWISE_RIGHT_SHIFT:  return params.builder->CreateLShr(a_expr, b_expr); // Logical shift right, fills leading bits with zeros.
+		default:
+			{
+				assert(0);
+				throw BaseException("Internal error in BinaryBitwiseExpression code emission");
+			}
+		}
+	}
+	else
+	{
+		throw BaseException("Unknown type for BinaryBitwiseExpression code emission");
+	}
+}
+
+
+Reference<ASTNode> BinaryBitwiseExpression::clone(CloneMapType& clone_map)
+{
+	BinaryBitwiseExpression* res = new BinaryBitwiseExpression(t, this->a->clone(clone_map), this->b->clone(clone_map), this->srcLocation());
+	clone_map.insert(std::make_pair(this, res));
+	return res;
+}
+
+
+bool BinaryBitwiseExpression::isConstant() const
+{
+	return a->isConstant() && b->isConstant();
+}
+
+
+//-------------------------------------------------------------------------------------------------
+
+
 //-------------------------------------------------------------------------------------------------------
 
 
@@ -3527,7 +3759,7 @@ ValueRef UnaryMinusExpression::exec(VMState& vmstate)
 	}
 	else if(this->type()->getType() == Type::IntType)
 	{
-		return new IntValue(-checkedCast<IntValue>(aval)->value);
+		return new IntValue(-checkedCast<IntValue>(aval)->value, checkedCast<IntValue>(aval)->is_signed);
 	}
 	else if(this->type()->getType() == Type::VectorTypeType)
 	{
@@ -3549,7 +3781,7 @@ ValueRef UnaryMinusExpression::exec(VMState& vmstate)
 			{
 				// TODO: over/under float check
 				for(unsigned int i=0; i<elem_values.size(); ++i)
-					elem_values[i] = new IntValue(-checkedCast<IntValue>(aval_vec->e[i])->value);
+					elem_values[i] = new IntValue(-checkedCast<IntValue>(aval_vec->e[i])->value, checkedCast<IntValue>(aval_vec->e[i])->is_signed);
 				break;
 			}
 			default:
@@ -3593,7 +3825,10 @@ void UnaryMinusExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 			throw BaseException("Unknown operand type." + errorContext(*this, payload));
 
 		if(this_type->getType() == Type::GenericTypeType || this_type->getType() == Type::IntType || this_type->getType() == Type::FloatType || this_type->getType() == Type::DoubleType)
-		{}
+		{
+			if(this_type->getType() == Type::IntType && !this_type.downcastToPtr<Int>()->is_signed)
+				throw BaseException("Unary minus not defined for unsigned type '" + this->type()->toString() + "'.");
+		}
 		else if(this_type->getType() == Type::VectorTypeType && 
 			(static_cast<VectorType*>(this_type.getPointer())->elem_type->getType() == Type::FloatType || static_cast<VectorType*>(this_type.getPointer())->elem_type->getType() == Type::DoubleType || static_cast<VectorType*>(this_type.getPointer())->elem_type->getType() == Type::IntType))
 		{

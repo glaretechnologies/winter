@@ -119,6 +119,12 @@ private:
 	ASTNodeRef parseAddSubExpression(ParseInfo& parseinfo);
 	ASTNodeRef parseMulDivExpression(ParseInfo& parseinfo);
 	ASTNodeRef parseBinaryLogicalExpression(ParseInfo& parseinfo);
+	ASTNodeRef parseShiftExpression(ParseInfo& parseinfo);
+
+	ASTNodeRef parseBinaryBitwiseExpression(ParseInfo& parseinfo);
+	//ASTNodeRef parseBitwiseOrExpression(ParseInfo& parseinfo);
+	//ASTNodeRef parseBitwiseXorExpression(ParseInfo& parseinfo);
+	//ASTNodeRef parseBitwiseAndExpression(ParseInfo& parseinfo);
 	ASTNodeRef parseTernaryConditionalExpression(ParseInfo& parseinfo);
 	//ASTNodeRef parseParenExpression(ParseInfo& parseinfo);
 	ASTNodeRef parseMapLiteralExpression(ParseInfo& parseinfo);

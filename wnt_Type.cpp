@@ -167,10 +167,20 @@ llvm::Type* GenericType::LLVMType(llvm::Module& module) const
 
 const std::string Int::toString() const
 {
-	if(num_bits == 32)
-		return "int";
+	if(is_signed)
+	{
+		if(num_bits == 32)
+			return "int";
+		else
+			return "int" + ::toString(num_bits);
+	}
 	else
-		return "int" + ::toString(num_bits);
+	{
+		if(num_bits == 32)
+			return "uint";
+		else
+			return "uint" + ::toString(num_bits);
+	}
 }
 
 
@@ -183,12 +193,13 @@ llvm::Type* Int::LLVMType(llvm::Module& module) const
 
 const std::string Int::OpenCLCType() const
 {
+	const std::string u_prefix = is_signed ? "" : "u";
 	if(num_bits == 16)
-		return "short";
+		return u_prefix + "short";
 	else if(num_bits == 32)
-		return "int";
+		return u_prefix + "int";
 	else if(num_bits == 64)
-		return "long";
+		return u_prefix + "long";
 	else
 		throw BaseException("No OpenCL type for int with num bits=" + ::toString(num_bits));
 }
@@ -201,7 +212,7 @@ bool Int::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
 
 	// So b is an Int as well.
 	const Int& b_ = static_cast<const Int&>(b);
-	return num_bits == b_.num_bits;
+	return num_bits == b_.num_bits && is_signed == b_.is_signed;
 }
 
 
@@ -212,7 +223,7 @@ llvm::Value* Int::getInvalidLLVMValue(llvm::Module& module) const // For array o
 		llvm::APInt(
 			num_bits, // num bits
 			0, // value
-			true // signed
+			is_signed // signed
 		)
 	);
 }
@@ -220,7 +231,7 @@ llvm::Value* Int::getInvalidLLVMValue(llvm::Module& module) const // For array o
 
 Reference<Value> Int::getInvalidValue() const // For array out-of-bounds
 {
-	return new IntValue(0);
+	return new IntValue(0, true);
 }
 
 

@@ -421,7 +421,10 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 					throw BaseException("Function argument to map must take one argument.");
 
 				if(*func_type->arg_types[0] != *array_elem_type)
-					throw BaseException("Function argument to map must take same argument type as array element.");
+				{
+					throw BaseException(std::string("Function argument to map must take same argument type as array element.\n") + 
+						"Function type: " + func_type->toString() + ",\n array_elem_type: " + array_elem_type->toString());
+				}
 
 				vector<FunctionDefinition::FunctionArg> args(2);
 				args[0].type = func_type;
