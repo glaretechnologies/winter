@@ -24,6 +24,7 @@ Copyright Glare Technologies Limited 2015 -
 #include <utils/MemMappedFile.h>
 #include <utils/FileUtils.h>
 #include <utils/StringUtils.h>
+#include <utils/PlatformUtils.h>
 #include <utils/ConPrint.h>
 #include "../indigo/StandardPrintOutput.h"
 #include <Mutex.h>
@@ -699,7 +700,7 @@ public:
 		Timer print_timer;
 		MTwister rng(rng_seed);
 
-		std::ofstream outfile("D:/fuzz_output/fuzz_thread_" + toString(thread_index) + ".txt"); // TEMP HACK HARD CODED PATH
+		std::ofstream outfile("e:/fuzz_output/fuzz_thread_" + toString(thread_index) + ".txt"); // TEMP HACK HARD CODED PATH
 		
 		// See comment in FuzzTask below about this number.
 		const int N = 134217728;
@@ -848,7 +849,8 @@ public:
 		Timer print_timer;
 		MTwister rng(rng_seed);
 
-		std::ofstream outfile("D:/fuzz_output/fuzz_thread_" + toString(thread_index) + ".txt"); // TEMP HACK HARD CODED PATH
+		const std::string fuzz_output_path = "E:/fuzz_output/fuzz_thread_" + toString(thread_index) + ".txt"; // TEMP HACK HARD CODED PATH
+		std::ofstream outfile(fuzz_output_path);
 		
 		// We want to N to be quite large, but not so large that the tested_program_hashes set uses up all our RAM.
 		// Lets say each of T threads generates N strings, and they happen to be disjoint.
@@ -962,6 +964,33 @@ done:
 			{
 				// Write program source to disk, so if testFuzzProgram crashes we will have a record of the program.
 				outfile << s << std::endl;
+				if(!outfile)
+				{
+					std::cout << "Writing to fuzz output failed!" << std::endl;
+					exit(1);
+				}
+
+				try
+				{
+					const size_t MAX_FUZZ_OUTPUT_FILE_SIZE = 20000000;
+					if(FileUtils::getFileSize(fuzz_output_path) > MAX_FUZZ_OUTPUT_FILE_SIZE)
+					{
+						// Close, then re-open with truncation to clear the file.
+						outfile.close();
+						outfile.open(fuzz_output_path, std::ios_base::out | std::ios_base::trunc);
+						if(!outfile)
+						{
+							std::cout << "Failed to re-open fuzz output." << std::endl;
+							exit(1);
+						}
+					}
+				}
+				catch(FileUtils::FileUtilsExcep& e)
+				{
+					std::cerr << "FileUtilsExcep: " + e.what() << std::endl;
+					exit(1);
+				}
+
 
 				testFuzzProgram(s);
 			}
@@ -1059,7 +1088,7 @@ static void doASTFuzzTests()
 
 		std::vector<std::string> fuzzer_input;
 		std::string filecontent;
-		FileUtils::readEntireFileTextMode("N:/winter/trunk/fuzzer_input.txt", filecontent); // TEMP HACK hardcoded path
+		FileUtils::readEntireFileTextMode("o:/winter/trunk/fuzzer_input.txt", filecontent); // TEMP HACK hardcoded path
 		fuzzer_input = ::split(filecontent, '\n');
 
 
@@ -1099,7 +1128,7 @@ static void doASTFuzzTests()
 
 void fuzzTests()
 {
-	doASTFuzzTests();
+	//doASTFuzzTests();
 
 	try
 	{
@@ -1122,6 +1151,13 @@ void fuzzTests()
 		choices.push_back(Choice(Choice::Action_Insert, " < ", 1.0f));
 		choices.push_back(Choice(Choice::Action_Insert, " ? ", 1.0f));
 		choices.push_back(Choice(Choice::Action_Insert, " : ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " && ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " || ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " & ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " | ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " ^ ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " << ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " >> ", 1.0f));
 		choices.push_back(Choice(Choice::Action_Insert, " true ", 1.0f));
 		choices.push_back(Choice(Choice::Action_Insert, " < ", " > ", 1.0f));
 		choices.push_back(Choice(Choice::Action_Insert, " [ ", " ]t ", 1.0f));
@@ -1140,6 +1176,8 @@ void fuzzTests()
 
 		choices.push_back(Choice(Choice::Action_Insert, " int ", 1.0f));
 		choices.push_back(Choice(Choice::Action_Insert, " int64 ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " uint ", 1.0f));
+		choices.push_back(Choice(Choice::Action_Insert, " uint64 ", 1.0f));
 		choices.push_back(Choice(Choice::Action_Insert, " string ", 1.0f));
 		choices.push_back(Choice(Choice::Action_Insert, " char ", 1.0f));
 		choices.push_back(Choice(Choice::Action_Insert, " opaque ", 1.0f));
@@ -1161,7 +1199,7 @@ void fuzzTests()
 
 		std::vector<std::string> fuzzer_input;
 		std::string filecontent;
-		FileUtils::readEntireFileTextMode("N:/winter/trunk/fuzzer_input.txt", filecontent); // TEMP HACK hardcoded path
+		FileUtils::readEntireFileTextMode("o:/winter/trunk/fuzzer_input.txt", filecontent); // TEMP HACK hardcoded path
 		fuzzer_input = ::split(filecontent, '\n');
 
 
@@ -1174,7 +1212,7 @@ void fuzzTests()
 			Mutex tested_programs_mutex;
 			std::unordered_set<uint64> tested_program_hashes;
 
-			const int NUM_THREADS = 4;
+			const int NUM_THREADS = 1;
 			Indigo::TaskManager manager("fuzz thread manager", NUM_THREADS);
 			for(int i=0; i<NUM_THREADS; ++i)
 			{
