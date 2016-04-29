@@ -313,6 +313,11 @@ void LanguageTests::run()
 
 	--------------------------------------------------
 	*/
+
+
+	// TODO: why is this vector being parsed as doubles?
+	//testMainFloatArgInvalidProgram("def main(float x): elem(-[1.0, 2.0, 3.0, 4.0]v, 2)");//, 1.0f, -3.0f, 0);
+
 	testMainFloatArgInvalidProgram("def makeFunc(float x) function<float, float> :\\(float y) : x + y       def main() float :  let f = makeFunc(2.0) in f(true)");
 
 	testMainFloatArgInvalidProgram("def main(int x) int : if x < 5 if x < 3 1 else 2 ( ) else if x < 7 6 else 7 ");
