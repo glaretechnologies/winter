@@ -342,9 +342,23 @@ void LanguageTests::run()
 
 	testMainUInt32Arg("def main(uint32 x) : 10u", 1, 10);
 
+	testMainUInt32Arg("def main(uint32 x) : 4294967295u", 1, 4294967295u);
+
+	// TODO: this should fail to compile:
+	//testMainUInt32Arg("def main(uint32 x) : 429496729500000u", 1, 4294967295u);
+
+	// Test hex literals
+	testMainUInt32Arg("def main(uint32 x) : 0x12345678u", 1, 0x12345678u);
+	testMainUInt32Arg("def main(uint32 x) : 0x90abcdefu", 1, 0x90abcdefu);
+	testMainUInt32Arg("def main(uint32 x) : 0xABCDEF01u", 1, 0xABCDEF01u);
+
+	testMainUInt32Arg("def main(uint32 x) : 0xFFFFFFFFu", 1, 0xFFFFFFFFu);
+
 	testMainUInt32Arg("def main(uint32 x) : 10u32", 1, 10);
 
 	testMainUInt32Arg("def main(uint32 x) : x + 10u32", 1, 11);
+
+	testMainUInt32Arg("def main(uint32 x) : x + 1u32", 4294967294u, 4294967295u);
 
 	testMainUInt32Arg("def main(uint32 x) : x * 10u32", 2, 20);
 
@@ -374,6 +388,15 @@ void LanguageTests::run()
 	testMainUInt32Arg("def main(uint32 x) : x >> 2u", 356, 356 >> 2);
 
 
+
+	// ===================================================================
+	// Test hex literal parsing (some more)
+	// ===================================================================
+	testMainIntegerArgInvalidProgram("def main(int x) : 0x");
+	testMainIntegerArgInvalidProgram("def main(int x) : 0xg");
+	testMainIntegerArgInvalidProgram("def main(int x) : 0xG");
+	testMainIntegerArgInvalidProgram("def main(int x) : 0x0x");
+	testMainIntegerArgInvalidProgram("def main(int x) : 0x-");
 
 	// ===================================================================
 	// Test 16-bit integers

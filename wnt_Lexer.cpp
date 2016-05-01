@@ -12,6 +12,7 @@ Copyright 2009 Nicholas Chapman
 #include "wnt_Diagnostics.h"
 #include "utils/Parser.h"
 #include "utils/UTF8Utils.h"
+#include "utils/BitUtils.h"
 #include "indigo/TestUtils.h"
 #include "maths/mathstypes.h"
 
@@ -242,12 +243,34 @@ void Lexer::parseNumericLiteral(const SourceBufferRef& buffer, Parser& parser, s
 	else
 	{
 		int64 x;
-		if(!parser.parseInt64(x))
+		if(parser.currentIsChar('0') && parser.nextIsChar('x'))
 		{
-			const unsigned int pos = parser.currentPos();
-			string_view next_token;
-			parser.parseNonWSToken(next_token);
-			throw LexerExcep("Failed to parse int.  (Next chars '" + next_token.to_string() + "')" + errorPosition(buffer, pos));
+			// Hexadecimal literal, e.g. 0xFFFF
+			parser.advance(); // Consume '0'
+			parser.advance(); // Consume 'x'
+
+			// Parse hex digits.  Note: This could can be optimised a lot, hexStringTo64UInt() call is slow etc..
+			std::string digits = "0x";
+			while(parser.notEOF() && (isNumeric(parser.current()) || (parser.current() >= 'a' && parser.current() <= 'f') || (parser.current() >= 'A' && parser.current() <= 'F')))
+			{
+				digits.push_back(parser.current());
+				parser.advance();
+			}
+			if(digits.size() == 2) // if still "0x":
+				throw LexerExcep("Failed to parse hexadecimal integer literal." + errorPosition(buffer, char_index));
+
+			uint64 val = hexStringTo64UInt(digits);
+			x = bitCast<int64>(val);
+		}
+		else
+		{
+			if(!parser.parseInt64(x))
+			{
+				const unsigned int pos = parser.currentPos();
+				string_view next_token;
+				parser.parseNonWSToken(next_token);
+				throw LexerExcep("Failed to parse int.  (Next chars '" + next_token.to_string() + "')" + errorPosition(buffer, pos));
+			}
 		}
 
 		int num_bits = 32;
