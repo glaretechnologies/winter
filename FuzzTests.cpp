@@ -849,7 +849,7 @@ public:
 		Timer print_timer;
 		MTwister rng(rng_seed);
 
-		const std::string fuzz_output_path = "E:/fuzz_output/fuzz_thread_" + toString(thread_index) + ".txt"; // TEMP HACK HARD CODED PATH
+		const std::string fuzz_output_path = "d:/fuzz_output/fuzz_thread_" + toString(thread_index) + ".txt"; // TEMP HACK HARD CODED PATH
 		std::ofstream outfile(fuzz_output_path);
 		
 		// We want to N to be quite large, but not so large that the tested_program_hashes set uses up all our RAM.
@@ -963,7 +963,7 @@ done:
 			if(!already_tested)
 			{
 				// Write program source to disk, so if testFuzzProgram crashes we will have a record of the program.
-				outfile << s << std::endl;
+				outfile << "-------------------------------\n" << s << std::endl;
 				if(!outfile)
 				{
 					std::cout << "Writing to fuzz output failed!" << std::endl;
@@ -973,7 +973,7 @@ done:
 				try
 				{
 					const size_t MAX_FUZZ_OUTPUT_FILE_SIZE = 20000000;
-					if(FileUtils::getFileSize(fuzz_output_path) > MAX_FUZZ_OUTPUT_FILE_SIZE)
+					if(outfile.tellp() > MAX_FUZZ_OUTPUT_FILE_SIZE)
 					{
 						// Close, then re-open with truncation to clear the file.
 						outfile.close();
@@ -999,8 +999,15 @@ done:
 			if(print_timer.elapsed() > 2.0)
 			{
 				const double tests_per_sec = i / timer.elapsed();
-				std::cout << (std::string("Iterations: ") + toString(i) + ", Num tested: " + toString(num_tested) + ", Test speed: " + doubleToStringNDecimalPlaces(tests_per_sec, 1) + " tests/s\n");
+				std::cout << (std::string("Thread iters: ") + toString(i) + ", Total num tested: " + toString(num_tested) + ", Test speed: " + doubleToStringNDecimalPlaces(tests_per_sec, 1) + " tests/s\n");
 				print_timer.reset();
+
+				conPrint("Working set size: " + getNiceByteSize(PlatformUtils::getMemoryUsage()));
+				if(PlatformUtils::getMemoryUsage() > 16000000000ull)
+				{
+					conPrint("Program used too much RAM (working set size: " + getNiceByteSize(PlatformUtils::getMemoryUsage()) + "), killing.");
+					exit(1);
+				}
 			}
 		}
 	}
@@ -1009,11 +1016,11 @@ done:
 	std::vector<Choice> choices;
 	Mutex* tested_programs_mutex;
 	std::unordered_set<uint64>* tested_program_hashes;
-	std::vector<std::string>* fuzzer_input;
+	const std::vector<std::string>* fuzzer_input;
 };
 
 
-static void doASTFuzzTests()
+void doASTFuzzTests()
 {
 	/*
 		ASTNode::FunctionExpressionType,
@@ -1128,8 +1135,6 @@ static void doASTFuzzTests()
 
 void fuzzTests()
 {
-	//doASTFuzzTests();
-
 	try
 	{
 		std::vector<Choice> choices;
@@ -1199,7 +1204,7 @@ void fuzzTests()
 
 		std::vector<std::string> fuzzer_input;
 		std::string filecontent;
-		FileUtils::readEntireFileTextMode("o:/winter/trunk/fuzzer_input.txt", filecontent); // TEMP HACK hardcoded path
+		FileUtils::readEntireFileTextMode("n:/winter/trunk/fuzzer_input.txt", filecontent); // TEMP HACK hardcoded path
 		fuzzer_input = ::split(filecontent, '\n');
 
 
@@ -1212,7 +1217,7 @@ void fuzzTests()
 			Mutex tested_programs_mutex;
 			std::unordered_set<uint64> tested_program_hashes;
 
-			const int NUM_THREADS = 1;
+			const int NUM_THREADS = 4;
 			Indigo::TaskManager manager("fuzz thread manager", NUM_THREADS);
 			for(int i=0; i<NUM_THREADS; ++i)
 			{
@@ -1226,6 +1231,8 @@ void fuzzTests()
 
 				rng_seed++;
 			}
+
+			manager.waitForTasksToComplete();
 		}
 	}
 	catch(FileUtils::FileUtilsExcep& e)

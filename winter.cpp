@@ -48,6 +48,11 @@ int main(int argc, char** argv)
 		fuzzTests();
 		return 0;
 	}
+	else if(std::string(argv[1]) == "--astfuzz")
+	{
+		doASTFuzzTests();
+		return 0;
+	}
 
 	try
 	{

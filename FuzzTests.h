@@ -18,6 +18,9 @@ FuzzTests
 void fuzzTests();
 
 
+void doASTFuzzTests();
+
+
 bool testFuzzProgram(const std::string& src);
 
 } // end namespace Winter
