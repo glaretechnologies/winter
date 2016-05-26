@@ -246,7 +246,7 @@ public:
 
 	std::set<TupleTypeRef, TypeRefLessThan> tuple_types_used;
 
-	int uid;
+	int uid; // A counter for generating unique names
 
 	bool emit_comments;
 	bool emit_in_bound_asserts;

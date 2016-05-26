@@ -157,7 +157,7 @@ std::string ArrayLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 		throw BaseException("Array literal must be of int or float type for OpenCL emission currently.");
 	
 
-	const std::string name = "array_literal_" + toString((uint64)this);
+	const std::string name = "array_literal_" + toString(params.uid++);
 	s += name + "[] = {";
 	for(size_t i=0; i<this->elements.size(); ++i)
 	{
