@@ -1002,12 +1002,13 @@ done:
 				std::cout << (std::string("Thread iters: ") + toString(i) + ", Total num tested: " + toString(num_tested) + ", Test speed: " + doubleToStringNDecimalPlaces(tests_per_sec, 1) + " tests/s\n");
 				print_timer.reset();
 
-				conPrint("Working set size: " + getNiceByteSize(PlatformUtils::getMemoryUsage()));
+				// Disabled PlatformUtils::getMemoryUsage() for now, since it requires linking to Psapi.lib, which is tricky to do with CMake and the SDK Lib.
+				/*conPrint("Working set size: " + getNiceByteSize(PlatformUtils::getMemoryUsage()));
 				if(PlatformUtils::getMemoryUsage() > 16000000000ull)
 				{
 					conPrint("Program used too much RAM (working set size: " + getNiceByteSize(PlatformUtils::getMemoryUsage()) + "), killing.");
 					exit(1);
-				}
+				}*/
 			}
 		}
 	}
