@@ -673,6 +673,7 @@ public:
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 	virtual llvm::Type* LLVMType(llvm::Module& module) const;
 	virtual const std::string OpenCLCType() const;
+	virtual bool OpenCLPassByPointer() const { return true; }
 
 	std::string name;
 };
