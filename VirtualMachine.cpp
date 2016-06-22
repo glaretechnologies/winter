@@ -1930,6 +1930,8 @@ float print_float_(float x) { printf((__constant char *)\"%1.7f\\n\", x); return
 int print_int_(int x) { printf((__constant char *)\"%i\\n\", x); return x; }    \n\
 int toInt32_int64_(long x) { return (int)x; }		\n\
 long toInt64_int_(int x) { return (long)x; }		\n\
+bool isFinite_float_(float x) { return isfinite(x); }		\n\
+bool isNAN_float_(float x) { return isnan(x); }		\n\
 ";
 
 	if(vm_args.opencl_double_support)
