@@ -4520,8 +4520,44 @@ std::string NamedConstant::sourceString() const
 
 std::string NamedConstant::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
-	// Need to declare this as constant otherwise get "error: global variable must be declared in addrSpace constant"
-	return type()->OpenCLCType() + " __constant " + name + " = " + value_expr->emitOpenCLC(params) + ";";
+	if(value_expr->nodeType() == ASTNode::ArrayLiteralType)
+	{
+		/*
+		Special case for array literal named constants.
+		The following type of code does not work on Nvidia:
+
+		//----------------------------------------------------------------
+		__constant float array_literal_49[] = {1.6592417f, 1.9547194f, 1.654599f, 1.9570677f};
+		__constant float* __constant some_named_constant = array_literal_49;
+		
+		void someFunc()
+		{
+			// ...
+			float x = some_named_constant[i]
+		}
+		//----------------------------------------------------------------
+
+		Presumably due to the assignment to the named constant and global scope.
+		So we have to avoid that, and emit code like this:
+
+		//----------------------------------------------------------------
+		__constant float some_named_constant[] = {1.6592417f, 1.9547194f, 1.654599f, 1.9570677f};
+		void someFunc()
+		{
+			// ...
+			float x = some_named_constant[i]
+		}
+		//----------------------------------------------------------------
+		*/
+		
+		params.file_scope_code += value_expr.downcastToPtr<ArrayLiteral>()->getFileScopeOpenCLC(params, name);
+		return "";
+	}
+	else
+	{
+		// Need to declare this as constant otherwise get "error: global variable must be declared in addrSpace constant"
+		return type()->OpenCLCType() + " __constant " + name + " = " + value_expr->emitOpenCLC(params) + ";";
+	}
 }
 
 

@@ -173,6 +173,37 @@ std::string ArrayLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 }
 
 
+// See NamedConstant::emitOpenCLC()
+std::string ArrayLiteral::getFileScopeOpenCLC(EmitOpenCLCodeParams& params, const std::string& varname) const
+{
+	TypeRef this_type = this->type();
+	assert(this_type->getType() == Type::ArrayTypeType);
+
+	ArrayType* array_type = static_cast<ArrayType*>(this_type.getPointer());
+
+	std::string s = "__constant ";
+	if(array_type->elem_type->getType() == Type::FloatType)
+		s += "float ";
+	else if(array_type->elem_type->getType() == Type::IntType)
+		s += "int ";
+	else
+		throw BaseException("Array literal must be of int or float type for OpenCL emission currently.");
+	
+
+	const std::string name = varname;
+	s += name + "[] = {";
+	for(size_t i=0; i<this->elements.size(); ++i)
+	{
+		s += this->elements[i]->emitOpenCLC(params);
+		if(i + 1 < this->elements.size())
+			s += ", ";
+	}
+	s += "};\n";
+
+	return s;
+}
+
+
 void ArrayLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
 	/*if(payload.operation == TraversalPayload::ConstantFolding)

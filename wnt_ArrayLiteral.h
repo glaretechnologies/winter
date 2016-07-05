@@ -34,6 +34,9 @@ public:
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 
+	// See NamedConstant::emitOpenCLC()
+	std::string getFileScopeOpenCLC(EmitOpenCLCodeParams& params, const std::string& varname) const;
+
 private:
 	//TypeRef array_type;
 	std::vector<ASTNodeRef> elements;
