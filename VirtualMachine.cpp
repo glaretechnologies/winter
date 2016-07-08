@@ -101,28 +101,28 @@ static const bool USE_MCJIT = true;
 
 static void* getVoidPtrArg(const vector<ValueRef>& arg_values, int i)
 {
-	assert(dynamic_cast<const VoidPtrValue*>(arg_values[i].getPointer()) != NULL);
+	assert(arg_values[i]->valueType() == Value::ValueType_VoidPtr);
 	return static_cast<const VoidPtrValue*>(arg_values[i].getPointer())->value;
 }
 
 
 static const std::string& getStringArg(const vector<ValueRef>& arg_values, int i)
 {
-	assert(dynamic_cast<const StringValue*>(arg_values[i].getPointer()) != NULL);
+	assert(arg_values[i]->valueType() == Value::ValueType_String);
 	return static_cast<const StringValue*>(arg_values[i].getPointer())->value;
 }
 
 
 static int64 getInt64Arg(const vector<ValueRef>& arg_values, int i)
 {
-	assert(dynamic_cast<const IntValue*>(arg_values[i].getPointer()) != NULL);
+	assert(arg_values[i]->valueType() == Value::ValueType_Int);
 	return static_cast<const IntValue*>(arg_values[i].getPointer())->value;
 }
 
 
 static const std::string& getCharArg(const vector<ValueRef>& arg_values, int i)
 {
-	assert(dynamic_cast<const CharValue*>(arg_values[i].getPointer()) != NULL);
+	assert(arg_values[i]->valueType() == Value::ValueType_Char);
 	return static_cast<const CharValue*>(arg_values[i].getPointer())->value;
 }
 
@@ -470,7 +470,7 @@ static void tracePrintFloat(const char* var_name, float x)
 #else
 static float getFloatArg(const vector<ValueRef>& arg_values, int i)
 {
-	assert(dynamic_cast<const FloatValue*>(arg_values[i].getPointer()) != NULL);
+	assert(arg_values[i]->valueType() == Value::ValueType_Float);
 	return static_cast<const FloatValue*>(arg_values[i].getPointer())->value;
 }
 

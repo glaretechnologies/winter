@@ -90,20 +90,8 @@ int main(int argc, char** argv)
 
 		vmstate.func_args_start.pop_back();
 
-		//IntValue* intval = dynamic_cast<IntValue*>(retval);
-		//StringValue* intval = dynamic_cast<StringValue*>(retval);
-		//StructureValue* val = dynamic_cast<StructureValue*>(retval);
-		//ArrayValue* val = dynamic_cast<ArrayValue*>(retval);
-		/*FloatValue* val = dynamic_cast<FloatValue*>(retval);
-		if(!val)
-		{
-			std::cerr << "main() Return value was of unexpected type." << std::endl;
-		}
-		assert(val);*/
-
 		std::cout << "Program returned " << retval->toString() << std::endl;
 
-		//TEMPdelete retval;
 
 		assert(vmstate.argument_stack.empty());
 		//assert(vmstate.let_stack.empty());
@@ -121,9 +109,6 @@ int main(int argc, char** argv)
 				def->exec(vmstate);
 			}
 		}*/
-
-		// TEMP:
-		//new char[666];
 	}
 	catch(Winter::BaseException& e)
 	{

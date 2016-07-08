@@ -26,7 +26,7 @@ static const IntervalSetInt64 updateIndexBounds(TraversalPayload& payload, const
 
 			ValueRef retval = comp_expr.b->exec(vmstate);
 
-			assert(dynamic_cast<IntValue*>(retval.getPointer()));
+			assert(retval->valueType() == Value::ValueType_Int);
 
 			const int64 x_val = static_cast<IntValue*>(retval.getPointer())->value;
 										
@@ -103,7 +103,7 @@ static const IntervalSetFloat updateBounds(TraversalPayload& payload, const Comp
 
 			ValueRef retval = comp_expr.b->exec(vmstate);
 
-			assert(dynamic_cast<FloatValue*>(retval.getPointer()));
+			assert(retval->valueType() == Value::ValueType_Float);
 
 			const float x_val = static_cast<FloatValue*>(retval.getPointer())->value;
 										

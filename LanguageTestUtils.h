@@ -23,7 +23,7 @@ extern "C"
 #include "Linker.h"
 #include "Value.h"
 #include "VirtualMachine.h"
-#include "../indigo/StandardPrintOutput.h"
+#include <StandardPrintOutput.h>
 #include <Mutex.h>
 #include <Lock.h>
 #include <Exception.h>

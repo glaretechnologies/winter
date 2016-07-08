@@ -196,35 +196,37 @@ bool shouldFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
 
 static ASTNodeRef makeLiteralASTNodeFromValue(const ValueRef& value, const SrcLocation& src_location, const TypeRef& type)
 {
-	if(dynamic_cast<FloatValue*>(value.getPointer()))
+	switch(value->valueType())
+	{
+	case Value::ValueType_Float:
 	{
 		if(type->getType() != Type::FloatType)
 			throw BaseException("invalid type");
 
 		return new FloatLiteral(value.downcastToPtr<FloatValue>()->value, src_location);
 	}
-	else if(dynamic_cast<DoubleValue*>(value.getPointer()))
+	case Value::ValueType_Double:
 	{
 		if(type->getType() != Type::DoubleType)
 			throw BaseException("invalid type");
 
 		return new DoubleLiteral(value.downcastToPtr<DoubleValue>()->value, src_location);
 	}
-	else if(dynamic_cast<IntValue*>(value.getPointer())) // e->type()->getType() == Type::IntType)
+	case Value::ValueType_Int:
 	{
 		if(type->getType() != Type::IntType)
 			throw BaseException("invalid type");
 
 		return new IntLiteral(value.downcastToPtr<IntValue>()->value, type.downcastToPtr<Int>()->numBits(), value.downcastToPtr<IntValue>()->is_signed, src_location);
 	}
-	else if(dynamic_cast<BoolValue*>(value.getPointer())) // e->type()->getType() == Type::BoolType)
+	case Value::ValueType_Bool:
 	{
 		if(type->getType() != Type::BoolType)
 			throw BaseException("invalid type");
 
 		return new BoolLiteral(value.downcastToPtr<BoolValue>()->value, src_location);
 	}
-	else if(dynamic_cast<ArrayValue*>(value.getPointer()))
+	case Value::ValueType_Array:
 	{
 		if(type->getType() != Type::ArrayTypeType)
 			throw BaseException("invalid type");
@@ -240,7 +242,7 @@ static ASTNodeRef makeLiteralASTNodeFromValue(const ValueRef& value, const SrcLo
 			0 // int suffix
 		);
 	}
-	else if(dynamic_cast<VectorValue*>(value.getPointer()))
+	case Value::ValueType_Vector:
 	{
 		if(type->getType() != Type::VectorTypeType)
 			throw BaseException("invalid type");
@@ -256,10 +258,11 @@ static ASTNodeRef makeLiteralASTNodeFromValue(const ValueRef& value, const SrcLo
 			0 // int suffix
 		);
 	}
-	else
+	default:
 	{
 		throw BaseException("invalid type");
 	}
+	};
 }
 	
 
@@ -3086,7 +3089,7 @@ void DivExpression::checkNoOverflow(TraversalPayload& payload, std::vector<ASTNo
 
 			ValueRef retval = a->exec(vmstate);
 
-			assert(dynamic_cast<IntValue*>(retval.getPointer()));
+			assert(retval->valueType() == Value::ValueType_Int);
 
 			const int64 numerator_val = static_cast<IntValue*>(retval.getPointer())->value;
 
@@ -3103,7 +3106,7 @@ void DivExpression::checkNoOverflow(TraversalPayload& payload, std::vector<ASTNo
 
 			ValueRef retval = b->exec(vmstate);
 
-			assert(dynamic_cast<IntValue*>(retval.getPointer()));
+			assert(retval->valueType() == Value::ValueType_Int);
 
 			const int64 divisor_val = static_cast<IntValue*>(retval.getPointer())->value;
 
@@ -3207,7 +3210,7 @@ void DivExpression::checkNoZeroDivide(TraversalPayload& payload, std::vector<AST
 
 			ValueRef retval = b->exec(vmstate);
 
-			assert(dynamic_cast<IntValue*>(retval.getPointer()));
+			assert(retval->valueType() == Value::ValueType_Int);
 
 			const int64 divisor_val = static_cast<IntValue*>(retval.getPointer())->value;
 

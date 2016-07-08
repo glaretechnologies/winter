@@ -26,7 +26,7 @@ Copyright Glare Technologies Limited 2015 -
 #include <utils/StringUtils.h>
 #include <utils/PlatformUtils.h>
 #include <utils/ConPrint.h>
-#include "../indigo/StandardPrintOutput.h"
+#include <StandardPrintOutput.h>
 #include <Mutex.h>
 #include <Lock.h>
 #include <Exception.h>
@@ -93,13 +93,14 @@ bool testFuzzProgram(const std::string& src)
 		ValueRef retval = maindef->invoke(vmstate);
 
 		vmstate.func_args_start.pop_back();
-		FloatValue* val = dynamic_cast<FloatValue*>(retval.getPointer());
-		if(!val)
+		
+		if(retval->valueType() != Value::ValueType_Float)
 		{
 			std::cerr << "main() Return value was of unexpected type." << std::endl;
 			assert(0);
 			exit(1);
 		}
+		FloatValue* val = static_cast<FloatValue*>(retval.getPointer());
 
 		if(isNAN(val->value) && isNAN(jitted_result))
 		{
@@ -299,13 +300,14 @@ static bool testFuzzASTProgram(Reference<BufferRoot>& root)//const std::vector<F
 		ValueRef retval = maindef->invoke(vmstate);
 
 		vmstate.func_args_start.pop_back();
-		FloatValue* val = dynamic_cast<FloatValue*>(retval.getPointer());
-		if(!val)
+		
+		if(retval->valueType() != Value::ValueType_Float)
 		{
 			std::cerr << "main() Return value was of unexpected type." << std::endl;
 			assert(0);
 			exit(1);
 		}
+		FloatValue* val = static_cast<FloatValue*>(retval.getPointer());
 
 		if(!((val->value == jitted_result) || epsEqual(val->value, jitted_result))) // val->value == jitted_result handles Inf == Inf case.
 		{

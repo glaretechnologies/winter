@@ -595,7 +595,7 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 				std::vector<int> mask(res_v->e.size());
 				for(size_t i=0; i<mask.size(); ++i)
 				{
-					if(!(dynamic_cast<IntValue*>(res_v->e[i].getPointer())))
+					if(res_v->e[i]->valueType() != Value::ValueType_Int)
 						throw BaseException("Element in shuffle mask was not an integer.");
 
 					const int64 index = static_cast<IntValue*>(res_v->e[i].getPointer())->value;
@@ -889,7 +889,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 
 				ValueRef retval = this->argument_expressions[1]->exec(vmstate);
 
-				assert(dynamic_cast<IntValue*>(retval.getPointer()));
+				assert(retval->valueType() == Value::ValueType_Int);
 
 				const int64 index_val = static_cast<IntValue*>(retval.getPointer())->value;
 
@@ -1040,7 +1040,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 
 				ValueRef retval = this->argument_expressions[1]->exec(vmstate);
 
-				assert(dynamic_cast<IntValue*>(retval.getPointer()));
+				assert(retval->valueType() == Value::ValueType_Int);
 
 				const int64 index_val = static_cast<IntValue*>(retval.getPointer())->value;
 
@@ -1189,7 +1189,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 					VMState vmstate;
 					vmstate.func_args_start.push_back(0);
 					ValueRef retval = this->argument_expressions[1]->exec(vmstate);
-					assert(dynamic_cast<IntValue*>(retval.getPointer()));
+					assert(retval->valueType() == Value::ValueType_Int);
 					const int64 index_val = static_cast<IntValue*>(retval.getPointer())->value;
 					if(index_val >= 0 && index_val < (int64)varray_literal->numElementsInValue())
 						return; // Array index is in-bounds!
@@ -1255,7 +1255,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 
 				ValueRef retval = this->argument_expressions[1]->exec(vmstate);
 
-				assert(dynamic_cast<IntValue*>(retval.getPointer()));
+				assert(retval->valueType() == Value::ValueType_Int);
 
 				const int64 index_val = static_cast<IntValue*>(retval.getPointer())->value;
 
@@ -1297,7 +1297,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 			VMState vmstate;
 			vmstate.func_args_start.push_back(0);
 			ValueRef retval = this->argument_expressions[0]->exec(vmstate);
-			assert(dynamic_cast<IntValue*>(retval.getPointer()));
+			assert(retval->valueType() == Value::ValueType_Int);
 			const int64 val = static_cast<IntValue*>(retval.getPointer())->value;
 
 			if(val >= -2147483648LL && val <= 2147483647LL)
