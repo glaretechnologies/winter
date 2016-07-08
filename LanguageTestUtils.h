@@ -88,7 +88,7 @@ static float testExternalFunc(float x/*, TestEnv* env*/)
 static ValueRef testExternalFuncInterpreted(const std::vector<ValueRef>& arg_values)
 {
 	assert(arg_values.size() == 1);
-	assert(dynamic_cast<const FloatValue*>(arg_values[0].getPointer()));
+	assert(arg_values[0]->valueType() == Value::ValueType_Float);
 	//assert(dynamic_cast<const VoidPtrValue*>(arg_values[1].getPointer()));
 
 	// Cast argument 0 to type FloatValue
@@ -190,13 +190,14 @@ static TestResults testMainFloat(const std::string& src, float target_return_val
 //		assert(vmstate.argument_stack.size() == 1);
 		//delete vmstate.argument_stack[0];
 		vmstate.func_args_start.pop_back();
-		FloatValue* val = dynamic_cast<FloatValue*>(retval.getPointer());
-		if(!val)
+		
+		if(retval->valueType() != Value::ValueType_Float)
 		{
 			std::cerr << "main() Return value was of unexpected type." << std::endl;
 			assert(0);
 			exit(1);
 		}
+		FloatValue* val = static_cast<FloatValue*>(retval.getPointer());
 
 		if(!epsEqual(val->value, target_return_val))
 		{
@@ -341,13 +342,14 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 		ValueRef retval = maindef->invoke(vmstate);
 
 		vmstate.func_args_start.pop_back();
-		FloatValue* val = dynamic_cast<FloatValue*>(retval.getPointer());
-		if(!val)
+		
+		if(retval->valueType() != Value::ValueType_Float)
 		{
 			std::cerr << "main() Return value was of unexpected type." << std::endl;
 			assert(0);
 			exit(1);
 		}
+		FloatValue* val = static_cast<FloatValue*>(retval.getPointer());
 
 		if(!epsEqual(val->value, target_return_val))
 		{
@@ -543,13 +545,14 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 		ValueRef retval = maindef->invoke(vmstate);
 
 		vmstate.func_args_start.pop_back();
-		DoubleValue* val = dynamic_cast<DoubleValue*>(retval.getPointer());
-		if(!val)
+		
+		if(retval->valueType() != Value::ValueType_Double)
 		{
 			std::cerr << "main() Return value was of unexpected type." << std::endl;
 			assert(0);
 			exit(1);
 		}
+		DoubleValue* val = static_cast<DoubleValue*>(retval.getPointer());
 
 		if(!epsEqual(val->value, target_return_val))
 		{
@@ -773,13 +776,14 @@ static void testMainInteger(const std::string& src, int target_return_val)
 		ValueRef retval = maindef->invoke(vmstate);
 
 		vmstate.func_args_start.pop_back();
-		IntValue* val = dynamic_cast<IntValue*>(retval.getPointer());
-		if(!val)
+		
+		if(retval->valueType() != Value::ValueType_Int)
 		{
 			std::cerr << "main() Return value was of unexpected type." << std::endl;
 			assert(0);
 			exit(1);
 		}
+		IntValue* val = static_cast<IntValue*>(retval.getPointer());
 
 		if(val->value != target_return_val)
 		{
@@ -880,13 +884,14 @@ static void testMainStringArg(const std::string& src, const std::string& arg, co
 		ValueRef retval = maindef->invoke(vmstate);
 
 		vmstate.func_args_start.pop_back();
-		StringValue* val = dynamic_cast<StringValue*>(retval.getPointer());
-		if(!val)
+		
+		if(retval->valueType() != Value::ValueType_String)
 		{
 			std::cerr << "main() Return value was of unexpected type." << std::endl;
 			assert(0);
 			exit(1);
 		}
+		StringValue* val = static_cast<StringValue*>(retval.getPointer());
 
 		if(val->value != target_return_val)
 		{
@@ -953,13 +958,14 @@ static TestResults testMainIntegerArg(const std::string& src, int x, int target_
 		ValueRef retval = maindef->invoke(vmstate);
 
 		vmstate.func_args_start.pop_back();
-		IntValue* val = dynamic_cast<IntValue*>(retval.getPointer());
-		if(!val)
+		
+		if(retval->valueType() != Value::ValueType_Int)
 		{
 			std::cerr << "main() Return value was of unexpected type." << std::endl;
 			assert(0);
 			exit(1);
 		}
+		IntValue* val = static_cast<IntValue*>(retval.getPointer());
 
 		if(val->value != target_return_val)
 		{
@@ -1147,13 +1153,14 @@ static void testMainInt64Arg(const std::string& src, int64 x, int64 target_retur
 		ValueRef retval = maindef->invoke(vmstate);
 
 		vmstate.func_args_start.pop_back();
-		IntValue* val = dynamic_cast<IntValue*>(retval.getPointer());
-		if(!val)
+		
+		if(retval->valueType() != Value::ValueType_Int)
 		{
 			std::cerr << "main() Return value was of unexpected type." << std::endl;
 			assert(0);
 			exit(1);
 		}
+		IntValue* val = static_cast<IntValue*>(retval.getPointer());
 
 		if(val->value != target_return_val)
 		{
@@ -1220,13 +1227,14 @@ static void testMainInt16Arg(const std::string& src, int16 x, int16 target_retur
 		ValueRef retval = maindef->invoke(vmstate);
 
 		vmstate.func_args_start.pop_back();
-		IntValue* val = dynamic_cast<IntValue*>(retval.getPointer());
-		if(!val)
+		
+		if(retval->valueType() != Value::ValueType_Int)
 		{
 			std::cerr << "main() Return value was of unexpected type." << std::endl;
 			assert(0);
 			exit(1);
 		}
+		IntValue* val = static_cast<IntValue*>(retval.getPointer());
 
 		if(val->value != target_return_val)
 		{
@@ -1293,13 +1301,14 @@ static void testMainUInt32Arg(const std::string& src, uint32 x, uint32 target_re
 		ValueRef retval = maindef->invoke(vmstate);
 
 		vmstate.func_args_start.pop_back();
-		IntValue* val = dynamic_cast<IntValue*>(retval.getPointer());
-		if(!val)
+		
+		if(retval->valueType() != Value::ValueType_Int)
 		{
 			std::cerr << "main() Return value was of unexpected type." << std::endl;
 			assert(0);
 			exit(1);
 		}
+		IntValue* val = static_cast<IntValue*>(retval.getPointer());
 
 		if(val->value != target_return_val)
 		{

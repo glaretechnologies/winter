@@ -48,8 +48,6 @@ const std::string DoubleValue::toString() const
 
 StructureValue::~StructureValue()
 {
-	//for(unsigned int i=0; i<this->fields.size(); ++i)
-	//	delete fields[i];
 }
 
 
@@ -140,8 +138,6 @@ const std::string VArrayValue::toString() const
 
 VectorValue::~VectorValue()
 {
-	//for(unsigned int i=0; i<this->e.size(); ++i)
-	//	delete e[i];
 }
 
 

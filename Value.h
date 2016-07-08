@@ -101,7 +101,6 @@ public:
 };
 
 
-//class StringRep;
 class StringValue : public Value
 {
 public:
@@ -109,7 +108,6 @@ public:
 	virtual Value* clone() const { return new StringValue(value); }
 
 	std::string value;
-	//StringRep* string_rep;
 };
 
 
@@ -158,7 +156,6 @@ public:
 
 	FunctionDefinition* func_def;
 
-	// vector<ValueRef> values;
 	Reference<StructureValue> captured_vars;
 };
 
@@ -259,7 +256,7 @@ template <> inline Value::ValueType getValueTypeForClass<const TupleValue>() { r
 template <> inline Value::ValueType getValueTypeForClass<const VoidPtrValue>() { return Value::ValueType_VoidPtr; }
 
 // Downcast from a value object, to a value object subclass.
-// Check the type is correct with dynamic_cast.  If it's not, throw an exception.
+// Check the type is correct with valueType().  If it's not, throw an exception.
 template <class T> 
 const T* checkedCast(const ValueRef& v)
 {
