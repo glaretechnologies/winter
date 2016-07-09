@@ -1,7 +1,7 @@
 /*=====================================================================
 LangParser.h
 ------------
-Copyright Glare Technologies Limited 2015 -
+Copyright Glare Technologies Limited 2016 -
 File created by ClassTemplate on Wed Jun 11 02:56:20 2008
 =====================================================================*/
 #pragma once
@@ -27,8 +27,6 @@ class LangParserExcep : public BaseException
 {
 public:
 	LangParserExcep(const std::string& text_) : BaseException(text_) {}
-	~LangParserExcep(){}
-private:
 };
 
 
@@ -143,4 +141,4 @@ private:
 };
 
 
-}
+} // end namespace Winter

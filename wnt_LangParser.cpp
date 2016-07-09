@@ -1,7 +1,7 @@
 /*=====================================================================
 LangParser.cpp
 --------------
-Copyright Glare Technologies Limited 2014 -
+Copyright Glare Technologies Limited 2016 -
 File created by ClassTemplate on Wed Jun 11 02:56:20 2008
 =====================================================================*/
 #include "wnt_LangParser.h"
@@ -455,7 +455,8 @@ bool LangParser::isKeyword(const std::string& name)
 	return 
 		name == "let" ||
 		name == "def" ||
-		name == "in";
+		name == "in" ||
+		name == "fn";
 	// TODO: finish
 }
 
@@ -466,12 +467,7 @@ Reference<FunctionDefinition> LangParser::parseFunctionDefinition(ParseInfo& p)
 
 	const std::string function_name = parseIdentifier("function name", p);
 
-	Reference<FunctionDefinition> def = parseFunctionDefinitionGivenName(function_name, p);
-
-	// Add this function def to the list of parsed function definitions.
-	//p.top_level_defs.push_back(def);
-
-	return def;
+	return parseFunctionDefinitionGivenName(function_name, p);
 }
 
 
@@ -879,6 +875,8 @@ TypeRef LangParser::parseType(ParseInfo& p)
 TypeRef LangParser::parseElementaryType(ParseInfo& p)
 {
 	std::string t = parseIdentifier("type", p);
+
+	// Handle optional address space qualifier for type.
 	std::string address_space;
 	if(t == "constant" || t == "global" || t == "__constant" || t == "__global")
 	{
@@ -1084,9 +1082,9 @@ TypeRef LangParser::parseVectorType(ParseInfo& p)
 	parseToken(COMMA_TOKEN, p);
 
 	Reference<IntLiteral> int_literal = parseIntLiteral(p);
-	int64 num = int_literal->value;
+	const int64 num = int_literal->value;
 
-	if(num <= 0 || num >= 128) // || !Maths::isPowerOfTwo(num))
+	if(num <= 0 || num >= 128)
 		throw LangParserExcep("num must be > 0, < 128");
 
 	parseToken(RIGHT_ANGLE_BRACKET_TOKEN, p);

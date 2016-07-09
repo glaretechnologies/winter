@@ -48,10 +48,9 @@ where square is defined with "def square" etc..
 The other kind of function application is where there is an arbitrary expression returning the actual function value,
 e.g. 
 
-func_arg(x), where func_arg is a variable, or e..g
+func_arg(x), where func_arg is a variable, or e.g.
 
 getFunc()(x), where getFunc() returns a function.
-
 
 =====================================================================*/
 class FunctionExpression : public ASTNode

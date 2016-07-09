@@ -1,10 +1,8 @@
 /*=====================================================================
 Lexer.cpp
 ---------
+Copyright Glare Technologies Limited 2016 -
 File created by ClassTemplate on Wed Jun 11 01:53:25 2008
-Code By Nicholas Chapman.
-
-Copyright 2009 Nicholas Chapman
 =====================================================================*/
 #include "wnt_Lexer.h"
 
@@ -19,16 +17,6 @@ Copyright 2009 Nicholas Chapman
 
 namespace Winter
 {
-
-
-Lexer::Lexer()
-{
-}
-
-
-Lexer::~Lexer()
-{
-}
 
 
 // Parse a single escaped character, append UTF-8 representation to s.
@@ -238,7 +226,7 @@ void Lexer::parseNumericLiteral(const SourceBufferRef& buffer, Parser& parser, s
 		char suffix = 0;
 		if(lastchar == 'f' || lastchar == 'd')
 			suffix = lastchar;
-		tokens_out.push_back(Reference<TokenBase>(new FloatLiteralToken(x, suffix, char_index)));
+		tokens_out.push_back(new FloatLiteralToken(x, suffix, char_index));
 	}
 	else
 	{
@@ -309,7 +297,7 @@ void Lexer::parseNumericLiteral(const SourceBufferRef& buffer, Parser& parser, s
 		if(!(num_bits == 16 || num_bits == 32 || num_bits == 64))
 			throw LexerExcep("Integer must have 16, 32 or 64 bits." + errorPosition(buffer, suffix_pos));
 
-		tokens_out.push_back(Reference<TokenBase>(new IntLiteralToken(x, num_bits, is_signed, char_index)));
+		tokens_out.push_back(new IntLiteralToken(x, num_bits, is_signed, char_index));
 	}
 }
 
@@ -329,11 +317,11 @@ void Lexer::parseIdentifier(const SourceBufferRef& buffer, Parser& parser, std::
 	}
 
 	if(s == "true")
-		tokens_out.push_back(Reference<TokenBase>(new BoolLiteralToken(true, char_index)));
+		tokens_out.push_back(new BoolLiteralToken(true, char_index));
 	else if(s == "false")
-		tokens_out.push_back(Reference<TokenBase>(new BoolLiteralToken(false, char_index)));
+		tokens_out.push_back(new BoolLiteralToken(false, char_index));
 	else
-		tokens_out.push_back(Reference<TokenBase>(new IdentifierToken(s, char_index)));
+		tokens_out.push_back(new IdentifierToken(s, char_index));
 }
 
 
@@ -364,7 +352,7 @@ void Lexer::process(const SourceBufferRef& src, std::vector<Reference<TokenBase>
 		{
 			if(parser.parseString("->"))
 			{
-				tokens_out.push_back(Reference<TokenBase>(new RIGHT_ARROW_Token(parser.currentPos() - 2)));
+				tokens_out.push_back(new RIGHT_ARROW_Token(parser.currentPos() - 2));
 			}
 			else
 			{
@@ -377,7 +365,7 @@ void Lexer::process(const SourceBufferRef& src, std::vector<Reference<TokenBase>
 					}
 					else
 					{
-						tokens_out.push_back(Reference<TokenBase>(new MINUS_Token(parser.currentPos())));
+						tokens_out.push_back(new MINUS_Token(parser.currentPos()));
 						parser.advance();
 					}
 				}
@@ -396,12 +384,12 @@ void Lexer::process(const SourceBufferRef& src, std::vector<Reference<TokenBase>
 					
 					if(parser.current() == '+')
 					{
-						tokens_out.push_back(Reference<TokenBase>(new PLUS_Token(parser.currentPos())));
+						tokens_out.push_back(new PLUS_Token(parser.currentPos()));
 						parser.advance();
 					}
 					else if(parser.current() == '-')
 					{
-						tokens_out.push_back(Reference<TokenBase>(new MINUS_Token(parser.currentPos())));
+						tokens_out.push_back(new MINUS_Token(parser.currentPos()));
 						parser.advance();
 					}
 				}
@@ -422,42 +410,42 @@ void Lexer::process(const SourceBufferRef& src, std::vector<Reference<TokenBase>
 		}
 		else if(parser.current() == ',')
 		{
-			tokens_out.push_back(Reference<TokenBase>(new COMMA_Token(parser.currentPos())));
+			tokens_out.push_back(new COMMA_Token(parser.currentPos()));
 			parser.advance();
 		}
 		else if(parser.current() == '(')
 		{
-			tokens_out.push_back(Reference<TokenBase>(new OPEN_PARENTHESIS_Token(parser.currentPos())));
+			tokens_out.push_back(new OPEN_PARENTHESIS_Token(parser.currentPos()));
 			parser.advance();
 		}
 		else if(parser.current() == ')')
 		{
-			tokens_out.push_back(Reference<TokenBase>(new CLOSE_PARENTHESIS_Token(parser.currentPos())));
+			tokens_out.push_back(new CLOSE_PARENTHESIS_Token(parser.currentPos()));
 			parser.advance();
 		}
 		else if(parser.current() == '[')
 		{
-			tokens_out.push_back(Reference<TokenBase>(new OPEN_SQUARE_BRACKET_Token(parser.currentPos())));
+			tokens_out.push_back(new OPEN_SQUARE_BRACKET_Token(parser.currentPos()));
 			parser.advance();
 		}
 		else if(parser.current() == ']')
 		{
-			tokens_out.push_back(Reference<TokenBase>(new CLOSE_SQUARE_BRACKET_Token(parser.currentPos())));
+			tokens_out.push_back(new CLOSE_SQUARE_BRACKET_Token(parser.currentPos()));
 			parser.advance();
 		}
 		else if(parser.current() == '{')
 		{
-			tokens_out.push_back(Reference<TokenBase>(new OPEN_BRACE_Token(parser.currentPos())));
+			tokens_out.push_back(new OPEN_BRACE_Token(parser.currentPos()));
 			parser.advance();
 		}
 		else if(parser.current() == '}')
 		{
-			tokens_out.push_back(Reference<TokenBase>(new CLOSE_BRACE_Token(parser.currentPos())));
+			tokens_out.push_back(new CLOSE_BRACE_Token(parser.currentPos()));
 			parser.advance();
 		}
 		else if(parser.current() == ':')
 		{
-			tokens_out.push_back(Reference<TokenBase>(new COLON_Token(parser.currentPos())));
+			tokens_out.push_back(new COLON_Token(parser.currentPos()));
 			parser.advance();
 		}
 		else if(parser.current() == '#')
@@ -466,27 +454,27 @@ void Lexer::process(const SourceBufferRef& src, std::vector<Reference<TokenBase>
 		}
 		else if(parser.current() == '+')
 		{
-			tokens_out.push_back(Reference<TokenBase>(new PLUS_Token(parser.currentPos())));
+			tokens_out.push_back(new PLUS_Token(parser.currentPos()));
 			parser.advance();
 		}
 		else if(parser.current() == '-')
 		{
-			tokens_out.push_back(Reference<TokenBase>(new MINUS_Token(parser.currentPos())));
+			tokens_out.push_back(new MINUS_Token(parser.currentPos()));
 			parser.advance();
 		}
 		else if(parser.current() == '/')
 		{
-			tokens_out.push_back(Reference<TokenBase>(new FORWARDS_SLASH_Token(parser.currentPos())));
+			tokens_out.push_back(new FORWARDS_SLASH_Token(parser.currentPos()));
 			parser.advance();
 		}
 		else if(parser.current() == '*')
 		{
-			tokens_out.push_back(Reference<TokenBase>(new ASTERISK_Token(parser.currentPos())));
+			tokens_out.push_back(new ASTERISK_Token(parser.currentPos()));
 			parser.advance();
 		}
 		else if(parser.current() == '\\')
 		{
-			tokens_out.push_back(Reference<TokenBase>(new BACK_SLASH_Token(parser.currentPos())));
+			tokens_out.push_back(new BACK_SLASH_Token(parser.currentPos()));
 			parser.advance();
 		}
 		else if(parser.current() == '=')
@@ -495,11 +483,11 @@ void Lexer::process(const SourceBufferRef& src, std::vector<Reference<TokenBase>
 
 			if(parser.notEOF() && parser.current() == '=')
 			{
-				tokens_out.push_back(Reference<TokenBase>(new DOUBLE_EQUALS_Token(parser.currentPos())));
+				tokens_out.push_back(new DOUBLE_EQUALS_Token(parser.currentPos()));
 				parser.advance();
 			}
 			else
-				tokens_out.push_back(Reference<TokenBase>(new EQUALS_Token(parser.currentPos())));
+				tokens_out.push_back(new EQUALS_Token(parser.currentPos()));
 				
 		}
 		else if(parser.current() == '!')
@@ -507,17 +495,17 @@ void Lexer::process(const SourceBufferRef& src, std::vector<Reference<TokenBase>
 			parser.advance();
 			if(parser.currentIsChar('='))
 			{
-				tokens_out.push_back(Reference<TokenBase>(new NOT_EQUALS_Token(parser.currentPos())));
+				tokens_out.push_back(new NOT_EQUALS_Token(parser.currentPos()));
 				parser.advance();
 			}
 			else
 			{
-				tokens_out.push_back(Reference<TokenBase>(new EXCLAMATION_MARK_Token(parser.currentPos())));
+				tokens_out.push_back(new EXCLAMATION_MARK_Token(parser.currentPos()));
 			}
 		}
 		else if(parser.current() == '.')
 		{
-			tokens_out.push_back(Reference<TokenBase>(new DOT_Token(parser.currentPos())));
+			tokens_out.push_back(new DOT_Token(parser.currentPos()));
 			parser.advance();
 		}
 		else if(parser.current() == '|')
@@ -525,22 +513,22 @@ void Lexer::process(const SourceBufferRef& src, std::vector<Reference<TokenBase>
 			parser.advance();
 			if(parser.currentIsChar('|'))
 			{
-				tokens_out.push_back(Reference<TokenBase>(new OR_Token(parser.currentPos() - 1)));
+				tokens_out.push_back(new OR_Token(parser.currentPos() - 1));
 				parser.advance();
 			}
 			else
-				tokens_out.push_back(Reference<TokenBase>(new BITWISE_OR_Token(parser.currentPos() - 1)));
+				tokens_out.push_back(new BITWISE_OR_Token(parser.currentPos() - 1));
 		}
 		else if(parser.current() == '&')
 		{
 			parser.advance();
 			if(parser.currentIsChar('&'))
 			{
-				tokens_out.push_back(Reference<TokenBase>(new AND_Token(parser.currentPos())));
+				tokens_out.push_back(new AND_Token(parser.currentPos()));
 				parser.advance();
 			}
 			else
-				tokens_out.push_back(Reference<TokenBase>(new BITWISE_AND_Token(parser.currentPos())));
+				tokens_out.push_back(new BITWISE_AND_Token(parser.currentPos()));
 		}
 		else if(parser.current() == '<')
 		{
@@ -548,15 +536,15 @@ void Lexer::process(const SourceBufferRef& src, std::vector<Reference<TokenBase>
 			if(parser.currentIsChar('='))
 			{
 				parser.advance();
-				tokens_out.push_back(Reference<TokenBase>(new LESS_EQUAL_Token(parser.currentPos())));
+				tokens_out.push_back(new LESS_EQUAL_Token(parser.currentPos()));
 			}
 			else if(parser.currentIsChar('<'))
 			{
 				parser.advance();
-				tokens_out.push_back(Reference<TokenBase>(new LEFT_SHIFT_Token(parser.currentPos())));
+				tokens_out.push_back(new LEFT_SHIFT_Token(parser.currentPos()));
 			}
 			else
-				tokens_out.push_back(Reference<TokenBase>(new LEFT_ANGLE_BRACKET_Token(parser.currentPos())));
+				tokens_out.push_back(new LEFT_ANGLE_BRACKET_Token(parser.currentPos()));
 		}
 		else if(parser.current() == '>')
 		{
@@ -564,24 +552,24 @@ void Lexer::process(const SourceBufferRef& src, std::vector<Reference<TokenBase>
 			if(parser.currentIsChar('='))
 			{
 				parser.advance();
-				tokens_out.push_back(Reference<TokenBase>(new GREATER_EQUAL_Token(parser.currentPos())));
+				tokens_out.push_back(new GREATER_EQUAL_Token(parser.currentPos()));
 			}
 			else if(parser.currentIsChar('>'))
 			{
 				parser.advance();
-				tokens_out.push_back(Reference<TokenBase>(new RIGHT_SHIFT_Token(parser.currentPos())));
+				tokens_out.push_back(new RIGHT_SHIFT_Token(parser.currentPos()));
 			}
 			else
-				tokens_out.push_back(Reference<TokenBase>(new RIGHT_ANGLE_BRACKET_Token(parser.currentPos())));
+				tokens_out.push_back(new RIGHT_ANGLE_BRACKET_Token(parser.currentPos()));
 		}
 		else if(parser.current() == '^')
 		{
 			parser.advance();
-			tokens_out.push_back(Reference<TokenBase>(new BITWISE_XOR_Token(parser.currentPos())));
+			tokens_out.push_back(new BITWISE_XOR_Token(parser.currentPos()));
 		}
 		else if(parser.current() == '?')
 		{
-			tokens_out.push_back(Reference<TokenBase>(new QUESTION_MARK_Token(parser.currentPos())));
+			tokens_out.push_back(new QUESTION_MARK_Token(parser.currentPos()));
 			parser.advance();
 		}
 		else
@@ -638,4 +626,4 @@ void Lexer::test()
 #endif
 
 
-} //end namespace Lang
+} //end namespace Winter

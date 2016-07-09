@@ -1,20 +1,18 @@
 /*=====================================================================
 Lexer.h
 -------
+Copyright Glare Technologies Limited 2016 -
 File created by ClassTemplate on Wed Jun 11 01:53:25 2008
-Code By Nicholas Chapman.
-
-Copyright 2009 Nicholas Chapman
 =====================================================================*/
 #pragma once
 
 
-#include <string>
-#include <vector>
 #include "TokenBase.h"
 #include "BaseException.h"
 #include "wnt_SourceBuffer.h"
 #include <utils/Reference.h>
+#include <string>
+#include <vector>
 class Parser;
 
 
@@ -26,9 +24,6 @@ class LexerExcep : public BaseException
 {
 public:
 	LexerExcep(const std::string& text_) : BaseException(text_) {}
-	~LexerExcep(){}
-
-private:
 };
 
 
@@ -40,15 +35,6 @@ Lexer
 class Lexer
 {
 public:
-	/*=====================================================================
-	Lexer
-	-----
-	
-	=====================================================================*/
-	Lexer();
-
-	~Lexer();
-
 	static void process(const SourceBufferRef& src, std::vector<Reference<TokenBase> >& tokens_out);
 
 	static void test();
@@ -64,8 +50,4 @@ private:
 };
 
 
-
-} //end namespace Lang
-
-
-
+} //end namespace Winter
