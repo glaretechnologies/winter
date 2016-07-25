@@ -26,6 +26,7 @@ public:
 
 	virtual ValueRef invoke(VMState& vmstate) = 0;
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const = 0;
+	virtual bool callIsExpensive() const { return true; } // Should this call be considered expensive, when considering possible duplication during inlining?
 };
 
 
@@ -40,7 +41,7 @@ public:
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
-
+	virtual bool callIsExpensive() const { return false; }
 private:
 	Reference<StructureType> struct_type;
 };
@@ -54,6 +55,7 @@ public:
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+	virtual bool callIsExpensive() const { return false; }
 //private:
 	Reference<StructureType> struct_type;
 	unsigned int index;
@@ -94,6 +96,7 @@ public:
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+	virtual bool callIsExpensive() const { return false; }
 
 	void setIndex(unsigned int i) { index = i; }
 //private:
@@ -110,6 +113,7 @@ public:
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+	virtual bool callIsExpensive() const { return false; }
 private:
 	Reference<VectorType> vector_type;
 	unsigned int index;
@@ -187,6 +191,7 @@ public:
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+	virtual bool callIsExpensive() const { return false; }
 private:
 	Reference<ArrayType> array_type;
 	TypeRef index_type;
@@ -201,6 +206,7 @@ public:
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+	virtual bool callIsExpensive() const { return false; }
 private:
 	Reference<VArrayType> array_type;
 	TypeRef index_type;
@@ -228,6 +234,7 @@ public:
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+	virtual bool callIsExpensive() const { return false; }
 private:
 	Reference<VectorType> vec_type;
 	TypeRef index_type;

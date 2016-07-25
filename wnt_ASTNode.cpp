@@ -381,7 +381,8 @@ void checkInlineExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector
 			
 			const int call_count = payload.calls_to_func_count[target_func];
 			
-			
+			const bool is_target_func_just_a_call = target_func->body->nodeType() == ASTNode::FunctionExpressionType;
+
 			// Work out if the argument expressions are 'expensive' to evaluate.
 			// If they are, don't inline this function expression, because the argument expression *may* be duplicated.
 			// e.g. def f(float x) : x + x + x + x, 
@@ -397,20 +398,39 @@ void checkInlineExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector
 			bool are_arg_expressions_expensive = false;
 			for(size_t i=0; i<func_expr->argument_expressions.size(); ++i)
 			{
-				if(!(func_expr->argument_expressions[i]->nodeType() == ASTNode::VariableASTNodeType || func_expr->argument_expressions[i]->nodeType() == ASTNode::IntLiteralType ||
-					func_expr->argument_expressions[i]->nodeType() == ASTNode::FloatLiteralType || func_expr->argument_expressions[i]->nodeType() == ASTNode::DoubleLiteralType ||
-					func_expr->argument_expressions[i]->nodeType() == ASTNode::BoolLiteralType || func_expr->argument_expressions[i]->nodeType() == ASTNode::CharLiteralType))
+				if(func_expr->argument_expressions[i]->nodeType() == ASTNode::FunctionExpressionType)
 				{
-					// This argument expression is expensive to evaluate.
-					are_arg_expressions_expensive = true;
+					// Consider function calls expensive, with some exceptions, such as:
+					//	* Call to getfield built-in function (field access)
+					bool func_call_is_expensive = true;
+					const FunctionDefinition* arg_target_func = func_expr->argument_expressions[i].downcastToPtr<FunctionExpression>()->static_target_function;
+					if(arg_target_func->built_in_func_impl.nonNull())
+					{
+						//if(dynamic_cast<const GetField*>(arg_target_func->built_in_func_impl.getPointer()))
+						//	func_call_is_expensive = false;
+						func_call_is_expensive = arg_target_func->built_in_func_impl->callIsExpensive();
+					}
+					
+					if(func_call_is_expensive)
+						are_arg_expressions_expensive = true;
+				}
+				else
+				{
+					if(!(func_expr->argument_expressions[i]->nodeType() == ASTNode::VariableASTNodeType || func_expr->argument_expressions[i]->nodeType() == ASTNode::IntLiteralType ||
+						func_expr->argument_expressions[i]->nodeType() == ASTNode::FloatLiteralType || func_expr->argument_expressions[i]->nodeType() == ASTNode::DoubleLiteralType ||
+						func_expr->argument_expressions[i]->nodeType() == ASTNode::BoolLiteralType || func_expr->argument_expressions[i]->nodeType() == ASTNode::CharLiteralType))
+					{
+						// This argument expression is expensive to evaluate.
+						are_arg_expressions_expensive = true;
+					}
 				}
 			}
 
 			if(verbose) std::cout << "target: " + target_func->sig.toString() + ", call_count=" << call_count << ", beta reduction=" << boolToString(is_beta_reduction) << 
-				", are_arg_expressions_expensive: " << boolToString(are_arg_expressions_expensive) << "\n";
+				", is_target_func_just_a_call: " << boolToString(is_target_func_just_a_call) << ", are_arg_expressions_expensive: " << boolToString(are_arg_expressions_expensive) << "\n";
 
 
-			const bool should_inline = (is_beta_reduction || (call_count <= 1)) && !are_arg_expressions_expensive;
+			const bool should_inline = (is_beta_reduction || (call_count <= 1) || is_target_func_just_a_call) && !are_arg_expressions_expensive;
 			if(should_inline)
 			{
 				if(verbose) std::cout << "------------original expr----------: " << std::endl;

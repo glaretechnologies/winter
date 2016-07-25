@@ -12,6 +12,8 @@
 #include "wnt_TupleLiteral.h"
 #include "wnt_IfExpression.h"
 #include "wnt_FunctionExpression.h"
+#include "wnt_LetBlock.h"
+#include "wnt_LetASTNode.h"
 #include <utils/Timer.h>
 #include <utils/MTwister.h>
 #include <utils/Task.h>
@@ -463,6 +465,29 @@ void LanguageTests::run()
 	// ===================================================================
 	// Test function inlining
 	// ===================================================================
+	
+	// A function that has a body which is just a function call should be inlined.
+	results = testMainFloatArg("def f1(float z) float : z*z						\n\
+		def f2(float z) float : f1(z)										\n\
+		def entryPoint2(float x) float : f1(x) + f2(x)						\n\
+		def main(float x) float : f2(x)", 4.0f, 16.0f); // Call to f2 should be inlined, and replaced with the call to f1
+	testAssert(results.maindef->body->nodeType() == ASTNode::FunctionExpressionType);
+	testAssert(results.maindef->body.downcastToPtr<FunctionExpression>()->static_function_name == "f1");
+
+	
+	// Test 'expensive' arg detection.  Test that getfield is not considered expensive.
+	results = testMainFloatArg("struct S { float x }  						\n\
+		def f1(float x) float : x*x											\n\
+		def f2(float x) float : f1(x)										\n\
+		def entryPoint2(float x) float : f1(x) + f2(x)						\n\
+		def main(float x) float : let s = S(x) in f2(s.x)", 4.0f, 16.0f); // Call to f should be inlined, even tho argument expression is a function.
+	testAssert(results.maindef->body->nodeType() == ASTNode::LetBlockType);
+	testAssert(results.maindef->body.downcastToPtr<LetBlock>()->expr->nodeType() == ASTNode::FunctionExpressionType);
+	testAssert(results.maindef->body.downcastToPtr<LetBlock>()->expr.downcastToPtr<FunctionExpression>()->static_function_name == "f1");
+
+
+
+
 	results = testMainIntegerArg("def f(int y) : y + 1    def main(int x) int : f(x)", 1, 2); // f should be inlined.
 	//TEMP isn't being inlined right now: testAssert(results.maindef->body->nodeType() == ASTNode::AdditionExpressionType);
 

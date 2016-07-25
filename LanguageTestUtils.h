@@ -305,6 +305,9 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 
 		vm_args.entry_point_sigs.push_back(mainsig);
 
+		const FunctionSignature entryPoint2sig("entryPoint2", std::vector<TypeRef>(1, TypeRef(new Float())));
+		vm_args.entry_point_sigs.push_back(entryPoint2sig);
+
 		VirtualMachine vm(vm_args);
 
 		// Get main function

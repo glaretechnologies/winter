@@ -1878,7 +1878,7 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 
 	std::set<TupleTypeRef, TypeRefLessThan> emitted_tuples;
 	std::string struct_def_code = this->vm_args.comments_in_opencl_output ? "// OpenCL structure definitions for Winter structs and tuples, from VirtualMachine::buildOpenCLCode()\n" : "";
-	std::string constructor_code;
+	std::string constructor_code = "// Constructor OpenCL code, from VirtualMachine::buildOpenCLCode()\n";
 
 	// Spit out structure definitions and constructors
 	for(auto i = 0; i != named_types_ordered.size(); ++i)
@@ -1956,6 +1956,8 @@ inline void doWinterAssert(bool val, const __constant char* message, const __con
 }\n\
 ";
 	}
+
+	built_in_func_code += "// End Winter built-in functions\n";
 
 	res.struct_def_code = struct_def_code;
 	res.function_code = constructor_code + "\n\n" + built_in_func_code + "\n\n" + params.file_scope_code + "\n\n" + top_level_def_src;
