@@ -1780,7 +1780,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		{
 			const GetField* get_field_func = static_cast<const GetField*>(this->static_target_function->built_in_func_impl.getPointer());
 
-			const int field_index = get_field_func->index;
+			const unsigned int field_index = get_field_func->index;
 
 			const TypeRef field_type = get_field_func->struct_type->component_types[field_index];
 			const std::string field_name = get_field_func->struct_type->component_names[field_index];
@@ -1819,7 +1819,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		{
 			const GetTupleElementBuiltInFunc* get_field_func = static_cast<const GetTupleElementBuiltInFunc*>(this->static_target_function->built_in_func_impl.getPointer());
 
-			const int field_index = get_field_func->index;
+			const unsigned int field_index = get_field_func->index;
 
 			const TypeRef field_type = get_field_func->tuple_type->component_types[field_index];
 			const std::string field_name = "field " + toString(field_index);
