@@ -22,11 +22,54 @@ class ASTNode;
 class BuiltInFunctionImpl : public RefCounted
 {
 public:
+	enum BuiltInFunctionImplType
+	{
+		BuiltInType_Constructor,
+		BuiltInType_GetField,
+		BuiltInType_UpdateElementBuiltInFunc,
+		BuiltInType_GetTupleElementBuiltInFunc,
+		BuiltInType_GetVectorElement,
+		BuiltInType_ArrayMapBuiltInFunc,
+		BuiltInType_ArrayFoldBuiltInFunc,
+		BuiltInType_ArraySubscriptBuiltInFunc,
+		BuiltInType_VArraySubscriptBuiltInFunc,
+		BuiltInType_MakeVArrayBuiltInFunc,
+		BuiltInType_VectorSubscriptBuiltInFunc,
+		BuiltInType_ArrayInBoundsBuiltInFunc,
+		BuiltInType_VectorInBoundsBuiltInFunc,
+		BuiltInType_IterateBuiltInFunc,
+		BuiltInType_DotProductBuiltInFunc,
+		BuiltInType_VectorMinBuiltInFunc,
+		BuiltInType_VectorMaxBuiltInFunc,
+		BuiltInType_ShuffleBuiltInFunc,
+		BuiltInType_PowBuiltInFunc,
+		BuiltInType_SqrtBuiltInFunc,
+		BuiltInType_ExpBuiltInFunc,
+		BuiltInType_LogBuiltInFunc,
+		BuiltInType_SinBuiltInFunc,
+		BuiltInType_CosBuiltInFunc,
+		BuiltInType_AbsBuiltInFunc,
+		BuiltInType_FloorBuiltInFunc,
+		BuiltInType_CeilBuiltInFunc,
+		BuiltInType_SignBuiltInFunc,
+		BuiltInType_TruncateToIntBuiltInFunc,
+		BuiltInType_ToFloatBuiltInFunc,
+		BuiltInType_ToInt64BuiltInFunc,
+		BuiltInType_ToInt32BuiltInFunc,
+		BuiltInType_VoidPtrToInt64BuiltInFunc,
+		BuiltInType_LengthBuiltInFunc
+	};
+
+	BuiltInFunctionImpl(BuiltInFunctionImplType builtin_type_) : builtin_type(builtin_type_) {}
 	virtual ~BuiltInFunctionImpl(){}
 
 	virtual ValueRef invoke(VMState& vmstate) = 0;
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const = 0;
 	virtual bool callIsExpensive() const { return true; } // Should this call be considered expensive, when considering possible duplication during inlining?
+
+	const BuiltInFunctionImplType builtInType() const { return builtin_type; }
+private:
+	BuiltInFunctionImplType builtin_type;
 };
 
 
@@ -51,7 +94,7 @@ private:
 class GetField : public BuiltInFunctionImpl
 {
 public:
-	GetField(Reference<StructureType>& struct_type_, unsigned int index_) : struct_type(struct_type_), index(index_) {}
+	GetField(Reference<StructureType>& struct_type_, unsigned int index_) : BuiltInFunctionImpl(BuiltInType_GetField), struct_type(struct_type_), index(index_) {}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -92,7 +135,7 @@ public:
 class GetTupleElementBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	GetTupleElementBuiltInFunc(const Reference<TupleType>& tuple_type_, unsigned int index_) : tuple_type(tuple_type_), index(index_) {}
+	GetTupleElementBuiltInFunc(const Reference<TupleType>& tuple_type_, unsigned int index_) : BuiltInFunctionImpl(BuiltInType_GetTupleElementBuiltInFunc), tuple_type(tuple_type_), index(index_) {}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -109,7 +152,7 @@ public:
 class GetVectorElement : public BuiltInFunctionImpl
 {
 public:
-	GetVectorElement(Reference<VectorType>& vector_type_, unsigned int index_) : vector_type(vector_type_), index(index_) {}
+	GetVectorElement(Reference<VectorType>& vector_type_, unsigned int index_) : BuiltInFunctionImpl(BuiltInType_GetVectorElement), vector_type(vector_type_), index(index_) {}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -123,7 +166,7 @@ private:
 class ArrayMapBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	ArrayMapBuiltInFunc(const Reference<ArrayType>& from_type_, const Reference<Function>& func_type_) : from_type(from_type_), func_type(func_type_), specialised_f(NULL) {}
+	ArrayMapBuiltInFunc(const Reference<ArrayType>& from_type_, const Reference<Function>& func_type_) : BuiltInFunctionImpl(BuiltInType_ArrayMapBuiltInFunc), from_type(from_type_), func_type(func_type_), specialised_f(NULL) {}
 
 	/*
 	map(function<T, R>, array<T, N>) array<R, N>
@@ -323,7 +366,7 @@ private:
 class DotProductBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	DotProductBuiltInFunc(const Reference<VectorType>& vector_type_) : vector_type(vector_type_) {}
+	DotProductBuiltInFunc(const Reference<VectorType>& vector_type_) : BuiltInFunctionImpl(BuiltInType_DotProductBuiltInFunc), vector_type(vector_type_) {}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -336,7 +379,7 @@ private:
 class VectorMinBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	VectorMinBuiltInFunc(const Reference<VectorType>& vector_type_) : vector_type(vector_type_) {}
+	VectorMinBuiltInFunc(const Reference<VectorType>& vector_type_) : BuiltInFunctionImpl(BuiltInType_VectorMinBuiltInFunc), vector_type(vector_type_) {}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -349,7 +392,7 @@ private:
 class VectorMaxBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	VectorMaxBuiltInFunc(const Reference<VectorType>& vector_type_) : vector_type(vector_type_) {}
+	VectorMaxBuiltInFunc(const Reference<VectorType>& vector_type_) : BuiltInFunctionImpl(BuiltInType_VectorMaxBuiltInFunc), vector_type(vector_type_) {}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -365,7 +408,8 @@ public:
 	ShuffleBuiltInFunc(const Reference<VectorType>& vector_type_, 
 		//const std::vector<int>& shuffle_mask_
 		const Reference<VectorType>& index_type_
-		) : vector_type(vector_type_), 
+		) : BuiltInFunctionImpl(BuiltInType_ShuffleBuiltInFunc), 
+		vector_type(vector_type_), 
 		//shuffle_mask(shuffle_mask_) 
 		index_type(index_type_) 
 	{}

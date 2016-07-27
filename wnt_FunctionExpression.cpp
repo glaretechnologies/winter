@@ -603,7 +603,7 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 				}
 
 				assert(this->static_target_function->built_in_func_impl.nonNull());
-				assert(dynamic_cast<ShuffleBuiltInFunc*>(this->static_target_function->built_in_func_impl.getPointer()));
+				assert(this->static_target_function->built_in_func_impl->builtInType() == BuiltInFunctionImpl::BuiltInType_ShuffleBuiltInFunc);
 				static_cast<ShuffleBuiltInFunc*>(this->static_target_function->built_in_func_impl.getPointer())->setShuffleMask(mask);
 			}
 			catch(BaseException& e)
@@ -636,7 +636,7 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 			}	
 
 			assert(this->static_target_function->built_in_func_impl.nonNull());
-			assert(dynamic_cast<GetTupleElementBuiltInFunc*>(this->static_target_function->built_in_func_impl.getPointer()));
+			assert(this->static_target_function->built_in_func_impl->builtInType() == BuiltInFunctionImpl::BuiltInType_GetTupleElementBuiltInFunc);
 			GetTupleElementBuiltInFunc* tuple_elem_func = static_cast<GetTupleElementBuiltInFunc*>(this->static_target_function->built_in_func_impl.getPointer());
 				
 
@@ -657,7 +657,7 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 			//if(this->binding_type == BoundToGlobalDef)
 			//{
 				assert(this->static_target_function->built_in_func_impl.nonNull());
-				assert(dynamic_cast<ArrayFoldBuiltInFunc*>(this->static_target_function->built_in_func_impl.getPointer()));
+				assert(this->static_target_function->built_in_func_impl->builtInType() == BuiltInFunctionImpl::BuiltInType_ArrayFoldBuiltInFunc);
 				ArrayFoldBuiltInFunc* fold_func = static_cast<ArrayFoldBuiltInFunc*>(this->static_target_function->built_in_func_impl.getPointer());
 
 				// Eval first arg (to get function 'f')
@@ -683,7 +683,7 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 			//if(this->binding_type == BoundToGlobalDef)
 			//{
 				assert(this->static_target_function->built_in_func_impl.nonNull());
-				assert(dynamic_cast<ArrayMapBuiltInFunc*>(this->static_target_function->built_in_func_impl.getPointer()));
+				assert(this->static_target_function->built_in_func_impl->builtInType() == BuiltInFunctionImpl::BuiltInType_ArrayMapBuiltInFunc);
 				ArrayMapBuiltInFunc* map_func = static_cast<ArrayMapBuiltInFunc*>(this->static_target_function->built_in_func_impl.getPointer());
 
 				// Eval first arg (to get function 'f')
@@ -1569,7 +1569,7 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 			throw BaseException("Error while emitting OpenCL C: invalid eN() function '" + static_function_name + "'.");
 		}
 	}
-	else if(static_target_function && static_target_function->built_in_func_impl.nonNull() && dynamic_cast<GetField*>(static_target_function->built_in_func_impl.getPointer()))
+	else if(static_target_function && static_target_function->built_in_func_impl.nonNull() && (static_target_function->built_in_func_impl->builtInType() == BuiltInFunctionImpl::BuiltInType_GetField))
 	{
 		// Transform get field built-in functions like so:
 		// struct s { int x; }
@@ -1776,7 +1776,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 	else // else if this->static_target_function:
 	{
 		// For structure field access functions, instead of emitting an actual function call, just emit the LLVM code to access the field.
-		if(dynamic_cast<GetField*>(this->static_target_function->built_in_func_impl.getPointer()))
+		if(static_target_function->built_in_func_impl.nonNull() && (static_target_function->built_in_func_impl->builtInType() == BuiltInFunctionImpl::BuiltInType_GetField))
 		{
 			const GetField* get_field_func = static_cast<const GetField*>(this->static_target_function->built_in_func_impl.getPointer());
 
@@ -1815,7 +1815,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			return result;
 		}
 		// For tuple field access functions, instead of emitting an actual function call, just emit the LLVM code to access the field.
-		else if(dynamic_cast<GetTupleElementBuiltInFunc*>(this->static_target_function->built_in_func_impl.getPointer()))
+		else if(static_target_function->built_in_func_impl.nonNull() && (static_target_function->built_in_func_impl->builtInType() == BuiltInFunctionImpl::BuiltInType_GetTupleElementBuiltInFunc))
 		{
 			const GetTupleElementBuiltInFunc* get_field_func = static_cast<const GetTupleElementBuiltInFunc*>(this->static_target_function->built_in_func_impl.getPointer());
 

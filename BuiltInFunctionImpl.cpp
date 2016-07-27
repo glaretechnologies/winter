@@ -206,7 +206,8 @@ static llvm::Value* makeForLoop(llvm::IRBuilder<>& builder, llvm::Module* module
 
 
 Constructor::Constructor(Reference<StructureType>& struct_type_)
-:	struct_type(struct_type_)
+:	BuiltInFunctionImpl(BuiltInType_Constructor),
+	struct_type(struct_type_)
 {
 }
 
@@ -356,7 +357,8 @@ llvm::Value* GetField::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 
 UpdateElementBuiltInFunc::UpdateElementBuiltInFunc(const TypeRef& collection_type_)
-:	collection_type(collection_type_)
+:	BuiltInFunctionImpl(BuiltInType_UpdateElementBuiltInFunc),
+	collection_type(collection_type_)
 {}
 
 
@@ -802,7 +804,8 @@ llvm::Value* ArrayMapBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 
 ArrayFoldBuiltInFunc::ArrayFoldBuiltInFunc(const Reference<Function>& func_type_, const Reference<ArrayType>& array_type_, const TypeRef& state_type_)
-:	func_type(func_type_), array_type(array_type_), state_type(state_type_), specialised_f(NULL)
+:	BuiltInFunctionImpl(BuiltInType_ArrayFoldBuiltInFunc),
+	func_type(func_type_), array_type(array_type_), state_type(state_type_), specialised_f(NULL)
 {}
 
 
@@ -1200,7 +1203,8 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 
 
 ArraySubscriptBuiltInFunc::ArraySubscriptBuiltInFunc(const Reference<ArrayType>& array_type_, const TypeRef& index_type_)
-:	array_type(array_type_), index_type(index_type_)
+:	BuiltInFunctionImpl(BuiltInType_ArraySubscriptBuiltInFunc),
+	array_type(array_type_), index_type(index_type_)
 {}
 
 
@@ -1525,7 +1529,8 @@ llvm::Value* ArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 
 
 VArraySubscriptBuiltInFunc::VArraySubscriptBuiltInFunc(const Reference<VArrayType>& array_type_, const TypeRef& index_type_)
-:	array_type(array_type_), index_type(index_type_)
+:	BuiltInFunctionImpl(BuiltInType_VArraySubscriptBuiltInFunc),
+	array_type(array_type_), index_type(index_type_)
 {}
 
 
@@ -1637,7 +1642,8 @@ llvm::Value* VArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 
 
 MakeVArrayBuiltInFunc::MakeVArrayBuiltInFunc(const Reference<VArrayType>& array_type_)
-:	array_type(array_type_)
+:	BuiltInFunctionImpl(BuiltInType_MakeVArrayBuiltInFunc),
+	array_type(array_type_)
 {
 }
 
@@ -1778,7 +1784,8 @@ llvm::Value* MakeVArrayBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) con
 
 
 VectorSubscriptBuiltInFunc::VectorSubscriptBuiltInFunc(const Reference<VectorType>& vec_type_, const TypeRef& index_type_)
-:	vec_type(vec_type_), index_type(index_type_)
+:	BuiltInFunctionImpl(BuiltInType_VectorSubscriptBuiltInFunc),
+	vec_type(vec_type_), index_type(index_type_)
 {}
 
 
@@ -1902,7 +1909,8 @@ llvm::Value* VectorSubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 
 
 ArrayInBoundsBuiltInFunc::ArrayInBoundsBuiltInFunc(const Reference<ArrayType>& array_type_, const TypeRef& index_type_)
-:	array_type(array_type_), index_type(index_type_)
+:	BuiltInFunctionImpl(BuiltInType_ArrayInBoundsBuiltInFunc),
+	array_type(array_type_), index_type(index_type_)
 {}
 
 
@@ -1939,7 +1947,8 @@ llvm::Value* ArrayInBoundsBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) 
 
 
 VectorInBoundsBuiltInFunc::VectorInBoundsBuiltInFunc(const Reference<VectorType>& vector_type_, const TypeRef& index_type_)
-:	vector_type(vector_type_), index_type(index_type_)
+:	BuiltInFunctionImpl(BuiltInType_VectorInBoundsBuiltInFunc),
+	vector_type(vector_type_), index_type(index_type_)
 {}
 
 
@@ -1976,7 +1985,8 @@ llvm::Value* VectorInBoundsBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 
 
 IterateBuiltInFunc::IterateBuiltInFunc(const Reference<Function>& func_type_, const TypeRef& state_type_, const vector<TypeRef>& invariant_data_types_)
-:	func_type(func_type_), state_type(state_type_), invariant_data_types(invariant_data_types_)
+:	BuiltInFunctionImpl(BuiltInType_IterateBuiltInFunc),
+	func_type(func_type_), state_type(state_type_), invariant_data_types(invariant_data_types_)
 {}
 
 
@@ -2720,7 +2730,8 @@ void ShuffleBuiltInFunc::setShuffleMask(const std::vector<int>& shuffle_mask_)
 
 
 PowBuiltInFunc::PowBuiltInFunc(const TypeRef& type_)
-:	type(type_)
+:	BuiltInFunctionImpl(BuiltInType_PowBuiltInFunc),
+	type(type_)
 {}
 
 
@@ -2782,7 +2793,8 @@ static llvm::Value* emitUnaryIntrinsic(EmitLLVMCodeParams& params, const TypeRef
 
 
 SqrtBuiltInFunc::SqrtBuiltInFunc(const TypeRef& type_)
-:	type(type_)
+:	BuiltInFunctionImpl(BuiltInType_SqrtBuiltInFunc),
+	type(type_)
 {}
 
 
@@ -2829,7 +2841,8 @@ llvm::Value* SqrtBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 
 ExpBuiltInFunc::ExpBuiltInFunc(const TypeRef& type_)
-:	type(type_)
+:	BuiltInFunctionImpl(BuiltInType_ExpBuiltInFunc),
+	type(type_)
 {}
 
 
@@ -2858,7 +2871,8 @@ llvm::Value* ExpBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 
 LogBuiltInFunc::LogBuiltInFunc(const TypeRef& type_)
-:	type(type_)
+:	BuiltInFunctionImpl(BuiltInType_LogBuiltInFunc),
+	type(type_)
 {}
 
 
@@ -2887,7 +2901,8 @@ llvm::Value* LogBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 
 SinBuiltInFunc::SinBuiltInFunc(const TypeRef& type_)
-:	type(type_)
+:	BuiltInFunctionImpl(BuiltInType_SinBuiltInFunc),
+	type(type_)
 {}
 
 
@@ -2916,7 +2931,8 @@ llvm::Value* SinBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 
 CosBuiltInFunc::CosBuiltInFunc(const TypeRef& type_)
-:	type(type_)
+:	BuiltInFunctionImpl(BuiltInType_CosBuiltInFunc),
+	type(type_)
 {}
 
 
@@ -2945,7 +2961,8 @@ llvm::Value* CosBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 
 AbsBuiltInFunc::AbsBuiltInFunc(const TypeRef& type_)
-:	type(type_)
+:	BuiltInFunctionImpl(BuiltInType_AbsBuiltInFunc),
+	type(type_)
 {}
 
 
@@ -2979,7 +2996,8 @@ llvm::Value* AbsBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 
 FloorBuiltInFunc::FloorBuiltInFunc(const TypeRef& type_)
-:	type(type_)
+:	BuiltInFunctionImpl(BuiltInType_FloorBuiltInFunc),
+	type(type_)
 {}
 
 
@@ -3025,7 +3043,8 @@ llvm::Value* FloorBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 
 CeilBuiltInFunc::CeilBuiltInFunc(const TypeRef& type_)
-:	type(type_)
+:	BuiltInFunctionImpl(BuiltInType_CeilBuiltInFunc),
+	type(type_)
 {}
 
 
@@ -3071,7 +3090,8 @@ llvm::Value* CeilBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 
 SignBuiltInFunc::SignBuiltInFunc(const TypeRef& type_)
-:	type(type_)
+:	BuiltInFunctionImpl(BuiltInType_SignBuiltInFunc),
+	type(type_)
 {}
 
 
@@ -3142,7 +3162,8 @@ llvm::Value* SignBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 
 TruncateToIntBuiltInFunc::TruncateToIntBuiltInFunc(const TypeRef& type_)
-:	type(type_)
+:	BuiltInFunctionImpl(BuiltInType_TruncateToIntBuiltInFunc),
+	type(type_)
 {}
 
 
@@ -3198,7 +3219,8 @@ llvm::Value* TruncateToIntBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) 
 
 
 ToFloatBuiltInFunc::ToFloatBuiltInFunc(const TypeRef& type_)
-:	type(type_)
+:	BuiltInFunctionImpl(BuiltInType_ToFloatBuiltInFunc),
+	type(type_)
 {}
 
 
@@ -3242,7 +3264,8 @@ llvm::Value* ToFloatBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 
 ToInt64BuiltInFunc::ToInt64BuiltInFunc(const TypeRef& type_)
-:	type(type_)
+:	BuiltInFunctionImpl(BuiltInType_ToInt64BuiltInFunc),
+	type(type_)
 {}
 
 
@@ -3270,7 +3293,8 @@ llvm::Value* ToInt64BuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 
 ToInt32BuiltInFunc::ToInt32BuiltInFunc(const TypeRef& type_)
-:	type(type_)
+:	BuiltInFunctionImpl(BuiltInType_ToInt32BuiltInFunc),
+	type(type_)
 {}
 
 
@@ -3302,6 +3326,7 @@ llvm::Value* ToInt32BuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 
 VoidPtrToInt64BuiltInFunc::VoidPtrToInt64BuiltInFunc(const TypeRef& type)
+:	BuiltInFunctionImpl(BuiltInType_VoidPtrToInt64BuiltInFunc)	
 {}
 
 
@@ -3327,7 +3352,8 @@ llvm::Value* VoidPtrToInt64BuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 
 
 LengthBuiltInFunc::LengthBuiltInFunc(const TypeRef& type_)
-:	type(type_)
+:	BuiltInFunctionImpl(BuiltInType_LengthBuiltInFunc),
+	type(type_)
 {}
 
 
