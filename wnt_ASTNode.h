@@ -10,7 +10,6 @@ File created by ClassTemplate on Wed Jun 11 03:55:25 2008
 #include "wnt_Type.h"
 #include "wnt_FunctionSignature.h"
 #include "wnt_ExternalFunction.h"
-#include "wnt_Frame.h"
 #include "BaseException.h"
 #include "TokenBase.h"
 #include "Value.h"
@@ -45,12 +44,14 @@ class AnonFunction;
 class Value;
 class BuiltInFunctionImpl;
 class FunctionDefinition;
-class Frame;
 class LetBlock;
 class ASTNode;
 class SourceBuffer;
 class ComparisonExpression;
 class TraversalPayload;
+class FunctionDefinition;
+class LetBlock;
+class NamedConstant;
 struct ProgramStats;
 
 
@@ -104,8 +105,6 @@ public:
 	std::vector<TypeRef> type_mappings; // for substitute type operation.
 
 	bool tree_changed;
-
-	//FrameRef top_lvl_frame;
 
 	//bool capture_variables; // If true, variables and function expressions will capture variable and add to captured_vars
 	//vector<CapturedVar> captured_vars; // For when parsing anon functions
@@ -377,9 +376,6 @@ bool shouldFoldExpression(ASTNodeRef& e, TraversalPayload& payload);
 ASTNodeRef foldExpression(ASTNodeRef& e, TraversalPayload& payload);
 //void updateIndexBounds(TraversalPayload& payload, const ComparisonExpression& comp_expr, const ASTNodeRef& index, int& i_lower, int& i_upper);
 bool expressionsHaveSameValue(const ASTNodeRef& a, const ASTNodeRef& b);
-class FunctionDefinition;
-class LetBlock;
-class NamedConstant;
 
 
 class BufferRoot : public ASTNode

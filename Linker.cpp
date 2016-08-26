@@ -1,4 +1,8 @@
-//Copyright 2009 Nicholas Chapman
+/*=====================================================================
+Linker.cpp
+----------
+Copyright Glare Technologies Limited 2016 -
+=====================================================================*/
 #include "Linker.h"
 
 
@@ -28,19 +32,6 @@ Linker::Linker(bool hidden_voidptr_arg_, bool try_coerce_int_to_double_first_, b
 
 Linker::~Linker()
 {}
-
-
-//void Linker::addFunctions(BufferRoot& root)
-//{
-//	for(unsigned int i=0; i<root.func_defs.size(); ++i)
-//	{
-//		Reference<FunctionDefinition> def = root.func_defs[i];
-//
-//		addFunction(def);
-//		//this->name_to_functions_map[def->sig.name].push_back(def);
-//		//this->sig_to_function_map.insert(std::make_pair(def->sig, def));
-//	}
-//}
 
 
 void Linker::addFunctions(const vector<FunctionDefinitionRef>& new_func_defs)
@@ -118,7 +109,7 @@ void Linker::addExternalFunctions(vector<ExternalFunctionRef>& funcs)
 }
 
 
-void Linker::buildLLVMCode(llvm::Module* module, const llvm::DataLayout/*TargetData*/* target_data, const CommonFunctions& common_functions, ProgramStats& stats, bool emit_trace_code)
+void Linker::buildLLVMCode(llvm::Module* module, const llvm::DataLayout* target_data, const CommonFunctions& common_functions, ProgramStats& stats, bool emit_trace_code)
 {
 	PlatformUtils::CPUInfo cpu_info;
 	PlatformUtils::getCPUInfo(cpu_info);
@@ -285,9 +276,10 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 		return sig_lookup_res->second;
 	}
 
-	// Handle float->float, or vector<float, N> -> vector<float, N> functions
+	
 	if(sig.param_types.size() == 1)
 	{
+		// Handle float->float, or vector<float, N> -> vector<float, N> functions
 		if(sig.param_types[0]->getType() == Type::FloatType || sig.param_types[0]->getType() == Type::DoubleType || // if float or double
 			(sig.param_types[0]->getType() == Type::VectorTypeType && static_cast<const VectorType*>(sig.param_types[0].getPointer())->elem_type->getType() == Type::FloatType) || // or vector of floats
 			(sig.param_types[0]->getType() == Type::VectorTypeType && static_cast<const VectorType*>(sig.param_types[0].getPointer())->elem_type->getType() == Type::DoubleType) // or vector of doubles
@@ -649,9 +641,6 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 		if(	(sig.param_types[0]->getType() == Type::FloatType && sig.param_types[1]->getType() == Type::FloatType) ||
 			(sig.param_types[0]->getType() == Type::DoubleType && sig.param_types[1]->getType() == Type::DoubleType))
 		{
-			// There is a problem with LLVM 3.3 and earlier with the pow intrinsic getting turned into exp2f() when the first argument is 2.
-			// So for now just use our own pow() external function.
-#if TARGET_LLVM_VERSION >= 34
 			if(sig.name == "pow")
 			{
 				vector<FunctionDefinition::FunctionArg> args(2);
@@ -673,7 +662,6 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 				this->sig_to_function_map.insert(std::make_pair(sig, def));
 				return def;
 			}
-#endif
 		}
 
 		if(

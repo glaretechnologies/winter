@@ -13,7 +13,6 @@ Generated at 2011-04-30 18:53:38 +0100
 #include "wnt_ASTNode.h"
 #include "wnt_FunctionSignature.h"
 #include "wnt_ExternalFunction.h"
-#include "wnt_Frame.h"
 #include "wnt_Variable.h"
 #include "BaseException.h"
 #include "TokenBase.h"

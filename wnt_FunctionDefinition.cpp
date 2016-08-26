@@ -1141,10 +1141,10 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 
 			llvm::AttrBuilder builder;
 			//builder.addAttribute(llvm::Attribute::ByVal);
-#if TARGET_LLVM_VERSION >= 34
+
 			builder.addAttribute(llvm::Attribute::ReadOnly); // From LLVM Lang ref: 
 			// "On an argument, this attribute indicates that the function does not write through this pointer argument, even though it may write to the memory that the pointer points to."
-#endif			
+
 			builder.addAttribute(llvm::Attribute::NoAlias);
 			llvm::AttributeSet set = llvm::AttributeSet::get(module->getContext(), 1 + i, builder); // "the attributes for the parameters start at  index `1'." - Attributes.h
 			AI->addAttr(set);
@@ -1157,9 +1157,9 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 			if(!this->args[winter_arg_index].type->passByValue()) // If pointer arg:
 			{
 				llvm::AttrBuilder builder;
-#if TARGET_LLVM_VERSION >= 34
+
 				builder.addAttribute(llvm::Attribute::ReadOnly);
-#endif
+
 				builder.addAttribute(llvm::Attribute::NoAlias);
 
 				llvm::AttributeSet set = llvm::AttributeSet::get(module->getContext(), 1 + i, builder);

@@ -731,6 +731,19 @@ inline std::vector<TypeRef> typePentuplet(const TypeRef& a, const TypeRef& b, co
 }
 
 
+inline std::vector<TypeRef> typeSextuplet(const TypeRef& a, const TypeRef& b, const TypeRef& c, const TypeRef& d, const TypeRef& e, const TypeRef& f)
+{
+	std::vector<TypeRef> v(6);
+	v[0] = a;
+	v[1] = b;
+	v[2] = c;
+	v[3] = d;
+	v[4] = e;
+	v[5] = e;
+	return v;
+}
+
+
 TypeRef errorTypeSum(const TypeRef& t);
 
 

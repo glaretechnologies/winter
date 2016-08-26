@@ -22,7 +22,6 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "wnt_LangParser.h"
 #include "wnt_RefCounting.h"
 #include "wnt_ASTNode.h"
-#include "wnt_Frame.h"
 #include "wnt_LLVMVersion.h"
 #include "VMState.h"
 #include "Linker.h"
@@ -466,22 +465,6 @@ static void tracePrintFloat(const char* var_name, float x)
 }
 
 
-#if TARGET_LLVM_VERSION >= 34
-#else
-static float getFloatArg(const vector<ValueRef>& arg_values, int i)
-{
-	assert(arg_values[i]->valueType() == Value::ValueType_Float);
-	return static_cast<const FloatValue*>(arg_values[i].getPointer())->value;
-}
-
-
-static ValueRef powInterpreted(const vector<ValueRef>& args)
-{
-	return new FloatValue(std::pow(getFloatArg(args, 0), getFloatArg(args, 1)));
-}
-#endif
-
-
 // We need to define our own memory manager so that we can supply our own getPointerToNamedFunction() method, that will return pointers to external functions.
 // This seems to be necessary when using MCJIT.
 class WinterMemoryManager : public llvm::SectionMemoryManager
@@ -490,7 +473,6 @@ public:
 	virtual ~WinterMemoryManager() {}
 
 
-#if TARGET_LLVM_VERSION >= 34
 	virtual uint64_t getSymbolAddress(const std::string& name)
 	{
 		std::map<std::string, void*>::iterator res = func_map->find(name);
@@ -558,47 +540,6 @@ public:
 			throw BaseException("Internal error: failed to find symbol '" + name + "'");
 		return (uint64_t)f;
 	}
-#else
-	virtual void *getPointerToNamedFunction(const std::string& name, bool AbortOnFailure = true)
-	{
-		std::map<std::string, void*>::iterator res = func_map->find(name);
-		if(res != func_map->end())
-			return res->second;
-
-		// If function was not in func_map (i.e. was not an 'external' function), then use normal symbol resolution, for functions like sinf, cosf etc..
-
-		// For some reason, DynamicLibrary::SearchForAddressOfSymbol() doesn't seem to work on Windows 32-bit.  So just manually resolve these symbols.
-		if(name == "sinf")
-			return (void*)sinf;
-		else if(name == "cosf")
-			return (void*)cosf;
-		else if(name == "powf")
-			return (void*)powf;
-		else if(name == "expf")
-			return (void*)expf;
-		else if(name == "logf")
-			return (void*)logf;
-
-		// For OS X:
-		if(name == "_sinf")
-			return (void*)sinf;
-		else if(name == "_cosf")
-			return (void*)cosf;
-		else if(name == "_powf")
-			return (void*)powf;
-		else if(name == "_expf")
-			return (void*)expf;
-		else if(name == "_logf")
-			return (void*)logf;
-
-		void* f = llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(name);
-
-		assert(f);
-		if(!f)
-			throw BaseException("Internal error: failed to find symbol '" + name + "'");
-		return f;
-	}
-#endif
 	
 	std::map<std::string, void*>* func_map;
 };
@@ -786,10 +727,8 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 				mem_manager->func_map = &func_map;
 #if TARGET_LLVM_VERSION >= 36
 				engine_builder.setMCJITMemoryManager(std::unique_ptr<llvm::SectionMemoryManager>(mem_manager));
-#elif TARGET_LLVM_VERSION >= 34
-				engine_builder.setMCJITMemoryManager(mem_manager);
 #else
-				engine_builder.setJITMemoryManager(mem_manager);
+				engine_builder.setMCJITMemoryManager(mem_manager);
 #endif
 			}
 
@@ -828,19 +767,6 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			this->external_functions.push_back(alloc_ref);*/
 
 		
-		
-
-			// There is a problem with LLVM 3.3 and earlier with the pow intrinsic getting turned into exp2f().
-			// So for now just use our own pow() external function.
-#if TARGET_LLVM_VERSION < 34
-			external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
-				(void*)(float(*)(float, float))std::pow,
-				powInterpreted,
-				FunctionSignature("pow", vector<TypeRef>(2, new Float())),
-				new Float()
-			)));
-#endif
-
 			for(unsigned int i=0; i<this->external_functions.size(); ++i)
 				addExternalFunction(this->external_functions[i], *this->llvm_context, *this->llvm_module);
 
@@ -2009,10 +1935,8 @@ void VirtualMachine::compileToNativeAssembly(llvm::Module* mod, const std::strin
 	llvm::raw_fd_ostream raw_out(filename.c_str(), errcode, llvm::sys::fs::F_None);
 	if(errcode)
 		throw Winter::BaseException("Error when opening file to print assembly to: " + errcode.message());
-#elif TARGET_LLVM_VERSION == 34
-	llvm::raw_fd_ostream raw_out(filename.c_str(), err, llvm::sys::fs::F_None);
 #else
-	llvm::raw_fd_ostream raw_out(filename.c_str(), err, 0);
+	llvm::raw_fd_ostream raw_out(filename.c_str(), err, llvm::sys::fs::F_None);
 #endif
 	if(!err.empty())
 		throw Winter::BaseException("Error when opening file to print assembly to: " + err);

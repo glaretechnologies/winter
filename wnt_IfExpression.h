@@ -10,7 +10,6 @@ Copyright Glare Technologies Limited 2014 -
 #include "wnt_ASTNode.h"
 #include "wnt_FunctionSignature.h"
 #include "wnt_ExternalFunction.h"
-#include "wnt_Frame.h"
 #include "BaseException.h"
 #include "TokenBase.h"
 #include "Value.h"

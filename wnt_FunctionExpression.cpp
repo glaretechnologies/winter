@@ -456,7 +456,7 @@ static bool varWithNameIsInScope(const std::string& name, TraversalPayload& payl
 	}
 
 	// Consider named constants
-	Frame::NamedConstantMap::iterator name_res = payload.linker->named_constant_map.find(name);
+	Linker::NamedConstantMap::iterator name_res = payload.linker->named_constant_map.find(name);
 	if(name_res != payload.linker->named_constant_map.end())
 	{
 		const NamedConstant* target_named_constant = name_res->second.getPointer();

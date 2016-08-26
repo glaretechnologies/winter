@@ -1,4 +1,8 @@
-//Copyright 2009 Nicholas Chapman
+/*=====================================================================
+Linker.h
+--------
+Copyright Glare Technologies Limited 2016 -
+=====================================================================*/
 #pragma once
 
 
@@ -7,7 +11,7 @@
 #include "wnt_ASTNode.h"
 #include "wnt_FunctionDefinition.h"
 #include <map>
-namespace llvm { class Module; /*class TargetData; */class DataLayout; }
+namespace llvm { class Module; class DataLayout; }
 
 
 namespace Winter
@@ -23,15 +27,11 @@ public:
 	Linker(bool hidden_voidptr_arg, bool try_coerce_int_to_double_first, bool emit_in_bound_asserts, void* env);
 	~Linker();
 
-
-	//void addFunctions(BufferRoot& root);
 	void addFunctions(const std::vector<FunctionDefinitionRef>& func_defs);
 	void addExternalFunctions(std::vector<ExternalFunctionRef>& f);
 
 	void addTopLevelDefs(const std::vector<ASTNodeRef>& defs);
 
-
-	//ExternalFunctionRef findMatchingExternalFunction(const FunctionSignature& sig);
 
 	// Don't match with built-in functions like elem, don't instantiate generic functions, just return from sig_to_function_map.
 	FunctionDefinitionRef findMatchingFunctionSimple(const FunctionSignature& sig); // Returns null ref if not found
@@ -42,7 +42,7 @@ public:
 
 	void getFuncsWithMatchingName(const std::string& name, std::vector<FunctionDefinitionRef>& funcs_out);
 
-	void buildLLVMCode(llvm::Module* module, const llvm::DataLayout/*TargetData*/* target_data, const CommonFunctions& common_functions, ProgramStats& stats, bool emit_trace_code);
+	void buildLLVMCode(llvm::Module* module, const llvm::DataLayout* target_data, const CommonFunctions& common_functions, ProgramStats& stats, bool emit_trace_code);
 
 	const std::string buildOpenCLCode();
 

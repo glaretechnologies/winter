@@ -132,20 +132,3 @@ int main(int argc, char** argv)
 
 	return 0;
 }
-
-
-//void doTestAssert(bool expr, const char* test, long line, const char* file)
-//{
-//	if(!expr)
-//	{
-//		std::cerr << "Test Assertion Failed: " << file << ", line " << line << ":\n" << test << std::endl;
-//		assert(0);
-//		exit(0);
-//	}
-//}
-
-
-//void conPrint(const std::string& s)
-//{
-//	std::cout << s << std::endl;
-//}

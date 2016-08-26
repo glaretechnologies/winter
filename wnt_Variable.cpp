@@ -279,7 +279,7 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 	}
 
 	// Try and bind to a named constant.
-	Frame::NamedConstantMap::iterator name_res = payload.linker->named_constant_map.find(this->name);
+	Linker::NamedConstantMap::iterator name_res = payload.linker->named_constant_map.find(this->name);
 	if(name_res != payload.linker->named_constant_map.end())
 	{
 		const NamedConstant* target_named_constant = name_res->second.getPointer();
