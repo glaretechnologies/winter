@@ -1846,41 +1846,71 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 
 	// Add some Winter built-in functions.  TODO: move this stuff some place better?
 	std::string built_in_func_code = 
-"// Winter built-in functions \n\
-float toFloat_int_(int x) { return (float)x; } \n\
-int truncateToInt_float_(float x) { return (int)x; } \n\
-int8 truncateToInt_vector_float__8__(float8 v) { return convert_int8(v); }  \n\
-long toInt_opaque_(void* p) { return (long)p; }  \n\
-float print_bool_(bool x) { if(x) { printf((__constant char *)\"true\\n\"); } else { printf((__constant char *)\"false\\n\"); } return x; }    \n\
-float print_float_(float x) { printf((__constant char *)\"%1.7f\\n\", x); return x; }    \n\
-int print_int_(int x) { printf((__constant char *)\"%i\\n\", x); return x; }    \n\
-int toInt32_int64_(long x) { return (int)x; }		\n\
-long toInt64_int_(int x) { return (long)x; }		\n\
-bool isFinite_float_(float x) { return isfinite(x); }		\n\
-bool isNAN_float_(float x) { return isnan(x); }		\n\
-";
+		"// Winter built-in functions \n"
+		"float toFloat_int_(int x) { return (float)x; } \n"
+		"int truncateToInt_float_(float x) { return (int)x; } \n"
+		"int8 truncateToInt_vector_float__8__(float8 v) { return convert_int8(v); }  \n"
+		"long toInt_opaque_(void* p) { return (long)p; }  \n"
+		"int toInt32_int64_(long x) { return (int)x; }		\n"
+		"long toInt64_int_(int x) { return (long)x; }		\n"
+		"bool isFinite_float_(float x) { return isfinite(x); }		\n"
+		"bool isNAN_float_(float x) { return isnan(x); }		\n";
+	if(vm_args.emit_opencl_printf_calls)
+	{
+		built_in_func_code += 
+			"float print_bool_(bool x) { if(x) { printf((__constant char *)\"true\\n\"); } else { printf((__constant char *)\"false\\n\"); } return x; }    \n"
+			"float print_float_(float x) { printf((__constant char *)\"%1.7f\\n\", x); return x; }    \n"
+			"int print_int_(int x) { printf((__constant char *)\"%i\\n\", x); return x; }    \n";
+	}
+	else
+	{
+		built_in_func_code += 
+			"// NOTE: printf calls have been disabled as emit_opencl_printf_calls vm arg is false.	\n"
+			"float print_bool_(bool x) { return x; }    \n"
+			"float print_float_(float x) { return x; }    \n"
+			"int print_int_(int x) { return x; }    \n";
+	}
+
 
 	if(vm_args.opencl_double_support)
 	{
 		built_in_func_code +=
-"double toDouble_int_(int x) { return (double)x; } \n\
-int truncateToInt_double_(double x) { return (int)x; } \n\
-int8 truncateToInt_vector_double__8__(float8 v) { return convert_int8(v); }  \n\
-double print_double_(double x) { printf((__constant char *)\"%f\\n\", x); return x; }    \n\
-\n";
+			"double toDouble_int_(int x) { return (double)x; } \n"
+			"int truncateToInt_double_(double x) { return (int)x; } \n"
+			"int8 truncateToInt_vector_double__8__(float8 v) { return convert_int8(v); }  \n";
+
+		if(vm_args.emit_opencl_printf_calls)
+			built_in_func_code += "double print_double_(double x) { printf((__constant char *)\"%f\\n\", x); return x; }    \n";
+		else
+			built_in_func_code += 
+				"// NOTE: printf calls have been disabled as emit_opencl_printf_calls vm arg is false.  \n"
+				"double print_double_(double x) { return x; }    \n";
 	}
 
 	if(vm_args.emit_in_bound_asserts)
 	{
-		built_in_func_code += 
-"#define winterAssert(expr) doWinterAssert(expr, #expr, __FILE__, __LINE__)		\n\
-\n\
-inline void doWinterAssert(bool val, const __constant char* message, const __constant char* file, unsigned int line)	\n\
-{\n\
-	if(!val)	\n\
-		printf(\"!!! winter assert failed: %s, file %s, line %i\\n\", message, file, line);	\n\
-}\n\
-";
+		if(vm_args.emit_opencl_printf_calls)
+		{
+			built_in_func_code += 
+				"#define winterAssert(expr) doWinterAssert(expr, #expr, __FILE__, __LINE__)		\n"
+				"\n"
+				"inline void doWinterAssert(bool val, const __constant char* message, const __constant char* file, unsigned int line)	\n"
+				"{\n"
+				"	if(!val)	\n"
+				"		printf(\"!!! winter assert failed: %s, file %s, line %i\\n\", message, file, line);	\n"
+				"}\n";
+		}
+		else
+		{
+			// TODO: issue some kind of warning here, since asserts are useless without printf?
+			assert(0);
+			built_in_func_code += 
+				"#define winterAssert(expr) doWinterAssert(expr, #expr, __FILE__, __LINE__)		\n"
+				"\n"
+				"// NOTE: printf calls have been disabled as emit_opencl_printf_calls vm arg is false.  \n"
+				"inline void doWinterAssert(bool val, const __constant char* message, const __constant char* file, unsigned int line)	\n"
+				"{}\n";
+		}
 	}
 
 	built_in_func_code += "// End Winter built-in functions\n";
