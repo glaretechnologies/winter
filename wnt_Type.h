@@ -22,6 +22,7 @@ namespace Winter
 
 class Value;
 class EmitLLVMCodeParams;
+class EmitOpenCLCodeParams;
 class TupleType;
 struct ConstTypeRefLessThan;
 
@@ -450,8 +451,8 @@ public:
 	virtual bool containsType(const Type& other_type) const;
 
 	const std::string definitionString() const; // Winter definition string, e.g "struct a { float b }"
-	const std::string getOpenCLCDefinition(bool emit_comments) const; // Get full definition string, e.g. "struct a { float b; };"
-	const std::string getOpenCLCConstructor(bool emit_comments) const; // Emit constructor for type
+	const std::string getOpenCLCDefinition(EmitOpenCLCodeParams& params, bool emit_comments) const; // Get full definition string, e.g. "struct a { float b; };"
+	const std::string getOpenCLCConstructor(EmitOpenCLCodeParams& params, bool emit_comments) const; // Emit constructor for type
 
 	std::vector<Reference<TupleType> > getElementTupleTypes() const;
 

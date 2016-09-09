@@ -1956,8 +1956,8 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 				}
 			}
 
-			struct_def_code += struct_type->getOpenCLCDefinition(vm_args.comments_in_opencl_output); // Emit structure definition
-			constructor_code += struct_type->getOpenCLCConstructor(vm_args.comments_in_opencl_output);
+			struct_def_code += struct_type->getOpenCLCDefinition(params, vm_args.comments_in_opencl_output); // Emit structure definition
+			constructor_code += struct_type->getOpenCLCConstructor(params, vm_args.comments_in_opencl_output);
 		}
 
 	// Spit out any remaining tuple definitions

@@ -329,6 +329,12 @@ void LanguageTests::run()
 	// Test function names.  Actually because of type decoration, function names (always?) won't clash with OpenCL C keywords.
 	testMainFloatArg("def switch(float x) float : x      def main(float x) : switch(x)", 10.0f, 10.f);
 	testMainFloatArg("def switch(float x) !noinline float : x      def main(float x) : switch(x)", 10.0f, 10.f);
+	
+	// Test structure names
+	testMainFloatArg(
+		"struct switch { float x }			\n"
+		"def main(float x) float : switch(x).x", 10.0f, 10.f);
+
 
 	// TODO: why is this vector being parsed as doubles?
 	//testMainFloatArgInvalidProgram("def main(float x): elem(-[1.0, 2.0, 3.0, 4.0]v, 2)");//, 1.0f, -3.0f, 0);
@@ -4014,6 +4020,12 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 
 	// Test unary minus in front of var
 	testMainInteger("def f(int x) int : -x        def main() int : f(3)", -3);
+
+	// Test unary minus with space
+	testMainFloatArg("def main(float x) : - x", 10.f, -10.f);
+	// Test double unary minus
+	testMainFloatArg("def main(float x) : - -x", 10.f, 10.f);
+	testMainFloatArg("def main(float x) : --x", 10.f, 10.f);
 
 
 

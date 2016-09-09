@@ -370,8 +370,7 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 
 
 		//============================= New: test with OpenCL ==============================
-		const bool TEST_OPENCL = false;
-		if(!(test_flags & INVALID_OPENCL) && TEST_OPENCL)
+		if(!(test_flags & INVALID_OPENCL))
 		{
 #if WINTER_OPENCL_TESTS
 			Winter::VirtualMachine::BuildOpenCLCodeArgs opencl_args;
@@ -558,8 +557,7 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 
 
 		//============================= New: test with OpenCL ==============================
-		const bool TEST_OPENCL = false;
-		if(!(test_flags & INVALID_OPENCL) && TEST_OPENCL)
+		if(!(test_flags & INVALID_OPENCL))
 		{
 #if WINTER_OPENCL_TESTS
 		
@@ -938,8 +936,7 @@ static TestResults testMainIntegerArg(const std::string& src, int x, int target_
 		}
 
 		//============================= New: test with OpenCL ==============================
-		const bool TEST_OPENCL = false;
-		if(!(test_flags & INVALID_OPENCL) && TEST_OPENCL)
+		if(!(test_flags & INVALID_OPENCL))
 		{
 #if WINTER_OPENCL_TESTS
 			

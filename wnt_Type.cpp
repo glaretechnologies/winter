@@ -939,16 +939,18 @@ const std::string StructureType::definitionString() const // Winter definition s
 }
 
 
-const std::string StructureType::getOpenCLCDefinition(bool emit_comments) const // Get full definition string, e.g. struct a { float b; };
+const std::string StructureType::getOpenCLCDefinition(EmitOpenCLCodeParams& params, bool emit_comments) const // Get full definition string, e.g. struct a { float b; };
 {
-	std::string s = "typedef struct " + name + "\n{\n";
+	const std::string use_name = mapOpenCLCVarName(params.opencl_c_keywords, name);
+
+	std::string s = "typedef struct " + use_name + "\n{\n";
 
 	for(size_t i=0; i<component_types.size(); ++i)
 	{
 		s += "\t" + component_types[i]->OpenCLCType() + " " + component_names[i] + ";\n";
 	}
 
-	s += "} " + name + ";\n\n";
+	s += "} " + use_name + ";\n\n";
 
 /*
 	// Make constructor.
@@ -981,16 +983,18 @@ const std::string StructureType::getOpenCLCDefinition(bool emit_comments) const 
 }
 
 
-const std::string StructureType::getOpenCLCConstructor(bool emit_comments) const // Emit constructor for type
+const std::string StructureType::getOpenCLCConstructor(EmitOpenCLCodeParams& params, bool emit_comments) const // Emit constructor for type
 {
 	std::string s;
 
+	const std::string use_name = mapOpenCLCVarName(params.opencl_c_keywords, name);
+
 	// FunctionDefinition::Funct
-	FunctionSignature sig(name, component_types);
+	FunctionSignature sig(name, component_types); // Just use raw name here for now.  Will probably not clash with OpenCL C keywords due to type decoration.
 
 	if(emit_comments)
 		s += "// Constructor for " + toString() + "\n";
-	s += name + " " + sig.typeMangledName() + "(";
+	s += use_name + " " + sig.typeMangledName() + "(";
 
 	for(size_t i=0; i<component_types.size(); ++i)
 	{
@@ -1001,7 +1005,7 @@ const std::string StructureType::getOpenCLCConstructor(bool emit_comments) const
 			s += ", ";
 	}
 
-	s += ") { " + name + " s_; ";
+	s += ") { " + use_name + " s_; ";
 
 	for(size_t i=0; i<component_types.size(); ++i)
 		s += "s_." + component_names[i] + " = " + (!component_types[i]->OpenCLPassByPointer() ? "" : "*") + component_names[i] + "; ";
