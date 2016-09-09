@@ -167,6 +167,8 @@ public:
 	int num_uses; // Conservative, >= than the actual num uses.
 
 	int order_num; // Used for establishing an ordering between function definitions and named constants, to avoid circular references.
+
+	bool noinline; // Optional attribute.  False by default.  If true, function won't be inlined.
 private:
 };
 

@@ -111,7 +111,8 @@ FunctionDefinition::FunctionDefinition(const SrcLocation& src_loc, int order_num
 	//use_captured_vars(false),
 	need_to_emit_captured_var_struct_version(false),
 	is_anon_func(false),
-	num_uses(0)
+	num_uses(0),
+	noinline(false)
 {
 	sig.name = name;
 	sig.param_types.resize(args_.size());
@@ -644,9 +645,9 @@ std::string FunctionDefinition::emitOpenCLC(EmitOpenCLCodeParams& params) const
 	for(unsigned int i=0; i<args.size(); ++i)
 	{
 		if(args[i].type->OpenCLPassByPointer())
-			opencl_sig += "const " + args[i].type->address_space + " " + args[i].type->OpenCLCType() + "* const " + args[i].name;
+			opencl_sig += "const " + args[i].type->address_space + " " + args[i].type->OpenCLCType() + "* const " + mapOpenCLCVarName(params.opencl_c_keywords, args[i].name);
 		else
-			opencl_sig += "const " + args[i].type->OpenCLCType() + " " + args[i].name;
+			opencl_sig += "const " + args[i].type->OpenCLCType() + " " + mapOpenCLCVarName(params.opencl_c_keywords, args[i].name);
 			
 		if(i + 1 < args.size())
 			opencl_sig += ", ";

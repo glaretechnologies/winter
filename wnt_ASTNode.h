@@ -166,6 +166,8 @@ void emitDestructorOrDecrCall(EmitLLVMCodeParams& params, const ASTNode& e, llvm
 bool mayEscapeCurrentlyBuildingFunction(EmitLLVMCodeParams& params, const TypeRef& type);
 void replaceAllUsesWith(Reference<ASTNode>& old_node, Reference<ASTNode>& new_node);
 void doDeadCodeElimination(Reference<ASTNode>& e, TraversalPayload& payload, std::vector<ASTNode*>& stack);
+const std::string mapOpenCLCVarName(const std::set<std::string>& opencl_c_keywords, const std::string& s); // Rename to something that isn't a keyword if is one.
+
 
 // Clones sub-tree, and updates up-refs to point into new subtree where possible.
 Reference<ASTNode> cloneASTNodeSubtree(Reference<ASTNode>& n);
@@ -244,6 +246,8 @@ public:
 	std::vector<std::string> blocks;
 
 	std::set<TupleTypeRef, TypeRefLessThan> tuple_types_used;
+
+	std::set<std::string> opencl_c_keywords;
 
 	int uid; // A counter for generating unique names
 

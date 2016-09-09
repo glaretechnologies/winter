@@ -169,7 +169,6 @@ set(WINTER_FILES
 "${winterdir}/wnt_ASTNode.cpp"
 "${winterdir}/wnt_Diagnostics.cpp"
 "${winterdir}/wnt_ExternalFunction.cpp"
-"${winterdir}/wnt_Frame.cpp"
 "${winterdir}/wnt_FunctionDefinition.cpp"
 "${winterdir}/wnt_FunctionExpression.cpp"
 "${winterdir}/wnt_FunctionSignature.cpp"
@@ -186,7 +185,6 @@ set(WINTER_FILES
 "${winterdir}/wnt_Variable.cpp"
 "${winterdir}/FuzzTests.cpp"
 "${winterdir}/BaseException.h"
-"${winterdir}/BuiltInFunctionImp.h"
 "${winterdir}/BuiltInFunctionImpl.h"
 "${winterdir}/GeneratedTokens.h"
 "${winterdir}/LanguageTests.h"
@@ -200,7 +198,6 @@ set(WINTER_FILES
 "${winterdir}/wnt_ASTNode.h"
 "${winterdir}/wnt_Diagnostics.h"
 "${winterdir}/wnt_ExternalFunction.h"
-"${winterdir}/wnt_Frame.h"
 "${winterdir}/wnt_FunctionDefinition.h"
 "${winterdir}/wnt_FunctionExpression.h"
 "${winterdir}/wnt_FunctionSignature.h"
@@ -321,6 +318,12 @@ if(WINTER_USE_OPENCL)
 	${INDIGO_TRUNK_DIR}/opencl/OpenCLKernel.h
 	${INDIGO_TRUNK_DIR}/opencl/OpenCLBuffer.cpp
 	${INDIGO_TRUNK_DIR}/opencl/OpenCLBuffer.h
+	${INDIGO_TRUNK_DIR}/opencl/OpenCLContext.cpp
+	${INDIGO_TRUNK_DIR}/opencl/OpenCLContext.h
+	${INDIGO_TRUNK_DIR}/opencl/OpenCLProgram.cpp
+	${INDIGO_TRUNK_DIR}/opencl/OpenCLProgram.h
+	${INDIGO_TRUNK_DIR}/opencl/OpenCLCommandQueue.cpp
+	${INDIGO_TRUNK_DIR}/opencl/OpenCLCommandQueue.h
 	)
 endif()
 

@@ -374,7 +374,7 @@ void checkInlineExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector
 		}
 
 
-		if(target_func && !target_func->isExternalFunction() && target_func->body.nonNull()) // If is potentially inlinable:
+		if(target_func && !target_func->noinline && !target_func->isExternalFunction() && target_func->body.nonNull()) // If is potentially inlinable:
 		{
 			const bool verbose = false;
 			if(verbose) std::cout << "\n=================== Considering inlining function call =====================\n";
@@ -558,6 +558,15 @@ void doDeadCodeElimination(Reference<ASTNode>& e, TraversalPayload& payload, std
 			payload.tree_changed = true;
 		}
 	}
+}
+
+
+const std::string mapOpenCLCVarName(const std::set<std::string>& opencl_c_keywords, const std::string& s)
+{
+	if(opencl_c_keywords.count(s))
+		return s + "_MODIFIED_";
+	else
+		return s;
 }
 
 
@@ -3896,7 +3905,8 @@ std::string UnaryMinusExpression::sourceString() const
 
 std::string UnaryMinusExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
-	return "-" + expr->emitOpenCLC(params);
+	// Put some space around the '-'.  Otherwise two unary minuses will be interepreted as decrement operator.
+	return " - " + expr->emitOpenCLC(params);
 }
 
 

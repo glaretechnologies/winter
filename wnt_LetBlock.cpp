@@ -153,7 +153,7 @@ std::string LetBlock::emitOpenCLC(EmitOpenCLCodeParams& params) const
 			if(this->lets[i]->expr->type()->OpenCLPassByPointer() && (this->lets[i]->expr->nodeType() == ASTNode::VariableASTNodeType) && (this->lets[i]->expr.downcastToPtr<Variable>()->binding_type == Variable::ArgumentVariable))
 				let_expression = "*" + let_expression;
 
-			s += "\t" + this->lets[i]->type()->OpenCLCType() + " " + this->lets[i]->vars[0].name + " = " + let_expression + ";\n";
+			s += "\t" + this->lets[i]->type()->OpenCLCType() + " " + mapOpenCLCVarName(params.opencl_c_keywords, this->lets[i]->vars[0].name) + " = " + let_expression + ";\n";
 		}
 		else
 		{
@@ -164,7 +164,7 @@ std::string LetBlock::emitOpenCLC(EmitOpenCLCodeParams& params) const
 			for(size_t z=0; z<this->lets[i]->vars.size(); ++z)
 			{
 				const TypeRef elem_type = this->lets[i]->type().downcastToPtr<TupleType>()->component_types[z];
-				s += "\t" + elem_type->OpenCLCType() + " " + this->lets[i]->vars[z].name + " = " + let_var_value_name + ".field_" + toString(z) + ";\n";
+				s += "\t" + elem_type->OpenCLCType() + " " + mapOpenCLCVarName(params.opencl_c_keywords, this->lets[i]->vars[z].name) + " = " + let_var_value_name + ".field_" + toString(z) + ";\n";
 			}
 		}
 	}

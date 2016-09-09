@@ -1772,6 +1772,139 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 	params.emit_comments = vm_args.comments_in_opencl_output;
 	params.emit_in_bound_asserts = vm_args.emit_in_bound_asserts;
 
+	// See Section '6.1.9 Keywords' of OpenCL 2.0 spec
+	const char* opencl_c_keywords_[] = {
+		// Preprocessor keywords
+		"__OPENCL_VERSION__",
+		"__FILE__",
+		"__LINE__",
+
+		// C99 keywords  (from http://stackoverflow.com/a/8140120)
+		"auto",
+		"enum",       
+		"break",
+		"extern",
+		"case",
+		"float",
+		"char",
+		"for",
+		"const",
+		"goto",
+		"continue",
+		"if",
+		"default",
+		"inline",    
+		"do",
+		"int",
+		"double",
+		"long",
+		"else",
+		"register",
+		"restrict",
+		"return",
+		"short",
+		"signed",
+		"sizeof",
+		"static",
+		"struct",
+		"switch",
+		"typedef",
+		"union",
+		"unsigned",
+		"void",
+		"volatile",
+		"while",
+		"_Bool",
+		"_Complex",
+		"_Imaginary",
+				
+
+
+		"half", // not actually described as a keyword in the spec, but seems to be treated as one.
+
+		/*"float2",
+		"float3",
+		"float4",
+		"float8",
+		"float16",
+		"double2",
+		"double3",
+		"double4",
+		"double8",
+		"double16",*/
+		// etc..
+
+		// Table 6.3
+		"image2d_t",
+		"image3d_t",
+		"image2d_array_t",
+		"image1d_t",
+		"image1d_buffer_t",
+		"image1d_array_t",
+		"image2d_depth_t",
+		"image2d_array_depth_t",
+		"sampler_t",
+		"queue_t",
+		"ndrange_t",
+		"clk_event_t",
+		"reserve_id_t",
+		"event_t",
+		"cl_mem_fence_flags",
+
+		// Address space qualifiers
+		"__global",
+		"global",
+		"__local",
+		"local",
+		"__constant",
+		"constant",
+		"__private",
+		"private",
+
+		// Function qualifiers
+		"__kernel",
+		"kernel",
+
+		// Access qualifiers
+		"__read_only",
+		"read_only",
+		"__write_only",
+		"write_only",
+		"__read_write",
+		"read_write",
+
+		// misc
+		"uniform",
+		"pipe",
+				
+		NULL
+	};
+
+	for(int i=0; opencl_c_keywords_[i]; i++)
+		params.opencl_c_keywords.insert(opencl_c_keywords_[i]);
+
+	const char* vector_base_types[] = {
+		"char",
+		"uchar",
+		"short",
+		"ushort",
+		"int",
+		"uint",
+		"long",
+		"ulong",
+		"float",
+		"double",
+		NULL
+	};
+	for(int i=0; vector_base_types[i]; i++)
+	{
+		params.opencl_c_keywords.insert(std::string(vector_base_types[i]) + "2");
+		params.opencl_c_keywords.insert(std::string(vector_base_types[i]) + "3");
+		params.opencl_c_keywords.insert(std::string(vector_base_types[i]) + "4");
+		params.opencl_c_keywords.insert(std::string(vector_base_types[i]) + "8");
+		params.opencl_c_keywords.insert(std::string(vector_base_types[i]) + "16");
+	}
+
 	std::string top_level_def_src;
 	for(size_t i=0; i<linker.top_level_defs.size(); ++i)
 	{

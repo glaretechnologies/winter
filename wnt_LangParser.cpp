@@ -511,6 +511,21 @@ FunctionDefinitionRef LangParser::parseFunctionDefinitionGivenName(const std::st
 		
 		//parseToken(tokens, text_buffer, Token::RIGHT_ARROW, i);
 
+		// Parse function attributes.
+		bool noinline = false;
+		if(isTokenCurrent(EXCLAMATION_MARK_TOKEN, p))
+		{
+			parseToken(EXCLAMATION_MARK_TOKEN, p);
+
+			const std::string attribute = parseIdentifier("attribute", p);
+			if(attribute == "noinline")
+			{
+				noinline = true;
+			}
+			else throw LangParserExcep("Error occurred while parsing function '" + func_name + "': unknown attribute '" + attribute + "'" +  errorPosition(p));
+		}
+
+
 		// Parse optional return type
 		TypeRef return_type(NULL);
 		if(!isTokenCurrent(COLON_TOKEN, p))
@@ -533,6 +548,7 @@ FunctionDefinitionRef LangParser::parseFunctionDefinitionGivenName(const std::st
 			NULL // built in func impl
 		);
 		def->generic_type_param_names = generic_type_param_names;
+		def->noinline = noinline;
 
 		return def;
 	}

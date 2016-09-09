@@ -536,7 +536,7 @@ std::string Variable::sourceString() const
 
 std::string Variable::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
-	return this->name;
+	return mapOpenCLCVarName(params.opencl_c_keywords, this->name);
 }
 
 

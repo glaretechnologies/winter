@@ -317,6 +317,19 @@ void LanguageTests::run()
 	*/
 
 
+	// =================================================================== 
+	// Test using variable names etc.. that are OpenCL C keywords
+	// ===================================================================
+	testMainFloatArg("def main(float switch) float : switch", 10.0f, 10.f); // "switch" is an OpenCL C keyword
+	testMainFloatArg("def main(float float16) float : float16", 10.0f, 10.f);
+
+	// Test let var names
+	testMainFloatArg("def main(float x) float : let switch = x in switch", 10.0f, 10.f);
+
+	// Test function names.  Actually because of type decoration, function names (always?) won't clash with OpenCL C keywords.
+	testMainFloatArg("def switch(float x) float : x      def main(float x) : switch(x)", 10.0f, 10.f);
+	testMainFloatArg("def switch(float x) !noinline float : x      def main(float x) : switch(x)", 10.0f, 10.f);
+
 	// TODO: why is this vector being parsed as doubles?
 	//testMainFloatArgInvalidProgram("def main(float x): elem(-[1.0, 2.0, 3.0, 4.0]v, 2)");//, 1.0f, -3.0f, 0);
 
