@@ -1978,7 +1978,7 @@ Reference<ASTNode> FunctionExpression::clone(CloneMapType& clone_map)
 
 const std::string FunctionExpression::functionName() const
 {
-	if(get_func_expr.nonNull() && get_func_expr.isType<Variable>())
+	if(get_func_expr.nonNull() && (get_func_expr->nodeType() == ASTNode::VariableASTNodeType))
 		return get_func_expr.downcastToPtr<Variable>()->name;
 
 	return static_function_name;
