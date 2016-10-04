@@ -740,7 +740,7 @@ inline std::vector<TypeRef> typeSextuplet(const TypeRef& a, const TypeRef& b, co
 	v[2] = c;
 	v[3] = d;
 	v[4] = e;
-	v[5] = e;
+	v[5] = f;
 	return v;
 }
 
