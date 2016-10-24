@@ -305,8 +305,8 @@ ${INDIGO_TRUNK_DIR}/double-conversion/utils.h
 )
 
 SET(xxhash_files
-${INDIGO_TRUNK_DIR}/xxHash-r39/xxhash.c
-${INDIGO_TRUNK_DIR}/xxHash-r39/xxhash.h
+${INDIGO_TRUNK_DIR}/zstd-1.0.0/lib/common/xxhash.c
+${INDIGO_TRUNK_DIR}/zstd-1.0.0/lib/common/xxhash.h
 )
 
 
@@ -340,7 +340,7 @@ ${llvmdir}/include
 ${INDIGO_TRUNK_DIR}
 ${INDIGO_TRUNK_DIR}/utils
 ${INDIGO_TRUNK_DIR}/maths
-${INDIGO_TRUNK_DIR}/xxHash-r39
+${INDIGO_TRUNK_DIR}/zstd-1.0.0/lib/common/
 ${WINTER_INCLUDE_DIRS}
 )
 

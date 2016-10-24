@@ -83,7 +83,7 @@ private:
 	Reference<IntLiteral> parseIntLiteral(ParseInfo& parseinfo);
 
 	FunctionDefinitionRef parseFunctionDefinition(ParseInfo& parseinfo);
-	FunctionDefinitionRef parseFunctionDefinitionGivenName(const std::string& func_name, ParseInfo& parseinfo);
+	FunctionDefinitionRef parseFunctionDefinitionGivenName(const std::string& func_name, ParseInfo& parseinfo, bool is_lambda);
 	//Reference<ASTNode> parseFunctionDeclaration(const std::vector<Reference<TokenBase> >& tokens, const char* text_buffer, unsigned int& i);
 	NamedConstantRef parseNamedConstant(ParseInfo& parseinfo);
 

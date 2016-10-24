@@ -467,11 +467,11 @@ Reference<FunctionDefinition> LangParser::parseFunctionDefinition(ParseInfo& p)
 
 	const std::string function_name = parseIdentifier("function name", p);
 
-	return parseFunctionDefinitionGivenName(function_name, p);
+	return parseFunctionDefinitionGivenName(function_name, p, /*is_lambda=*/false);
 }
 
 
-FunctionDefinitionRef LangParser::parseFunctionDefinitionGivenName(const std::string& func_name, ParseInfo& p)
+FunctionDefinitionRef LangParser::parseFunctionDefinitionGivenName(const std::string& func_name, ParseInfo& p, bool is_lambda)
 {
 	try
 	{
@@ -528,12 +528,27 @@ FunctionDefinitionRef LangParser::parseFunctionDefinitionGivenName(const std::st
 
 		// Parse optional return type
 		TypeRef return_type(NULL);
-		if(!isTokenCurrent(COLON_TOKEN, p))
+
+		if(is_lambda)
 		{
-			return_type = parseType(p);
-		}
+			// Both ':' and '->' are acceptable after the arg list
+			if(!(isTokenCurrent(COLON_TOKEN, p) || isTokenCurrent(RIGHT_ARROW_TOKEN, p)))
+				return_type = parseType(p);
 		
-		parseToken(COLON_TOKEN, p);
+			if(isTokenCurrent(COLON_TOKEN, p))
+				parseToken(COLON_TOKEN, p);
+			else if(isTokenCurrent(RIGHT_ARROW_TOKEN, p))
+				parseToken(RIGHT_ARROW_TOKEN, p);
+			else
+				throw LangParserExcep("Error occurred while parsing anon function: expected ':' or '->'" + errorPosition(p));
+		}
+		else
+		{
+			if(!isTokenCurrent(COLON_TOKEN, p))
+				return_type = parseType(p);
+		
+			parseToken(COLON_TOKEN, p);
+		}
 		
 		// Parse function body
 		ASTNodeRef body = parseExpression(p);
@@ -1761,7 +1776,7 @@ FunctionDefinitionRef LangParser::parseAnonFunction(ParseInfo& p)
 
 	const std::string func_name = "anon_func_" + ::toString(p.i);
 
-	FunctionDefinitionRef def = parseFunctionDefinitionGivenName(func_name, p);
+	FunctionDefinitionRef def = parseFunctionDefinitionGivenName(func_name, p, /*is_lambda=*/true);
 
 	//def->use_captured_vars = true;
 	def->is_anon_func = true;

@@ -4215,6 +4215,9 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 	// Test lambda expressions and closures
 	// ===================================================================
 
+	// Test lambda with arrow syntax:
+	testMainFloatArg("def main(float x) float : (\\(float x) -> x*x) (x)", 4.0f, 16.0f, INVALID_OPENCL);
+
 	// Test Lambda applied directly.  Function inlining (beta reduction) should be done.
 	results = testMainFloatArg("def main(float x) float : (\\(float y) : y*y) (x)", 4.0f, 16.0f, INVALID_OPENCL);
 	testAssert(results.maindef->body->nodeType() == ASTNode::MulExpressionType);
