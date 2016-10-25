@@ -174,149 +174,8 @@ void LanguageTests::doLLVMInit()
 }
 
 
-void LanguageTests::run()
+static void doCKeywordTests()
 {
-	Timer timer;
-	TestResults results;
-
-	//useKnownReturnRefCountOptimsiation(3);
-
-	//fuzzTests();
-	//////////////////
-
-
-	// ===================================================================
-	// Check equality for types, and that they work in sets etc.. correctly.
-	// ===================================================================
-	const TypeRef ta = new Int();
-	const TypeRef tb = new Int();
-
-	testAssert(*ta == *tb);
-
-	{
-		std::set<TypeRef, TypeRefLessThan> type_set;
-		type_set.insert(ta);
-		type_set.insert(tb);
-		testAssert(type_set.size() == 1);
-	}
-
-	//testMainFloatArgInvalidProgram("struct s { s a, s b } def main(float x) float : x");
-	//testMainFloatArgInvalidProgram("def main(float x) float : let varray<T> v = [v]va in x");
-	
-	// ===================================================================
-	// 
-	// ===================================================================
-	//testMainFloatArgAllowUnsafe("def main(float x) float : let A = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]a   i = truncateToInt(x) in A[i] + A[i+1]", 2.f, 7.0f);
-	//testMainFloatArgAllowUnsafe("A = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]a       def main(float x) float : let i = truncateToInt(x) in A[i] + A[i+1] + A[i+2]", 2.f, 12.0f);
-
-	// Test map with more elems
-	/*{
-		const size_t N = 1 << 28;
-		js::Vector<float, 32> input(N, 4.0f);
-		js::Vector<float, 32> target_results(N, 16.f);//std::pow(4.0f, 2.2f));//std::sqrt(std::sqrt(std::sqrt(4.0))));
-
-
-		testFloatArray(
-			"def f(float x) float : pow(x, 2.2)			\n\
-			def main(array<float, 268435456> a, array<float, 268435456> b) array<float, 268435456> : map(f, a)",
-			&input[0], &input[0], &target_results[0], N);
-
-		// Reference c++ code:
-		{
-			js::Vector<float, 32> output(N);
-
-			
-
-			// Warm up cache, page table etc..
-			std::memcpy(&output[0], &input[0], N * sizeof(float));
-
-			double sum1 = 0;
-			for(size_t i=0; i<N; ++i)
-				sum1 += output[i];
-
-			Timer timer;
-
-			//float sum = 0;
-			//for(size_t i=0; i<N; ++i)
-			//	sum += input[i];
-			for(size_t i=0; i<N; ++i)
-				output[i] = std::pow(input[i], 2.2f);//std::sqrt(std::sqrt(std::sqrt(input[i])));
-			//std::memcpy(&output[0], &input[0], N * sizeof(float));
-
-			const double elapsed = timer.elapsed();
-
-			double sum = 0;
-			for(size_t i=0; i<N; ++i)
-				sum += output[i];
-
-			std::cout << "C++ ref elapsed: " << (elapsed * 1.0) << " s" << std::endl;
-			const double bandwidth = N * sizeof(float) / elapsed;
-			std::cout << "C++ ref bandwidth: " << (bandwidth * 1.0e-9) << " GiB/s" << std::endl;
-			std::cout << "sum1: " << sum << std::endl;
-			std::cout << "sum: " << sum << std::endl;
-		}
-	}*/
-
-	//testMainStringArg("def main(string s) string : s", "hello", "hello");
-	//testMainStringArg("def main(string s) string : \"hello\"", "bleh", "hello");
-
-
-	/*
-
-	want to prove:
-	T: index >= 0 && index < len(f(x))
-
-	substitute
-	index <- 0
-
-	get T_1:
-	T_1: 0 >= 0 && 0 < len(f(x))
-	=  true && 0 < len(f(x))
-	=  0 < len(f(x))
-
-	Use postcondition of f:  len(res) = 1
-
-	T' becomes
-	0 < 1
-	true
-
-
-	{ len(res) = 1 }
-
-	----------------------------
-	valid = 
-	0 >= 0 && 0 < len(f(x))
-	true && 0 < len(f(x))
-	0 < len(f(x))
-
-	[use len(f(x)) = 1]
-	0 < 1
-	true
-
-
-
-	----------------------------------
-	From "def f(int i) varray<float> : [i, i, i, i]va			def main(int x) int : if i > 0 && i < 4 then f(x)[i] else 0", 4, 4);:
-
-	Want to prove:
-
-	i >= 0 && i < len(f(x))
-
-	[since in true branch, we know i > 0 && i < 3, in other words i e [0, 3]]
-
-	true && i < len(f(x))
-	i < len(f(x))
-
-	[use len(f(x)) = 4]
-
-	i < 4
-
-	true
-
-	--------------------------------------------------
-	*/
-
-
 	// =================================================================== 
 	// Test using variable names etc.. that are OpenCL C keywords
 	// ===================================================================
@@ -334,28 +193,11 @@ void LanguageTests::run()
 	testMainFloatArg(
 		"struct switch { float x }			\n"
 		"def main(float x) float : switch(x).x", 10.0f, 10.f);
+}
 
 
-	// TODO: why is this vector being parsed as doubles?
-	//testMainFloatArgInvalidProgram("def main(float x): elem(-[1.0, 2.0, 3.0, 4.0]v, 2)");//, 1.0f, -3.0f, 0);
-
-	testMainFloatArgInvalidProgram("def makeFunc(float x) function<float, float> :\\(float y) : x + y       def main() float :  let f = makeFunc(2.0) in f(true)");
-
-	testMainFloatArgInvalidProgram("def main(int x) int : if x < 5 if x < 3 1 else 2 ( ) else if x < 7 6 else 7 ");
-	testMainFloatArgInvalidProgram("def main(float x) float : (1 * (1 * ((1 + 1) * (1 - 1 + 1)) - 1 - ((1 + (((((1 + 		 1 / (1 + (((1 + 1 / (1 * (1 - 1 + 1 / 1 / 1))) - 1 - 1 - (1 + 1 / 1) + (((1 * 1 		) * 1) * 1) / 1) - 1 + 1)) - 1 / 1) + (1 * 1)) + 1 - 1) + 1) * 1)) + 1) / (1 + 1 		) / 1 - ((1 + 1 / 1 - (((1 * ((1 - 1 - 1 / 1 - 1 * 1) - (1 / 1 - 1 * 1) + ((1 +	 		1) - 1 * 1) - 1 / 1)) + (1 / 1 / 1 - 1 - (1 + 1) / (1 + 1) + 1)) * (1 * ((((1 +	 		1) * 1) / 1 - 1 - 1 - (((1 + 1) * 1 - (((1 / 1 * 1) * (1 + 1) - 1) / 1 / 1 / 1 - 		 (1 + (((1 + 1) + 1) * 1)) - 1 / ((1 + 1) / (1 * 1) / (1 + (1 / 1 * 1 / 1 - 1 -	 		(1 * 1) / (1 + 1) - 1 - 1 - 1 - 1 - 1 / 1)) / (1 / 1 * 1) + (((1 + 1) * ((1 + 1) 		 * 1)) / 1 + ((1 - ((1 * 1) + 1) + 1) + 1 - 1 / ((1 / (1 - ((1 + 1) - ((((1 - (( 		1 * ((1 * ((1 + 1) + ((1 - (1 * 1) + (1 - (1 - 1 - (1 * 1) / (1 + 1) / 1 * (1 -	 		1 + (1 + 1) - ((1 / 1 / 1 + 1) * 1) - (1 - 1 * 1))) * 1) - 1 - 1 - 1 - (1 * (((1 		 * 1) * ((1 + (1 / (1 * 1) * 1 - 1)) * (1 + (((1 + 1) + 1) + 1)))) + 1) / 1)) +	 		1 / 1) / 1 - 1)) * 1 - 1)) / 1 * (1 * 1) - 1 - 1 / (1 * ((((1 + 1) + 1) * 1 - 1	 		- 1 / ((1 + 1) / (1 * 1) - ((1 / 1 + 1) * 1) + (1 + (1 * 1) - 1 - 1 - 1 - (1 + ( 		1 + 1))) / 1)) - 1 * (1 / ((1 * 1) + ((1 - 1 + (1 + 1)) + ((1 + 1) * 1))) / 1 *	 		1)) - 1) / 1 / 1 / 1) / 1 + 1) / (1 / (1 + (1 + (1 * 1 - 1)) - 1) / 1 - ((1 * 1	 		/ 1 / (1 / (1 * 1 / 1 - 1) / 1 * 1) / 1) - 1 * ((1 + (((1 + 1) + 1) - ((1 * ((1	 		+ 1) + 1)) * ((1 * 1) * 1) - 1) / 1 / (1 - 1 / (1 - 1 * 1) / 1 * 1) / ((1 - (1 + 		 1) / 1 * 1) + 1 - (1 + (1 * 1)) - 1) - 1 * 1) - 1 / 1) * 1)) + (((1 - (1 / 1 -	 		1 + 1 - (1 * (1 + 1)) / (1 + (1 + 1))) + 1) - ((1 + 1) * (1 * 1 / 1)) * 1 - 1) + 		 1) - 1 / 1 - (((1 * 1 - 1) + 1) - (1 + 1) - 1 - 1 * 1)) / (1 + 1) + (((1 * ((1	 		/ (1 * 1) * 1) * 1)) * 1) + 1 - (1 * 1)) / 1) * 1) + (1 / 1 * 1 / (1 * (1 + (1 / 		 1 / 1 - ((1 + ((1 - 1 / 1 + 1 / 1 - 1) * 1)) * 1) - 1 / 1 / 1 / (1 + 1) - (1 +	 		((1 + (((1 + 1 - 1 / ((1 + 1) * (1 + (1 / 1 + (1 + 1))))) * 1) * ((1 - 1 / (1 +	 		1 - (((1 / 1 - 1 / 1 * (1 + (((1 * 1) * (1 - 1 * (1 * 1))) - 1 + ((1 * 1) * ((1	 		- 1 * 1) / 1 + (1 + 1)))))) * 1) + 1 - 1 - 1 / (1 + ((1 * (1 + 1)) * 1)))) / (1	 		+ 1 - 1) + 1) - 1 * 1) / 1 - 1 / 1 - ((((1 + (1 * 1 - 1)) * ((1 + (1 * 1)) * 1)) 		 * ((1 + 1) + 1)) + 1) / 1 / 1 - ((1 / 1 - (((1 + (1 * 1) - 1) - 1 * 1 - (1 + 1) 		 - 1) + 1) + (1 / (1 + (1 * 1)) / 1 * 1 / 1) / (1 + 1)) * 1 / 1 - 1) - 1 - 1 - 1 		) / 1) * 1) / 1) + 1)) / 1 / 1)) / 1) * ((((1 / 1 + 1) - 1 * 1 / (1 + 1)) * 1 /	 		1) / 1 * 1) / 1 / 1 / 1 - ((1 * (((1 / 1 * (1 * (1 / ((1 - 1 * (1 * 1 / 1)) + (( 		1 * (1 + 1)) * 1)) * (1 + (1 + (1 * (1 + 1 / 1 - (1 - 1 * ((1 + 1) + 1 - (1 * 1) 		) / ((1 - 1 + 1) - 1 + 1)))) - 1 / (1 + 1) / 1 / 1 / 1 / (1 + (1 * (1 - (1 * 1 / 		 1) * 1))) / 1 - 1 - 1))) / ((1 + 1) + 1 / (1 * 1) / 1 / (1 * 1 / 1) - 1 - 1 - 1 		 / (1 * ((1 / 1 - 1 / 1 - 1 / 1 / 1 / 1 / 1 * 1) - 1 / (1 - ((1 / 1 + 1) + 1) -	 		1 / (1 * (1 + 1)) / 1 * (1 * 1) / 1) / 1 * 1)) / (1 + 1) / (((1 - 1 * 1) + (1 -	 		(1 + 1) + 1 / 1)) * 1)(1 / 1 / 1 * 1) - (1 - ((1 * (1 - (1 + 1) + 1)) * (1 +	 		1)) / 1 / 1 + (1 - 1 - (1 + (1 * 1)) - ((1 + 1 - ((1 + ((1 * 1) * 1 - 1 / 1)) +	 		1) - 1) / 1 - 1 + 1) / (((1 * 1) + 1) + 1) * (1 * 1)))) / 1 / ((1 * 1) + 1 - 1)) 		 / 1) * 1) * 1)) * ((1 - (1 * 1 / 1) + 1) * 1 / 1)) / (1 + 1) / 1) + (1 / 1 * (1 		 + 1 / 1 - (1 / (1 - 1 + 1) + 1) / (1 + 1) - (1 * 1)) - (((1 / 1 + 1 - 1 - 1) /	 		1 * 1) + (1 * 1) / (1 / 1 * 1) - 1 - (1 + 1))) / 1) + 1) + 1)) / 1 / 1)) + 1) -	 		1 - (1 * 1 - 1)) * ((1 + 1) * 1)) - 1 * (1 + ((1 * 1) + (1 * 1)))) - 1 * 1)))) * 		 1) - 1 - 1 - 1))");
-	testMainFloatArgInvalidProgram("def main(float x) float : (1 * (1 * ((1 + 1) * (1 - 1 + 1)) - 1 - ((1 + (((((1 + 		 1 / (1 + (((1 + 1 / (1 * (1 - 1 + 1 / 1 / 1))) - 1 - 1 - (1 + 1 / 1) + (((1 * 1 		) * 1) * 1) / 1) - 1 + 1)) - 1 / 1) + (1 * 1)) + 1 - 1) + 1) * 1)) + 1) / (1 + 1 		) / 1 - ((1 + 1 / 1 - (((1 * ((1 - 1 - 1 / 1 - 1 * 1) - (1 / 1 - 1 * 1) + ((1 +	 		1) - 1 * 1) - 1 / 1)) + (1 / 1 / 1 - 1 - (1 + 1) / (1 + 1) + 1)) * (1 * ((((1 +	 		1) * 1) / 1 - 1 - 1 - (((1 + 1) * 1 - (((1 / 1 * 1) * (1 + 1) - 1) / 1 / 1 / 1 - 		 (1 + (((1 + 1) + 1) * 1)) - 1 / ((1 + 1) / (1 * 1) / (1 + (1 / 1 * 1 / 1 - 1 -	 		(1 * 1) / (1 + 1) - 1 - 1 - 1 - 1 - 1 / 1)) / (1 / 1 * 1) + (((1 + 1) * ((1 + 1) 		 * 1)) / 1 + ((1 - ((1 * 1) + 1) + 1) + 1 - 1 / ((1 / (1 - ((1 + 1) - ((((1 - (( 		1 * ((1 * ((1 + 1) + ((1 - (1 * 1) + (1 - (1 - 1 - (1 * 1) / (1 + 1) / 1 * (1 -	 		1 + (1 + 1) - ((1 / 1 / 1 + 1) * 1) - (1 - 1 * 1))) * 1) - 1 - 1 - 1 - (1 * (((1 		 * 1) * ((1 + (1 / (1 * 1) * 1 - 1)) * (1 + (((1 + 1) + 1) + 1)))) + 1)) / 1)) +	 		1 / 1) / 1 - 1)) * 1 - 1)) / 1 * (1 * 1) - 1 - 1 / (1 * ((((1 + 1) + 1) * 1 - 1	 		- 1 / ((1 + 1) / (1 * 1) - ((1 / 1 + 1) * 1) + (1 + (1 * 1) - 1 - 1 - 1 - (1 + ( 		1 + 1))) / 1)) - 1 * (1 / ((1 * 1) + ((1 - 1 + (1 + 1)) + ((1 + 1) * 1))) / 1 *	 		1)) - 1) / 1 / 1 / 1) / 1 + 1) / (1 / (1 + (1 + (1 * 1 - 1)) - 1) / 1 - ((1 * 1	 		/ 1 / (1 / (1 * 1 / 1 - 1) / 1 * 1) / 1) - 1 * ((1 + (((1 + 1) + 1) - ((1 * ((1	 		+ 1) + 1)) * ((1 * 1) * 1) - 1) / 1 / (1 - 1 / (1 - 1 * 1) / 1 * 1) / ((1 - (1 + 		 1) / 1 * 1) + 1 - (1 + (1 * 1)) - 1) - 1 * 1) - 1 / 1) * 1)) + (((1 - (1 / 1 -	 		1 + 1 - (1 * (1 + 1)) / (1 + (1 + 1))) + 1) - ((1 + 1) * (1 * 1 / 1)) * 1 - 1) + 		 1) - 1 / 1 - (((1 * 1 - 1) + 1) - (1 + 1) - 1 - 1 * 1)) / (1 + 1) + (((1 * ((1	 		/ (1 * 1) * 1) * 1)) * 1) + 1 - (1 * 1)) / 1) * 1) + (1 / 1 * 1 / (1 * (1 + (1 / 		 1 / 1 - ((1 + ((1 - 1 / 1 + 1 / 1 - 1) * 1)) * 1) - 1 / 1 / 1 / (1 + 1) - (1 +	 		((1 + (((1 + 1 - 1 / ((1 + 1) * (1 + (1 / 1 + (1 + 1))))) * 1) * ((1 - 1 / (1 +	 		1 - (((1 / 1 - 1 / 1 * (1 + (((1 * 1) * (1 - 1 * (1 * 1))) - 1 + ((1 * 1) * ((1	 		- 1 * 1) / 1 + (1 + 1))()))) * 1) + 1 - 1 - 1 / (1 + ((1 * (1 + 1)) * 1)))) / (1	 		+ 1 - 1) + 1) - 1 * 1) / 1 - 1 / 1 - ((((1 + (1 * 1 - 1)) * ((1 + (1 * 1)) * 1)) 		 * ((1 + 1) + 1)) + 1) / 1 / 1 - ((1 / 1 - (((1 + (1 * 1) - 1) - 1 * 1 - (1 + 1) 		 - 1) + 1) + (1 / (1 + (1 * 1)) / 1 * 1 / 1) / (1 + 1)) * 1 / 1 - 1) - 1 - 1 - 1 		) / 1) * 1) / 1) + 1))) / 1 / 1)) / 1) * ((((1 / 1 + 1) - 1 * 1 / (1 + 1)) * 1 /	 		1) / 1 * 1) / 1 / 1 / 1 - ((1 * (((1 / 1 * (1 * (1 / ((1 - 1 * (1 * 1 / 1)) + (( 		1 * (1 + 1)) * 1)) * (1 + (1 + (1 * (1 + 1 / 1 - (1 - 1 * ((1 + 1) + 1 - (1 * 1) 		) / ((1 - 1 + 1) - 1 + 1)))) - 1 / (1 + 1) / 1 / 1 / 1 / (1 + (1 * (1 - (1 * 1 / 		 1) * 1))) / 1 - 1 - 1))) / ((1 + 1) + 1 / (1 * 1) / 1 / (1 * 1 / 1) - 1 - 1 - 1 		 / (1 * ((1 / 1 - 1 / 1 - 1 / 1 / 1 / 1 / 1 * 1) - 1 / (1 - ((1 / 1 + 1) + 1) -	 		1 / (1 * (1 + 1)) / 1 * (1 * 1) / 1) / 1 * 1)) / (1 + 1) / (((1 - 1 * 1) + (1 -	 		(1 + 1) + 1 / 1)) * 1) - (1 / 1 / 1 * 1) - (1 - ((1 * (1 - (1 + 1) + 1)) * (1 +	 		1)) / 1 / 1 + (1 - 1 - (1 + (1 * 1)) - ((1 + 1 - ((1 + ((1 * 1) * 1 - 1 / 1)) +	 		1) - 1) / 1 - 1 + 1) / (((1 * 1) + 1) + 1) * (1 * 1)))) / 1 / ((1 * 1) + 1 - 1)) 		 / 1) * 1) * 1)) * ((1 - (1 * 1 / 1) + 1) * 1 / 1)) / (1 + 1) / 1) + (1 / 1 * (1 		 + 1 / 1 - (1 / (1 - 1 + 1) + 1) / (1 + 1) - (1 * 1)) - (((1 / 1 + 1 - 1 - 1) /	 		1 * 1) + (1 * 1) / (1 / 1 * 1) - 1 - (1 + 1))) / 1) + 1) + 1)) / 1 / 1)) + 1) -	 		1( - (1 * 1 - 1)) * ((1 + 1) * 1)) - 1 * (1 + ((1 * 1) + (1 * 1)))) - 1 * 1)))) * 		 1) - 1 - 1 - 1))");
-	testMainFloatArgInvalidProgram("def main(float x) float : (1 * (1 * ((1 + 1) * (1 - 1 + 1)) - 1 - ((1 + (((((1 + 		 1 / (1 + (((1 + 1 / (1 * (1 - 1 + 1 / 1 / 1))) - 1 - 1 - (1 + 1 / 1) + (((1 * 1 		) * 1) * 1) / 1) - 1 + 1)) - 1 / 1) + (1 * 1)) + 1 - 1) + 1) * 1)) + 1) / (1 + 1 		) / 1 - ((1 + 1 / 1 - (((1 * ((1 - 1 - 1 / 1 - 1 * 1) - (1 / 1 - 1 * 1) + ((1 +	 		1) - 1 * 1) - 1 / 1)) + (1 / 1 / 1 - 1 - (1 + 1) / (1 + 1) + 1)) * (1 * ((((1 +	 		1) * 1) / 1 - 1 - 1 - (((1 + 1) * 1 - (((1 / 1 * 1) * (1 + 1) - 1) / 1 / 1 / 1 - 		 (1 + (((1 + 1) + 1) * 1)) - 1 / ((1 + 1) / (1 * 1) / (1 + (1 / 1 * 1 / 1 - 1 -	 		(1 * 1) / (1 + 1) - 1 - 1 - 1 - 1 - 1 / 1)) / (1 / 1 * 1) + (((1 + 1) * ((1 + 1) 		 * 1)) / 1 + ((1 -  true ((1 * 1) + 1) + 1) + 1 - 1 / ((1 / (1 - ((1 + 1) - ((((1 - (( 		1 * ((1 * ((1 + 1) + ((1 - (1 * 1) + (1 - (1 - 1 - (1 * 1) / (1 + 1) / 1 * (1 -	 		1 + (1 + 1) - ((1 / 1 / 1 + 1) * 1) - (1 - 1 * 1))) * 1) - 1 - 1 - 1 - (1 * (((1 		 * 1) * ((1 + (1 / (1 * 1) * 1 - 1)) * (1 + (((1 + 1) + 1) + 1)))) + 1) / 1)) +	 		1 / 1) / 1 - 1)) * 1 - 1)) / 1 * (1 * 1) - 1 - 1 / (1 * ((((1 + 1) + 1) * 1 - 1	 		- 1 / ((1 + 1) / (1 * 1) - ((1 / 1 + 1) * 1) + (1 + (1 * 1) - 1 - 1 - 1 - (1 + ( 		1 + 1))) / 1)) - 1 * (1 / ((1 * 1) + ((1 - 1 + (1 + 1)) + ((1 + 1) * 1))) / 1 *	 		1)) - 1) / 1 / 1 / 1) / 1 + 1) / (1 / (1 + (1 + (1 * 1 - 1)) - 1) / 1 - ((1 * 1	 		/ 1 / (1 / (1 * 1 / 1 - 1) / 1 * 1) / 1) - 1 * ((1 + (((1 + 1) + 1) - ((1 * ((1	 		+ 1) + 1)) * ((1 * 1) * 1) - 1) / 1 / (1 - 1 / (1 - 1 * 1) / 1 * 1) / ((1 - (1 + 		 1) / 1 * 1) + 1 - (1 + (1 * 1)) - 1) - 1 * 1) - 1 / 1) * 1)) + (((1 - (1 / 1 -	 		1 + 1 - (1 * (1 + 1)) / (1 + (1 + 1))) + 1) - ((1 + 1) * (1 * 1 / 1)) * 1 - 1) + 		 1) - 1 / 1 - (((1 * 1 - 1) + 1) - (1 + 1) - 1 - 1 * 1)) / (1 + 1) + (((1 * ((1	 		/ (1 * 1) * 1) * 1)) * 1) + 1 - (1 * 1)) / 1) * 1) + (1 / 1 * 1 / (1 * (1 + (1 / 		 1 / 1 - ((1 + ((1 - 1 / 1 + 1 / 1 - 1) * 1)) * 1) - 1 / 1 / 1 / (1 + 1) - (1 +	 		((1 + (((1 + 1 - 1 / ((1 + 1) * (1 + (1 / 1 + (1 + 1))))) * 1) * ((1 - 1 / (1 +	 		1 - (((1 / 1 - 1 / 1 * (1 + (((1 * 1) * (1 - 1 * (1 * 1))) - 1 + ((1 * 1) * ((1	 		- 1 * 1) / 1 + (1 + 1)))))) * 1) + 1 - 1 - 1 / (1 + ((1 * (1 + 1)) * 1)))) / (1	 		+ 1 - 1) + 1) - 1 * 1) / 1 - 1 / 1 - ((((1 + (1 * 1 - 1)) * ((1 + (1 * 1)) * 1)) 		 * ((1 + 1) + 1)) + 1) / 1 / 1 - ((1 / 1 - (((1 + (1 * 1) - 1) - 1 * 1 - (1 + 1) 		 - 1) + 1) + (1 / (1 + (1 * 1)) / 1 * 1 / 1) / (1 + 1)) * 1 / 1 - 1) - 1 - 1 - 1 		) / 1) * 1) / 1) + 1)) / 1 / 1)) / 1) * ((((1 / 1 + 1) - 1 * 1 / (1 + 1)) * 1 /	 		1) / 1 * 1) / 1 / 1 / 1 - ((1 * (((1 / 1 * (1 * (1 / ((1 - 1 * (1 * 1 / 1)) + (( 		1 * (1 + 1)) * 1)) * (1 + (1 + (1 * (1 + 1 / 1 - (1 - 1 * ((1 + 1) + 1 - (1 * 1) 		) / ((1 - 1 + 1) - 1 + 1)))) - 1 / (1 + 1) / 1 / 1 / 1 / (1 + (1 * (1 - (1 * 1 / 		 1) * 1))) / 1 - 1 - 1))) / ((1 + 1) + 1 / (1 * 1) / 1 / (1 * 1 / 1) - 1 - 1 - 1 		 / (1 * ((1 / 1 - 1 / 1 - 1 / 1 / 1 / 1 / 1 * 1) - 1 / (1 - ((1 / 1 + 1) + 1) -	 		1 / (1 * (1 + 1)) / 1 * (1 * 1) / 1) / 1 * 1)) / (1 + 1) / (((1 - 1 * 1) + (1 -	 		(1 + 1) + 1 / 1)) * 1) - (1 / 1 / 1 * 1) - (1 - ((1 * (1 - (1 + 1) + 1)) * (1 +	 		1)) / 1 / 1 + (1 - 1 - (1 + (1 * 1)) - ((1 + 1 - ((1 + ((1 * 1) * 1 - 1 / 1)) +	 		1) - 1) / 1 - 1 + 1) / (((1 * 1) + 1) + 1) * (1 * 1)))) / 1 / ((1 * 1) + 1 - 1)) 		 / 1) * 1) * 1)) * ((1 - (1 * 1 / 1) + 1) * 1 / 1)) / (1 + 1) / 1) + (1 / 1 * (1 		 + 1 / 1 - (1 / (1 - 1 + 1) + 1) / (1 + 1) - (1 * 1)) - (((1 / 1 + 1 - 1 - 1) /	 		1 * 1) + (1 * 1) / (1 / 1 * 1) - 1 - (1 + 1))) / 1) + 1) + 1)) / 1 / 1)) + 1) -	 		1 - (1 * 1 - 1)) * ((1 + 1) * 1)) - 1 * (1 + ((1 * 1) + (1 * 1)))) - 1 * 1)))) * 		 1) - 1 - 1 - 1))");
-
-	testMainFloatArg("def g(function<float> f) float : f()       def main(float x) float : g(\\() float : x)",  4.0f, 4.0f, ALLOW_UNSAFE | INVALID_OPENCL);
-
-	// Test first class function with OpenCL code-gen
-	//testMainFloatArg("def f(array<float, 16> a, int i) float : a[i]    def g(function<array<float, 16>, int, float>      def main(float x) float : g(f, [truncateToInt(x)]", 2.1f, 3.0f, ALLOW_UNSAFE);
-
-
-
-
-	//testMainFloatArg("def main(float x) float : let a = [1.0, 2.0, 3.0, 4.0]a in a[truncateToInt(x)]", 2.1f, 3.0f, ALLOW_UNSAFE);
-
+static void doUnsignedIntegerTests()
+{
 	// ===================================================================
 	// Test unsigned integers
 	// ===================================================================
@@ -382,7 +224,11 @@ void LanguageTests::run()
 	testMainUInt32Arg("def main(uint32 x) : x + 1u32", 4294967294u, 4294967295u);
 
 	testMainUInt32Arg("def main(uint32 x) : x * 10u32", 2, 20);
+}
 
+
+static void doBitWiseOpTests()
+{
 	// ===================================================================
 	// Test bitwise AND
 	// ===================================================================
@@ -407,9 +253,11 @@ void LanguageTests::run()
 	// Test right shift
 	// ===================================================================
 	testMainUInt32Arg("def main(uint32 x) : x >> 2u", 356, 356 >> 2);
+}
 
 
-
+static void doHexLiteralParsingTests()
+{
 	// ===================================================================
 	// Test hex literal parsing (some more)
 	// ===================================================================
@@ -418,32 +266,11 @@ void LanguageTests::run()
 	testMainIntegerArgInvalidProgram("def main(int x) : 0xG");
 	testMainIntegerArgInvalidProgram("def main(int x) : 0x0x");
 	testMainIntegerArgInvalidProgram("def main(int x) : 0x-");
-
-	// ===================================================================
-	// Test 16-bit integers
-	// ===================================================================
-	testMainInt16Arg("def main(int16 x) : x + 5i16", 1, 6);
-	
-	// TODO: need to add i32 -> i16 implicit conversions.
-
-	testMainInt16Arg("def main(int16 x) : [10i16, 11i16]a[0]", 1, 10);
-	//testMainInt16Arg("def main(int16 x) : [65535i16, 11i16]a[0]", 1, 65535);
-	
-
-	// Test toFloat(int16)
-	//testMainInt16Arg("def main(int16 x) int16 : toInt16(1.0f + toFloat(x))", 2, 3); // TODO: add truncateToInt16
-	testMainFloatArg("def main(float x) float : x + toFloat(4i16)", 2.0f, 6.0f);
-
-	// ===================================================================
-	// Test 'real' type.
-	// Will be aliased to 'float' for float tests, and to 'double'
-	// for double tests.
-	// ===================================================================
-	testMainFloatArg("def main(real x) real :  x", 1.0f, 1.0f);
-	testMainDoubleArg("def main(real x) real :  x", 1.0f, 1.0f);
+}
 
 
-
+static void testVariableShadowing()
+{
 	// ===================================================================
 	// Test variable shadowing
 	// ===================================================================
@@ -480,13 +307,17 @@ void LanguageTests::run()
 
 	testMainFloatArgInvalidProgram("def main(float x) float : let x = x in x");
 	testMainFloatArgInvalidProgram("def main(float x) float : let x = x + 1 in x");
+}
 
+
+static void testFunctionInlining()
+{
 	// ===================================================================
 	// Test function inlining
 	// ===================================================================
 	
 	// A function that has a body which is just a function call should be inlined.
-	results = testMainFloatArg("def f1(float z) float : z*z						\n\
+	Winter::TestResults results = testMainFloatArg("def f1(float z) float : z*z						\n\
 		def f2(float z) float : f1(z)										\n\
 		def entryPoint2(float x) float : f1(x) + f2(x)						\n\
 		def main(float x) float : f2(x)", 4.0f, 16.0f); // Call to f2 should be inlined, and replaced with the call to f1
@@ -588,7 +419,11 @@ void LanguageTests::run()
 	testMainFloatArg("def f(float x) : x + x + x + x							\n\
 		def main(float x) float :													\n\
 			f(sin(x))", 1, 4*sin(1.f)); // f should be inlined.
+}
 
+
+static void testDeadCodeElimination()
+{
 	// ===================================================================
 	// Test dead code elimination
 	// ===================================================================
@@ -614,15 +449,18 @@ void LanguageTests::run()
 
 
 	// Test that a let block with no let vars is removed, and is replaced with the value expression (x var)
-	results = testMainIntegerArg("def main(int x) int :		\n\
+	Winter::TestResults results = testMainIntegerArg("def main(int x) int :		\n\
 		let													\n\
 			a = 1 + x	# dead								\n\
 		in													\n\
 			x												\n\
 		", 4, 4);
 	testAssert(results.maindef->body->nodeType() == ASTNode::VariableASTNodeType);
+}
 
 
+static void testDeadFunctionElimination()
+{
 	// ===================================================================
 	// Test dead function elimination
 	// ===================================================================
@@ -651,8 +489,11 @@ void LanguageTests::run()
 		assert(0);
 		exit(1);
 	}
+}
 
 
+static void testVArrays()
+{
 	// ===================================================================
 	// Test makeVArray(elem, count) varray<T>
 	// ===================================================================
@@ -688,7 +529,6 @@ void LanguageTests::run()
 				  def main(float x) float : [s(1) + s(3)]va[0].x", 1.0f, 4.0f, INVALID_OPENCL);
 	
 
-	
 	// ===================================================================
 	// Test constant indices into varray literals.
 	// ===================================================================
@@ -723,370 +563,7 @@ void LanguageTests::run()
 	testMainIntegerArgInvalidProgram("def main(int x) int : if x >= 0 && x < 5 then [10, 11, 12, 13]va[x] else 0"); // Test with some incorrect bounding expressions.
 
 
-	// ===================================================================
-	// Test toInt32
-	// ===================================================================
-	testMainIntegerArg("def main(int x) int : toInt32(0i64)", 0, 0);
-	testMainIntegerArg("def main(int x) int : toInt32(1i64)", 0, 1);
-	testMainIntegerArg("def main(int x) int : toInt32(-1i64)", 0, -1);
-	testMainIntegerArg("def main(int x) int : toInt32(12345i64)", 0, 12345);
-	testMainIntegerArg("def main(int x) int : toInt32(-12345i64)", 0, -12345);
-	testMainIntegerArg("def main(int x) int : toInt32(-2147483648i64)", 0, -2147483647 - 1);
-	testMainIntegerArg("def main(int x) int : toInt32(2147483647i64)", 0, 2147483647);
-
-	// Test some out-of domain values
-	testMainIntegerArgInvalidProgram("def main(int x) int : toInt32(-2147483649i64)");
-	testMainIntegerArgInvalidProgram("def main(int x) int : toInt32(-2147483650i64)");
-	testMainIntegerArgInvalidProgram("def main(int x) int : toInt32(-300147483650i64)");
-	testMainIntegerArgInvalidProgram("def main(int x) int : toInt32(-9223372036854775808i64)"); // -2^63
-	testMainIntegerArgInvalidProgram("def main(int x) int : toInt32(2147483648i64)");
-	testMainIntegerArgInvalidProgram("def main(int x) int : toInt32(2147483649i64)");
-	testMainIntegerArgInvalidProgram("def main(int x) int : toInt32(300147483650i64)");
-	testMainIntegerArgInvalidProgram("def main(int x) int : toInt32(9223372036854775807i64)"); // 2^63-1
-
-	// TODO: should be able to remove ALLOW_UNSAFE at some point.
-	testMainIntegerArg("def main(int x) int : toInt32(toInt64(x))", 0, 0, ALLOW_UNSAFE);
-	testMainIntegerArg("def main(int x) int : toInt32(toInt64(x))", 1, 1, ALLOW_UNSAFE);
-	testMainIntegerArg("def main(int x) int : toInt32(toInt64(x))", -1, -1, ALLOW_UNSAFE);
-	testMainIntegerArg("def main(int x) int : toInt32(toInt64(x))", -2147483647 - 1, -2147483647 - 1, ALLOW_UNSAFE);
-	testMainIntegerArg("def main(int x) int : toInt32(toInt64(x))", 2147483647, 2147483647, ALLOW_UNSAFE);
-
-	// ===================================================================
-	// Test toInt64
-	// ===================================================================
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(0)", 0, 0);
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(1)", 0, 1);
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(-1)", 0, -1);
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(-2147483648)", 0, -2147483648LL);
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(2147483647)", 0, 2147483647);
-
-	
-	// ===================================================================
-	// Test string elem function (elem(string s, uint64 index) char)
-	// ===================================================================
-	// TODO: should be able to remove ALLOW_UNSAFE at some point.
-	testMainIntegerArg("def main(int x) int : codePoint(elem(\"a\", 0i64))", 0, (int)'a', ALLOW_UNSAFE | INVALID_OPENCL);
-	testMainIntegerArg("def main(int x) int : codePoint(elem(\"hello\", 0i64))", 0, (int)'h', ALLOW_UNSAFE | INVALID_OPENCL);
-	testMainIntegerArg("def main(int x) int : codePoint(elem(\"hello\", 1i64))", 0, (int)'e', ALLOW_UNSAFE | INVALID_OPENCL);
-	testMainIntegerArg("def main(int x) int : codePoint(elem(\"hello\", 4i64))", 0, (int)'o', ALLOW_UNSAFE | INVALID_OPENCL);
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"abc\", x)))", 0, (int)'a', ALLOW_UNSAFE | INVALID_OPENCL);
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"abc\", x)))", 1, (int)'b', ALLOW_UNSAFE | INVALID_OPENCL);
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"abc\", x)))", 2, (int)'c', ALLOW_UNSAFE | INVALID_OPENCL);
-
-	// with multi-byte chars:
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"\\u{393}\", x)))", 0, 0x393, ALLOW_UNSAFE | INVALID_OPENCL);
-
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"\\u{393}bc\", x)))", 0, 0x393, ALLOW_UNSAFE | INVALID_OPENCL);
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"\\u{393}bc\", x)))", 1, (int)'b', ALLOW_UNSAFE | INVALID_OPENCL);
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"\\u{393}bc\", x)))", 2, (int)'c', ALLOW_UNSAFE | INVALID_OPENCL);
-
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"a\\u{393}c\", x)))", 0, (int)'a', ALLOW_UNSAFE | INVALID_OPENCL);
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"a\\u{393}c\", x)))", 1, 0x393, ALLOW_UNSAFE | INVALID_OPENCL);
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"a\\u{393}c\", x)))", 2, (int)'c', ALLOW_UNSAFE | INVALID_OPENCL);
-
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"ab\\u{393}\", x)))", 0, (int)'a', ALLOW_UNSAFE | INVALID_OPENCL);
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"ab\\u{393}\", x)))", 1, (int)'b', ALLOW_UNSAFE | INVALID_OPENCL);
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"ab\\u{393}\", x)))", 2, 0x393, ALLOW_UNSAFE | INVALID_OPENCL);
-
-	// ===================================================================
-	// Test Escaped characters in string literals
-	// ===================================================================
-	const std::string SINGLE_QUOTE = "'";
-	const std::string DBL_QUOTE = "\"";
-	const std::string NEWLINE = "\n";
-	const std::string CRG_RTN = "\r";
-	const std::string TAB = "\t";
-	const std::string BACKSLASH = "\\";
-	testMainStringArg("def main(string s) string : " + DBL_QUOTE + NEWLINE + DBL_QUOTE, "hello", "\n"); // \n
-	testMainStringArg("def main(string s) string : " + DBL_QUOTE + CRG_RTN + DBL_QUOTE, "hello", "\r"); // \r
-	testMainStringArg("def main(string s) string : " + DBL_QUOTE + TAB + DBL_QUOTE, "hello", "\t"); // \t
-	testMainStringArg("def main(string s) string : " + DBL_QUOTE + BACKSLASH + BACKSLASH + DBL_QUOTE, "hello", "\\"); // test backslash escape
-	testMainStringArg("def main(string s) string : " + DBL_QUOTE + BACKSLASH + DBL_QUOTE + DBL_QUOTE, "hello", "\""); // test double quote escape
-
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + BACKSLASH + "a" + DBL_QUOTE + ")");
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + BACKSLASH + "a"); // EOF in middle of literal
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + BACKSLASH + "n"); // EOF in middle of literal
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + BACKSLASH); // EOF in middle of literal
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE); // EOF in middle of literal
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{0}"); // EOF immediately after literal
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{0"); // EOF in middle of literal
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{"); // EOF in middle of literal
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u"); // EOF in middle of literal
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\"); // EOF in middle of literal
-
-	// Test Unicode code-point escape sequence
-	testMainIntegerArg("def main(int x) int : length(" + DBL_QUOTE + "\\u{0}" + DBL_QUOTE + ")", 2, 1, INVALID_OPENCL);
-	testMainIntegerArg("def main(int x) int : length(" + DBL_QUOTE + "\\u{7FFF}" + DBL_QUOTE + ")", 2, 1, INVALID_OPENCL);
-	testMainIntegerArg("def main(int x) int : length(" + DBL_QUOTE + "\\u{10FFFF}" + DBL_QUOTE + ")", 2, 1, INVALID_OPENCL);
-
-	testMainStringArg("def main(string s) string : " + DBL_QUOTE + "\\u{393}" + DBL_QUOTE, "hello", "\xCE\x93"); // Greek capital letter gamma, U+393, http://unicodelookup.com/#gamma/1, 
-	testMainStringArg("def main(string s) string : " + DBL_QUOTE + "\\u{20AC}" + DBL_QUOTE, "hello", "\xE2\x82\xAC"); // Euro sign, U+20AC
-	testMainStringArg("def main(string s) string : " + DBL_QUOTE + "\\u{2005A}" + DBL_QUOTE, "hello", "\xF0\xA0\x81\x9A"); // A vietnamese character: U+2005A  http://www.isthisthingon.org/unicode/index.php?page=20&subpage=0&glyph=2005A
-
-
-	// Test some invalid Unicode code-point escape sequences
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{-0}" + DBL_QUOTE + ")");
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{q}" + DBL_QUOTE + ")");
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{7Fq}" + DBL_QUOTE + ")");
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{11FFFF}" + DBL_QUOTE + ")");
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{11FFFF" + DBL_QUOTE + ")");
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{" + DBL_QUOTE + ")");
-
-
-	// ===================================================================
-	// Test Escaped characters in char literals
-	// ===================================================================
-	testMainStringArg("def main(string s) string : toString('" + NEWLINE + "')", "hello", "\n"); // \n
-	testMainStringArg("def main(string s) string : toString('" + CRG_RTN + "')", "hello", "\r"); // \r
-	testMainStringArg("def main(string s) string : toString('" + TAB + "')", "hello", "\t"); // \t
-	testMainStringArg("def main(string s) string : toString('" + BACKSLASH + BACKSLASH + "')", "hello", "\\"); // test backslash escape
-	testMainStringArg("def main(string s) string : toString('" + BACKSLASH + SINGLE_QUOTE + "')", "hello", "'"); // test single quote escape
-
-
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\a'))");
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\a"); // EOF in middle of literal
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\"); // EOF in middle of literal
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('"); // EOF in middle of literal
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('"); // EOF in middle of literal
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{0}"); // EOF immediately after literal
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{0"); // EOF in middle of literal
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{"); // EOF in middle of literal
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u"); // EOF in middle of literal
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\"); // EOF in middle of literal
-
-	// Test Unicode code-point escape sequence
-	testMainIntegerArg("def main(int x) int : length(toString('\\u{0}'))", 2, 1, INVALID_OPENCL);
-	testMainIntegerArg("def main(int x) int : length(toString('\\u{7FFF}'))", 2, 1, INVALID_OPENCL);
-	testMainIntegerArg("def main(int x) int : length(toString('\\u{10FFFF}'))", 2, 1, INVALID_OPENCL);
-
-	testMainStringArg("def main(string s) string : toString('\\u{393}')", "hello", "\xCE\x93"); // Greek capital letter gamma, U+393, http://unicodelookup.com/#gamma/1, 
-	testMainStringArg("def main(string s) string : toString('\\u{20AC}')", "hello", "\xE2\x82\xAC"); // Euro sign, U+20AC
-	testMainStringArg("def main(string s) string : toString('\\u{2005A}')", "hello", "\xF0\xA0\x81\x9A"); // A vietnamese character: U+2005A  http://www.isthisthingon.org/unicode/index.php?page=20&subpage=0&glyph=2005A
-
-
-	// Test some invalid Unicode code-point escape sequences
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{-0}'))");
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{q}'))");
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{7Fq}'))");
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{11FFFF}'))");
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{11FFFF'))"); // EOF in middle of literal
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{'))"); // EOF in middle of literal
-
-
-	// ===================================================================
-	// Test codePoint()
-	// ===================================================================
-	testMainIntegerArg("def main(int x) int : codePoint('\\u{0}')", 2, 0, INVALID_OPENCL);
-	testMainIntegerArg("def main(int x) int : codePoint('a')", 2, 0x61, INVALID_OPENCL);
-	testMainIntegerArg("def main(int x) int : codePoint('\\u{393}')", 2, 0x393, INVALID_OPENCL);
-	testMainIntegerArg("def main(int x) int : codePoint('\\u{20AC}')", 2, 0x20AC, INVALID_OPENCL);
-	testMainIntegerArg("def main(int x) int : codePoint('\\u{2005A}')", 2, 0x2005A, INVALID_OPENCL);
-
-	// ===================================================================
-	// Test character literals
-	// ===================================================================
-	testMainIntegerArg("def main(int x) int : let c = 'a' in 10 ", 2, 10, INVALID_OPENCL);
-
-
-	// Return a character from a function
-	testMainIntegerArg("def f() char : 'a'    def main(int x) int : let c = f() in 10 ", 2, 10, INVALID_OPENCL);
-
-
-	// ===================================================================
-	// Test toString(char)
-	// ===================================================================
-	testMainStringArg("def main(string s) string : toString('a')", "", "a");
-
-	testMainStringArg("def main(string s) string : toString(length(s) < 2 ? 'a' : 'b')", "", "a"); // Test with runtime character choice
-	testMainStringArg("def main(string s) string : toString(length(s) < 2 ? 'a' : 'b')", "hello", "b"); // Test with runtime character choice
-
-	testMainIntegerArg("def main(int x) int : length(toString('a'))", 2, 1, INVALID_OPENCL);
-
-	testMainIntegerArg("def main(int x) int : length(toString(x < 5 ? 'a' : 'b'))", 2, 1, INVALID_OPENCL); // Test with runtime character
-
-
-	testMainStringArg("def main(string s) string : concatStrings(toString('a'), toString('b'))", "", "ab");
-
-
-	// ===================================================================
-	// Test ternary conditional operator (?:)
-	// ===================================================================
-	testMainIntegerArg("def main(int x) int : x < 5 ? 10 : 5 ", 2, 10);
-	testMainIntegerArg("def main(int x) int : x < 5 ? 10 : 5 ", 6, 5);
-
-	testMainIntegerArg("def main(int x) int : (x < 5) ? 10 : 5 ", 6, 5);
-	testMainIntegerArg("def main(int x) int : (x * 2) < 5 ? 10 : 5 ", 6, 5);
-
-	// Test nested ?:
-	testMainIntegerArg("def main(int x) int : x < 5 ? (x < 2 ? 1 : 2) : 5 ", 1, 1);
-	testMainIntegerArg("def main(int x) int : x < 5 ? x < 2 ? 1 : 2 : 5 ", 1, 1);
-
-	testMainIntegerArg("def main(int x) int : x < 5 ? x < 2 ? 1 : 2 : 5 ", 2, 2);
-	testMainIntegerArg("def main(int x) int : x < 5 ? x < 2 ? 1 : 2 : 5 ", 10, 5);
-	testMainIntegerArg("def main(int x) int : (x < 5) ? x < 2 ? 1 : 2 : 5 ", 10, 5); // Test with parens
-	testMainIntegerArg("def main(int x) int : x < 5 ? (x < 2) ? 1 : 2 : 5 ", 10, 5); // Test with parens
-
-
-	// ===================================================================
-	// Test sign()
-	// ===================================================================
-	testMainFloatArg("def main(float x) float :	sign(x)", 4.f, 1.f);
-	testMainFloatArg("def main(float x) float :	sign(x)", -4.f, -1.f);
-	//NOTE: a bit of a problem wtih sign(0).  sign(0) is plus/minus zero in OpenCL.
-	// but copysign(1.0, 0.f) is one.
-	//testMainFloatArg("def main(float x) float :	sign(x)", 0.f, 1.f);
-
-	// sign() on vectors:
-	testMainFloatArg("def main(float x) float :	sign([x, x, x, x]v)[0]", -4.f, -1.f);
-	testMainFloatArg("def main(float x) float :	sign([x, x, x, x]v)[3]", -4.f, -1.f);
-	testMainFloatArg("def main(float x) float :	sign([4.0, 4.0, 4.0, 4.0]v)[3]", -4.f, 1.f);
-
-	// with vector of length 3:
-	testMainFloatArg("def main(float x) float :	sign([x, x, x]v)[0]", -4.f, -1.f);
-	testMainFloatArg("def main(float x) float :	sign([x, x, x]v)[2]", -4.f, -1.f);
-	testMainFloatArg("def main(float x) float :	sign([4.0, 4.0, 4.0]v)[2]", -4.f, 1.f);
-
-
-	// Caused a crash earlier:
-	testMainFloatArgInvalidProgram("struct Float4Struct { vector<float, 4> v }   def sin(Float4Struct f) : Float4Struct(sign(f.v))		def main(Float4Struct a, Float4Struct b) Float4Struct : sin(a)");
-
-	testMainFloatArgAllowUnsafe("struct S { float x }   def f(S s) float : s.x   def main(float x) float :	f(S(x))", 1.f, 1.f);
-
-
-	testMainIntegerArg("def main(int x) int :	 length(\"hello\")", 1, 5, INVALID_OPENCL);
-
-	// ===================================================================
-	// Test optimisation of varray from heap allocated to stack allocated
-	// ===================================================================
-	results = testMainFloatArg("def main(float x) float :	 [3.0, 4.0, 5.0]va[0]", 1.f, 3.f, INVALID_OPENCL);
-	testAssert(results.stats.num_heap_allocation_calls == 0);
-
-	results = testMainFloatArg("def main(float x) float :	 let v = [3.0, 4.0, 5.0]va in v[0]", 1.f, 3.f, INVALID_OPENCL);
-	testAssert(results.stats.num_heap_allocation_calls == 0);
-
-	results = testMainFloatArg("def main(float x) float :	 let v = [3.0, 4.0, 5.0]va in v[1]", 1.f, 4.f, INVALID_OPENCL);
-	testAssert(results.stats.num_heap_allocation_calls == 0);
-
-	results = testMainFloatArg("def main(float x) float :	 let v = [3.0, 4.0, 5.0]va in v[2]", 1.f, 5.f, INVALID_OPENCL);
-	testAssert(results.stats.num_heap_allocation_calls == 0);
-
-	results = testMainFloatArg("def main(float x) float :	 let v = [x + 3.0, x + 4.0, x + 5.0]va in v[0]", 10.f, 13.f, INVALID_OPENCL);
-	testAssert(results.stats.num_heap_allocation_calls == 0);
-
-	// Test varray being returned from function, has to be heap allocated.  (Assuming no inlining of f)
-	results = testMainFloatArgAllowUnsafe("def f(float x) : [x + 3.0, x + 4.0, x + 5.0]va             def main(float x) float :	 let v = f(x) in v[0]", 10.f, 13.f, INVALID_OPENCL);
-	testAssert(results.stats.num_heap_allocation_calls <= 1);
-
-	
-	// ===================================================================
-	// Test destructuring assignment
-	// ===================================================================
-	testMainFloatArg("def main(float x) float :	 let a, b = (x + 1.0, x + 2.0) in a", 4.f, 5.f);
-
-	testMainFloatArg("def main(float x) float :	 let a, b = (3, 4) in a", 1.f, 3.f);
-	testMainFloatArg("def main(float x) float :	 let a, b = (3, 4) in b", 1.f, 4.f);
-
-	// Test on a tuple returned from a function
-	testMainFloatArg("def f(float x) : (x + 1.0, x + 2.0)           def main(float x) float :	 let a, b = f(x) in a", 1.f, 2.f);
-	testMainFloatArg("def f(float x) : (x + 1.0, x + 2.0)           def main(float x) float :	 let a, b = f(x) in b", 1.f, 3.f);
-
-	// Not enough vars
-	testMainFloatArgInvalidProgram("def main(float x) float :	 let a, b = (1, 2, 3) in a");
-	testMainFloatArgInvalidProgram("def main(float x) float :	 let a, b, c = (1, 2, 3, 4) in a");
-
-	// Too many vars
-	testMainFloatArgInvalidProgram("def main(float x) float :	 let a, b = [1]t in a");
-	testMainFloatArgInvalidProgram("def main(float x) float :	 let a, b, c = (1, 2) in a");
-	testMainFloatArgInvalidProgram("def main(float x) float :	 let a, b, c, d = (1, 2, 3) in a");
-
-	// Test type declarations on let vars
-	testMainFloatArg("def main(float x) float :	 let float a, b = (3.0, 4.0) in a", 1.f, 3.f);
-	testMainFloatArg("def main(float x) float :	 let float a, float b = (3.0, 4.0f) in a", 1.f, 3.f);
-	testMainFloatArg("def main(float x) float :	 let a, float b = (3.0, 4.0f) in a", 1.f, 3.f);
-	testMainFloatArg("def main(float x) float :	 let float a, b = (3.0, 4.0) in b", 1.f, 4.f);
-	testMainFloatArg("def main(float x) float :	 let float a, float b = (3.0, 4.0f) in a", 1.f, 3.f);
-	testMainFloatArg("def main(float x) float :	 let a, float b = (3.0, 4.0f) in a", 1.f, 3.f);
-
-	// TODO: test type coercion
-
-	// Test ref-counted types
-	testMainFloatArgAllowUnsafe("def main(float x) float :	 let a, b = ([3.0, 4.0, 5.0]va, 10.0) in a[0]", 1.f, 3.f, INVALID_OPENCL);
-	testMainFloatArgAllowUnsafe("def main(float x) float :	 let a, b = ([3.0, 4.0, 5.0]va, 10.0) in a[1]", 1.f, 4.f, INVALID_OPENCL);
-
-	// Test with structs
-	testMainFloatArg("struct S { float s }     def main(float x) float :	 let a, b = (S(3.0), 10.0) in a.s", 1.f, 3.f);
-
-
-	
-
-
-	// Test on a tuple returned from a function with a struct
-	testMainFloatArg("struct S { float s }     def f(float x) : (S(x + 1.0), x + 2.0)           def main(float x) float :	 let a, b = f(x) in a.s", 1.f, 2.f);
-	
-	// Test on a tuple returned from a function with a varray
-	testMainFloatArgAllowUnsafe("def f(float x) : ([x + 1.0]va, x + 2.0)           def main(float x) float :	 let a, b = f(x) in a[0]", 1.f, 2.f, INVALID_OPENCL);
-
-	// Test with an incorrect number of variable names (caused a crash at some point)
-	testMainIntegerArgInvalidProgram("def main(float x) float :	 let float, a, b = (3.0, 4.0) in b");
-
-	// Test map
-	{
-		const float a[] = {1.0f, 2.0f, 3.0f, 4.0f};
-		const float b[] = {10.0f, 20.0f, 30.0f, 40.0f};
-		float target_results[] = {1.0f, 4.0f, 9.0f, 16.0f};
-
-		testFloatArray(
-			"def square(float x) float : x*x			\n\
-			def main(array<float, 4> a, array<float, 4> b) array<float, 4> : map(square, a)",
-			a, b, target_results, 4);
-	}
-
-	
-
-	testMainFloatArg("struct S { int x }  def f(S s) S : let t = S(1) in s   def main(float x) float : let v = [99]va in x", 1.f, 1.0f, INVALID_OPENCL);
-
-
-	// ===================================================================
-	// Test Refcounting optimisations: test that a let variable used as a function argument is not incremented and decremented
-	// ===================================================================
-
-	testMainIntegerArg("def f(string s, int x) int : length(s) + x       def main(int x) int : let s = \"hello\" in f(s, x)", 1, 6, INVALID_OPENCL);
-
-
-	// ===================================================================
-	// Test Refcounting optimisations: test that a argument variable used as a function argument is not incremented and decremented
-	// ===================================================================
-
-	testMainIntegerArg("def f(string s, int x) int : length(s) + x     def g(string s, int x) int : f(s, x)      def main(int x) int : g(\"hello\", x)", 1, 6, INVALID_OPENCL);
-
-	// test that a argument variable used as a function argument is not incremented and decremented, even when the argument may be stored and returned in the result.
-	testMainIntegerArg("struct S { string str }      def f(string str) S : S(str)     def g(string s) S : f(s)      def main(int x) int : length(g(\"hello\").str)", 1, 5, INVALID_OPENCL);
-
-
-
-	testMainIntegerArg("def f(string s, int x) int : length(s) + x       def main(int x) int : f(\"hello\", x)", 1, 6, INVALID_OPENCL);
-
-
-	// ===================================================================
-	// Test length function
-	// ===================================================================
-	// Test length() function on varrays
-	testMainInt64Arg("def main(int64 x) int64 : length([1.0]va)", 1, 1);
-	testMainInt64Arg("def main(int64 x) int64 : length([1.0, 2.0, 3.0]va)", 1, 3);
-
-	// Test length() function on tuples
-	testMainInt64Arg("def main(int64 x) int64 : length([1.0]t)", 1, 1);
-	testMainInt64Arg("def main(int64 x) int64 : length([1.0, 2.0, 3.0]t)", 1, 3);
-
-	// Test length() function on arrays
-	testMainInt64Arg("def main(int64 x) int64 : length([1.0]a)", 1, 1);
-	testMainInt64Arg("def main(int64 x) int64 : length([1.0, 2.0, 3.0]a)", 1, 3);
-
-	// Test length() function on vectors
-	testMainInt64Arg("def main(int64 x) int64 : length([1.0]v)", 1, 1);
-	testMainInt64Arg("def main(int64 x) int64 : length([1.0, 2.0, 3.0]v)", 1, 3);
-
-	// ===================================================================
+		// ===================================================================
 	// Test VArrays
 	// ===================================================================
 	
@@ -1247,116 +724,299 @@ void LanguageTests::run()
 
 	testMainFloatArgAllowUnsafe("def f(varray<float> v) : v     TEST = f([3.0]va)     def main(float x) float : TEST[0]", 10.f, 3.0f, INVALID_OPENCL);
 	testMainFloatArgAllowUnsafe("def f(varray<float> v) : v     TEST = f([3.0]va)     def main(float x) float : TEST[0] + TEST[0]", 10.f, 6.0f, INVALID_OPENCL);
+}
 
 
+static void testToIntFunctions()
+{
+	// ===================================================================
+	// Test toInt32
+	// ===================================================================
+	testMainIntegerArg("def main(int x) int : toInt32(0i64)", 0, 0);
+	testMainIntegerArg("def main(int x) int : toInt32(1i64)", 0, 1);
+	testMainIntegerArg("def main(int x) int : toInt32(-1i64)", 0, -1);
+	testMainIntegerArg("def main(int x) int : toInt32(12345i64)", 0, 12345);
+	testMainIntegerArg("def main(int x) int : toInt32(-12345i64)", 0, -12345);
+	testMainIntegerArg("def main(int x) int : toInt32(-2147483648i64)", 0, -2147483647 - 1);
+	testMainIntegerArg("def main(int x) int : toInt32(2147483647i64)", 0, 2147483647);
 
+	// Test some out-of domain values
+	testMainIntegerArgInvalidProgram("def main(int x) int : toInt32(-2147483649i64)");
+	testMainIntegerArgInvalidProgram("def main(int x) int : toInt32(-2147483650i64)");
+	testMainIntegerArgInvalidProgram("def main(int x) int : toInt32(-300147483650i64)");
+	testMainIntegerArgInvalidProgram("def main(int x) int : toInt32(-9223372036854775808i64)"); // -2^63
+	testMainIntegerArgInvalidProgram("def main(int x) int : toInt32(2147483648i64)");
+	testMainIntegerArgInvalidProgram("def main(int x) int : toInt32(2147483649i64)");
+	testMainIntegerArgInvalidProgram("def main(int x) int : toInt32(300147483650i64)");
+	testMainIntegerArgInvalidProgram("def main(int x) int : toInt32(9223372036854775807i64)"); // 2^63-1
+
+	// TODO: should be able to remove ALLOW_UNSAFE at some point.
+	testMainIntegerArg("def main(int x) int : toInt32(toInt64(x))", 0, 0, ALLOW_UNSAFE);
+	testMainIntegerArg("def main(int x) int : toInt32(toInt64(x))", 1, 1, ALLOW_UNSAFE);
+	testMainIntegerArg("def main(int x) int : toInt32(toInt64(x))", -1, -1, ALLOW_UNSAFE);
+	testMainIntegerArg("def main(int x) int : toInt32(toInt64(x))", -2147483647 - 1, -2147483647 - 1, ALLOW_UNSAFE);
+	testMainIntegerArg("def main(int x) int : toInt32(toInt64(x))", 2147483647, 2147483647, ALLOW_UNSAFE);
+
+	// ===================================================================
+	// Test toInt64
+	// ===================================================================
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(0)", 0, 0);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(1)", 0, 1);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(-1)", 0, -1);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(-2147483648)", 0, -2147483648LL);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(2147483647)", 0, 2147483647);
+}
+
+
+static void testStringFunctions()
+{
+	// ===================================================================
+	// Test string elem function (elem(string s, uint64 index) char)
+	// ===================================================================
+	// TODO: should be able to remove ALLOW_UNSAFE at some point.
+	testMainIntegerArg("def main(int x) int : codePoint(elem(\"a\", 0i64))", 0, (int)'a', ALLOW_UNSAFE | INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int : codePoint(elem(\"hello\", 0i64))", 0, (int)'h', ALLOW_UNSAFE | INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int : codePoint(elem(\"hello\", 1i64))", 0, (int)'e', ALLOW_UNSAFE | INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int : codePoint(elem(\"hello\", 4i64))", 0, (int)'o', ALLOW_UNSAFE | INVALID_OPENCL);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"abc\", x)))", 0, (int)'a', ALLOW_UNSAFE | INVALID_OPENCL);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"abc\", x)))", 1, (int)'b', ALLOW_UNSAFE | INVALID_OPENCL);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"abc\", x)))", 2, (int)'c', ALLOW_UNSAFE | INVALID_OPENCL);
+
+	// with multi-byte chars:
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"\\u{393}\", x)))", 0, 0x393, ALLOW_UNSAFE | INVALID_OPENCL);
+
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"\\u{393}bc\", x)))", 0, 0x393, ALLOW_UNSAFE | INVALID_OPENCL);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"\\u{393}bc\", x)))", 1, (int)'b', ALLOW_UNSAFE | INVALID_OPENCL);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"\\u{393}bc\", x)))", 2, (int)'c', ALLOW_UNSAFE | INVALID_OPENCL);
+
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"a\\u{393}c\", x)))", 0, (int)'a', ALLOW_UNSAFE | INVALID_OPENCL);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"a\\u{393}c\", x)))", 1, 0x393, ALLOW_UNSAFE | INVALID_OPENCL);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"a\\u{393}c\", x)))", 2, (int)'c', ALLOW_UNSAFE | INVALID_OPENCL);
+
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"ab\\u{393}\", x)))", 0, (int)'a', ALLOW_UNSAFE | INVALID_OPENCL);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"ab\\u{393}\", x)))", 1, (int)'b', ALLOW_UNSAFE | INVALID_OPENCL);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"ab\\u{393}\", x)))", 2, 0x393, ALLOW_UNSAFE | INVALID_OPENCL);
+
+	// ===================================================================
+	// Test Escaped characters in string literals
+	// ===================================================================
+	const std::string SINGLE_QUOTE = "'";
+	const std::string DBL_QUOTE = "\"";
+	const std::string NEWLINE = "\n";
+	const std::string CRG_RTN = "\r";
+	const std::string TAB = "\t";
+	const std::string BACKSLASH = "\\";
+	testMainStringArg("def main(string s) string : " + DBL_QUOTE + NEWLINE + DBL_QUOTE, "hello", "\n"); // \n
+	testMainStringArg("def main(string s) string : " + DBL_QUOTE + CRG_RTN + DBL_QUOTE, "hello", "\r"); // \r
+	testMainStringArg("def main(string s) string : " + DBL_QUOTE + TAB + DBL_QUOTE, "hello", "\t"); // \t
+	testMainStringArg("def main(string s) string : " + DBL_QUOTE + BACKSLASH + BACKSLASH + DBL_QUOTE, "hello", "\\"); // test backslash escape
+	testMainStringArg("def main(string s) string : " + DBL_QUOTE + BACKSLASH + DBL_QUOTE + DBL_QUOTE, "hello", "\""); // test double quote escape
+
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + BACKSLASH + "a" + DBL_QUOTE + ")");
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + BACKSLASH + "a"); // EOF in middle of literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + BACKSLASH + "n"); // EOF in middle of literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + BACKSLASH); // EOF in middle of literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE); // EOF in middle of literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{0}"); // EOF immediately after literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{0"); // EOF in middle of literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{"); // EOF in middle of literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u"); // EOF in middle of literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\"); // EOF in middle of literal
+
+	// Test Unicode code-point escape sequence
+	testMainIntegerArg("def main(int x) int : length(" + DBL_QUOTE + "\\u{0}" + DBL_QUOTE + ")", 2, 1, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int : length(" + DBL_QUOTE + "\\u{7FFF}" + DBL_QUOTE + ")", 2, 1, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int : length(" + DBL_QUOTE + "\\u{10FFFF}" + DBL_QUOTE + ")", 2, 1, INVALID_OPENCL);
+
+	testMainStringArg("def main(string s) string : " + DBL_QUOTE + "\\u{393}" + DBL_QUOTE, "hello", "\xCE\x93"); // Greek capital letter gamma, U+393, http://unicodelookup.com/#gamma/1, 
+	testMainStringArg("def main(string s) string : " + DBL_QUOTE + "\\u{20AC}" + DBL_QUOTE, "hello", "\xE2\x82\xAC"); // Euro sign, U+20AC
+	testMainStringArg("def main(string s) string : " + DBL_QUOTE + "\\u{2005A}" + DBL_QUOTE, "hello", "\xF0\xA0\x81\x9A"); // A vietnamese character: U+2005A  http://www.isthisthingon.org/unicode/index.php?page=20&subpage=0&glyph=2005A
+
+
+	// Test some invalid Unicode code-point escape sequences
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{-0}" + DBL_QUOTE + ")");
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{q}" + DBL_QUOTE + ")");
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{7Fq}" + DBL_QUOTE + ")");
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{11FFFF}" + DBL_QUOTE + ")");
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{11FFFF" + DBL_QUOTE + ")");
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{" + DBL_QUOTE + ")");
+
+
+	// ===================================================================
+	// Test Escaped characters in char literals
+	// ===================================================================
+	testMainStringArg("def main(string s) string : toString('" + NEWLINE + "')", "hello", "\n"); // \n
+	testMainStringArg("def main(string s) string : toString('" + CRG_RTN + "')", "hello", "\r"); // \r
+	testMainStringArg("def main(string s) string : toString('" + TAB + "')", "hello", "\t"); // \t
+	testMainStringArg("def main(string s) string : toString('" + BACKSLASH + BACKSLASH + "')", "hello", "\\"); // test backslash escape
+	testMainStringArg("def main(string s) string : toString('" + BACKSLASH + SINGLE_QUOTE + "')", "hello", "'"); // test single quote escape
+
+
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\a'))");
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\a"); // EOF in middle of literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\"); // EOF in middle of literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('"); // EOF in middle of literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('"); // EOF in middle of literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{0}"); // EOF immediately after literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{0"); // EOF in middle of literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{"); // EOF in middle of literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u"); // EOF in middle of literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\"); // EOF in middle of literal
+
+	// Test Unicode code-point escape sequence
+	testMainIntegerArg("def main(int x) int : length(toString('\\u{0}'))", 2, 1, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int : length(toString('\\u{7FFF}'))", 2, 1, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int : length(toString('\\u{10FFFF}'))", 2, 1, INVALID_OPENCL);
+
+	testMainStringArg("def main(string s) string : toString('\\u{393}')", "hello", "\xCE\x93"); // Greek capital letter gamma, U+393, http://unicodelookup.com/#gamma/1, 
+	testMainStringArg("def main(string s) string : toString('\\u{20AC}')", "hello", "\xE2\x82\xAC"); // Euro sign, U+20AC
+	testMainStringArg("def main(string s) string : toString('\\u{2005A}')", "hello", "\xF0\xA0\x81\x9A"); // A vietnamese character: U+2005A  http://www.isthisthingon.org/unicode/index.php?page=20&subpage=0&glyph=2005A
+
+
+	// Test some invalid Unicode code-point escape sequences
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{-0}'))");
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{q}'))");
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{7Fq}'))");
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{11FFFF}'))");
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{11FFFF'))"); // EOF in middle of literal
+	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{'))"); // EOF in middle of literal
+
+
+	// ===================================================================
+	// Test codePoint()
+	// ===================================================================
+	testMainIntegerArg("def main(int x) int : codePoint('\\u{0}')", 2, 0, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int : codePoint('a')", 2, 0x61, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int : codePoint('\\u{393}')", 2, 0x393, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int : codePoint('\\u{20AC}')", 2, 0x20AC, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int : codePoint('\\u{2005A}')", 2, 0x2005A, INVALID_OPENCL);
+
+	// ===================================================================
+	// Test character literals
+	// ===================================================================
+	testMainIntegerArg("def main(int x) int : let c = 'a' in 10 ", 2, 10, INVALID_OPENCL);
+
+
+	// Return a character from a function
+	testMainIntegerArg("def f() char : 'a'    def main(int x) int : let c = f() in 10 ", 2, 10, INVALID_OPENCL);
+
+
+	// ===================================================================
+	// Test toString(char)
+	// ===================================================================
+	testMainStringArg("def main(string s) string : toString('a')", "", "a");
+
+	testMainStringArg("def main(string s) string : toString(length(s) < 2 ? 'a' : 'b')", "", "a"); // Test with runtime character choice
+	testMainStringArg("def main(string s) string : toString(length(s) < 2 ? 'a' : 'b')", "hello", "b"); // Test with runtime character choice
+
+	testMainIntegerArg("def main(int x) int : length(toString('a'))", 2, 1, INVALID_OPENCL);
+
+	testMainIntegerArg("def main(int x) int : length(toString(x < 5 ? 'a' : 'b'))", 2, 1, INVALID_OPENCL); // Test with runtime character
+
+
+	testMainStringArg("def main(string s) string : concatStrings(toString('a'), toString('b'))", "", "ab");
+}
+
+
+static void testDestructuringAssignment()
+{
+	// ===================================================================
+	// Test destructuring assignment
+	// ===================================================================
+	testMainFloatArg("def main(float x) float :	 let a, b = (x + 1.0, x + 2.0) in a", 4.f, 5.f);
+
+	testMainFloatArg("def main(float x) float :	 let a, b = (3, 4) in a", 1.f, 3.f);
+	testMainFloatArg("def main(float x) float :	 let a, b = (3, 4) in b", 1.f, 4.f);
+
+	// Test on a tuple returned from a function
+	testMainFloatArg("def f(float x) : (x + 1.0, x + 2.0)           def main(float x) float :	 let a, b = f(x) in a", 1.f, 2.f);
+	testMainFloatArg("def f(float x) : (x + 1.0, x + 2.0)           def main(float x) float :	 let a, b = f(x) in b", 1.f, 3.f);
+
+	// Not enough vars
+	testMainFloatArgInvalidProgram("def main(float x) float :	 let a, b = (1, 2, 3) in a");
+	testMainFloatArgInvalidProgram("def main(float x) float :	 let a, b, c = (1, 2, 3, 4) in a");
+
+	// Too many vars
+	testMainFloatArgInvalidProgram("def main(float x) float :	 let a, b = [1]t in a");
+	testMainFloatArgInvalidProgram("def main(float x) float :	 let a, b, c = (1, 2) in a");
+	testMainFloatArgInvalidProgram("def main(float x) float :	 let a, b, c, d = (1, 2, 3) in a");
+
+	// Test type declarations on let vars
+	testMainFloatArg("def main(float x) float :	 let float a, b = (3.0, 4.0) in a", 1.f, 3.f);
+	testMainFloatArg("def main(float x) float :	 let float a, float b = (3.0, 4.0f) in a", 1.f, 3.f);
+	testMainFloatArg("def main(float x) float :	 let a, float b = (3.0, 4.0f) in a", 1.f, 3.f);
+	testMainFloatArg("def main(float x) float :	 let float a, b = (3.0, 4.0) in b", 1.f, 4.f);
+	testMainFloatArg("def main(float x) float :	 let float a, float b = (3.0, 4.0f) in a", 1.f, 3.f);
+	testMainFloatArg("def main(float x) float :	 let a, float b = (3.0, 4.0f) in a", 1.f, 3.f);
+
+	// TODO: test type coercion
+
+	// Test ref-counted types
+	testMainFloatArgAllowUnsafe("def main(float x) float :	 let a, b = ([3.0, 4.0, 5.0]va, 10.0) in a[0]", 1.f, 3.f, INVALID_OPENCL);
+	testMainFloatArgAllowUnsafe("def main(float x) float :	 let a, b = ([3.0, 4.0, 5.0]va, 10.0) in a[1]", 1.f, 4.f, INVALID_OPENCL);
+
+	// Test with structs
+	testMainFloatArg("struct S { float s }     def main(float x) float :	 let a, b = (S(3.0), 10.0) in a.s", 1.f, 3.f);
+
+
+	// Test on a tuple returned from a function with a struct
+	testMainFloatArg("struct S { float s }     def f(float x) : (S(x + 1.0), x + 2.0)           def main(float x) float :	 let a, b = f(x) in a.s", 1.f, 2.f);
 	
-	// Test fold built-in function with update
-	/*{
-		const int len = 256;
-		js::Vector<int, 32> vals(len, 0);
-		js::Vector<int, 32> b(len, 0);
-		js::Vector<int, 32> target_results(len, 1);
+	// Test on a tuple returned from a function with a varray
+	testMainFloatArgAllowUnsafe("def f(float x) : ([x + 1.0]va, x + 2.0)           def main(float x) float :	 let a, b = f(x) in a[0]", 1.f, 2.f, INVALID_OPENCL);
 
-		testIntArray("																\n\
-		def f(array<int, 256> state, int iteration) tuple<array<int, 256>, bool> :			\n\
-				[update(state, iteration, elem(state, iteration) + 1),					\n\
-				iteration < 255]t																\n\
-																							\n\
-		def main(array<int, 256> vals, array<int, 256> initial_counts) array<int, 256>:  iterate(f, vals)",
-			&vals[0], &b[0], &target_results[0], vals.size(),
-			true // allow_unsafe_operations
-		);
-	}
-
-	std::cout << timer.elapsedString() << std::endl;
-	int a = 9;
-	return;*/
-
-	// Test with pass-by-reference data (struct)
-	testMainIntegerArg("															\n\
-		struct s { int x, int y }													\n\
-		def f(s current_state, int iteration) tuple<s, bool> :					\n\
-			if iteration >= current_state.y												\n\
-				[current_state, false]t # break										\n\
-			else																	\n\
-				[s(current_state.x*current_state.x, current_state.y), true]t					\n\
-		def main(int x) int :  iterate(f, s(x, x)).x", 3, 6561, INVALID_OPENCL);
-	
-
-	// This test triggers a problem with __chkstk when >= 4K is allocated on stack
-	/*{
-		const int len = 1024;
-		js::Vector<int, 32> vals(len, 0);
-		js::Vector<int, 32> b(len, 0);
-		js::Vector<int, 32> target_results(len, 0);
-		target_results[0] = len;
-
-		testIntArray("																\n\
-		def f(array<int, 1024> counts, int x) array<int, 1024> :			\n\
-				update(counts, x, elem(counts, x) + 1)			\n\
-		def main(array<int, 1024> vals, array<int, 1024> initial_counts) array<int, 1024>:  fold(f, vals, initial_counts)",
-			&vals[0], &b[0], &target_results[0], vals.size(),
-			true // allow_unsafe_operations
-		);
-	}*/
-
-	//testMainFloatArg("def f(array<float, 1024> a, float x) float : a[0]       def main(float x) float : f([x]a1024, x) ", 2.f, 2.f);
-
-	// Test that binding to a let variable overrides (shadows) a global function definition
-	testMainIntegerArg("def f(int x) int : 1		   def main(int x) int : let y = 1 f = 2 in f", 10, 2);
-
-	testMainIntegerArg("def f(int x) tuple<int, int> : [1, 2]t		   def main(int x) int : f(x)[1 - 1]", 10, 1);
-
-	testMainIntegerArg("def f() bool : 1 + 2 < 3         def main(int x) int : x", 1, 1);
-	//testMainIntegerArg("def f() bool : 1 + 2 * 3         def main(int x) int : x", 1, 1);
-
-	//TEMP:
-	testMainFloatArgInvalidProgram("def main(float x) float :  x [bleh");
-
-	testMainIntegerArg("def f(int x) tuple<int, int> : [1, 2]t		   def main(int x) int : f(x)[0]", 10, 1);
-		//testMainIntegerArg("def f(int x) tuple<int, int> : if x < 0 [1, 2]t else [3, 4]t			\n\
-		//			   def main(int x) int : f(x)[0]", 10, 3);
-
-	testMainIntegerArg("def f(int x) tuple<int> : if x < 0 [1]t else [3]t			\n\
-					   def main(int x) int : f(x)[0]", 10, 3);
+	// Test with an incorrect number of variable names (caused a crash at some point)
+	testMainIntegerArgInvalidProgram("def main(float x) float :	 let float, a, b = (3.0, 4.0) in b");
+}
 
 
+static void testTernaryConditionalOperator()
+{
+	// ===================================================================
+	// Test ternary conditional operator (?:)
+	// ===================================================================
+	testMainIntegerArg("def main(int x) int : x < 5 ? 10 : 5 ", 2, 10);
+	testMainIntegerArg("def main(int x) int : x < 5 ? 10 : 5 ", 6, 5);
+
+	testMainIntegerArg("def main(int x) int : (x < 5) ? 10 : 5 ", 6, 5);
+	testMainIntegerArg("def main(int x) int : (x * 2) < 5 ? 10 : 5 ", 6, 5);
+
+	// Test nested ?:
+	testMainIntegerArg("def main(int x) int : x < 5 ? (x < 2 ? 1 : 2) : 5 ", 1, 1);
+	testMainIntegerArg("def main(int x) int : x < 5 ? x < 2 ? 1 : 2 : 5 ", 1, 1);
+
+	testMainIntegerArg("def main(int x) int : x < 5 ? x < 2 ? 1 : 2 : 5 ", 2, 2);
+	testMainIntegerArg("def main(int x) int : x < 5 ? x < 2 ? 1 : 2 : 5 ", 10, 5);
+	testMainIntegerArg("def main(int x) int : (x < 5) ? x < 2 ? 1 : 2 : 5 ", 10, 5); // Test with parens
+	testMainIntegerArg("def main(int x) int : x < 5 ? (x < 2) ? 1 : 2 : 5 ", 10, 5); // Test with parens
+}
 
 
-	//testMainFloatArg("struct vec2 { vector<float, 2> v }     def main(float x) float : let a = vec2([1.0, 2.0]v)  in a.v[0]", 0.f, 1.0f);
-	testMainFloatArg("struct vec2 { vector<float, 2> v }     def main(float x) float : let a = vec2([1.0, 2.0]v) in a.v[0]", 0.f, 1.0f);
+static void testLengthFunc()
+{
+	// ===================================================================
+	// Test length function
+	// ===================================================================
+	// Test length() function on varrays
+	testMainInt64Arg("def main(int64 x) int64 : length([1.0]va)", 1, 1);
+	testMainInt64Arg("def main(int64 x) int64 : length([1.0, 2.0, 3.0]va)", 1, 3);
 
-	testMainFloatArg("struct s { float y }     def main(float x) float : s(x).y", 3.f, 3.0f);
+	// Test length() function on tuples
+	testMainInt64Arg("def main(int64 x) int64 : length([1.0]t)", 1, 1);
+	testMainInt64Arg("def main(int64 x) int64 : length([1.0, 2.0, 3.0]t)", 1, 3);
 
-	testMainFloatArg("struct vec2 { vector<float, 2> v }     def main(float x) float : let a = vec2([x, 2.0]v)  in (a.v)[0]", 3.f, 3.0f);
-	testMainFloatArg("struct vec2 { vector<float, 2> v }     def main(float x) float : let a = vec2([1.0, 2.0]v)  in a.v[0]", 0.f, 1.0f);
-	testMainFloatArg("struct vec2 { vector<float, 2> v }     def main(float x) float : let a = vec2([x, 2.0]v)  in a.v[0]", 3.f, 3.0f);
-	testMainFloatArg("struct vec2 { vector<float, 2> v }     def main(float x) float : let a = vec2([1.0, 2.0]v)  in  elem(a.v, 0)", 0.f, 1.0f);
+	// Test length() function on arrays
+	testMainInt64Arg("def main(int64 x) int64 : length([1.0]a)", 1, 1);
+	testMainInt64Arg("def main(int64 x) int64 : length([1.0, 2.0, 3.0]a)", 1, 3);
 
-
-
-	// Test constant folding with a vector literal that is not well typed (has boolean element).
-	// Make sure that constant folding doesn't allow it.
-	testMainFloatArgInvalidProgram("def main(float x) float : elem(  [2.0, false]v   , 0)");
-
-	// Check constant folding with elem() and collections
-	testMainFloatArgCheckConstantFolded("def main(float x) float : elem([1.0, 2.0]v, 1)", 1.f, 2.f);
-	testMainFloatArgCheckConstantFolded("def main(float x) float : elem([1.0, 2.0]t, 1)", 1.f, 2.f);
-	testMainFloatArgCheckConstantFolded("def main(float x) float : elem([1.0, 2.0]a, 1)", 1.f, 2.f);
-
-	// Check constant folding with elem() and collections, and operations on collections
-	testMainFloatArgCheckConstantFolded("def main(float x) float : elem([1.0, 2.0]v + [3.0, 4.0]v, 1)", 1.f, 6.f);
-	testMainFloatArgCheckConstantFolded("def main(float x) float : elem([1.0, 2.0]v - [3.0, 4.0]v, 1)", 1.f, -2.f);
-	testMainFloatArgCheckConstantFolded("def main(float x) float : elem([1.0, 2.0]v * [3.0, 4.0]v, 1)", 1.f, 8.f);
+	// Test length() function on vectors
+	testMainInt64Arg("def main(int64 x) int64 : length([1.0]v)", 1, 1);
+	testMainInt64Arg("def main(int64 x) int64 : length([1.0, 2.0, 3.0]v)", 1, 3);
+}
 
 
-
-	testMainFloatArg("def main(float x) float : elem([x, 2.0]v, 1)", 1.f, 2.f);
-
-
-	testMainFloatArgCheckConstantFolded("def main(float x) float : 1.0 + 2.0", 1.f, 3.f);
-
+static void testFuzzingIssues()
+{
 	testFuzzProgram("def main(float x) float : x!");
 
 	testFuzzProgram("struct vec3 { float x, float y, float z }	 		def vec3(float v) vec3 : vec3(v, v, v)		 		def op_add(vec3 a, vec3 b) vec3 : vec3(a.x+b.x, a.y+b.y, a.z+b.z)	 		def eval(vec3 pos) vec3 :					 			let											 				scale = 2/0.0							 			in											 				vec3(scale) + vec3(0.2)					 		def main(float x) float: x(eval(vec3(x, x, x)))");
@@ -1384,8 +1044,7 @@ void LanguageTests::run()
 
 	testMainIntegerArgInvalidProgram("def g(function<float, float> f, float x) : f(xow(x, 3))");
 
-
-	timer.reset();
+	Timer timer;
 	testMainFloatArgInvalidProgram("def main(float x) float : (1 * (1 * ((1 + 1) * (1 - 1 + 1)) - 1 - ((1 + (((((1 +\n\
 		 1 / (1 + (((1 + 1 / (1 * (1 - 1 + 1 / 1 / 1))) - 1 - 1 - (1 + 1 / 1) + (((1 * 1\n\
 		) * 1) * 1) / 1) - 1 + 1)) - 1 / 1) + (1 * 1)) + 1 - 1) + 1) * 1)) + 1) / (1 + 1\n\
@@ -1532,109 +1191,6 @@ void LanguageTests::run()
 		def main(int x) int : 1", 1, 1);*/
 
 	// ===================================================================
-	// Test logical negation operator (!)
-	// ===================================================================
-	testMainIntegerArg("def main(int x) int : if !true then 10 else 20", 1, 20);
-	testMainIntegerArg("def main(int x) int : if !false then 10 else 20", 1, 10);
-	testMainIntegerArg("def main(int x) int : if !(x < 5) then 10 else 20", 1, 20);
-	testMainIntegerArg("def main(int x) int : if !(x >= 5) then 10 else 20", 1, 10);
-
-	testMainIntegerArg("def main(int x) int : if !true then 10 else 20", 1, 20);
-	testMainIntegerArg("def main(int x) int : if !!true then 10 else 20", 1, 10);
-	testMainIntegerArg("def main(int x) int : if !!!true then 10 else 20", 1, 20);
-
-	testMainIntegerArgInvalidProgram("def main(int x) int : if !1 then 10 else 20");
-	testMainIntegerArgInvalidProgram("def main(int x) int : if ![1, 2]t then 10 else 20");
-
-	// int64 - int mixing
-	testMainIntegerArgInvalidProgram("def main(int64 x) int :	x + 1");
-	testMainIntegerArgInvalidProgram("def main(int64 x) int :	x - 1");
-	testMainIntegerArgInvalidProgram("def main(int64 x) int :	x * 1");
-	testMainIntegerArgInvalidProgram("def main(int64 x) int :	x / 1");
-	testMainIntegerArgInvalidProgram("def main(int64 x) int :	if x < 5 1 else 2");
-
-	testMainFloatArgInvalidProgram("	def f(float x) float if(x < 1.0) : 				  let	 					z = 2.0 					y = 3.0 				  in 					y + z 				  def main() float : f(0.0)");
-	testMainFloatArgInvalidProgram("def main() float : 					 let a = [1.0, 2.0, 3.0, 4.0]v 					 b = [11.0, 12.0, 13.0, 14 else .0]v in 					 e2(min(a, b)) 		de if f main() float : 				  let a = [1.0, 2.0, 3.0, 4.0]v 				  b = [11.0, 12.0, 13.0, 14.0]v in 				  e2(min(b, a))");
-	testMainFloatArgInvalidProgram("		main(int i) int :								 			let												 				a = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]v		 				b = string  [1.0, 1.6, 1.0, 1.0, 1.3, 1.6, 1.8, 1.6]v		 				c = [1.7, 2.8, 3.0, 4 true .7, 5.5, 6.7, 7.0, 8.4] int64 v		 			in												 				truncateToInt(elem(a + if(i < 1, b, c), i))");
-	testMainFloatArgInvalidProgram("		def main() float : 					let x = [1.0, 2.0, 3.0, 4.0]v 					y = [10.0, 20.0, 30.0, 40.0]v* sin(x + 0.03) in 					e1(x + y)");
-
-	// Test that we can't put a structure in a vector
-	testMainFloatArgInvalidProgram("struct teststruct { float y } \n\
-        def main(float x) float : elem([teststruct(x)]v, 0).y");
-
-	testMainFloatArgInvalidProgram("struct teststruct { int y } \n\
-								   def f(teststruct a, teststruct b, bool condition) teststruct : let x = if(condition, a, b) in let v = [x, x, x, x, x, x, x, x]v in x \n\
-        def main(int x) int : y( f(teststruct(1), teststruct(2), x < 5) )");
-
-	testMainFloatArgInvalidProgram("struct s { float x, float yd }  	def op_sub(s a, s b) : s(a.x - b.x, a.y - b.y)  	def main() float : x( true  < s(2, 3) - s(3, 4))");
-
-	testMainFloatArgInvalidProgram("def f(float x) float : x*x def main(int x) int :  elem(fold(f, [0, 0, 1, 2]a, [0]a16), 1)    def main(float x) float : f(x) - 3");
-
-	
-	// A vector of elements that contains one or more float-typed elements will be considered to be a float-typed vector.
-	// Either all integer elements will be succesfully constant-folded and coerced to a float literal, or type checking will fail.
-
-	// OLD: A vector of elements, where each element is either an integer literal, or has float type, and there is at least one element with float tyoe, 
-	// and each integer literal can be converted to a float literal, will be converted to a vector of floats
-
-	// Test incoercible integers
-	testMainFloatArgInvalidProgram("def main(float x) float : elem(  [100000001, 2.0]v   , 0)");
-	testMainFloatArgInvalidProgram("def main(float x) float : elem(  [2.0, 100000001]v   , 0)");
-
-	testMainFloatArg("def main(float x) float : elem(  [1, 2.0]v   , 0)", 1.0f, 1.0f);
-	testMainFloatArg("def main(float x) float : elem(  [1.0, 2]v   , 0)", 1.0f, 1.0f);
-
-	testMainFloatArg("def main(float x) float : elem(  [1, x]v   , 0)", 1.0f, 1.0f);
-	testMainFloatArg("def main(float x) float : elem(  [x, 2]v   , 0)", 1.0f, 1.0f);
-
-	testMainFloatArg("def main(float x) float : elem(  [1, x, 3.0]v   , 0)", 1.0f, 1.0f);
-	testMainFloatArg("def main(float x) float : elem(  [x, 2, 3.0]v   , 0)", 1.0f, 1.0f);
-
-	testMainIntegerArgInvalidProgram("struct Float4Struct { vector<float, 4> v }  			def main(Float4Struct a, Float4Struct b) Float4Struct :  				Float4Struct(a.v + [eleFm(b.v, 0)]v4)");
-
-
-	testMainIntegerArgInvalidProgram("def main(int i) int : if i >= 0 && i < 10 then elem([1, 2, 3, 4, 5 + 1.0, 6, 7, 8, 9, 10]v, i) else 0");
-		
-	testMainIntegerArgInvalidProgram("def main(int x) int :  elem(update([0]a, 0, [  x ]t ), 0)");
-	
-	testMainIntegerArgInvalidProgram("def main(int i) int : if i >= 0 && i < 1i0 then elem([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]v, i) else 0");
-
-	// Test circular definitions between named constants and function definitions
-	testMainIntegerArgInvalidProgram("TEN = main			def main(int x) : TEN + x");
-	
-	testMainFloatArgInvalidProgram("struct S { tuple<float, float> a, int b }		 		def f(float x) S : S([x + 2.0, x(f(x), 0).a]t, 1)    		def main(float x) float :  elem(f(x).a, 0)");
-	
-	testMainFloatArgInvalidProgram("def f(float x) float :	let	float z = 2.0 in x + z       def main(int x) int :  iterate(f, 0)");
-//	testMainFloatArgInvalidProgram("def f(float x) float :	let	float z = 2.0 in x + z       def main(int x) int :  iterate(f, 0)	  def main(float x) float : f(x)");
-	
-	
-	testMainFloatArgInvalidProgram("def main(float x) float : elem(   shuffle([1.0, 20, 4.0]v, [2, 3]v)   , 1)");
-
-	testMainIntegerArgInvalidProgram("def main(int i) int : if i >= 0 && i < 10 then elem([1, 2, 3, 4, 5, 6, 7, 8., 9, 10]t, i) else 0");
-	testMainIntegerArgInvalidProgram("def main(int i) int : if i >= 0 && i < 10 then elem([1, 2, 3, 4, 5, 6, 7, 8., 9, 10]a, i) else 0");
-
-	// Test type coercion in vector literal changing elem() type
-	testMainFloatArgInvalidProgram("def main(int i) int : if i >= 0 && i < 10 then elem([1, 2, 3, 4, 5, 6, 7, 8., 9, 10]v, i) else 0");
-
-	testMainFloatArgInvalidProgram("def mul(vector<float, 4> v, float x) vector<float, 4> : v * [x, x,]v  					def main() float : 	let x = [1.0, 2.0, 3.0, 4.0]v 		y = 10.0 in   mul(x, y).e1");
-	
-		
-
-	testMainFloatArgInvalidProgram("def main() float : 					let x = [1.0, 2.0, 3.0, 4.0]v 					y = [10.0, 20.0, 30.0, 40.0]v  <1.0 in 					e1(x + y)");
-
-	testMainFloatArgInvalidProgram("def f(array<int, 4> a, int i) int : if inBounds(a, i) elem(a, i) else 0       def main(int i) int : f([1, 2, 3]a, i)");
-
-
-	// This function has special static global variabl-creating mem-leaking powers.
-	testMainFloatArg(
-		"def expensiveA(float x) float : cos(x * 0.456 + cos(x))			\n\
-		def expensiveB(float x) float : sin(x * 0.345 + sin(x))			\n\
-		def main(float x) float: if(x < 0.5, expensiveA(x + 0.145), expensiveB(x + 0.2435))",
-		0.2f, cos((0.2f + 0.145f) * 0.456f + cos((0.2f + 0.145f))));	
-
-
-
-	// ===================================================================
 	// Miscellaneous programs that caused crashes or other errors during fuzz testing
 	// ===================================================================
 
@@ -1702,34 +1258,30 @@ void LanguageTests::run()
 	testMainFloatArgInvalidProgram("def main(float x) float : b(elem([Pair(1.0, 2.0), Pair(3.0, 4.0)]a, 1))  		def main(float x) float : b(elem([Pair(1.0, 2.0), Pair(3.0, 4.0)]a, 1)) ");
 
 	testMainFloatArgInvalidProgram("\t\t\tin\t\t\t\t\t\t\t\t\t\t \t\t\tin\t\t\t\t\t\t\t\t\t\t \t\t\t\telem(a, -1)\t\t\t\t\t\t\t\" \t ");
-	
+}
 
 
-
+static void testLogicalNegation()
+{
 	// ===================================================================
-	// Test that recursion is disallowed.
+	// Test logical negation operator (!)
 	// ===================================================================
-	testMainFloatArgInvalidProgram("def main(float x) float :  main(x)  ");
-	testMainFloatArgInvalidProgram("def main(float x) float :  1  def f(int x) int : f(0)  ");
+	testMainIntegerArg("def main(int x) int : if !true then 10 else 20", 1, 20);
+	testMainIntegerArg("def main(int x) int : if !false then 10 else 20", 1, 10);
+	testMainIntegerArg("def main(int x) int : if !(x < 5) then 10 else 20", 1, 20);
+	testMainIntegerArg("def main(int x) int : if !(x >= 5) then 10 else 20", 1, 10);
 
-	// Mutual recursion
-	testMainFloatArgInvalidProgram("def g(float x) float : f(x)      def f(float x) float : g(x)              def main(float x) float : f(x)");
-	
-	
-	// ===================================================================
-	// Test that some programs with invalid syntax fail to compile.
-	// ===================================================================
-	testMainFloatArgInvalidProgram("def main(float x) float :  x [bleh");
+	testMainIntegerArg("def main(int x) int : if !true then 10 else 20", 1, 20);
+	testMainIntegerArg("def main(int x) int : if !!true then 10 else 20", 1, 10);
+	testMainIntegerArg("def main(int x) int : if !!!true then 10 else 20", 1, 20);
 
-
-	testMainIntegerArg("def main(int x) int : 10 + (if x < 10 then 1 else 2)", 5, 11);
-
-	testMainIntegerArg("def main(int x) int : if x < 10 then 1 else 2", 5, 1);
-
-	testMainIntegerArg("def main(int x) int : if x < 10 then (if x < 5 then 1 else 2) else (if x < 15 then 3 else 4)", 5, 2);
+	testMainIntegerArgInvalidProgram("def main(int x) int : if !1 then 10 else 20");
+	testMainIntegerArgInvalidProgram("def main(int x) int : if ![1, 2]t then 10 else 20");
+}
 
 
-
+static void testNamedConstants()
+{
 	// ===================================================================
 	// Test named constants
 	// ===================================================================
@@ -1788,55 +1340,11 @@ void LanguageTests::run()
 
 	// Test invalidity of mutual references between named contants.
 	testMainFloatArgInvalidProgram("z = y	y = z      def main(float x) float : x");
+}
 
 
-	// NOTE: if 'then' token is removed, we get a parse error below.
-
-	testMainIntegerArg("def f(int x) tuple<int> : if x < 0 [1]t else [3]t			\n\
-					   def main(int x) int : f(x)[0]", 10, 3);
-	// ===================================================================
-	// Test array subscript (indexing) operator []
-	// ===================================================================
-
-	// NOTE: if 'then' token is removed, we get a parse error below.
-
-	testMainIntegerArg("def f(int x) tuple<int> : if x < 0 [1]t else [3]t			\n\
-					   def main(int x) int : f(x)[0]", 10, 3);
-
-	testMainIntegerArg("def f(int x) tuple<int, int> : if x < 0 [1, 2]t else [3, 4]t			\n\
-					   def main(int x) int : f(x)[0]", 10, 3);
-
-	// OpenCL doesn't support new array values at runtime, nor fold() currently.
-	
-	testMainIntegerArg("def main(int x) int : [x]a[0]", 10, 10, INVALID_OPENCL);
-	testMainIntegerArg("def main(int x) int : [x, x + 1, x + 2]a[1]", 10, 11, INVALID_OPENCL);
-	testMainIntegerArg("def main(int x) int : [x, x + 1, x + 2]a[1 + 1]", 10, 12, INVALID_OPENCL);
-
-	// Test index out of bounds
-	testMainIntegerArgInvalidProgram("def main(int x) int :  [x, x + 1, x + 2]a[-1])");
-	testMainIntegerArgInvalidProgram("def main(int x) int :  [x, x + 1, x + 2]a[3])");
-	
-	// ===================================================================
-	// Test update()
-	// update(CollectionType c, int index, T newval) CollectionType
-	// ===================================================================
-
-	testMainIntegerArg("def main(int x) int :  elem(update([0]a, 0, x), 0)", 10, 10, INVALID_OPENCL);
-
-	testMainIntegerArg("def main(int x) int :  elem(update([0, 0]a, 0, x), 0)", 10, 10, INVALID_OPENCL);
-	testMainIntegerArg("def main(int x) int :  elem(update([0, 0]a, 0, x), 1)", 10, 0, INVALID_OPENCL);
-	testMainIntegerArg("def main(int x) int :  elem(update([0, 0]a, 1, x), 0)", 10, 0, INVALID_OPENCL);
-	testMainIntegerArg("def main(int x) int :  elem(update([0, 0]a, 1, x), 1)", 10, 10, INVALID_OPENCL);
-
-	// Test update arg out of bounds
-	testMainIntegerArgInvalidProgram("def main(int x) int :  elem(update([]a, 0, x), 0)");
-	testMainIntegerArgInvalidProgram("def main(int x) int :  elem(update([0]a, -1, x), 0)");
-	testMainIntegerArgInvalidProgram("def main(int x) int :  elem(update([0]a, 1, x), 0)");
-
-	// Test failure to prove valid, since index arg cannot be proven in bounds:
-	testMainIntegerArgInvalidProgram("def main(int x) int :  elem(update([0]a, x, x), 0)");
-
-
+static void testFold()
+{
 	// ===================================================================
 	// Test fold built-in function
 	// fold(function<State, T, State> f, array<T> array, State initial_state) State
@@ -1902,8 +1410,12 @@ void LanguageTests::run()
 			ALLOW_UNSAFE | INVALID_OPENCL // allow_unsafe_operations
 		);
 	}
+}
 
-	// ===================================================================
+
+static void testIterate()
+{
+// ===================================================================
 	// Test iterate built-in function
 	// ===================================================================
 
@@ -1961,8 +1473,11 @@ void LanguageTests::run()
 			else																	\n\
 				[current_state + invariant_data.x, true]t											\n\
 		def main(int x) int :  iterate(f, 0, s(3, 4), x)", 17, 3 * 17, INVALID_OPENCL);
+}
 
 
+static void testTuples()
+{
 	// ===================================================================
 	// Test tuples
 	// ===================================================================
@@ -2105,15 +1620,11 @@ void LanguageTests::run()
 	// Test varying index (invalid)
 	testMainFloatArgInvalidProgram("def f(float x) tuple<float, float> : (x, x)   \n\
 		def main(float x) float :  elem(f(x), truncateToInt(x))");
+}
 
 
-
-
-
-
-
-	testMainFloatArg("def main(float x) float :  elem([x, x, x, x]v, 0)", 1.0f, 1.0f);
-
+static void testTypeCoercion()
+{
 	// Test int->float type coercion in various ways	
 
 	// Test int->float coercion in an if statement as required for an argument to another function. (truncateToInt in this case).
@@ -2206,295 +1717,86 @@ void LanguageTests::run()
 	testMainFloatArg("def f(int i) float : 10.0     def f(float x) float : 20.0     def main(float x) float : f(1 + x)", 1.0f, 20.0f); // 1 op x should be coerced to float
 
 
-
-
-
-	// Test if LLVM combined multiple sqrts into a sqrtps instruction (doesn't do this as of LLVM 3.4)
-	testMainFloatArg("def main(float x) float : sqrt(x) + sqrt(x + 1.0) + sqrt(x + 2.0) + sqrt(x + 3.0)", 1.0f, sqrt(1.0f) + sqrt(1.0f + 1.0f) + sqrt(1.0f + 2.0f) + sqrt(1.0f + 3.0f));
-
-	{
-		Float4Struct a(1.0f, 2.0, 3.0, 4.0);
-		Float4Struct target_result(3.f, 4.f, 5.f, 6.f);
-		
-		testFloat4Struct(
-			"struct Float4Struct { vector<float, 4> v } \n\
-			def main(Float4Struct a, Float4Struct b) Float4Struct : \n\
-				Float4Struct(a.v + [2.0]v4)", 
-			a, a, target_result
-		);
-	}
-
-	{
-		Float4Struct a(1.0f, 2.0, 3.0, 4.0);
-		Float4Struct target_result(2.f, 3.f, 4.f, 5.f);
-		
-		testFloat4Struct(
-			"struct Float4Struct { vector<float, 4> v } \n\
-			def main(Float4Struct a, Float4Struct b) Float4Struct : \n\
-				Float4Struct(a.v + [elem(b.v, 0)]v4)", 
-			a, a, target_result
-		);
-	}
-
-	// Check scalar initialisation of vector
-	testMainFloatArg("def main(float x) float :  elem(    [2.0]v8    , 5)", 1.0f, 2.0f);
-
-	/*testMainFloatArg(
-		"def expensiveA(float x) float : cos(x * 2.0)			\n\
-		def main(float x) float: expensiveA(x)",
-		0.2f, cos(0.2 * 2.0f));
-
-	testMainFloatArg(
-		"def expensiveA(float x) float : cos(x * 2.0)			\n\
-		def main(float x) float: x + expensiveA(x)",
-		0.2f, 0.2f + cos(0.2 * 2.0f));
-*/
-	testMainFloatArg(
-		//"def expensiveA(float x) float : pow(x, 0.1 + pow(0.2, x))			\n
-		"def expensiveA(float x) float : cos(x * 0.456 + cos(x))			\n\
-		def expensiveB(float x) float : sin(x * 0.345 + sin(x))			\n\
-		def main(float x) float: if(x < 0.5, expensiveA(x + 0.145), expensiveB(x + 0.2435))",
-		0.2f, cos((0.2f + 0.145f) * 0.456f + cos((0.2f + 0.145f))));	
-
-
-	// Check constant folding for a function that is ostensibly a function of several arguments but does not actually depend on them.
-	//testMainFloatArg("def g(float x) float : pow(2.0, 3.0)             def main(float x) float :  g(x)",    1.f, 8.f);
-
-	//testMainFloatArg("def g(float x) float : pow(2.0, 3.0)             def main(float x) float :  pow(g(x), 2.0)",    1.f, 64.f);
-	testMainFloatArg("def g(float x) float : 8.f             def main(float x) float :  pow(g(x), 2.0)",    1.f, 64.f);
-
-	// Check constant folding for a let variable
-	//testMainFloatArg("def main(float x) float :  let y = pow(2.0, 3.0) in y", 1.f, 8.f);
-
-	// Check constant folding for expression involving a let variable
-	testMainFloatArgCheckConstantFolded("def main(float x) float :  let y = 2.0 in y", 1.f, 2.f);
-	testMainFloatArgCheckConstantFolded("def main(float x) float :  let y = 1.0 + 1.0 in y", 1.f, 2.f);
-	testMainFloatArgCheckConstantFolded("def main(float x) float :  let y = (1.0 + 1.0) in pow(y, 3.0)", 1.f, 8.f);
 	
+	// ===================================================================
+	// Test implicit type conversions from int to float
+	// ===================================================================
 
-	// Check constant folding of a pow function that is inside another function
-	testMainFloatArgCheckConstantFolded("def g(float x) float :  pow(2 + x, -(1.0 / 8.0))         def main(float x) float : g(0.5)", 1.f, std::pow(2.f + 0.5f, -(1.0f / 8.0f)));
+	// For numeric literals
+	testMainFloat("def main() float : 3.0 + 4", 7.0);
+	testMainFloat("def main() float : 3 + 4.0", 7.0);
+
+	testMainFloat("def main() float : 3.0 - 4", -1.0);
+	testMainFloat("def main() float : 3 - 4.0", -1.0);
+
+	testMainFloat("def main() float : 3.0 * 4", 12.0);
+	testMainFloat("def main() float : 3 * 4.0", 12.0);
+
+	testMainFloat("def main() float : 12.0 / 4", 3.0);
+	testMainFloat("def main() float : 12 / 4.0", 3.0);
 	
-	testMainFloatArgCheckConstantFolded("def g(float x, float y) float : pow(x, y)         def main(float x) float : g(2.0, 3.0)", 1.f, 8.0f);
+	// Test with nodes that can't be constant-folded.
+	// Addition
+	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : f(x) + 3", 2.0f, 7.0f);
+	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : 3 + f(x)", 2.0f, 7.0f);
 
-	// Test promotion to match function return type:  
-	// Test in if statement
-	// TODO: Get this working testMainFloatArg("def g(float x) float : if x > 1.0 then 2 else 3         def main(float x) float : g(x)", 1.f, 2.f);
+	// Subtraction
+	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : f(x) - 3", 2.0f, 1.0f);
+	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : 3 - f(x)", 2.0f, -1.0f);
 
-	//testMainFloatArg("def g(float x) float : 2         def main(float x) float : g(2)", 1.f, 2.f);
+	// Multiplication
+	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : f(x) * 3", 2.0f, 12.0f);
+	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : 3 * f(x)", 2.0f, 12.0f);
 
+	// Division
+	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : f(x) / 3", 3.0f, 3.0f);
+	// Can't be done as f(x) might be zero:
+	// testMainFloatArg("def f(float x) float : x*x      def main(float x) float : 3 / f(x)", 2.0f, 12.0f);
 
-	// Test calling a function that will only be finished / correct when type promotion is done, but will be called during constant folding phase.
-	testMainFloatArgCheckConstantFolded("def g(float x) float : 1 / x         def main(float x) float : g(2)", 1.f, 0.5f);
-	testMainFloatArg("def g(float x) float : 1 / x         def main(float x) float : g(x)", 4.f, 0.25f);
-
-
-	// Test calling a function that will only be finished / correct when type promotion is done, but will be called during constant folding phase.
-	testMainFloatArgCheckConstantFolded("def g(float x) float : 10 + x         def main(float x) float : g(1)", 2.f, 11.f);
-
-	// Test promotion from int to float
-	testMainFloatArg("def main(float x) float : 1 + x", 2.f, 3.f);
-
-	testMainFloatArg("def g(float x) float : x*x         def main(float x) float : g(1 + x)", 2.f, 9.f);
-
-
-	// Test FMA codegen.
-	testMainFloatArg("def main(float x) float : sin(x) + sin(x + 0.02) * sin(x + 0.03)", 0.f, sin(0.f) + sin(0.02f) * sin(0.03f));
-
-	// Unary minus applied to vector:
-	// Test with no runtime values
-	testMainFloatArg("def main(float x) float : elem(-[1.0, 2.0, 3.0, 4.0]v, 2)", 0.1f, -3.0f);
-	testMainIntegerArg("def main(int x) int : elem(-[1, 2, 3, 4]v, 2)", 1, -3);
-
-	// Test with runtime values
-	testMainFloatArg("def main(float x) float : elem(-[x + 1.0, x + 2.0, x + 3.0, x + 4.0]v, 2)", 0.4f, -3.4f);
-	testMainIntegerArg("def main(int x) int : elem(-[x + 1, x + 2, x + 3, x + 4]v, 2)", 1, -4);
-
-	// Test runtime unary minus of 4-vector
-	{
-		Float4Struct a(1.0f, 2.0, 3.0, 4.0);
-		Float4Struct target_result(-1.0f, -2.0f, -3.0f, -4.0f);
-		
-		testFloat4Struct(
-			"struct Float4Struct { vector<float, 4> v } \n\
-			def main(Float4Struct a, Float4Struct b) Float4Struct : \n\
-				Float4Struct(-v(a))", 
-			a, a, target_result
-		);
-	}
-
-
-	// Vector divide (not supported currently)
-	testMainIntegerArgInvalidProgram("def main() float : 					let x = [1.0, 2.0, 3.0, 4.0]v 					y = [10.0, 20.0, 30.0, 40.0]v in 					e1(x/ - y)");
-
-
-	// Gather load:
-	testMainFloatArg("def main(float x) float : elem(  elem([1.0, 2.0, 3.0, 4.0]a, [2, 3]v)   , 0)", 0.1f, 3.0f);
-
-	// Shuffle
-	testMainFloatArg("def main(float x) float : elem(   shuffle([1.0, 2.0, 3.0, 4.0]v, [2, 3]v)   , 1)", 0.1f, 4.0f);
-
-	testMainFloatArg("def main(float x) float : elem(   shuffle([x + 1.0, x + 2.0, x + 3.0, x + 4.0]v, [2, 3]v)   , 1)", 0.1f, 4.1f);
-
-	// Test shuffle mask index out of bounds.
-	testMainFloatArgInvalidProgram("def main(float x) float : elem(   shuffle([x + 1.0, x + 2.0, x + 3.0, x + 4.0]v, [2, 33]v)   , 1)     def main(float x) float : x");
- 
-
-	// Test a shuffle where the mask is invalid - a float
-	testMainFloatArgInvalidProgram("def main(float x) float : elem(   shuffle([1.0, 2.0, 3.0, 4.0]v, [2, 3.0]v)   , 1)");
-
-	// Test a shuffle where the mask is invalid - not a constant
-	testMainIntegerArgInvalidProgram("def main(int x) int : elem(   shuffle([1.0, 2.0, 3.0, 4.0]v, [2, x]v)   , 1)");
-
-	
-
-	// Test returning a structure from a function that is called inside an if expression
-	testMainIntegerArg(
-		"struct teststruct { int y }										\n\
-		def f() teststruct : teststruct(1)						\n\
-		def g() teststruct : teststruct(2)						\n\
-		def main(int x) int : y( if x < 5 then f() else g() ) ",
-		2, 1);
-
-	// Test returning a structure from a function that takes a structure and that is called inside an if expression
-	testMainIntegerArg(
-		"struct teststruct { int y }										\n\
-		def f(teststruct s) teststruct : teststruct(1 + y(s))						\n\
-		def g(teststruct s) teststruct : teststruct(2 + y(s))						\n\
-		def main(int x) int : y( if x < 5 then f(teststruct(1)) else g(teststruct(2)) ) ",
-		2, 2);
-
-
-
-	// Test a function (f) that just returns an arg directly
-	testMainIntegerArg(
-		"struct teststruct { int y }										\n\
-		def f(teststruct a, teststruct b, bool condition) teststruct : a      \n\
-		def main(int x) int : y( f(teststruct(1), teststruct(2), x < 5) ) ",
-		2, 1);
-
-	// Test a function (f) that just returns a new struct
-	testMainIntegerArg(
-		"struct teststruct { int y }										\n\
-		def f(teststruct a, teststruct b, bool condition) teststruct : teststruct(1)      \n\
-		def main(int x) int : y( f(teststruct(1), teststruct(2), x < 5) ) ",
-		2, 1);
-
-	// Test a function (f) that is just an if expression that returns pass-by-reference arguments directly.
-	testMainIntegerArg(
-		"struct teststruct { int y }										\n\
-		def f(teststruct a, teststruct b, bool condition) teststruct : if(condition, a, b)      \n\
-		def main(int x) int : y( f(teststruct(1), teststruct(2), x < 5) ) ",
-		2, 1);
-
-
-	// Test a function (f) that is just an if expression that returns pass-by-reference arguments directly, in a let block
-	testMainIntegerArg(
-		"struct teststruct { int y }										\n\
-		def f(teststruct a, teststruct b, bool condition) teststruct :      \n\
-			let																\n\
-				x = if(condition, a, b)										\n\
-			in																\n\
-				x															\n\
-		def main(int x) int : y( f(teststruct(1), teststruct(2), x < 5) ) ",
-		2, 1);
-
-	// Test a function (f) that is just an if expression that returns pass-by-reference arguments directly, in a let block
-	testMainIntegerArg(
-		"struct teststruct { int y }										\n\
-		def f(teststruct a, teststruct b, bool condition) teststruct :      \n\
-			let																\n\
-				x = teststruct( y(if(condition, a, b))	)									\n\
-			in																\n\
-				x															\n\
-		def main(int x) int : y( f(teststruct(1), teststruct(2), x < 5) ) ",
-		2, 1);
-
-
-	testMainIntegerArg(
-		"struct teststruct { int y }										\n\
-		def g(teststruct a, teststruct b, bool condition) teststruct : if(condition, a, b)      \n\
-		def f(teststruct a, teststruct b, bool condition) teststruct : if(condition, g(a, b, condition), g(a, b, condition))      \n\
-		def main(int x) int : y( f(teststruct(1), teststruct(2), x < 5) ) ",
-		2, 1);
-
-	// truncateToInt with runtime args, with bounds checking
-	testMainFloatArg("def main(float x) float : toFloat(if x >= -2147483648.0 && x < 2147483647.0 then truncateToInt(x) else 0)", 3.1f, 3.0f);
-
-	// truncateToInt with constant value
-	testMainFloatArg("def main(float x) float : toFloat(truncateToInt(3.1))", 3.1f, 3.0f);
-
-	// Test truncateToInt where we can't prove the arg is in-bounds.
-//TEMP	testMainFloatArgInvalidProgram("def main(float x) float : toFloat(truncateToInt(x))", 3.9f, 3.0f);
-
-
-
-	
-
-	// Test division by -1 where we prove the numerator is not INT_MIN
-	/*testMainIntegerArg(
-		"def main(int i) int : if i > 1 then 2 else 0", 
-		8, -8);*/
-
-
-	testMainIntegerArg("def div(int x, int y) int : if(y != 0 && x != -2147483648, x / y, 0)	\n\
-					   def main(int i) int : div(i, i)",    
-		5, 1);
-	testMainIntegerArg("def main(int i) int : if i != 0 && i != -1 then i / i else 0",    
-		5, 1);
-
-
-	// Do a test where a division by zero would be done while constant folding.
-	testMainFloatArgInvalidProgram("def f(int x) int : x*x	      def main(float x) float : 14 / (f(2) - 4)");
-
-	testMainFloatArg("def f(int x) int : x*x	      def main(float x) float : 14 / (f(2) + 2)", 2.0f, 2.0f);
-
-	//testMainFloatArg("def f(int x) int : x*x	      def main(float x) float : f(2) + 3", 1.0f, 7.0f);
+	// NOTE: this one can't convert because f(x) + 3 might be zero.
+	//testMainFloatArg("def f(float x) float : x*x      def main(float x) float : 14 / (f(x) + 3)", 2.0f, 2.0f);
+	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : 14 / (f(2) + 3)", 2.0f, 2.0f);
 	testMainFloatArg("def f(int x) int : x*x	      def main(float x) float : 14 / (f(2) + 3)", 2.0f, 2.0f);
+	testMainFloatArg("def f<T>(T x) T : x*x           def main(float x) float : 14 / (f(2) + 3)", 2.0, 2.0f);
 
-	// Test division by -1 where we prove the numerator is not INT_MIN
-	testMainIntegerArg(
-		"def main(int i) int : if i > -10000 then i / -1 else 0", 
-		8, -8);
+	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : f(x) * 2 + 1", 2.0f, 9.0f);
+	
+	testMainFloatArg("def main(float x) float : ( x + x) * (-0.4)", 2.0f, -1.6f);
 
-	// Test division where numerator = INT_MIN where we prove the denominator is not -1
-	testMainIntegerArg(
-		"def main(int i) int : if i >= 1 then -2147483648 / i else 0", 
-		2, -1073741824);
-
-	// Test division by -1 where we can't prove the numerator is not INT_MIN
-	testMainIntegerArgInvalidProgram(
-		"def main(int i) int : i / -1"
-	);
+	testMainFloatArg("def main(float x) float : (x + x) - 1.5", 2.0f, 2.5f);
+	//testMainFloatArg("def main(float x) float : (x + x) -1.5", 2.0f, 2.0); // NOTE: this works in C++. (e.g. the -1.5 is interpreted as a binary subtraction)
+	
+	// Division
+	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : f(x) / 3", 3.0f, 3.0f);
 
 
-	// Test division by a constant
-	testMainIntegerArg(
-		"def main(int i) int : i / 4", 
-		8, 2);
+	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : f(x) * (1.0 / 3.0)", 3.0f, 3.0f);
+	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : f(x) * (1 / 3.0)", 3.0f, 3.0f);
+	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : f(x) * (1.0 / 3)", 3.0f, 3.0f);
 
-	// Test division by zero
-	testMainIntegerArgInvalidProgram(
-		"def main(int i) int : i / 0"
-	);
-
-
-	// Test division by a runtime value
-	testMainIntegerArg(
-		"def main(int i) int : if i != 0 then 8 / i else 0", 
-		4, 2);
+	// Division
+	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : 1.0 / 3.0", 3.0f, 1.0f / 3.0f);
 
 
 
-	// Test array in array
-/*	
-	TEMP NOT SUPPORTED IN OPENCL YET
-	testMainIntegerArg(
-		"def main(int i) int : if i >= 0 && i < 2 then elem(elem([[1, 2]a, [3, 4]a]a, i), i) else 0", 
-		1, 4);
-		*/
+	// Test promotion to match function return type:
+	testMainFloat("def main() float : 3", 3.0);
 
-	// Test integer in-bounds runtime index access to array
+	testMainFloat("def main() float : 1.0 + (2 + 3)", 6.0);
+	
+	testMainFloat("def main() float : 1.0 + 2 + 3", 6.0);
+	
+	// Test implicit conversion from int to float in addition operation with a function call
+	//testMainFloat("def f(int x) : x*x    def main() float : 1.0 + f(2)", 5.0f);
+
+	testMainFloat("def main() float : (1.0 + 2.0) + (3 + 4)", 10.0);
+	testMainFloat("def main() float : (1.0 + 2) + (3 + 4)", 10.0);
+}
+
+
+static void testElem()
+{
+		// Test integer in-bounds runtime index access to array
 	testMainIntegerArg(
 		"def main(int i) int : if i >= 0 && i < 10 then elem([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]a, i) else 0", 
 		2, 3);
@@ -2636,15 +1938,11 @@ void LanguageTests::run()
 				int: x								\n\
 				error: 0							",
 		100, 0);*/
+}
 
 
-
-	/*float x = 2.0f;
-	float y = (x + x) -1.5;*/
-
-	// Test divide-by-zero
-	//testMainIntegerArg("def main(int x) int : 10 / x ", 0, 10);
-
+static void testIfThenElse()
+{
 	// ===================================================================
 	// Test if-then-else
 	// ===================================================================
@@ -2697,25 +1995,11 @@ void LanguageTests::run()
 
 	// Test if expression with a structure passed as an argument
 	testMainIntegerArg("struct S { int a }     def f(int x, S a, S b) S : if x < 4 then a else b      def main(int x) int : f(x, S(x + 1), S(x + 2)).a ", 10, 12);
+}
 
 
-	// ===================================================================
-	// Ref counting tests
-	// ===================================================================
-	// Test putting a string in a structure, then returning it.
-	testMainIntegerArg(
-		"struct teststruct { string str }										\n\
-		def f() teststruct : teststruct(\"hello world\")						\n\
-		def main(int x) int : length(str(f())) ",
-		2, 11, INVALID_OPENCL);
-
-	// Test a string in a structure
-	testMainIntegerArg(
-		"struct teststruct { string str }										\n\
-		def main(int x) int : length(teststruct(\"hello world\").str) ",
-		2, 11, INVALID_OPENCL);
-
-	
+static void stringTests()
+{
 	// ===================================================================
 	// String tests
 	// ===================================================================
@@ -2804,348 +2088,11 @@ void LanguageTests::run()
 			in								\n\
 				10",
 		2, 10);
+}
 
 
-	// test type coercion on vectors: vector<float> initialisation with some int elems
-	testMainFloatArg(
-		"def main(float x) float: elem(   2.0 * [1.0, 2.0, 3, 4]v, 1)",
-		1.0f, 4.0f);
-
-	// float * Vector<float> multiplication
-	testMainFloatArg(
-		"def main(float x) float: elem(   2.0 * [1.0, 2.0, 3.0, 4.0]v, 1)",
-		1.0f, 4.0f);
-
-	// Vector<float> * float multiplication
-	testMainFloatArg(
-		"def main(float x) float: elem(   [1.0, 2.0, 3.0, 4.0]v * 2.0, 1)",
-		1.0f, 4.0f);
-
-	// int * Vector<int> multiplication
-	testMainIntegerArg(
-		"def main(int x) int: elem(   2 * [1, 2, 3, 4]v, 1)",
-		1, 4);
-
-	// Vector<int> * int multiplication
-	testMainIntegerArg(
-		"def main(int x) int: elem(   [1, 2, 3, 4]v * 2, 1)",
-		1, 4);
-
-
-	// float * Vector<float> multiplication
-	testMainFloatArg(
-		"def main(float x) float: elem(   x * [x, 2.0, 3.0, 4.0]v, 1)",
-		2.0f, 4.0f);
-
-	// Vector<float> * float multiplication
-	testMainFloatArg(
-		"def main(float x) float: elem(   [1.0, 2.0, 3.0, 4.0]v * x, 1)",
-		2.0f, 4.0f);
-
-	// int * Vector<int> multiplication
-	testMainIntegerArg(
-		"def main(int x) int: elem(   x * [1, 2, 3, 4]v, 1)",
-		2, 4);
-
-	// Vector<int> * int multiplication
-	testMainIntegerArg(
-		"def main(int x) int: elem(   [1, 2, 3, 4]v * x, 1)",
-		2, 4);
-
-	
-
-
-	// Test integer in-bounds runtime index access to vector
-	/*testMainIntegerArg(
-		"def main(int i) int :								\n\
-			let												\n\
-				a = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]v		\n\
-				b = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1 ]v		\n\
-			in												\n\
-				elem(a + b, i)",
-		2, 4);
-
-	
-
-	// Test integer in-bounds runtime index access to vector
-	testMainIntegerArg(
-		"def main(int i) int :								\n\
-			let												\n\
-				a = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]v		\n\
-				b = [1.0, 1.6, 1.0, 1.0, 1.3, 1.6, 1.8, 1.6]v		\n\
-				c = [1.7, 2.8, 3.0, 4.7, 5.5, 6.7, 7.0, 8.4]v		\n\
-			in												\n\
-				truncateToInt(elem(a + if(i < 1, b, c), i))",
-		2, 6);
-
-	//exit(1);//TEMP
-
-	// Test integer in-bounds runtime index access to vector
-	testMainIntegerArg(
-		"def main(int i) int :								\n\
-			let												\n\
-				a = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]v		\n\
-				b = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 ]v		\n\
-				c = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]v		\n\
-			in												\n\
-				truncateToInt(elem(a + if(i < 1, b, c), i))",
-		2, 6);
-		*/
-	
-
-	// Test integer in-bounds runtime index access to vector
-/*TEMP NO OPENCL
-	testMainIntegerArg(
-		"def main(int i) int : if i >= 0 && i < 10 then elem([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]v, i) else 0", 
-		2, 3);
-		*/
-
-	testMainFloatArg(
-		"def main(float x) float: elem( if(x < 0.5, [1.0, 2.0]a, [3.0, 4.0]a), 0)",
-		1.0f, 3.0f, INVALID_OPENCL);
-	
-	// Test a structure composed of another structure, and taking the dot product of two vectors in the child structures, in an if statement
-	{
-		Float4StructPair a(
-			Float4Struct(1, 1, 1, 1),
-			Float4Struct(2, 2, 2, 2)
-		);
-		
-		testFloat4StructPairRetFloat(
-			"struct Float4Struct { vector<float, 4> v }			\n\
-			struct Float4StructPair { Float4Struct a, Float4Struct b }			\n\
-			def main(Float4StructPair pair1, Float4StructPair pair2) float :			\n\
-				if(e0(pair1.a.v) < 0.5, dot(pair1.a.v, pair2.b.v), dot(pair1.b.v, pair2.a.v))",
-			a, a, 8.0f);
-	}
-
-	// Test a structure composed of another structure, and taking the dot product of two vectors in the child structures.
-	{
-		Float4StructPair a(
-			Float4Struct(1, 1, 1, 1),
-			Float4Struct(2, 2, 2, 2)
-		);
-		
-		testFloat4StructPairRetFloat(
-			"struct Float4Struct { vector<float, 4> v }			\n\
-			struct Float4StructPair { Float4Struct a, Float4Struct b }			\n\
-			def main(Float4StructPair pair1, Float4StructPair pair2) float :			\n\
-				dot(pair1.a.v, pair2.b.v)",
-			a, a, 8.0f);
-	}
-
-
-	
-
-	// Test if with expensive-to-eval args
-	testMainFloatArg(
-		//"def expensiveA(float x) float : pow(x, 0.1 + pow(0.2, x))			\n
-		"def expensiveA(float x) float : cos(x * 0.456 + cos(x))			\n\
-		def expensiveB(float x) float : sin(x * 0.345 + sin(x))			\n\
-		def main(float x) float: if(x < 0.5, expensiveA(x + 0.145), expensiveB(x + 0.2435))",
-		0.2f, cos((0.2f + 0.145f) * 0.456f + cos((0.2f + 0.145f))));	
-
-
-/*
-TEMP OPENCL
-	// Test operator overloading (op_add) for an array
-	testMainFloatArg(
-		"def op_add(array<float, 2> a, array<float, 2> b) array<float, 2> : [elem(a, 0) + elem(b, 0), elem(a, 1) + elem(b, 1)]a		\n\
-		def main(float x) float: elem([1.0, 2.0]a  + [3.0, 4.0]a, 1)",
-		1.0f, 6.0f);	
-
-	// Test operator overloading (op_mul) for an array
-	testMainFloatArg(
-		"def op_mul(array<float, 2> a, float x) array<float, 2> : [elem(a, 0) * x, elem(a, 1) * x]a		\n\
-		def main(float x) float: elem([1.0, 2.0]a * 2.0, 1)",
-		1.0f, 4.0f);	
-
-	
-	// Test array in array
-	testMainIntegerArg(
-		"def main(int i) int : if i >= 0 && i < 2 then elem(elem([[1, 2]a, [3, 4]a]a, i), i) else 0", 
-		1, 4);
-
-	// Test struct in array
-	testMainIntegerArg(
-		"struct Pair { int a, int b }		\n\
-		def main(int i) int : if i >= 0 && i < 2 then b(elem([Pair(1, 2), Pair(3, 4)]a, i)) else 0 ", 
-		1, 4);
-*/
-
-	testMainIntegerArg(
-		"def main(int i) int : if i >= 0 && i < 5 then elem([1, 2, 3, 4, 5]a, i) else 0", 
-		1, 2);
-		
-	// Test integer in-bounds runtime index access
-	testMainIntegerArg(
-		"def main(int i) int : if i >= 0 && i < 20 then elem([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]a, i) else 0", 
-		10, 11);
-
-	// Test integer in-bounds runtime index access
-	for(int i=0; i<5; ++i)
-	{
-		testMainIntegerArg(
-			"def main(int i) int : if i >= 0 && i < 5 then elem([1, 2, 3, 4, 5]a, i) else 0", 
-			i, i+1);
-	}
-
-	// Test integer in-bounds runtime index access
-	testMainIntegerArg(
-		"def main(int i) int : if i >= 0 && i < 4 then elem([1, 2, 3, 4]a, i) else 0", 
-		1, 2);
-
-	// Test runtime out of bounds access.  Should return 0.
-	if(false)
-	{
-		testMainIntegerArg(
-			"def main(int i) int : elem([1, 2, 3, 4]a, i)", 
-			-1, 0);
-
-		testMainIntegerArg(
-			"def main(int i) int : elem([1, 2, 3, 4]a, i)", 
-			4, 0);
-
-		// Test out of bounds array access
-		testMainFloatArg(
-			"def main(float x) float : elem([1.0, 2.0, 3.0, 4.0]a, 4)", 
-			10.0, std::numeric_limits<float>::quiet_NaN());
-
-		testMainFloatArg(
-			"def main(float x) float : elem([1.0, 2.0, 3.0, 4.0]a, -1)", 
-			10.0, std::numeric_limits<float>::quiet_NaN());
-	}
-
-	
-
-
-
-	
-
-	// Test float arrays getting passed in to and returned from main function
-	{
-		const float a[] = {1.0f, 2.0f, 3.0f, 4.0f};
-		const float b[] = {10.0f, 20.0f, 30.0f, 40.0f};
-		float target_results[] = {1.0f, 2.0f, 3.0f, 4.0f};
-
-		testFloatArray("def main(array<float, 4> a, array<float, 4> b) array<float, 4> : a",
-			a, b, target_results, 4);
-	}
-
-	// Test map
-	{
-		const float a[] = {1.0f, 2.0f, 3.0f, 4.0f};
-		const float b[] = {10.0f, 20.0f, 30.0f, 40.0f};
-		float target_results[] = {1.0f, 4.0f, 9.0f, 16.0f};
-
-		testFloatArray(
-			"def square(float x) float : x*x			\n\
-			def main(array<float, 4> a, array<float, 4> b) array<float, 4> : map(square, a)",
-			a, b, target_results, 4);
-	}
-
-	// Test map from one element type to another
-	{
-		const float a[] = {1.0f, 2.0f, 3.0f, 4.0f};
-		const float b[] = {10.0f, 20.0f, 30.0f, 40.0f};
-		float target_results[] = {1.0f, 2.0f, 3.0f, 4.0f};
-
-		testFloatArray(
-			"def squareToInt(float x) int : truncateToInt(x*x + 0.000001)			\n\
-			def sqrtToFloat(int i) float : sqrt(toFloat(i))							\n\
-			def main(array<float, 4> a, array<float, 4> b) array<float, 4> : map(sqrtToFloat, map(squareToInt, a))",
-			a, b, target_results, 4);
-	}
-
-	// Test map with more elems
-	{
-		const size_t N = 256;
-		std::vector<float> input(N, 2.0f);
-		std::vector<float> target_results(N, 4.0f);
-
-
-		testFloatArray(
-			"def square(float x) float : x*x			\n\
-			def main(array<float, 256> a, array<float, 256> b) array<float, 256> : map(square, a)",
-			&input[0], &input[0], &target_results[0], N);
-	}
-
-
-	// Test float arrays getting passed in to and returned from main function
-	{
-		const float a[] = {1.0f, 2.0f, 3.0f, 4.0f};
-		const float b[] = {10.0f, 20.0f, 30.0f, 40.0f};
-		float target_results[] = {11.f, 22.f, 33.f, 44.f};
-
-		testFloatArray("def main(array<float, 4> a, array<float, 4> b) array<float, 4> : [elem(a,0) + elem(b,0), elem(a,1) + elem(b,1), elem(a,2) + elem(b,2), elem(a,3) + elem(b,3)]a",
-			a, b, target_results, 4);
-	}
-
-
-
-	
-
-	// Test structure getting returned directly.
-	{
-		Float4Struct a(1.0f, -2.0f, 3.0f, -4.0f);
-		Float4Struct target_result(1.0f, -2.0f, 3.0f, -4.0f);
-		
-		testFloat4Struct(
-			"struct Float4Struct { vector<float, 4> v } \n\
-			def main(Float4Struct a, Float4Struct b) Float4Struct : \n\
-				a", 
-			a, a, target_result
-		);
-	}
-
-
-	
-
-	// Test Array of structs
-	testMainFloatArg(
-		"struct Pair { float a, float b }		\n\
-		def main(float x) float : b(elem([Pair(1.0, 2.0), Pair(3.0, 4.0)]a, 1)) ", 
-		10.0, 4.0f, INVALID_OPENCL);
-	
-	// Test mixing of int and float in an array - is invalid
-	testMainFloatArgInvalidProgram("def main(float x) float : elem([1.0, 2, 3.0, 4.0]a, 1) + x");
-	testMainFloatArgInvalidProgram("def main(float x) float : elem([1, 2.0, 3.0, 4.0]a, 1) + x");
-
-	// Test Array Literal
-	testMainFloatArg("def main(float x) float : elem([1.0, 2.0, 3.0, 4.0]a, 1) + x", 10.0, 12.f);
-
-	// Test Array Literal with one element
-	testMainFloatArg("def main(float x) float : elem([1.0]a, 0) + x", 10.0, 11.f);
-
-	/*
-TEMP OPENCL
-	// Test Array Literal with non-const value
-	testMainFloatArg("def main(float x) float : elem([x, x, x, x]a, 1) + x", 1.0, 2.f);
-	testMainFloatArg("def main(float x) float : elem([x, x+1.0, x+2.0, x+3.0]a, 2)", 1.0, 3.f);
-	*/
-	
-	// Test Array Literal of integers
-	testMainIntegerArg("def main(int x) int : elem([1, 2, 3, 4]a, 1) + x", 10, 12);
-
-
-	// Test array with let statement
-	testMainFloatArg(
-		"def main(float x) float :				\n\
-			let									\n\
-				a = [1.0, 2.0, 3.0, 4.0]a		\n\
-			in									\n\
-				elem(a, 0)",
-		0.0f, 1.0f);
-
-	// Passing array by argument
-	testMainFloatArg(
-		"def f(array<float, 4> a) float : elem(a, 1)		\n\
-		def main(float x) float :						\n\
-			f([1.0, 2.0, 3.0, 4.0]a) +  x",
-		10.0f, 12.0f);
-
-
-
+static void testMathsFunctions()
+{
 	// abs
 	testMainFloatArg("def main(float x) float : abs(x)", 9.0f, 9.0f);
 	testMainFloatArg("def main(float x) float : abs(x)", -9.0f, 9.0f);
@@ -3178,8 +2125,8 @@ TEMP OPENCL
 	//testMainIntegerArg("def main(int x) int : truncateToInt(toFloat(x) + 0.2)", -3, -2);
 
 	// Test truncateToInt on vector
-/*	
-TODO: FIXME: needs truncateToInt in bounds proof.
+	/*	
+	TODO: FIXME: needs truncateToInt in bounds proof.
 	{
 		Float4Struct a(-2.2f, -1.2f, 0.2f, 1.2f);
 		Float4Struct target_result(-2.f, -1.f, 0.f, 1.f);
@@ -3195,7 +2142,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 			a, a, target_result
 		);
 	}
-*/
+	*/
 
 	// sqrt
 	testMainFloatArg("def main(float x) float : sqrt(x)", 9.0f, std::sqrt(9.0f));
@@ -3375,238 +2322,11 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 	testMainFloatArg("def main(float x) float : mod(x, 4.0f)", 1.f, 1.f);
 	testMainFloatArg("def main(float x) float : mod(x, 1.0f)", 4.f, 0.f);
 	testMainFloatArg("def main(float x) float : mod(x, 1.0f)", 5.f, 1.f);*/
-
-	// Test using a let variable (y) before it is defined:
-	testMainFloatArgInvalidProgram("									\n\
-		def main(float x) float :		\n\
-			let							\n\
-				z = y					\n\
-				y = x					\n\
-			in							\n\
-				z						"
-	);
-
-	// Test using a let variable (y) before it is defined, that would have created a cycle:
-	testMainFloatArgInvalidProgram("									\n\
-		def main(float x) float :		\n\
-			let							\n\
-				z = y					\n\
-				y = z					\n\
-			in							\n\
-				z						"
-	);
-
-	// Test avoidance of circular let definition: 
-	testMainFloatArgInvalidProgram("									\n\
-		def main(float y) float :		\n\
-			let							\n\
-				x = x					\n\
-			in							\n\
-				x						"
-	);
-
-	// Test avoidance of circular let definition
-	testMainFloatArgInvalidProgram("									\n\
-		def main(float y) float :		\n\
-			let							\n\
-				x = 1.0 + x				\n\
-			in							\n\
-				x						"
-	);
-
-	// Test avoidance of circular let definition for functions
-	testMainFloatArg("						\n\
-		def f(float x) float : x		\n\
-		def main(float y) float :		\n\
-			let							\n\
-				f1 = f(1.0) + 1.0				\n\
-				f = f(1.0) + 1.0				\n\
-			in							\n\
-				f						",
-		1.0f,
-		2.0f
-	);
+}
 
 
-	//COPIED:
-	// Test two let clauses where one refers to the other.
-	testMainFloat("def f() float : \
-				  let	\
-					z = 2.0 \
-					y = z \
-				  in \
-					y \
-				  def main() float : f()", 2.0);
-
-	// Test vector in structure
-	{
-		Float4Struct a(1, 2, 3, 4);
-		Float4Struct b(1, 2, 3, 4);
-		Float4Struct target_result(1, 2, 3, 4);
-		
-		 //Float8Struct([min(e0(a.v), e0(b.v)), min(e1(a.v), e1(b.v)),	min(e2(a.v), e2(b.v)),	min(e3(a.v), e3(b.v)), min(e4(a.v), e4(b.v)), min(e5(a.v), e5(b.v)), min(e6(a.v), e6(b.v)), min(e7(a.v), e7(b.v))]v ) 
-		testFloat4Struct(
-			"struct Float4Struct { vector<float, 4> v } \n\
-			def min(Float4Struct a, Float4Struct b) Float4Struct : Float4Struct(min(a.v, b.v)) \n\
-			def main(Float4Struct a, Float4Struct b) Float4Struct : \n\
-				min(a, b)", 
-			a, b, target_result
-		);
-	}
-
-
-	// Test vector in structure
-	{
-		Float8Struct a;
-		a.v.e[0] = 10;
-		a.v.e[1] = 2;
-		a.v.e[2] = 30;
-		a.v.e[3] = 4;
-		a.v.e[4] = 4;
-		a.v.e[5] = 5;
-		a.v.e[6] = 6;
-		a.v.e[7] = 7;
-
-		Float8Struct b;
-		b.v.e[0] = 1;
-		b.v.e[1] = 20;
-		b.v.e[2] = 3;
-		b.v.e[3] = 40;
-		b.v.e[4] = 4;
-		b.v.e[5] = 5;
-		b.v.e[6] = 6;
-		b.v.e[7] = 7;
-
-		Float8Struct target_result;
-		target_result.v.e[0] = 1;
-		target_result.v.e[1] = 2;
-		target_result.v.e[2] = 3;
-		target_result.v.e[3] = 4;
-		target_result.v.e[4] = 4;
-		target_result.v.e[5] = 5;
-		target_result.v.e[6] = 6;
-		target_result.v.e[7] = 7;
-		
-		 //Float8Struct([min(e0(a.v), e0(b.v)), min(e1(a.v), e1(b.v)),	min(e2(a.v), e2(b.v)),	min(e3(a.v), e3(b.v)), min(e4(a.v), e4(b.v)), min(e5(a.v), e5(b.v)), min(e6(a.v), e6(b.v)), min(e7(a.v), e7(b.v))]v ) 
-		testFloat8Struct(
-			"struct Float8Struct { vector<float, 8> v } \n\
-			def min(Float8Struct a, Float8Struct b) Float8Struct : Float8Struct(min(a.v, b.v)) \n\
-			def main(Float8Struct a, Float8Struct b) Float8Struct : \n\
-				min(a, b)", 
-			a, b, target_result
-		);
-	}
-
-
-	// Test alignment of structure elements when they are vectors
-	testMainFloatArg("struct vec4 { vector<float, 4> v }					\n\
-				   struct vec16 { vector<float, 16> v }					\n\
-				   struct large_struct { vec4 a, vec16 b }				\n\
-				   def main(float x) float : large_struct(vec4([x, x, x, x]v), vec16([x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x]v)).a.v.e0",
-				  3.0f, 3.0f);
-
-
-	//TEMP:
-	// Try dot product
-	testMainFloatArg("	def main(float x) float : \
-					 let v = [x, x, x, x]v in\
-					 dot(v, v)", 4.0f, 64.0f);
-
-	testMainFloatArg("	def main(float x) float : \
-					 let v = [x, x, x, x]v in\
-					 dot(v, v)", 2.0f, 16.0f);
-
-	testMainDoubleArg("	def main(double x) double : \
-					 let v = [x, x, x, x]v in\
-					 dot(v, v)", 4.0, 64.0);
-	
-
-	// Test avoidance of circular variable definition: 
-	testMainFloatArg("									\n\
-		def main(float x) float :		\n\
-			let							\n\
-				x = 2.0					\n\
-			in							\n\
-				x						",
-		2.0f,
-		2.0f
-	);
-
-	// Test avoidance of circular variable definition: the x(pos) expression was attempting to get the type of the 'x =' let node,
-	// which was not known yet as was being computed.  The solution adopted is to not try to bind to let variables that are ancestors of the current variable.
-	// Another solution could be to not try to bind to unbound variables.
-	testMainFloatArg("									\n\
-		struct vec3 { float x, float y, float z }		\n\
-		def vec3(float v) vec3 : vec3(v, v, v)			\n\
-		def eval(vec3 pos) vec3 :						\n\
-			let											\n\
-				x = sin(x(pos) * 1000.0)				\n\
-			in											\n\
-				vec3(0.1)								\n\
-		def main(float t) float: x(eval(vec3(t, t, t)))",
-		1.0f,
-		0.1f
-	);
-
-
-
-
-	// Test operator overloading (op_add) in a let block.
-	testMainFloatArg("								\n\
-		struct vec3 { float x, float y, float z }	\n\
-		def vec3(float v) vec3 : vec3(v, v, v)		\n\
-		def op_add(vec3 a, vec3 b) vec3 : vec3(a.x+b.x, a.y+b.y, a.z+b.z)	\n\
-		def eval(vec3 pos) vec3 :					\n\
-			let											\n\
-				scale = 20.0							\n\
-			in											\n\
-				vec3(scale) + vec3(0.2)					\n\
-		def main(float x) float: x(eval(vec3(x, x, x)))",
-		1.0f, 20.2f);	
-
-	// Test operator overloading (op_mul) in a let block.
-	testMainFloatArg("								\n\
-		struct vec3 { float x, float y, float z }	\n\
-		def vec3(float v) vec3 : vec3(v, v, v)		\n\
-		def op_mul(vec3 a, float b) vec3 : vec3(a.x*b, a.y*b, a.z*b)	\n\
-		def eval(vec3 pos) vec3 :					\n\
-			let											\n\
-				actualpos = vec3(pos.x, pos.y, pos.z + 10.0)				\n\
-			in											\n\
-				actualpos * 10000.0						\n\
-		def main(float x) float: x(eval(vec3(x, x, x)))",
-		1.0f, 10000.0f);	
-
-	
-	
-	
-	
-	// Test comparison vs addition precedence: addition should have higher precedence.
-	testMainFloatArg("def main(float x) float : if(x < 1.0 + 2.0, 5.0, 6.0)", 1.0f, 5.0f);
-
-
-
-
-	// Test capture of let variable.
-	
-	//NOTE: Disabled, because these tests leak due to call to allocateRefCountedStructure().
-	/*testMainFloat("	def main() float :                          \n\
-				  let blerg = 3.0 in                     \n\
-				  let f = \\() : blerg  in                    \n\
-				  f()", 3.0);
-	*/
-	
-
-	testMainFloatArg("def main(float x) float : sin(x)", 1.0f, std::sin(1.0f));
-
-
-	// Test boolean logical expressions
-	testMainFloat(" def main() float : if(true && true, 1.0, 2.0)", 1.0f);
-	testMainFloat(" def main() float : if(true && false, 1.0, 2.0)", 2.0f);
-	testMainFloat(" def main() float : if(true || false, 1.0, 2.0)", 1.0f);
-	testMainFloat(" def main() float : if(false || false, 1.0, 2.0)", 2.0f);
-
-
+static void testOperatorOverloading()
+{
 	// =================================================================== 
 	// Test Operator Overloading 
 	// ===================================================================
@@ -3771,81 +2491,39 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 				  def f(float x, int y) float : 2.0f   \n\
 				  def main() float : f(1.0, 2)", 2.0);
 
-	// ===================================================================
-	// Test implicit type conversions from int to float
-	// ===================================================================
-
-	// For numeric literals
-	testMainFloat("def main() float : 3.0 + 4", 7.0);
-	testMainFloat("def main() float : 3 + 4.0", 7.0);
-
-	testMainFloat("def main() float : 3.0 - 4", -1.0);
-	testMainFloat("def main() float : 3 - 4.0", -1.0);
-
-	testMainFloat("def main() float : 3.0 * 4", 12.0);
-	testMainFloat("def main() float : 3 * 4.0", 12.0);
-
-	testMainFloat("def main() float : 12.0 / 4", 3.0);
-	testMainFloat("def main() float : 12 / 4.0", 3.0);
-	
-	// Test with nodes that can't be constant-folded.
-	// Addition
-	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : f(x) + 3", 2.0f, 7.0f);
-	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : 3 + f(x)", 2.0f, 7.0f);
-
-	// Subtraction
-	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : f(x) - 3", 2.0f, 1.0f);
-	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : 3 - f(x)", 2.0f, -1.0f);
-
-	// Multiplication
-	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : f(x) * 3", 2.0f, 12.0f);
-	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : 3 * f(x)", 2.0f, 12.0f);
-
-	// Division
-	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : f(x) / 3", 3.0f, 3.0f);
-	// Can't be done as f(x) might be zero:
-	// testMainFloatArg("def f(float x) float : x*x      def main(float x) float : 3 / f(x)", 2.0f, 12.0f);
-
-	// NOTE: this one can't convert because f(x) + 3 might be zero.
-	//testMainFloatArg("def f(float x) float : x*x      def main(float x) float : 14 / (f(x) + 3)", 2.0f, 2.0f);
-	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : 14 / (f(2) + 3)", 2.0f, 2.0f);
-	testMainFloatArg("def f(int x) int : x*x	      def main(float x) float : 14 / (f(2) + 3)", 2.0f, 2.0f);
-	testMainFloatArg("def f<T>(T x) T : x*x           def main(float x) float : 14 / (f(2) + 3)", 2.0, 2.0f);
-
-	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : f(x) * 2 + 1", 2.0f, 9.0f);
-	
-	testMainFloatArg("def main(float x) float : ( x + x) * (-0.4)", 2.0f, -1.6f);
-
-	testMainFloatArg("def main(float x) float : (x + x) - 1.5", 2.0f, 2.5f);
-	//testMainFloatArg("def main(float x) float : (x + x) -1.5", 2.0f, 2.0); // NOTE: this works in C++. (e.g. the -1.5 is interpreted as a binary subtraction)
-	
-	// Division
-	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : f(x) / 3", 3.0f, 3.0f);
 
 
-	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : f(x) * (1.0 / 3.0)", 3.0f, 3.0f);
-	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : f(x) * (1 / 3.0)", 3.0f, 3.0f);
-	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : f(x) * (1.0 / 3)", 3.0f, 3.0f);
+	// Test operator overloading (op_add) in a let block.
+	testMainFloatArg("								\n\
+		struct vec3 { float x, float y, float z }	\n\
+		def vec3(float v) vec3 : vec3(v, v, v)		\n\
+		def op_add(vec3 a, vec3 b) vec3 : vec3(a.x+b.x, a.y+b.y, a.z+b.z)	\n\
+		def eval(vec3 pos) vec3 :					\n\
+			let											\n\
+				scale = 20.0							\n\
+			in											\n\
+				vec3(scale) + vec3(0.2)					\n\
+		def main(float x) float: x(eval(vec3(x, x, x)))",
+		1.0f, 20.2f);	
 
-	// Division
-	testMainFloatArg("def f(float x) float : x*x      def main(float x) float : 1.0 / 3.0", 3.0f, 1.0f / 3.0f);
+	// Test operator overloading (op_mul) in a let block.
+	testMainFloatArg("								\n\
+		struct vec3 { float x, float y, float z }	\n\
+		def vec3(float v) vec3 : vec3(v, v, v)		\n\
+		def op_mul(vec3 a, float b) vec3 : vec3(a.x*b, a.y*b, a.z*b)	\n\
+		def eval(vec3 pos) vec3 :					\n\
+			let											\n\
+				actualpos = vec3(pos.x, pos.y, pos.z + 10.0)				\n\
+			in											\n\
+				actualpos * 10000.0						\n\
+		def main(float x) float: x(eval(vec3(x, x, x)))",
+		1.0f, 10000.0f);	
+}
 
 
 
-	// Test promotion to match function return type:
-	testMainFloat("def main() float : 3", 3.0);
-
-	testMainFloat("def main() float : 1.0 + (2 + 3)", 6.0);
-	
-	testMainFloat("def main() float : 1.0 + 2 + 3", 6.0);
-	
-	// Test implicit conversion from int to float in addition operation with a function call
-	//testMainFloat("def f(int x) : x*x    def main() float : 1.0 + f(2)", 5.0f);
-
-	testMainFloat("def main() float : (1.0 + 2.0) + (3 + 4)", 10.0);
-	testMainFloat("def main() float : (1.0 + 2) + (3 + 4)", 10.0);
-
-
+static void testComparisons()
+{
 	// Integer comparisons:
 	// Test <=
 	testMainInteger("def main() int : if(1 <= 2, 10, 20)", 10);
@@ -3921,164 +2599,11 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 
 	testMainFloatArg("def main(float x) float : if(2 <= x, 10.0, 20.0)", 3.0, 10.0);
 	testMainFloatArg("def main(float x) float : if(2 <= x, 10.0, 20.0)", 1.0, 20.0);
+}
 
 
-
-
-	// Test 'if'
-	testMainInteger("def main() int : if(true, 2, 3)", 2);
-	testMainInteger("def main() int : if(false, 2, 3)", 3);
-
-	// Test 'if' with structures as the return type
-	testMainInteger(
-		"struct s { int a, int b }   \n\
-		def main() int : a(if(true, s(1, 2), s(3, 4)))", 
-		1);
-	testMainInteger(
-		"struct s { int a, int b }   \n\
-		def main() int : a(if(false, s(1, 2), s(3, 4)))", 
-		3);
-
-	// Test 'if' with vectors as the return type
-	testMainFloat(
-		"def main() float : e0(if(true, [1.0, 2.0, 3.0, 4.0]v, [10.0, 20.0, 30.0, 40.0]v))", 
-		1.0f);
-	testMainFloat(
-		"def main() float : e0(if(false, [1.0, 2.0, 3.0, 4.0]v, [10.0, 20.0, 30.0, 40.0]v))", 
-		10.0f);
-
-
-	// Test call to external function
-	testMainFloat("def main() float : testExternalFunc(3.0)", 9.0f);
-	testMainFloatArg("def main(float x) float : testExternalFunc(x)", 5.0f, 25.0f, INVALID_OPENCL);
-
-	// Check that we can do constant folding even with an external expression
-	testMainFloatArgCheckConstantFolded("def main(float x) float : testExternalFunc(3.0)", 5.0f, 9.0f, INVALID_OPENCL);
-	
-	// Simple test
-	testMainFloat("def main() float : 1.0", 1.0);
-
-	// Test addition expression
-	testMainFloat("def main() float : 1.0 + 2.0", 3.0);
-
-	// Test integer addition
-	testMainInteger("def main() int : 1 + 2", 3);
-
-	// Test multiple integer additions
-	testMainInteger("def main() int : 1 + 2 + 3", 6);
-	testMainInteger("def main() int : 1 + 2 + 3 + 4", 10);
-
-	// Test multiple integer subtractions
-	testMainInteger("def main() int : 1 - 2 - 3 - 4", 1 - 2 - 3 - 4);
-
-	// Test left-to-right associativity
-	// Note that right-to-left associativity here would give 2 - (3 + 4) = -5
-	assert(2 - 3 + 4 == (2 - 3) + 4);
-	assert(2 - 3 + 4 == 3);
-	testMainInteger("def main() int : 2 - 3 + 4", 3);
-
-
-	// Test multiplication expression
-	testMainFloat("def main() float : 3.0 * 2.0", 6.0);
-
-
-
-
-	// Test integer multiplication
-	testMainInteger("def main() int : 2 * 3", 6);
-
-	// Test multiple integer multiplication
-	testMainInteger("def main() int : 2 * 3 * 4 * 5", 2 * 3 * 4 * 5);
-
-	// Test left-to-right associativity of division
-	// 12 / 4 / 3 = (12 / 4) / 3 = 1
-	// whereas
-	// 12 / (4 / 3) = 12 / 1 = 12
-	testMainInteger("def main() int : 12 / 4 / 3", 1);
-
-
-	// Test float subtraction
-	testMainFloat("def main() float : 3.0 - 2.0", 1.0);
-
-	// Test integer subtraction
-	testMainInteger("def main() int : 2 - 3", -1);
-
-	// Test precedence
-	testMainInteger("def main() int : 2 + 3 * 4", 14);
-	testMainInteger("def main() int : 2 * 3 + 4", 10);
-
-	// Test parentheses controlling order of operation
-	testMainInteger("def main() int : (2 + 3) * 4", 20);
-	testMainInteger("def main() int : 2 * (3 + 4)", 14);
-
-
-	// Test unary minus in front of parenthesis
-	testMainInteger("def main() int : -(1 + 2)", -3);
-
-	// Test floating point unary minus
-	testMainFloat("def main() float : -(1.0 + 2.0)", -3.0);
-
-	// Test unary minus in front of var
-	testMainInteger("def f(int x) int : -x        def main() int : f(3)", -3);
-
-	// Test unary minus with space
-	testMainFloatArg("def main(float x) : - x", 10.f, -10.f);
-	// Test double unary minus
-	testMainFloatArg("def main(float x) : - -x", 10.f, 10.f);
-	testMainFloatArg("def main(float x) : --x", 10.f, 10.f);
-
-
-
-
-	// Test simple function call
-	testMainFloat("def f(float x) float : x        def main() float : f(3.0)", 3.0);
-
-	// Test function call with two parameters
-	testMainFloat("def f(float x, float y) float : x        def main() float : f(3.0, 4.0)", 3.0);
-	testMainFloat("def f(float x, float y) float : y        def main() float : f(3.0, 4.0)", 4.0);
-
-	// Test inferred return type (for f)
-	testMainFloat("def f(float x) : x        def main() float : f(3.0)", 3.0);
-
-	// Test two call levels of inferred return type (f, g)
-	testMainFloat("def g(float x) : x    def f(float x) : g(x)       def main() float : f(3.0)", 3.0);
-	testMainFloat("def f(float x) : x    def g(float x) : f(x)       def main() float : g(3.0)", 3.0);
-
-	// Test generic function
-	testMainFloat("def f<T>(T x) T : x        def main() float : f(2.0)", 2.0);
-
-	// Test generic function with inferred return type (f)
-	testMainFloat("def f<T>(T x) : x        def main() float : f(2.0)", 2.0);
-
-
-	// Test function overloading - call with int param, should select 1st overload
-	testMainFloat("def overloadedFunc(int x) float : 4.0 \
-				  def overloadedFunc(float x) float : 5.0 \
-				  def main() float: overloadedFunc(1)", 4.0f);
-
-	// Call with float param, should select 2nd overload.
-	testMainFloat("def overloadedFunc(int x) float : 4.0 \
-				  def overloadedFunc(float x) float : 5.0 \
-				  def main() float: overloadedFunc(1.0)", 5.0f);
-
-	// Test binding to different overloaded functions based on type parameter to generic function
-	testMainFloat("def overloadedFunc(int x) float : 4.0 \
-				  def overloadedFunc(float x) float : 5.0 \
-				  def f<T>(T x) float: overloadedFunc(x)\
-				  def main() float : f(1)", 4.0f);
-
-
-	// Test invalidity of recursive call in generic function.
-	testMainFloatArgInvalidProgram("def f<T>(T x) f(x)   def main(float x) float : f(x)");
-	testMainFloatArgInvalidProgram("def f<T>(T x) T : x*x / (f(2) + 3)   def main(float x) float : 1/ (f(2) + 3)");
-
-
-	// Call f with float param
-	testMainFloat("def overloadedFunc(int x) float : 4.0 \
-				  def overloadedFunc(float x) float : 5.0 \
-				  def f<T>(T x) float: overloadedFunc(x)\
-				  def main() float : f(1.0)", 5.0f);
-
+static void testLetBlocks()
+{
 	// ===================================================================
 	// Test let blocks
 	// ===================================================================
@@ -4211,6 +2736,134 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 						y						\n\
 				def main() float : f()", 2.0);
 
+
+	
+
+	// Test addition expression in let
+	testMainFloat("def f(float x) float : \
+				  let z = 2.0 + 3.0 in\
+				  z \
+				  def main() float : f(0.0)", 5.0);
+
+	// Test function expression in let
+	testMainFloat("	def g(float x) float : x + 1.0 \
+					def f(float x) float : \
+					let z = g(1.0) in \
+					z \
+					def main() float : f(0.0)", 2.0);
+
+	// Test function argument in let
+	testMainFloat("	def f(float x) float : \
+					let z = x + 1.0 in\
+					z \
+					def main() float : f(2.0)", 3.0);
+
+
+	// Test use of let variable twice
+	testMainFloat("	def f(float x) float : \
+				  let z = x + 1.0 in\
+				  z + z\
+				  def main() float : f(2.0)", 6.0);
+
+	// test multiple lets with the same name in the same let block aren't allowed
+	testMainFloatArgInvalidProgram("def f(float x) float :		\n\
+			  let								\n\
+				float y = 2.0					\n\
+				float y = 3.0					\n\
+			  in								\n\
+				x + y							\n\
+			  def main(float x) float : f(x)");
+
+
+	// Test a let var with structure type.
+	testMainFloatArg("struct S { float a }							\n\
+				def f(float x) float :			\n\
+					let							\n\
+						z = S(x)				\n\
+					in								\n\
+						z.a + 1.0						\n\
+				def main(float x) float : f(x)", 4.0, 5.0, INVALID_OPENCL);
+
+
+	// Test a let var set to a structure passed as an argument.
+	testMainFloatArg("struct S { float a }							\n\
+				def f(float x, S s) float :			\n\
+					let							\n\
+						z = s				\n\
+					in								\n\
+						z.a + 1.0						\n\
+				def main(float x) float : f(x, S(x))", 4.0, 5.0, INVALID_OPENCL);
+
+
+	
+
+	// Test using a let variable (y) before it is defined:
+	testMainFloatArgInvalidProgram("									\n\
+		def main(float x) float :		\n\
+			let							\n\
+				z = y					\n\
+				y = x					\n\
+			in							\n\
+				z						"
+	);
+
+	// Test using a let variable (y) before it is defined, that would have created a cycle:
+	testMainFloatArgInvalidProgram("									\n\
+		def main(float x) float :		\n\
+			let							\n\
+				z = y					\n\
+				y = z					\n\
+			in							\n\
+				z						"
+	);
+
+	// Test avoidance of circular let definition: 
+	testMainFloatArgInvalidProgram("									\n\
+		def main(float y) float :		\n\
+			let							\n\
+				x = x					\n\
+			in							\n\
+				x						"
+	);
+
+	// Test avoidance of circular let definition
+	testMainFloatArgInvalidProgram("									\n\
+		def main(float y) float :		\n\
+			let							\n\
+				x = 1.0 + x				\n\
+			in							\n\
+				x						"
+	);
+
+	// Test avoidance of circular let definition for functions
+	testMainFloatArg("						\n\
+		def f(float x) float : x		\n\
+		def main(float y) float :		\n\
+			let							\n\
+				f1 = f(1.0) + 1.0				\n\
+				f = f(1.0) + 1.0				\n\
+			in							\n\
+				f						",
+		1.0f,
+		2.0f
+	);
+
+
+	//COPIED:
+	// Test two let clauses where one refers to the other.
+	testMainFloat("def f() float : \
+				  let	\
+					z = 2.0 \
+					y = z \
+				  in \
+					y \
+				  def main() float : f()", 2.0);
+
+}
+
+
+static void testLambdaExpressionsAndClosures()
+{
 	// ===================================================================
 	// Test lambda expressions and closures
 	// ===================================================================
@@ -4219,7 +2872,7 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 	testMainFloatArg("def main(float x) float : (\\(float x) -> x*x) (x)", 4.0f, 16.0f, INVALID_OPENCL);
 
 	// Test Lambda applied directly.  Function inlining (beta reduction) should be done.
-	results = testMainFloatArg("def main(float x) float : (\\(float y) : y*y) (x)", 4.0f, 16.0f, INVALID_OPENCL);
+	Winter::TestResults results = testMainFloatArg("def main(float x) float : (\\(float y) : y*y) (x)", 4.0f, 16.0f, INVALID_OPENCL);
 	testAssert(results.maindef->body->nodeType() == ASTNode::MulExpressionType);
 
 	// Test Lambda applied directly (with same variable names)
@@ -4518,8 +3171,9 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 					let z = 4.0 in                         \n\
 					let f = \\() : z  in                    \n\
 					f()", 4.0);
-	
 
+
+	
 	// ===================================================================
 	// Test type-checking for calls to function variables.
 	// ===================================================================
@@ -4773,64 +3427,11 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 								in f()						\n\
 								", 3.f);
 
-
-	// Test addition expression in let
-	testMainFloat("def f(float x) float : \
-				  let z = 2.0 + 3.0 in\
-				  z \
-				  def main() float : f(0.0)", 5.0);
-
-	// Test function expression in let
-	testMainFloat("	def g(float x) float : x + 1.0 \
-					def f(float x) float : \
-					let z = g(1.0) in \
-					z \
-					def main() float : f(0.0)", 2.0);
-
-	// Test function argument in let
-	testMainFloat("	def f(float x) float : \
-					let z = x + 1.0 in\
-					z \
-					def main() float : f(2.0)", 3.0);
+}
 
 
-	// Test use of let variable twice
-	testMainFloat("	def f(float x) float : \
-				  let z = x + 1.0 in\
-				  z + z\
-				  def main() float : f(2.0)", 6.0);
-
-	// test multiple lets with the same name in the same let block aren't allowed
-	testMainFloatArgInvalidProgram("def f(float x) float :		\n\
-			  let								\n\
-				float y = 2.0					\n\
-				float y = 3.0					\n\
-			  in								\n\
-				x + y							\n\
-			  def main(float x) float : f(x)");
-
-
-	// Test a let var with structure type.
-	testMainFloatArg("struct S { float a }							\n\
-				def f(float x) float :			\n\
-					let							\n\
-						z = S(x)				\n\
-					in								\n\
-						z.a + 1.0						\n\
-				def main(float x) float : f(x)", 4.0, 5.0, INVALID_OPENCL);
-
-
-	// Test a let var set to a structure passed as an argument.
-	testMainFloatArg("struct S { float a }							\n\
-				def f(float x, S s) float :			\n\
-					let							\n\
-						z = s				\n\
-					in								\n\
-						z.a + 1.0						\n\
-				def main(float x) float : f(x, S(x))", 4.0, 5.0, INVALID_OPENCL);
-
-
-
+static void testStructs()
+{
 	// Test creation of struct
 	{
 		Float4Struct a(1.0f, -2.0f, 3.0f, -4.0f);
@@ -4884,8 +3485,12 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 				  struct ComplexPair { Complex a, Complex b } \n\
 				  def main() float : ComplexPair(Complex(2.0, 3.0), Complex(4.0, 5.0)).a.im",
 				  3.0f);
+}
 
 
+static void testVectors()
+{
+	
 	// Test vector
 	testMainFloat("	def main() float : \
 					let x = [1.0, 2.0, 3.0, 4.0]v in\
@@ -5022,23 +3627,1591 @@ TODO: FIXME: needs truncateToInt in bounds proof.
 					let a = PolarisationVec([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]v) in \
 					e5(e(clamp(a, 2.0, 2.5)))", 2.5);
 
-	//class PolarisationVec
-	//{
-	//public:
-	//	__m128 e[2];
+	
+
+	// test type coercion on vectors: vector<float> initialisation with some int elems
+	testMainFloatArg(
+		"def main(float x) float: elem(   2.0 * [1.0, 2.0, 3, 4]v, 1)",
+		1.0f, 4.0f);
+
+	// float * Vector<float> multiplication
+	testMainFloatArg(
+		"def main(float x) float: elem(   2.0 * [1.0, 2.0, 3.0, 4.0]v, 1)",
+		1.0f, 4.0f);
+
+	// Vector<float> * float multiplication
+	testMainFloatArg(
+		"def main(float x) float: elem(   [1.0, 2.0, 3.0, 4.0]v * 2.0, 1)",
+		1.0f, 4.0f);
+
+	// int * Vector<int> multiplication
+	testMainIntegerArg(
+		"def main(int x) int: elem(   2 * [1, 2, 3, 4]v, 1)",
+		1, 4);
+
+	// Vector<int> * int multiplication
+	testMainIntegerArg(
+		"def main(int x) int: elem(   [1, 2, 3, 4]v * 2, 1)",
+		1, 4);
 
 
-	/* Try matrix * vec4f mult
+	// float * Vector<float> multiplication
+	testMainFloatArg(
+		"def main(float x) float: elem(   x * [x, 2.0, 3.0, 4.0]v, 1)",
+		2.0f, 4.0f);
 
+	// Vector<float> * float multiplication
+	testMainFloatArg(
+		"def main(float x) float: elem(   [1.0, 2.0, 3.0, 4.0]v * x, 1)",
+		2.0f, 4.0f);
+
+	// int * Vector<int> multiplication
+	testMainIntegerArg(
+		"def main(int x) int: elem(   x * [1, 2, 3, 4]v, 1)",
+		2, 4);
+
+	// Vector<int> * int multiplication
+	testMainIntegerArg(
+		"def main(int x) int: elem(   [1, 2, 3, 4]v * x, 1)",
+		2, 4);
+
+	
+
+
+	// Test integer in-bounds runtime index access to vector
+	/*testMainIntegerArg(
+		"def main(int i) int :								\n\
+			let												\n\
+				a = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]v		\n\
+				b = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1 ]v		\n\
+			in												\n\
+				elem(a + b, i)",
+		2, 4);
+
+	
+
+	// Test integer in-bounds runtime index access to vector
+	testMainIntegerArg(
+		"def main(int i) int :								\n\
+			let												\n\
+				a = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]v		\n\
+				b = [1.0, 1.6, 1.0, 1.0, 1.3, 1.6, 1.8, 1.6]v		\n\
+				c = [1.7, 2.8, 3.0, 4.7, 5.5, 6.7, 7.0, 8.4]v		\n\
+			in												\n\
+				truncateToInt(elem(a + if(i < 1, b, c), i))",
+		2, 6);
+
+	//exit(1);//TEMP
+
+	// Test integer in-bounds runtime index access to vector
+	testMainIntegerArg(
+		"def main(int i) int :								\n\
+			let												\n\
+				a = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]v		\n\
+				b = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 ]v		\n\
+				c = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]v		\n\
+			in												\n\
+				truncateToInt(elem(a + if(i < 1, b, c), i))",
+		2, 6);
+		*/
+	
+
+	// Test integer in-bounds runtime index access to vector
+	/*TEMP NO OPENCL
+	testMainIntegerArg(
+		"def main(int i) int : if i >= 0 && i < 10 then elem([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]v, i) else 0", 
+		2, 3);
+		*/
+}
+
+
+void LanguageTests::run()
+{
+	Timer timer;
+	TestResults results;
+
+	//useKnownReturnRefCountOptimsiation(3);
+
+	//fuzzTests();
+	//////////////////
+
+
+	// ===================================================================
+	// Check equality for types, and that they work in sets etc.. correctly.
+	// ===================================================================
+	const TypeRef ta = new Int();
+	const TypeRef tb = new Int();
+
+	testAssert(*ta == *tb);
+
+	{
+		std::set<TypeRef, TypeRefLessThan> type_set;
+		type_set.insert(ta);
+		type_set.insert(tb);
+		testAssert(type_set.size() == 1);
+	}
+
+	//testMainFloatArgInvalidProgram("struct s { s a, s b } def main(float x) float : x");
+	//testMainFloatArgInvalidProgram("def main(float x) float : let varray<T> v = [v]va in x");
+	
+	// ===================================================================
+	// 
+	// ===================================================================
+	//testMainFloatArgAllowUnsafe("def main(float x) float : let A = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]a   i = truncateToInt(x) in A[i] + A[i+1]", 2.f, 7.0f);
+	//testMainFloatArgAllowUnsafe("A = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]a       def main(float x) float : let i = truncateToInt(x) in A[i] + A[i+1] + A[i+2]", 2.f, 12.0f);
+
+	// Test map with more elems
+	/*{
+		const size_t N = 1 << 28;
+		js::Vector<float, 32> input(N, 4.0f);
+		js::Vector<float, 32> target_results(N, 16.f);//std::pow(4.0f, 2.2f));//std::sqrt(std::sqrt(std::sqrt(4.0))));
+
+
+		testFloatArray(
+			"def f(float x) float : pow(x, 2.2)			\n\
+			def main(array<float, 268435456> a, array<float, 268435456> b) array<float, 268435456> : map(f, a)",
+			&input[0], &input[0], &target_results[0], N);
+
+		// Reference c++ code:
+		{
+			js::Vector<float, 32> output(N);
+
+			
+
+			// Warm up cache, page table etc..
+			std::memcpy(&output[0], &input[0], N * sizeof(float));
+
+			double sum1 = 0;
+			for(size_t i=0; i<N; ++i)
+				sum1 += output[i];
+
+			Timer timer;
+
+			//float sum = 0;
+			//for(size_t i=0; i<N; ++i)
+			//	sum += input[i];
+			for(size_t i=0; i<N; ++i)
+				output[i] = std::pow(input[i], 2.2f);//std::sqrt(std::sqrt(std::sqrt(input[i])));
+			//std::memcpy(&output[0], &input[0], N * sizeof(float));
+
+			const double elapsed = timer.elapsed();
+
+			double sum = 0;
+			for(size_t i=0; i<N; ++i)
+				sum += output[i];
+
+			std::cout << "C++ ref elapsed: " << (elapsed * 1.0) << " s" << std::endl;
+			const double bandwidth = N * sizeof(float) / elapsed;
+			std::cout << "C++ ref bandwidth: " << (bandwidth * 1.0e-9) << " GiB/s" << std::endl;
+			std::cout << "sum1: " << sum << std::endl;
+			std::cout << "sum: " << sum << std::endl;
+		}
+	}*/
+
+	//testMainStringArg("def main(string s) string : s", "hello", "hello");
+	//testMainStringArg("def main(string s) string : \"hello\"", "bleh", "hello");
+
+
+	/*
+
+	want to prove:
+	T: index >= 0 && index < len(f(x))
+
+	substitute
+	index <- 0
+
+	get T_1:
+	T_1: 0 >= 0 && 0 < len(f(x))
+	=  true && 0 < len(f(x))
+	=  0 < len(f(x))
+
+	Use postcondition of f:  len(res) = 1
+
+	T' becomes
+	0 < 1
+	true
+
+
+	{ len(res) = 1 }
+
+	----------------------------
+	valid = 
+	0 >= 0 && 0 < len(f(x))
+	true && 0 < len(f(x))
+	0 < len(f(x))
+
+	[use len(f(x)) = 1]
+	0 < 1
+	true
+
+
+
+	----------------------------------
+	From "def f(int i) varray<float> : [i, i, i, i]va			def main(int x) int : if i > 0 && i < 4 then f(x)[i] else 0", 4, 4);:
+
+	Want to prove:
+
+	i >= 0 && i < len(f(x))
+
+	[since in true branch, we know i > 0 && i < 3, in other words i e [0, 3]]
+
+	true && i < len(f(x))
+	i < len(f(x))
+
+	[use len(f(x)) = 4]
+
+	i < 4
+
+	true
+
+	--------------------------------------------------
 	*/
-	/*testMainFloatArg("	struct Matrix { vector<float, 4> r0, vector<float, 4> r1, vector<float, 4> r2, vector<float, 4> r3 } \n\
-						def mul(Matrix m, vector<float, 4> v) vector<float, 4> : [dot(r0(m), v), dot(r1(m), v), dot(r2(m), v), dot(r3(m), v)]v  \n\
-						def main(float x) float : \
-						let m = Matrix([x, x, x, x]v, [x, x, x, x]v, [x, x, x, x]v, [x, x, x, x]v) \
-					 let v = [1.0, 2.0, 3.0, 4.0]v \
-					 e0(mul(m, v))", 1.0f, 10.0f);*/
+
+	doCKeywordTests();
+	
+	doUnsignedIntegerTests();
+	
+	doBitWiseOpTests();
+
+	doHexLiteralParsingTests();
+
+	testVariableShadowing();
+
+	testFunctionInlining();
+
+	testDeadCodeElimination();
+
+	testDeadFunctionElimination();
+	
+	testVArrays();
+
+	testToIntFunctions();
+
+	testStringFunctions();
+	
+	testTernaryConditionalOperator();
+
+	testDestructuringAssignment();
+
+	testLengthFunc();
+
+	testFuzzingIssues();
+
+	testLogicalNegation();
+
+	testNamedConstants();
+	
+	testFold();
+
+	testIterate();
+
+	testTuples();
+
+	testTypeCoercion();
+
+	testElem();
+
+	testIfThenElse();
+
+	stringTests();
+	
+	testMathsFunctions();
+
+	testOperatorOverloading();
+
+	testComparisons();
+	
+	testLetBlocks();
+	
+	testLambdaExpressionsAndClosures();
+	
+	testStructs();
+
+	testVectors();
 
 
+	// TODO: why is this vector being parsed as doubles?
+	//testMainFloatArgInvalidProgram("def main(float x): elem(-[1.0, 2.0, 3.0, 4.0]v, 2)");//, 1.0f, -3.0f, 0);
+
+	testMainFloatArgInvalidProgram("def makeFunc(float x) function<float, float> :\\(float y) : x + y       def main() float :  let f = makeFunc(2.0) in f(true)");
+
+	testMainFloatArgInvalidProgram("def main(int x) int : if x < 5 if x < 3 1 else 2 ( ) else if x < 7 6 else 7 ");
+	testMainFloatArgInvalidProgram("def main(float x) float : (1 * (1 * ((1 + 1) * (1 - 1 + 1)) - 1 - ((1 + (((((1 + 		 1 / (1 + (((1 + 1 / (1 * (1 - 1 + 1 / 1 / 1))) - 1 - 1 - (1 + 1 / 1) + (((1 * 1 		) * 1) * 1) / 1) - 1 + 1)) - 1 / 1) + (1 * 1)) + 1 - 1) + 1) * 1)) + 1) / (1 + 1 		) / 1 - ((1 + 1 / 1 - (((1 * ((1 - 1 - 1 / 1 - 1 * 1) - (1 / 1 - 1 * 1) + ((1 +	 		1) - 1 * 1) - 1 / 1)) + (1 / 1 / 1 - 1 - (1 + 1) / (1 + 1) + 1)) * (1 * ((((1 +	 		1) * 1) / 1 - 1 - 1 - (((1 + 1) * 1 - (((1 / 1 * 1) * (1 + 1) - 1) / 1 / 1 / 1 - 		 (1 + (((1 + 1) + 1) * 1)) - 1 / ((1 + 1) / (1 * 1) / (1 + (1 / 1 * 1 / 1 - 1 -	 		(1 * 1) / (1 + 1) - 1 - 1 - 1 - 1 - 1 / 1)) / (1 / 1 * 1) + (((1 + 1) * ((1 + 1) 		 * 1)) / 1 + ((1 - ((1 * 1) + 1) + 1) + 1 - 1 / ((1 / (1 - ((1 + 1) - ((((1 - (( 		1 * ((1 * ((1 + 1) + ((1 - (1 * 1) + (1 - (1 - 1 - (1 * 1) / (1 + 1) / 1 * (1 -	 		1 + (1 + 1) - ((1 / 1 / 1 + 1) * 1) - (1 - 1 * 1))) * 1) - 1 - 1 - 1 - (1 * (((1 		 * 1) * ((1 + (1 / (1 * 1) * 1 - 1)) * (1 + (((1 + 1) + 1) + 1)))) + 1) / 1)) +	 		1 / 1) / 1 - 1)) * 1 - 1)) / 1 * (1 * 1) - 1 - 1 / (1 * ((((1 + 1) + 1) * 1 - 1	 		- 1 / ((1 + 1) / (1 * 1) - ((1 / 1 + 1) * 1) + (1 + (1 * 1) - 1 - 1 - 1 - (1 + ( 		1 + 1))) / 1)) - 1 * (1 / ((1 * 1) + ((1 - 1 + (1 + 1)) + ((1 + 1) * 1))) / 1 *	 		1)) - 1) / 1 / 1 / 1) / 1 + 1) / (1 / (1 + (1 + (1 * 1 - 1)) - 1) / 1 - ((1 * 1	 		/ 1 / (1 / (1 * 1 / 1 - 1) / 1 * 1) / 1) - 1 * ((1 + (((1 + 1) + 1) - ((1 * ((1	 		+ 1) + 1)) * ((1 * 1) * 1) - 1) / 1 / (1 - 1 / (1 - 1 * 1) / 1 * 1) / ((1 - (1 + 		 1) / 1 * 1) + 1 - (1 + (1 * 1)) - 1) - 1 * 1) - 1 / 1) * 1)) + (((1 - (1 / 1 -	 		1 + 1 - (1 * (1 + 1)) / (1 + (1 + 1))) + 1) - ((1 + 1) * (1 * 1 / 1)) * 1 - 1) + 		 1) - 1 / 1 - (((1 * 1 - 1) + 1) - (1 + 1) - 1 - 1 * 1)) / (1 + 1) + (((1 * ((1	 		/ (1 * 1) * 1) * 1)) * 1) + 1 - (1 * 1)) / 1) * 1) + (1 / 1 * 1 / (1 * (1 + (1 / 		 1 / 1 - ((1 + ((1 - 1 / 1 + 1 / 1 - 1) * 1)) * 1) - 1 / 1 / 1 / (1 + 1) - (1 +	 		((1 + (((1 + 1 - 1 / ((1 + 1) * (1 + (1 / 1 + (1 + 1))))) * 1) * ((1 - 1 / (1 +	 		1 - (((1 / 1 - 1 / 1 * (1 + (((1 * 1) * (1 - 1 * (1 * 1))) - 1 + ((1 * 1) * ((1	 		- 1 * 1) / 1 + (1 + 1)))))) * 1) + 1 - 1 - 1 / (1 + ((1 * (1 + 1)) * 1)))) / (1	 		+ 1 - 1) + 1) - 1 * 1) / 1 - 1 / 1 - ((((1 + (1 * 1 - 1)) * ((1 + (1 * 1)) * 1)) 		 * ((1 + 1) + 1)) + 1) / 1 / 1 - ((1 / 1 - (((1 + (1 * 1) - 1) - 1 * 1 - (1 + 1) 		 - 1) + 1) + (1 / (1 + (1 * 1)) / 1 * 1 / 1) / (1 + 1)) * 1 / 1 - 1) - 1 - 1 - 1 		) / 1) * 1) / 1) + 1)) / 1 / 1)) / 1) * ((((1 / 1 + 1) - 1 * 1 / (1 + 1)) * 1 /	 		1) / 1 * 1) / 1 / 1 / 1 - ((1 * (((1 / 1 * (1 * (1 / ((1 - 1 * (1 * 1 / 1)) + (( 		1 * (1 + 1)) * 1)) * (1 + (1 + (1 * (1 + 1 / 1 - (1 - 1 * ((1 + 1) + 1 - (1 * 1) 		) / ((1 - 1 + 1) - 1 + 1)))) - 1 / (1 + 1) / 1 / 1 / 1 / (1 + (1 * (1 - (1 * 1 / 		 1) * 1))) / 1 - 1 - 1))) / ((1 + 1) + 1 / (1 * 1) / 1 / (1 * 1 / 1) - 1 - 1 - 1 		 / (1 * ((1 / 1 - 1 / 1 - 1 / 1 / 1 / 1 / 1 * 1) - 1 / (1 - ((1 / 1 + 1) + 1) -	 		1 / (1 * (1 + 1)) / 1 * (1 * 1) / 1) / 1 * 1)) / (1 + 1) / (((1 - 1 * 1) + (1 -	 		(1 + 1) + 1 / 1)) * 1)(1 / 1 / 1 * 1) - (1 - ((1 * (1 - (1 + 1) + 1)) * (1 +	 		1)) / 1 / 1 + (1 - 1 - (1 + (1 * 1)) - ((1 + 1 - ((1 + ((1 * 1) * 1 - 1 / 1)) +	 		1) - 1) / 1 - 1 + 1) / (((1 * 1) + 1) + 1) * (1 * 1)))) / 1 / ((1 * 1) + 1 - 1)) 		 / 1) * 1) * 1)) * ((1 - (1 * 1 / 1) + 1) * 1 / 1)) / (1 + 1) / 1) + (1 / 1 * (1 		 + 1 / 1 - (1 / (1 - 1 + 1) + 1) / (1 + 1) - (1 * 1)) - (((1 / 1 + 1 - 1 - 1) /	 		1 * 1) + (1 * 1) / (1 / 1 * 1) - 1 - (1 + 1))) / 1) + 1) + 1)) / 1 / 1)) + 1) -	 		1 - (1 * 1 - 1)) * ((1 + 1) * 1)) - 1 * (1 + ((1 * 1) + (1 * 1)))) - 1 * 1)))) * 		 1) - 1 - 1 - 1))");
+	testMainFloatArgInvalidProgram("def main(float x) float : (1 * (1 * ((1 + 1) * (1 - 1 + 1)) - 1 - ((1 + (((((1 + 		 1 / (1 + (((1 + 1 / (1 * (1 - 1 + 1 / 1 / 1))) - 1 - 1 - (1 + 1 / 1) + (((1 * 1 		) * 1) * 1) / 1) - 1 + 1)) - 1 / 1) + (1 * 1)) + 1 - 1) + 1) * 1)) + 1) / (1 + 1 		) / 1 - ((1 + 1 / 1 - (((1 * ((1 - 1 - 1 / 1 - 1 * 1) - (1 / 1 - 1 * 1) + ((1 +	 		1) - 1 * 1) - 1 / 1)) + (1 / 1 / 1 - 1 - (1 + 1) / (1 + 1) + 1)) * (1 * ((((1 +	 		1) * 1) / 1 - 1 - 1 - (((1 + 1) * 1 - (((1 / 1 * 1) * (1 + 1) - 1) / 1 / 1 / 1 - 		 (1 + (((1 + 1) + 1) * 1)) - 1 / ((1 + 1) / (1 * 1) / (1 + (1 / 1 * 1 / 1 - 1 -	 		(1 * 1) / (1 + 1) - 1 - 1 - 1 - 1 - 1 / 1)) / (1 / 1 * 1) + (((1 + 1) * ((1 + 1) 		 * 1)) / 1 + ((1 - ((1 * 1) + 1) + 1) + 1 - 1 / ((1 / (1 - ((1 + 1) - ((((1 - (( 		1 * ((1 * ((1 + 1) + ((1 - (1 * 1) + (1 - (1 - 1 - (1 * 1) / (1 + 1) / 1 * (1 -	 		1 + (1 + 1) - ((1 / 1 / 1 + 1) * 1) - (1 - 1 * 1))) * 1) - 1 - 1 - 1 - (1 * (((1 		 * 1) * ((1 + (1 / (1 * 1) * 1 - 1)) * (1 + (((1 + 1) + 1) + 1)))) + 1)) / 1)) +	 		1 / 1) / 1 - 1)) * 1 - 1)) / 1 * (1 * 1) - 1 - 1 / (1 * ((((1 + 1) + 1) * 1 - 1	 		- 1 / ((1 + 1) / (1 * 1) - ((1 / 1 + 1) * 1) + (1 + (1 * 1) - 1 - 1 - 1 - (1 + ( 		1 + 1))) / 1)) - 1 * (1 / ((1 * 1) + ((1 - 1 + (1 + 1)) + ((1 + 1) * 1))) / 1 *	 		1)) - 1) / 1 / 1 / 1) / 1 + 1) / (1 / (1 + (1 + (1 * 1 - 1)) - 1) / 1 - ((1 * 1	 		/ 1 / (1 / (1 * 1 / 1 - 1) / 1 * 1) / 1) - 1 * ((1 + (((1 + 1) + 1) - ((1 * ((1	 		+ 1) + 1)) * ((1 * 1) * 1) - 1) / 1 / (1 - 1 / (1 - 1 * 1) / 1 * 1) / ((1 - (1 + 		 1) / 1 * 1) + 1 - (1 + (1 * 1)) - 1) - 1 * 1) - 1 / 1) * 1)) + (((1 - (1 / 1 -	 		1 + 1 - (1 * (1 + 1)) / (1 + (1 + 1))) + 1) - ((1 + 1) * (1 * 1 / 1)) * 1 - 1) + 		 1) - 1 / 1 - (((1 * 1 - 1) + 1) - (1 + 1) - 1 - 1 * 1)) / (1 + 1) + (((1 * ((1	 		/ (1 * 1) * 1) * 1)) * 1) + 1 - (1 * 1)) / 1) * 1) + (1 / 1 * 1 / (1 * (1 + (1 / 		 1 / 1 - ((1 + ((1 - 1 / 1 + 1 / 1 - 1) * 1)) * 1) - 1 / 1 / 1 / (1 + 1) - (1 +	 		((1 + (((1 + 1 - 1 / ((1 + 1) * (1 + (1 / 1 + (1 + 1))))) * 1) * ((1 - 1 / (1 +	 		1 - (((1 / 1 - 1 / 1 * (1 + (((1 * 1) * (1 - 1 * (1 * 1))) - 1 + ((1 * 1) * ((1	 		- 1 * 1) / 1 + (1 + 1))()))) * 1) + 1 - 1 - 1 / (1 + ((1 * (1 + 1)) * 1)))) / (1	 		+ 1 - 1) + 1) - 1 * 1) / 1 - 1 / 1 - ((((1 + (1 * 1 - 1)) * ((1 + (1 * 1)) * 1)) 		 * ((1 + 1) + 1)) + 1) / 1 / 1 - ((1 / 1 - (((1 + (1 * 1) - 1) - 1 * 1 - (1 + 1) 		 - 1) + 1) + (1 / (1 + (1 * 1)) / 1 * 1 / 1) / (1 + 1)) * 1 / 1 - 1) - 1 - 1 - 1 		) / 1) * 1) / 1) + 1))) / 1 / 1)) / 1) * ((((1 / 1 + 1) - 1 * 1 / (1 + 1)) * 1 /	 		1) / 1 * 1) / 1 / 1 / 1 - ((1 * (((1 / 1 * (1 * (1 / ((1 - 1 * (1 * 1 / 1)) + (( 		1 * (1 + 1)) * 1)) * (1 + (1 + (1 * (1 + 1 / 1 - (1 - 1 * ((1 + 1) + 1 - (1 * 1) 		) / ((1 - 1 + 1) - 1 + 1)))) - 1 / (1 + 1) / 1 / 1 / 1 / (1 + (1 * (1 - (1 * 1 / 		 1) * 1))) / 1 - 1 - 1))) / ((1 + 1) + 1 / (1 * 1) / 1 / (1 * 1 / 1) - 1 - 1 - 1 		 / (1 * ((1 / 1 - 1 / 1 - 1 / 1 / 1 / 1 / 1 * 1) - 1 / (1 - ((1 / 1 + 1) + 1) -	 		1 / (1 * (1 + 1)) / 1 * (1 * 1) / 1) / 1 * 1)) / (1 + 1) / (((1 - 1 * 1) + (1 -	 		(1 + 1) + 1 / 1)) * 1) - (1 / 1 / 1 * 1) - (1 - ((1 * (1 - (1 + 1) + 1)) * (1 +	 		1)) / 1 / 1 + (1 - 1 - (1 + (1 * 1)) - ((1 + 1 - ((1 + ((1 * 1) * 1 - 1 / 1)) +	 		1) - 1) / 1 - 1 + 1) / (((1 * 1) + 1) + 1) * (1 * 1)))) / 1 / ((1 * 1) + 1 - 1)) 		 / 1) * 1) * 1)) * ((1 - (1 * 1 / 1) + 1) * 1 / 1)) / (1 + 1) / 1) + (1 / 1 * (1 		 + 1 / 1 - (1 / (1 - 1 + 1) + 1) / (1 + 1) - (1 * 1)) - (((1 / 1 + 1 - 1 - 1) /	 		1 * 1) + (1 * 1) / (1 / 1 * 1) - 1 - (1 + 1))) / 1) + 1) + 1)) / 1 / 1)) + 1) -	 		1( - (1 * 1 - 1)) * ((1 + 1) * 1)) - 1 * (1 + ((1 * 1) + (1 * 1)))) - 1 * 1)))) * 		 1) - 1 - 1 - 1))");
+	testMainFloatArgInvalidProgram("def main(float x) float : (1 * (1 * ((1 + 1) * (1 - 1 + 1)) - 1 - ((1 + (((((1 + 		 1 / (1 + (((1 + 1 / (1 * (1 - 1 + 1 / 1 / 1))) - 1 - 1 - (1 + 1 / 1) + (((1 * 1 		) * 1) * 1) / 1) - 1 + 1)) - 1 / 1) + (1 * 1)) + 1 - 1) + 1) * 1)) + 1) / (1 + 1 		) / 1 - ((1 + 1 / 1 - (((1 * ((1 - 1 - 1 / 1 - 1 * 1) - (1 / 1 - 1 * 1) + ((1 +	 		1) - 1 * 1) - 1 / 1)) + (1 / 1 / 1 - 1 - (1 + 1) / (1 + 1) + 1)) * (1 * ((((1 +	 		1) * 1) / 1 - 1 - 1 - (((1 + 1) * 1 - (((1 / 1 * 1) * (1 + 1) - 1) / 1 / 1 / 1 - 		 (1 + (((1 + 1) + 1) * 1)) - 1 / ((1 + 1) / (1 * 1) / (1 + (1 / 1 * 1 / 1 - 1 -	 		(1 * 1) / (1 + 1) - 1 - 1 - 1 - 1 - 1 / 1)) / (1 / 1 * 1) + (((1 + 1) * ((1 + 1) 		 * 1)) / 1 + ((1 -  true ((1 * 1) + 1) + 1) + 1 - 1 / ((1 / (1 - ((1 + 1) - ((((1 - (( 		1 * ((1 * ((1 + 1) + ((1 - (1 * 1) + (1 - (1 - 1 - (1 * 1) / (1 + 1) / 1 * (1 -	 		1 + (1 + 1) - ((1 / 1 / 1 + 1) * 1) - (1 - 1 * 1))) * 1) - 1 - 1 - 1 - (1 * (((1 		 * 1) * ((1 + (1 / (1 * 1) * 1 - 1)) * (1 + (((1 + 1) + 1) + 1)))) + 1) / 1)) +	 		1 / 1) / 1 - 1)) * 1 - 1)) / 1 * (1 * 1) - 1 - 1 / (1 * ((((1 + 1) + 1) * 1 - 1	 		- 1 / ((1 + 1) / (1 * 1) - ((1 / 1 + 1) * 1) + (1 + (1 * 1) - 1 - 1 - 1 - (1 + ( 		1 + 1))) / 1)) - 1 * (1 / ((1 * 1) + ((1 - 1 + (1 + 1)) + ((1 + 1) * 1))) / 1 *	 		1)) - 1) / 1 / 1 / 1) / 1 + 1) / (1 / (1 + (1 + (1 * 1 - 1)) - 1) / 1 - ((1 * 1	 		/ 1 / (1 / (1 * 1 / 1 - 1) / 1 * 1) / 1) - 1 * ((1 + (((1 + 1) + 1) - ((1 * ((1	 		+ 1) + 1)) * ((1 * 1) * 1) - 1) / 1 / (1 - 1 / (1 - 1 * 1) / 1 * 1) / ((1 - (1 + 		 1) / 1 * 1) + 1 - (1 + (1 * 1)) - 1) - 1 * 1) - 1 / 1) * 1)) + (((1 - (1 / 1 -	 		1 + 1 - (1 * (1 + 1)) / (1 + (1 + 1))) + 1) - ((1 + 1) * (1 * 1 / 1)) * 1 - 1) + 		 1) - 1 / 1 - (((1 * 1 - 1) + 1) - (1 + 1) - 1 - 1 * 1)) / (1 + 1) + (((1 * ((1	 		/ (1 * 1) * 1) * 1)) * 1) + 1 - (1 * 1)) / 1) * 1) + (1 / 1 * 1 / (1 * (1 + (1 / 		 1 / 1 - ((1 + ((1 - 1 / 1 + 1 / 1 - 1) * 1)) * 1) - 1 / 1 / 1 / (1 + 1) - (1 +	 		((1 + (((1 + 1 - 1 / ((1 + 1) * (1 + (1 / 1 + (1 + 1))))) * 1) * ((1 - 1 / (1 +	 		1 - (((1 / 1 - 1 / 1 * (1 + (((1 * 1) * (1 - 1 * (1 * 1))) - 1 + ((1 * 1) * ((1	 		- 1 * 1) / 1 + (1 + 1)))))) * 1) + 1 - 1 - 1 / (1 + ((1 * (1 + 1)) * 1)))) / (1	 		+ 1 - 1) + 1) - 1 * 1) / 1 - 1 / 1 - ((((1 + (1 * 1 - 1)) * ((1 + (1 * 1)) * 1)) 		 * ((1 + 1) + 1)) + 1) / 1 / 1 - ((1 / 1 - (((1 + (1 * 1) - 1) - 1 * 1 - (1 + 1) 		 - 1) + 1) + (1 / (1 + (1 * 1)) / 1 * 1 / 1) / (1 + 1)) * 1 / 1 - 1) - 1 - 1 - 1 		) / 1) * 1) / 1) + 1)) / 1 / 1)) / 1) * ((((1 / 1 + 1) - 1 * 1 / (1 + 1)) * 1 /	 		1) / 1 * 1) / 1 / 1 / 1 - ((1 * (((1 / 1 * (1 * (1 / ((1 - 1 * (1 * 1 / 1)) + (( 		1 * (1 + 1)) * 1)) * (1 + (1 + (1 * (1 + 1 / 1 - (1 - 1 * ((1 + 1) + 1 - (1 * 1) 		) / ((1 - 1 + 1) - 1 + 1)))) - 1 / (1 + 1) / 1 / 1 / 1 / (1 + (1 * (1 - (1 * 1 / 		 1) * 1))) / 1 - 1 - 1))) / ((1 + 1) + 1 / (1 * 1) / 1 / (1 * 1 / 1) - 1 - 1 - 1 		 / (1 * ((1 / 1 - 1 / 1 - 1 / 1 / 1 / 1 / 1 * 1) - 1 / (1 - ((1 / 1 + 1) + 1) -	 		1 / (1 * (1 + 1)) / 1 * (1 * 1) / 1) / 1 * 1)) / (1 + 1) / (((1 - 1 * 1) + (1 -	 		(1 + 1) + 1 / 1)) * 1) - (1 / 1 / 1 * 1) - (1 - ((1 * (1 - (1 + 1) + 1)) * (1 +	 		1)) / 1 / 1 + (1 - 1 - (1 + (1 * 1)) - ((1 + 1 - ((1 + ((1 * 1) * 1 - 1 / 1)) +	 		1) - 1) / 1 - 1 + 1) / (((1 * 1) + 1) + 1) * (1 * 1)))) / 1 / ((1 * 1) + 1 - 1)) 		 / 1) * 1) * 1)) * ((1 - (1 * 1 / 1) + 1) * 1 / 1)) / (1 + 1) / 1) + (1 / 1 * (1 		 + 1 / 1 - (1 / (1 - 1 + 1) + 1) / (1 + 1) - (1 * 1)) - (((1 / 1 + 1 - 1 - 1) /	 		1 * 1) + (1 * 1) / (1 / 1 * 1) - 1 - (1 + 1))) / 1) + 1) + 1)) / 1 / 1)) + 1) -	 		1 - (1 * 1 - 1)) * ((1 + 1) * 1)) - 1 * (1 + ((1 * 1) + (1 * 1)))) - 1 * 1)))) * 		 1) - 1 - 1 - 1))");
+
+	testMainFloatArg("def g(function<float> f) float : f()       def main(float x) float : g(\\() float : x)",  4.0f, 4.0f, ALLOW_UNSAFE | INVALID_OPENCL);
+
+	// Test first class function with OpenCL code-gen
+	//testMainFloatArg("def f(array<float, 16> a, int i) float : a[i]    def g(function<array<float, 16>, int, float>      def main(float x) float : g(f, [truncateToInt(x)]", 2.1f, 3.0f, ALLOW_UNSAFE);
+
+
+	//testMainFloatArg("def main(float x) float : let a = [1.0, 2.0, 3.0, 4.0]a in a[truncateToInt(x)]", 2.1f, 3.0f, ALLOW_UNSAFE);
+
+	// ===================================================================
+	// Test 16-bit integers
+	// ===================================================================
+	testMainInt16Arg("def main(int16 x) : x + 5i16", 1, 6);
+	
+	// TODO: need to add i32 -> i16 implicit conversions.
+
+	testMainInt16Arg("def main(int16 x) : [10i16, 11i16]a[0]", 1, 10);
+	//testMainInt16Arg("def main(int16 x) : [65535i16, 11i16]a[0]", 1, 65535);
+	
+
+	// Test toFloat(int16)
+	//testMainInt16Arg("def main(int16 x) int16 : toInt16(1.0f + toFloat(x))", 2, 3); // TODO: add truncateToInt16
+	testMainFloatArg("def main(float x) float : x + toFloat(4i16)", 2.0f, 6.0f);
+
+	// ===================================================================
+	// Test 'real' type.
+	// Will be aliased to 'float' for float tests, and to 'double'
+	// for double tests.
+	// ===================================================================
+	testMainFloatArg("def main(real x) real :  x", 1.0f, 1.0f);
+	testMainDoubleArg("def main(real x) real :  x", 1.0f, 1.0f);
+
+
+
+	// ===================================================================
+	// Test sign()
+	// ===================================================================
+	testMainFloatArg("def main(float x) float :	sign(x)", 4.f, 1.f);
+	testMainFloatArg("def main(float x) float :	sign(x)", -4.f, -1.f);
+	//NOTE: a bit of a problem wtih sign(0).  sign(0) is plus/minus zero in OpenCL.
+	// but copysign(1.0, 0.f) is one.
+	//testMainFloatArg("def main(float x) float :	sign(x)", 0.f, 1.f);
+
+	// sign() on vectors:
+	testMainFloatArg("def main(float x) float :	sign([x, x, x, x]v)[0]", -4.f, -1.f);
+	testMainFloatArg("def main(float x) float :	sign([x, x, x, x]v)[3]", -4.f, -1.f);
+	testMainFloatArg("def main(float x) float :	sign([4.0, 4.0, 4.0, 4.0]v)[3]", -4.f, 1.f);
+
+	// with vector of length 3:
+	testMainFloatArg("def main(float x) float :	sign([x, x, x]v)[0]", -4.f, -1.f);
+	testMainFloatArg("def main(float x) float :	sign([x, x, x]v)[2]", -4.f, -1.f);
+	testMainFloatArg("def main(float x) float :	sign([4.0, 4.0, 4.0]v)[2]", -4.f, 1.f);
+
+
+	// Caused a crash earlier:
+	testMainFloatArgInvalidProgram("struct Float4Struct { vector<float, 4> v }   def sin(Float4Struct f) : Float4Struct(sign(f.v))		def main(Float4Struct a, Float4Struct b) Float4Struct : sin(a)");
+
+	testMainFloatArgAllowUnsafe("struct S { float x }   def f(S s) float : s.x   def main(float x) float :	f(S(x))", 1.f, 1.f);
+
+
+	testMainIntegerArg("def main(int x) int :	 length(\"hello\")", 1, 5, INVALID_OPENCL);
+
+	// ===================================================================
+	// Test optimisation of varray from heap allocated to stack allocated
+	// ===================================================================
+	results = testMainFloatArg("def main(float x) float :	 [3.0, 4.0, 5.0]va[0]", 1.f, 3.f, INVALID_OPENCL);
+	testAssert(results.stats.num_heap_allocation_calls == 0);
+
+	results = testMainFloatArg("def main(float x) float :	 let v = [3.0, 4.0, 5.0]va in v[0]", 1.f, 3.f, INVALID_OPENCL);
+	testAssert(results.stats.num_heap_allocation_calls == 0);
+
+	results = testMainFloatArg("def main(float x) float :	 let v = [3.0, 4.0, 5.0]va in v[1]", 1.f, 4.f, INVALID_OPENCL);
+	testAssert(results.stats.num_heap_allocation_calls == 0);
+
+	results = testMainFloatArg("def main(float x) float :	 let v = [3.0, 4.0, 5.0]va in v[2]", 1.f, 5.f, INVALID_OPENCL);
+	testAssert(results.stats.num_heap_allocation_calls == 0);
+
+	results = testMainFloatArg("def main(float x) float :	 let v = [x + 3.0, x + 4.0, x + 5.0]va in v[0]", 10.f, 13.f, INVALID_OPENCL);
+	testAssert(results.stats.num_heap_allocation_calls == 0);
+
+	// Test varray being returned from function, has to be heap allocated.  (Assuming no inlining of f)
+	results = testMainFloatArgAllowUnsafe("def f(float x) : [x + 3.0, x + 4.0, x + 5.0]va             def main(float x) float :	 let v = f(x) in v[0]", 10.f, 13.f, INVALID_OPENCL);
+	testAssert(results.stats.num_heap_allocation_calls <= 1);
+
+	
+	
+	// Test map
+	{
+		const float a[] = {1.0f, 2.0f, 3.0f, 4.0f};
+		const float b[] = {10.0f, 20.0f, 30.0f, 40.0f};
+		float target_results[] = {1.0f, 4.0f, 9.0f, 16.0f};
+
+		testFloatArray(
+			"def square(float x) float : x*x			\n\
+			def main(array<float, 4> a, array<float, 4> b) array<float, 4> : map(square, a)",
+			a, b, target_results, 4);
+	}
+
+	
+
+	testMainFloatArg("struct S { int x }  def f(S s) S : let t = S(1) in s   def main(float x) float : let v = [99]va in x", 1.f, 1.0f, INVALID_OPENCL);
+
+
+	// ===================================================================
+	// Test Refcounting optimisations: test that a let variable used as a function argument is not incremented and decremented
+	// ===================================================================
+
+	testMainIntegerArg("def f(string s, int x) int : length(s) + x       def main(int x) int : let s = \"hello\" in f(s, x)", 1, 6, INVALID_OPENCL);
+
+
+	// ===================================================================
+	// Test Refcounting optimisations: test that a argument variable used as a function argument is not incremented and decremented
+	// ===================================================================
+
+	testMainIntegerArg("def f(string s, int x) int : length(s) + x     def g(string s, int x) int : f(s, x)      def main(int x) int : g(\"hello\", x)", 1, 6, INVALID_OPENCL);
+
+	// test that a argument variable used as a function argument is not incremented and decremented, even when the argument may be stored and returned in the result.
+	testMainIntegerArg("struct S { string str }      def f(string str) S : S(str)     def g(string s) S : f(s)      def main(int x) int : length(g(\"hello\").str)", 1, 5, INVALID_OPENCL);
+
+
+
+	testMainIntegerArg("def f(string s, int x) int : length(s) + x       def main(int x) int : f(\"hello\", x)", 1, 6, INVALID_OPENCL);
+
+	
+	// Test fold built-in function with update
+	/*{
+		const int len = 256;
+		js::Vector<int, 32> vals(len, 0);
+		js::Vector<int, 32> b(len, 0);
+		js::Vector<int, 32> target_results(len, 1);
+
+		testIntArray("																\n\
+		def f(array<int, 256> state, int iteration) tuple<array<int, 256>, bool> :			\n\
+				[update(state, iteration, elem(state, iteration) + 1),					\n\
+				iteration < 255]t																\n\
+																							\n\
+		def main(array<int, 256> vals, array<int, 256> initial_counts) array<int, 256>:  iterate(f, vals)",
+			&vals[0], &b[0], &target_results[0], vals.size(),
+			true // allow_unsafe_operations
+		);
+	}
+
+	std::cout << timer.elapsedString() << std::endl;
+	int a = 9;
+	return;*/
+
+	// Test with pass-by-reference data (struct)
+	testMainIntegerArg("															\n\
+		struct s { int x, int y }													\n\
+		def f(s current_state, int iteration) tuple<s, bool> :					\n\
+			if iteration >= current_state.y												\n\
+				[current_state, false]t # break										\n\
+			else																	\n\
+				[s(current_state.x*current_state.x, current_state.y), true]t					\n\
+		def main(int x) int :  iterate(f, s(x, x)).x", 3, 6561, INVALID_OPENCL);
+	
+
+	// This test triggers a problem with __chkstk when >= 4K is allocated on stack
+	/*{
+		const int len = 1024;
+		js::Vector<int, 32> vals(len, 0);
+		js::Vector<int, 32> b(len, 0);
+		js::Vector<int, 32> target_results(len, 0);
+		target_results[0] = len;
+
+		testIntArray("																\n\
+		def f(array<int, 1024> counts, int x) array<int, 1024> :			\n\
+				update(counts, x, elem(counts, x) + 1)			\n\
+		def main(array<int, 1024> vals, array<int, 1024> initial_counts) array<int, 1024>:  fold(f, vals, initial_counts)",
+			&vals[0], &b[0], &target_results[0], vals.size(),
+			true // allow_unsafe_operations
+		);
+	}*/
+
+	//testMainFloatArg("def f(array<float, 1024> a, float x) float : a[0]       def main(float x) float : f([x]a1024, x) ", 2.f, 2.f);
+
+	// Test that binding to a let variable overrides (shadows) a global function definition
+	testMainIntegerArg("def f(int x) int : 1		   def main(int x) int : let y = 1 f = 2 in f", 10, 2);
+
+	testMainIntegerArg("def f(int x) tuple<int, int> : [1, 2]t		   def main(int x) int : f(x)[1 - 1]", 10, 1);
+
+	testMainIntegerArg("def f() bool : 1 + 2 < 3         def main(int x) int : x", 1, 1);
+	//testMainIntegerArg("def f() bool : 1 + 2 * 3         def main(int x) int : x", 1, 1);
+
+	//TEMP:
+	testMainFloatArgInvalidProgram("def main(float x) float :  x [bleh");
+
+	testMainIntegerArg("def f(int x) tuple<int, int> : [1, 2]t		   def main(int x) int : f(x)[0]", 10, 1);
+		//testMainIntegerArg("def f(int x) tuple<int, int> : if x < 0 [1, 2]t else [3, 4]t			\n\
+		//			   def main(int x) int : f(x)[0]", 10, 3);
+
+	testMainIntegerArg("def f(int x) tuple<int> : if x < 0 [1]t else [3]t			\n\
+					   def main(int x) int : f(x)[0]", 10, 3);
+
+
+
+	
+
+
+	//testMainFloatArg("struct vec2 { vector<float, 2> v }     def main(float x) float : let a = vec2([1.0, 2.0]v)  in a.v[0]", 0.f, 1.0f);
+	testMainFloatArg("struct vec2 { vector<float, 2> v }     def main(float x) float : let a = vec2([1.0, 2.0]v) in a.v[0]", 0.f, 1.0f);
+
+	testMainFloatArg("struct s { float y }     def main(float x) float : s(x).y", 3.f, 3.0f);
+
+	testMainFloatArg("struct vec2 { vector<float, 2> v }     def main(float x) float : let a = vec2([x, 2.0]v)  in (a.v)[0]", 3.f, 3.0f);
+	testMainFloatArg("struct vec2 { vector<float, 2> v }     def main(float x) float : let a = vec2([1.0, 2.0]v)  in a.v[0]", 0.f, 1.0f);
+	testMainFloatArg("struct vec2 { vector<float, 2> v }     def main(float x) float : let a = vec2([x, 2.0]v)  in a.v[0]", 3.f, 3.0f);
+	testMainFloatArg("struct vec2 { vector<float, 2> v }     def main(float x) float : let a = vec2([1.0, 2.0]v)  in  elem(a.v, 0)", 0.f, 1.0f);
+
+
+
+	// Test constant folding with a vector literal that is not well typed (has boolean element).
+	// Make sure that constant folding doesn't allow it.
+	testMainFloatArgInvalidProgram("def main(float x) float : elem(  [2.0, false]v   , 0)");
+
+	// Check constant folding with elem() and collections
+	testMainFloatArgCheckConstantFolded("def main(float x) float : elem([1.0, 2.0]v, 1)", 1.f, 2.f);
+	testMainFloatArgCheckConstantFolded("def main(float x) float : elem([1.0, 2.0]t, 1)", 1.f, 2.f);
+	testMainFloatArgCheckConstantFolded("def main(float x) float : elem([1.0, 2.0]a, 1)", 1.f, 2.f);
+
+	// Check constant folding with elem() and collections, and operations on collections
+	testMainFloatArgCheckConstantFolded("def main(float x) float : elem([1.0, 2.0]v + [3.0, 4.0]v, 1)", 1.f, 6.f);
+	testMainFloatArgCheckConstantFolded("def main(float x) float : elem([1.0, 2.0]v - [3.0, 4.0]v, 1)", 1.f, -2.f);
+	testMainFloatArgCheckConstantFolded("def main(float x) float : elem([1.0, 2.0]v * [3.0, 4.0]v, 1)", 1.f, 8.f);
+
+
+
+	testMainFloatArg("def main(float x) float : elem([x, 2.0]v, 1)", 1.f, 2.f);
+
+
+	testMainFloatArgCheckConstantFolded("def main(float x) float : 1.0 + 2.0", 1.f, 3.f);
+
+	
+
+	
+
+	// int64 - int mixing
+	testMainIntegerArgInvalidProgram("def main(int64 x) int :	x + 1");
+	testMainIntegerArgInvalidProgram("def main(int64 x) int :	x - 1");
+	testMainIntegerArgInvalidProgram("def main(int64 x) int :	x * 1");
+	testMainIntegerArgInvalidProgram("def main(int64 x) int :	x / 1");
+	testMainIntegerArgInvalidProgram("def main(int64 x) int :	if x < 5 1 else 2");
+
+	testMainFloatArgInvalidProgram("	def f(float x) float if(x < 1.0) : 				  let	 					z = 2.0 					y = 3.0 				  in 					y + z 				  def main() float : f(0.0)");
+	testMainFloatArgInvalidProgram("def main() float : 					 let a = [1.0, 2.0, 3.0, 4.0]v 					 b = [11.0, 12.0, 13.0, 14 else .0]v in 					 e2(min(a, b)) 		de if f main() float : 				  let a = [1.0, 2.0, 3.0, 4.0]v 				  b = [11.0, 12.0, 13.0, 14.0]v in 				  e2(min(b, a))");
+	testMainFloatArgInvalidProgram("		main(int i) int :								 			let												 				a = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]v		 				b = string  [1.0, 1.6, 1.0, 1.0, 1.3, 1.6, 1.8, 1.6]v		 				c = [1.7, 2.8, 3.0, 4 true .7, 5.5, 6.7, 7.0, 8.4] int64 v		 			in												 				truncateToInt(elem(a + if(i < 1, b, c), i))");
+	testMainFloatArgInvalidProgram("		def main() float : 					let x = [1.0, 2.0, 3.0, 4.0]v 					y = [10.0, 20.0, 30.0, 40.0]v* sin(x + 0.03) in 					e1(x + y)");
+
+	// Test that we can't put a structure in a vector
+	testMainFloatArgInvalidProgram("struct teststruct { float y } \n\
+        def main(float x) float : elem([teststruct(x)]v, 0).y");
+
+	testMainFloatArgInvalidProgram("struct teststruct { int y } \n\
+								   def f(teststruct a, teststruct b, bool condition) teststruct : let x = if(condition, a, b) in let v = [x, x, x, x, x, x, x, x]v in x \n\
+        def main(int x) int : y( f(teststruct(1), teststruct(2), x < 5) )");
+
+	testMainFloatArgInvalidProgram("struct s { float x, float yd }  	def op_sub(s a, s b) : s(a.x - b.x, a.y - b.y)  	def main() float : x( true  < s(2, 3) - s(3, 4))");
+
+	testMainFloatArgInvalidProgram("def f(float x) float : x*x def main(int x) int :  elem(fold(f, [0, 0, 1, 2]a, [0]a16), 1)    def main(float x) float : f(x) - 3");
+
+	
+	// A vector of elements that contains one or more float-typed elements will be considered to be a float-typed vector.
+	// Either all integer elements will be succesfully constant-folded and coerced to a float literal, or type checking will fail.
+
+	// OLD: A vector of elements, where each element is either an integer literal, or has float type, and there is at least one element with float tyoe, 
+	// and each integer literal can be converted to a float literal, will be converted to a vector of floats
+
+	// Test incoercible integers
+	testMainFloatArgInvalidProgram("def main(float x) float : elem(  [100000001, 2.0]v   , 0)");
+	testMainFloatArgInvalidProgram("def main(float x) float : elem(  [2.0, 100000001]v   , 0)");
+
+	testMainFloatArg("def main(float x) float : elem(  [1, 2.0]v   , 0)", 1.0f, 1.0f);
+	testMainFloatArg("def main(float x) float : elem(  [1.0, 2]v   , 0)", 1.0f, 1.0f);
+
+	testMainFloatArg("def main(float x) float : elem(  [1, x]v   , 0)", 1.0f, 1.0f);
+	testMainFloatArg("def main(float x) float : elem(  [x, 2]v   , 0)", 1.0f, 1.0f);
+
+	testMainFloatArg("def main(float x) float : elem(  [1, x, 3.0]v   , 0)", 1.0f, 1.0f);
+	testMainFloatArg("def main(float x) float : elem(  [x, 2, 3.0]v   , 0)", 1.0f, 1.0f);
+
+	testMainIntegerArgInvalidProgram("struct Float4Struct { vector<float, 4> v }  			def main(Float4Struct a, Float4Struct b) Float4Struct :  				Float4Struct(a.v + [eleFm(b.v, 0)]v4)");
+
+
+	testMainIntegerArgInvalidProgram("def main(int i) int : if i >= 0 && i < 10 then elem([1, 2, 3, 4, 5 + 1.0, 6, 7, 8, 9, 10]v, i) else 0");
+		
+	testMainIntegerArgInvalidProgram("def main(int x) int :  elem(update([0]a, 0, [  x ]t ), 0)");
+	
+	testMainIntegerArgInvalidProgram("def main(int i) int : if i >= 0 && i < 1i0 then elem([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]v, i) else 0");
+
+	// Test circular definitions between named constants and function definitions
+	testMainIntegerArgInvalidProgram("TEN = main			def main(int x) : TEN + x");
+	
+	testMainFloatArgInvalidProgram("struct S { tuple<float, float> a, int b }		 		def f(float x) S : S([x + 2.0, x(f(x), 0).a]t, 1)    		def main(float x) float :  elem(f(x).a, 0)");
+	
+	testMainFloatArgInvalidProgram("def f(float x) float :	let	float z = 2.0 in x + z       def main(int x) int :  iterate(f, 0)");
+//	testMainFloatArgInvalidProgram("def f(float x) float :	let	float z = 2.0 in x + z       def main(int x) int :  iterate(f, 0)	  def main(float x) float : f(x)");
+	
+	
+	testMainFloatArgInvalidProgram("def main(float x) float : elem(   shuffle([1.0, 20, 4.0]v, [2, 3]v)   , 1)");
+
+	testMainIntegerArgInvalidProgram("def main(int i) int : if i >= 0 && i < 10 then elem([1, 2, 3, 4, 5, 6, 7, 8., 9, 10]t, i) else 0");
+	testMainIntegerArgInvalidProgram("def main(int i) int : if i >= 0 && i < 10 then elem([1, 2, 3, 4, 5, 6, 7, 8., 9, 10]a, i) else 0");
+
+	// Test type coercion in vector literal changing elem() type
+	testMainFloatArgInvalidProgram("def main(int i) int : if i >= 0 && i < 10 then elem([1, 2, 3, 4, 5, 6, 7, 8., 9, 10]v, i) else 0");
+
+	testMainFloatArgInvalidProgram("def mul(vector<float, 4> v, float x) vector<float, 4> : v * [x, x,]v  					def main() float : 	let x = [1.0, 2.0, 3.0, 4.0]v 		y = 10.0 in   mul(x, y).e1");
+	
+		
+
+	testMainFloatArgInvalidProgram("def main() float : 					let x = [1.0, 2.0, 3.0, 4.0]v 					y = [10.0, 20.0, 30.0, 40.0]v  <1.0 in 					e1(x + y)");
+
+	testMainFloatArgInvalidProgram("def f(array<int, 4> a, int i) int : if inBounds(a, i) elem(a, i) else 0       def main(int i) int : f([1, 2, 3]a, i)");
+
+
+	// This function has special static global variabl-creating mem-leaking powers.
+	testMainFloatArg(
+		"def expensiveA(float x) float : cos(x * 0.456 + cos(x))			\n\
+		def expensiveB(float x) float : sin(x * 0.345 + sin(x))			\n\
+		def main(float x) float: if(x < 0.5, expensiveA(x + 0.145), expensiveB(x + 0.2435))",
+		0.2f, cos((0.2f + 0.145f) * 0.456f + cos((0.2f + 0.145f))));	
+
+
+
+	
+
+
+
+	// ===================================================================
+	// Test that recursion is disallowed.
+	// ===================================================================
+	testMainFloatArgInvalidProgram("def main(float x) float :  main(x)  ");
+	testMainFloatArgInvalidProgram("def main(float x) float :  1  def f(int x) int : f(0)  ");
+
+	// Mutual recursion
+	testMainFloatArgInvalidProgram("def g(float x) float : f(x)      def f(float x) float : g(x)              def main(float x) float : f(x)");
+	
+	
+	// ===================================================================
+	// Test that some programs with invalid syntax fail to compile.
+	// ===================================================================
+	testMainFloatArgInvalidProgram("def main(float x) float :  x [bleh");
+
+
+	testMainIntegerArg("def main(int x) int : 10 + (if x < 10 then 1 else 2)", 5, 11);
+
+	testMainIntegerArg("def main(int x) int : if x < 10 then 1 else 2", 5, 1);
+
+	testMainIntegerArg("def main(int x) int : if x < 10 then (if x < 5 then 1 else 2) else (if x < 15 then 3 else 4)", 5, 2);
+
+
+
+	
+
+
+	// NOTE: if 'then' token is removed, we get a parse error below.
+
+	testMainIntegerArg("def f(int x) tuple<int> : if x < 0 [1]t else [3]t			\n\
+					   def main(int x) int : f(x)[0]", 10, 3);
+	// ===================================================================
+	// Test array subscript (indexing) operator []
+	// ===================================================================
+
+	// NOTE: if 'then' token is removed, we get a parse error below.
+
+	testMainIntegerArg("def f(int x) tuple<int> : if x < 0 [1]t else [3]t			\n\
+					   def main(int x) int : f(x)[0]", 10, 3);
+
+	testMainIntegerArg("def f(int x) tuple<int, int> : if x < 0 [1, 2]t else [3, 4]t			\n\
+					   def main(int x) int : f(x)[0]", 10, 3);
+
+	// OpenCL doesn't support new array values at runtime, nor fold() currently.
+	
+	testMainIntegerArg("def main(int x) int : [x]a[0]", 10, 10, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int : [x, x + 1, x + 2]a[1]", 10, 11, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int : [x, x + 1, x + 2]a[1 + 1]", 10, 12, INVALID_OPENCL);
+
+	// Test index out of bounds
+	testMainIntegerArgInvalidProgram("def main(int x) int :  [x, x + 1, x + 2]a[-1])");
+	testMainIntegerArgInvalidProgram("def main(int x) int :  [x, x + 1, x + 2]a[3])");
+	
+	// ===================================================================
+	// Test update()
+	// update(CollectionType c, int index, T newval) CollectionType
+	// ===================================================================
+
+	testMainIntegerArg("def main(int x) int :  elem(update([0]a, 0, x), 0)", 10, 10, INVALID_OPENCL);
+
+	testMainIntegerArg("def main(int x) int :  elem(update([0, 0]a, 0, x), 0)", 10, 10, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int :  elem(update([0, 0]a, 0, x), 1)", 10, 0, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int :  elem(update([0, 0]a, 1, x), 0)", 10, 0, INVALID_OPENCL);
+	testMainIntegerArg("def main(int x) int :  elem(update([0, 0]a, 1, x), 1)", 10, 10, INVALID_OPENCL);
+
+	// Test update arg out of bounds
+	testMainIntegerArgInvalidProgram("def main(int x) int :  elem(update([]a, 0, x), 0)");
+	testMainIntegerArgInvalidProgram("def main(int x) int :  elem(update([0]a, -1, x), 0)");
+	testMainIntegerArgInvalidProgram("def main(int x) int :  elem(update([0]a, 1, x), 0)");
+
+	// Test failure to prove valid, since index arg cannot be proven in bounds:
+	testMainIntegerArgInvalidProgram("def main(int x) int :  elem(update([0]a, x, x), 0)");
+
+
+	
+
+	testMainFloatArg("def main(float x) float :  elem([x, x, x, x]v, 0)", 1.0f, 1.0f);
+
+	
+
+
+	// Test if LLVM combined multiple sqrts into a sqrtps instruction (doesn't do this as of LLVM 3.4)
+	testMainFloatArg("def main(float x) float : sqrt(x) + sqrt(x + 1.0) + sqrt(x + 2.0) + sqrt(x + 3.0)", 1.0f, sqrt(1.0f) + sqrt(1.0f + 1.0f) + sqrt(1.0f + 2.0f) + sqrt(1.0f + 3.0f));
+
+	{
+		Float4Struct a(1.0f, 2.0, 3.0, 4.0);
+		Float4Struct target_result(3.f, 4.f, 5.f, 6.f);
+		
+		testFloat4Struct(
+			"struct Float4Struct { vector<float, 4> v } \n\
+			def main(Float4Struct a, Float4Struct b) Float4Struct : \n\
+				Float4Struct(a.v + [2.0]v4)", 
+			a, a, target_result
+		);
+	}
+
+	{
+		Float4Struct a(1.0f, 2.0, 3.0, 4.0);
+		Float4Struct target_result(2.f, 3.f, 4.f, 5.f);
+		
+		testFloat4Struct(
+			"struct Float4Struct { vector<float, 4> v } \n\
+			def main(Float4Struct a, Float4Struct b) Float4Struct : \n\
+				Float4Struct(a.v + [elem(b.v, 0)]v4)", 
+			a, a, target_result
+		);
+	}
+
+	// Check scalar initialisation of vector
+	testMainFloatArg("def main(float x) float :  elem(    [2.0]v8    , 5)", 1.0f, 2.0f);
+
+	/*testMainFloatArg(
+		"def expensiveA(float x) float : cos(x * 2.0)			\n\
+		def main(float x) float: expensiveA(x)",
+		0.2f, cos(0.2 * 2.0f));
+
+	testMainFloatArg(
+		"def expensiveA(float x) float : cos(x * 2.0)			\n\
+		def main(float x) float: x + expensiveA(x)",
+		0.2f, 0.2f + cos(0.2 * 2.0f));
+*/
+	testMainFloatArg(
+		//"def expensiveA(float x) float : pow(x, 0.1 + pow(0.2, x))			\n
+		"def expensiveA(float x) float : cos(x * 0.456 + cos(x))			\n\
+		def expensiveB(float x) float : sin(x * 0.345 + sin(x))			\n\
+		def main(float x) float: if(x < 0.5, expensiveA(x + 0.145), expensiveB(x + 0.2435))",
+		0.2f, cos((0.2f + 0.145f) * 0.456f + cos((0.2f + 0.145f))));	
+
+
+	// Check constant folding for a function that is ostensibly a function of several arguments but does not actually depend on them.
+	//testMainFloatArg("def g(float x) float : pow(2.0, 3.0)             def main(float x) float :  g(x)",    1.f, 8.f);
+
+	//testMainFloatArg("def g(float x) float : pow(2.0, 3.0)             def main(float x) float :  pow(g(x), 2.0)",    1.f, 64.f);
+	testMainFloatArg("def g(float x) float : 8.f             def main(float x) float :  pow(g(x), 2.0)",    1.f, 64.f);
+
+	// Check constant folding for a let variable
+	//testMainFloatArg("def main(float x) float :  let y = pow(2.0, 3.0) in y", 1.f, 8.f);
+
+	// Check constant folding for expression involving a let variable
+	testMainFloatArgCheckConstantFolded("def main(float x) float :  let y = 2.0 in y", 1.f, 2.f);
+	testMainFloatArgCheckConstantFolded("def main(float x) float :  let y = 1.0 + 1.0 in y", 1.f, 2.f);
+	testMainFloatArgCheckConstantFolded("def main(float x) float :  let y = (1.0 + 1.0) in pow(y, 3.0)", 1.f, 8.f);
+	
+
+	// Check constant folding of a pow function that is inside another function
+	testMainFloatArgCheckConstantFolded("def g(float x) float :  pow(2 + x, -(1.0 / 8.0))         def main(float x) float : g(0.5)", 1.f, std::pow(2.f + 0.5f, -(1.0f / 8.0f)));
+	
+	testMainFloatArgCheckConstantFolded("def g(float x, float y) float : pow(x, y)         def main(float x) float : g(2.0, 3.0)", 1.f, 8.0f);
+
+	// Test promotion to match function return type:  
+	// Test in if statement
+	// TODO: Get this working testMainFloatArg("def g(float x) float : if x > 1.0 then 2 else 3         def main(float x) float : g(x)", 1.f, 2.f);
+
+	//testMainFloatArg("def g(float x) float : 2         def main(float x) float : g(2)", 1.f, 2.f);
+
+
+	// Test calling a function that will only be finished / correct when type promotion is done, but will be called during constant folding phase.
+	testMainFloatArgCheckConstantFolded("def g(float x) float : 1 / x         def main(float x) float : g(2)", 1.f, 0.5f);
+	testMainFloatArg("def g(float x) float : 1 / x         def main(float x) float : g(x)", 4.f, 0.25f);
+
+
+	// Test calling a function that will only be finished / correct when type promotion is done, but will be called during constant folding phase.
+	testMainFloatArgCheckConstantFolded("def g(float x) float : 10 + x         def main(float x) float : g(1)", 2.f, 11.f);
+
+	// Test promotion from int to float
+	testMainFloatArg("def main(float x) float : 1 + x", 2.f, 3.f);
+
+	testMainFloatArg("def g(float x) float : x*x         def main(float x) float : g(1 + x)", 2.f, 9.f);
+
+
+	// Test FMA codegen.
+	testMainFloatArg("def main(float x) float : sin(x) + sin(x + 0.02) * sin(x + 0.03)", 0.f, sin(0.f) + sin(0.02f) * sin(0.03f));
+
+	// Unary minus applied to vector:
+	// Test with no runtime values
+	testMainFloatArg("def main(float x) float : elem(-[1.0, 2.0, 3.0, 4.0]v, 2)", 0.1f, -3.0f);
+	testMainIntegerArg("def main(int x) int : elem(-[1, 2, 3, 4]v, 2)", 1, -3);
+
+	// Test with runtime values
+	testMainFloatArg("def main(float x) float : elem(-[x + 1.0, x + 2.0, x + 3.0, x + 4.0]v, 2)", 0.4f, -3.4f);
+	testMainIntegerArg("def main(int x) int : elem(-[x + 1, x + 2, x + 3, x + 4]v, 2)", 1, -4);
+
+	// Test runtime unary minus of 4-vector
+	{
+		Float4Struct a(1.0f, 2.0, 3.0, 4.0);
+		Float4Struct target_result(-1.0f, -2.0f, -3.0f, -4.0f);
+		
+		testFloat4Struct(
+			"struct Float4Struct { vector<float, 4> v } \n\
+			def main(Float4Struct a, Float4Struct b) Float4Struct : \n\
+				Float4Struct(-v(a))", 
+			a, a, target_result
+		);
+	}
+
+
+	// Vector divide (not supported currently)
+	testMainIntegerArgInvalidProgram("def main() float : 					let x = [1.0, 2.0, 3.0, 4.0]v 					y = [10.0, 20.0, 30.0, 40.0]v in 					e1(x/ - y)");
+
+
+	// Gather load:
+	testMainFloatArg("def main(float x) float : elem(  elem([1.0, 2.0, 3.0, 4.0]a, [2, 3]v)   , 0)", 0.1f, 3.0f);
+
+	// Shuffle
+	testMainFloatArg("def main(float x) float : elem(   shuffle([1.0, 2.0, 3.0, 4.0]v, [2, 3]v)   , 1)", 0.1f, 4.0f);
+
+	testMainFloatArg("def main(float x) float : elem(   shuffle([x + 1.0, x + 2.0, x + 3.0, x + 4.0]v, [2, 3]v)   , 1)", 0.1f, 4.1f);
+
+	// Test shuffle mask index out of bounds.
+	testMainFloatArgInvalidProgram("def main(float x) float : elem(   shuffle([x + 1.0, x + 2.0, x + 3.0, x + 4.0]v, [2, 33]v)   , 1)     def main(float x) float : x");
+ 
+
+	// Test a shuffle where the mask is invalid - a float
+	testMainFloatArgInvalidProgram("def main(float x) float : elem(   shuffle([1.0, 2.0, 3.0, 4.0]v, [2, 3.0]v)   , 1)");
+
+	// Test a shuffle where the mask is invalid - not a constant
+	testMainIntegerArgInvalidProgram("def main(int x) int : elem(   shuffle([1.0, 2.0, 3.0, 4.0]v, [2, x]v)   , 1)");
+
+	
+
+	// Test returning a structure from a function that is called inside an if expression
+	testMainIntegerArg(
+		"struct teststruct { int y }										\n\
+		def f() teststruct : teststruct(1)						\n\
+		def g() teststruct : teststruct(2)						\n\
+		def main(int x) int : y( if x < 5 then f() else g() ) ",
+		2, 1);
+
+	// Test returning a structure from a function that takes a structure and that is called inside an if expression
+	testMainIntegerArg(
+		"struct teststruct { int y }										\n\
+		def f(teststruct s) teststruct : teststruct(1 + y(s))						\n\
+		def g(teststruct s) teststruct : teststruct(2 + y(s))						\n\
+		def main(int x) int : y( if x < 5 then f(teststruct(1)) else g(teststruct(2)) ) ",
+		2, 2);
+
+
+
+	// Test a function (f) that just returns an arg directly
+	testMainIntegerArg(
+		"struct teststruct { int y }										\n\
+		def f(teststruct a, teststruct b, bool condition) teststruct : a      \n\
+		def main(int x) int : y( f(teststruct(1), teststruct(2), x < 5) ) ",
+		2, 1);
+
+	// Test a function (f) that just returns a new struct
+	testMainIntegerArg(
+		"struct teststruct { int y }										\n\
+		def f(teststruct a, teststruct b, bool condition) teststruct : teststruct(1)      \n\
+		def main(int x) int : y( f(teststruct(1), teststruct(2), x < 5) ) ",
+		2, 1);
+
+	// Test a function (f) that is just an if expression that returns pass-by-reference arguments directly.
+	testMainIntegerArg(
+		"struct teststruct { int y }										\n\
+		def f(teststruct a, teststruct b, bool condition) teststruct : if(condition, a, b)      \n\
+		def main(int x) int : y( f(teststruct(1), teststruct(2), x < 5) ) ",
+		2, 1);
+
+
+	// Test a function (f) that is just an if expression that returns pass-by-reference arguments directly, in a let block
+	testMainIntegerArg(
+		"struct teststruct { int y }										\n\
+		def f(teststruct a, teststruct b, bool condition) teststruct :      \n\
+			let																\n\
+				x = if(condition, a, b)										\n\
+			in																\n\
+				x															\n\
+		def main(int x) int : y( f(teststruct(1), teststruct(2), x < 5) ) ",
+		2, 1);
+
+	// Test a function (f) that is just an if expression that returns pass-by-reference arguments directly, in a let block
+	testMainIntegerArg(
+		"struct teststruct { int y }										\n\
+		def f(teststruct a, teststruct b, bool condition) teststruct :      \n\
+			let																\n\
+				x = teststruct( y(if(condition, a, b))	)									\n\
+			in																\n\
+				x															\n\
+		def main(int x) int : y( f(teststruct(1), teststruct(2), x < 5) ) ",
+		2, 1);
+
+
+	testMainIntegerArg(
+		"struct teststruct { int y }										\n\
+		def g(teststruct a, teststruct b, bool condition) teststruct : if(condition, a, b)      \n\
+		def f(teststruct a, teststruct b, bool condition) teststruct : if(condition, g(a, b, condition), g(a, b, condition))      \n\
+		def main(int x) int : y( f(teststruct(1), teststruct(2), x < 5) ) ",
+		2, 1);
+
+	// truncateToInt with runtime args, with bounds checking
+	testMainFloatArg("def main(float x) float : toFloat(if x >= -2147483648.0 && x < 2147483647.0 then truncateToInt(x) else 0)", 3.1f, 3.0f);
+
+	// truncateToInt with constant value
+	testMainFloatArg("def main(float x) float : toFloat(truncateToInt(3.1))", 3.1f, 3.0f);
+
+	// Test truncateToInt where we can't prove the arg is in-bounds.
+//TEMP	testMainFloatArgInvalidProgram("def main(float x) float : toFloat(truncateToInt(x))", 3.9f, 3.0f);
+
+
+
+	
+
+	// Test division by -1 where we prove the numerator is not INT_MIN
+	/*testMainIntegerArg(
+		"def main(int i) int : if i > 1 then 2 else 0", 
+		8, -8);*/
+
+
+	testMainIntegerArg("def div(int x, int y) int : if(y != 0 && x != -2147483648, x / y, 0)	\n\
+					   def main(int i) int : div(i, i)",    
+		5, 1);
+	testMainIntegerArg("def main(int i) int : if i != 0 && i != -1 then i / i else 0",    
+		5, 1);
+
+
+	// Do a test where a division by zero would be done while constant folding.
+	testMainFloatArgInvalidProgram("def f(int x) int : x*x	      def main(float x) float : 14 / (f(2) - 4)");
+
+	testMainFloatArg("def f(int x) int : x*x	      def main(float x) float : 14 / (f(2) + 2)", 2.0f, 2.0f);
+
+	//testMainFloatArg("def f(int x) int : x*x	      def main(float x) float : f(2) + 3", 1.0f, 7.0f);
+	testMainFloatArg("def f(int x) int : x*x	      def main(float x) float : 14 / (f(2) + 3)", 2.0f, 2.0f);
+
+	// Test division by -1 where we prove the numerator is not INT_MIN
+	testMainIntegerArg(
+		"def main(int i) int : if i > -10000 then i / -1 else 0", 
+		8, -8);
+
+	// Test division where numerator = INT_MIN where we prove the denominator is not -1
+	testMainIntegerArg(
+		"def main(int i) int : if i >= 1 then -2147483648 / i else 0", 
+		2, -1073741824);
+
+	// Test division by -1 where we can't prove the numerator is not INT_MIN
+	testMainIntegerArgInvalidProgram(
+		"def main(int i) int : i / -1"
+	);
+
+
+	// Test division by a constant
+	testMainIntegerArg(
+		"def main(int i) int : i / 4", 
+		8, 2);
+
+	// Test division by zero
+	testMainIntegerArgInvalidProgram(
+		"def main(int i) int : i / 0"
+	);
+
+
+	// Test division by a runtime value
+	testMainIntegerArg(
+		"def main(int i) int : if i != 0 then 8 / i else 0", 
+		4, 2);
+
+
+
+
+
+
+	// Test array in array
+/*	
+	TEMP NOT SUPPORTED IN OPENCL YET
+	testMainIntegerArg(
+		"def main(int i) int : if i >= 0 && i < 2 then elem(elem([[1, 2]a, [3, 4]a]a, i), i) else 0", 
+		1, 4);
+		*/
+
+
+
+
+	/*float x = 2.0f;
+	float y = (x + x) -1.5;*/
+
+	// Test divide-by-zero
+	//testMainIntegerArg("def main(int x) int : 10 / x ", 0, 10);
+
+	
+
+	// ===================================================================
+	// Ref counting tests
+	// ===================================================================
+	// Test putting a string in a structure, then returning it.
+	testMainIntegerArg(
+		"struct teststruct { string str }										\n\
+		def f() teststruct : teststruct(\"hello world\")						\n\
+		def main(int x) int : length(str(f())) ",
+		2, 11, INVALID_OPENCL);
+
+	// Test a string in a structure
+	testMainIntegerArg(
+		"struct teststruct { string str }										\n\
+		def main(int x) int : length(teststruct(\"hello world\").str) ",
+		2, 11, INVALID_OPENCL);
+
+
+
+	
+	
+
+	testMainFloatArg(
+		"def main(float x) float: elem( if(x < 0.5, [1.0, 2.0]a, [3.0, 4.0]a), 0)",
+		1.0f, 3.0f, INVALID_OPENCL);
+	
+	// Test a structure composed of another structure, and taking the dot product of two vectors in the child structures, in an if statement
+	{
+		Float4StructPair a(
+			Float4Struct(1, 1, 1, 1),
+			Float4Struct(2, 2, 2, 2)
+		);
+		
+		testFloat4StructPairRetFloat(
+			"struct Float4Struct { vector<float, 4> v }			\n\
+			struct Float4StructPair { Float4Struct a, Float4Struct b }			\n\
+			def main(Float4StructPair pair1, Float4StructPair pair2) float :			\n\
+				if(e0(pair1.a.v) < 0.5, dot(pair1.a.v, pair2.b.v), dot(pair1.b.v, pair2.a.v))",
+			a, a, 8.0f);
+	}
+
+	// Test a structure composed of another structure, and taking the dot product of two vectors in the child structures.
+	{
+		Float4StructPair a(
+			Float4Struct(1, 1, 1, 1),
+			Float4Struct(2, 2, 2, 2)
+		);
+		
+		testFloat4StructPairRetFloat(
+			"struct Float4Struct { vector<float, 4> v }			\n\
+			struct Float4StructPair { Float4Struct a, Float4Struct b }			\n\
+			def main(Float4StructPair pair1, Float4StructPair pair2) float :			\n\
+				dot(pair1.a.v, pair2.b.v)",
+			a, a, 8.0f);
+	}
+
+
+	
+
+	// Test if with expensive-to-eval args
+	testMainFloatArg(
+		//"def expensiveA(float x) float : pow(x, 0.1 + pow(0.2, x))			\n
+		"def expensiveA(float x) float : cos(x * 0.456 + cos(x))			\n\
+		def expensiveB(float x) float : sin(x * 0.345 + sin(x))			\n\
+		def main(float x) float: if(x < 0.5, expensiveA(x + 0.145), expensiveB(x + 0.2435))",
+		0.2f, cos((0.2f + 0.145f) * 0.456f + cos((0.2f + 0.145f))));	
+
+
+/*
+TEMP OPENCL
+	// Test operator overloading (op_add) for an array
+	testMainFloatArg(
+		"def op_add(array<float, 2> a, array<float, 2> b) array<float, 2> : [elem(a, 0) + elem(b, 0), elem(a, 1) + elem(b, 1)]a		\n\
+		def main(float x) float: elem([1.0, 2.0]a  + [3.0, 4.0]a, 1)",
+		1.0f, 6.0f);	
+
+	// Test operator overloading (op_mul) for an array
+	testMainFloatArg(
+		"def op_mul(array<float, 2> a, float x) array<float, 2> : [elem(a, 0) * x, elem(a, 1) * x]a		\n\
+		def main(float x) float: elem([1.0, 2.0]a * 2.0, 1)",
+		1.0f, 4.0f);	
+
+	
+	// Test array in array
+	testMainIntegerArg(
+		"def main(int i) int : if i >= 0 && i < 2 then elem(elem([[1, 2]a, [3, 4]a]a, i), i) else 0", 
+		1, 4);
+
+	// Test struct in array
+	testMainIntegerArg(
+		"struct Pair { int a, int b }		\n\
+		def main(int i) int : if i >= 0 && i < 2 then b(elem([Pair(1, 2), Pair(3, 4)]a, i)) else 0 ", 
+		1, 4);
+*/
+
+	testMainIntegerArg(
+		"def main(int i) int : if i >= 0 && i < 5 then elem([1, 2, 3, 4, 5]a, i) else 0", 
+		1, 2);
+		
+	// Test integer in-bounds runtime index access
+	testMainIntegerArg(
+		"def main(int i) int : if i >= 0 && i < 20 then elem([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]a, i) else 0", 
+		10, 11);
+
+	// Test integer in-bounds runtime index access
+	for(int i=0; i<5; ++i)
+	{
+		testMainIntegerArg(
+			"def main(int i) int : if i >= 0 && i < 5 then elem([1, 2, 3, 4, 5]a, i) else 0", 
+			i, i+1);
+	}
+
+	// Test integer in-bounds runtime index access
+	testMainIntegerArg(
+		"def main(int i) int : if i >= 0 && i < 4 then elem([1, 2, 3, 4]a, i) else 0", 
+		1, 2);
+
+	// Test runtime out of bounds access.  Should return 0.
+	if(false)
+	{
+		testMainIntegerArg(
+			"def main(int i) int : elem([1, 2, 3, 4]a, i)", 
+			-1, 0);
+
+		testMainIntegerArg(
+			"def main(int i) int : elem([1, 2, 3, 4]a, i)", 
+			4, 0);
+
+		// Test out of bounds array access
+		testMainFloatArg(
+			"def main(float x) float : elem([1.0, 2.0, 3.0, 4.0]a, 4)", 
+			10.0, std::numeric_limits<float>::quiet_NaN());
+
+		testMainFloatArg(
+			"def main(float x) float : elem([1.0, 2.0, 3.0, 4.0]a, -1)", 
+			10.0, std::numeric_limits<float>::quiet_NaN());
+	}
+
+	
+
+
+
+	
+
+	// Test float arrays getting passed in to and returned from main function
+	{
+		const float a[] = {1.0f, 2.0f, 3.0f, 4.0f};
+		const float b[] = {10.0f, 20.0f, 30.0f, 40.0f};
+		float target_results[] = {1.0f, 2.0f, 3.0f, 4.0f};
+
+		testFloatArray("def main(array<float, 4> a, array<float, 4> b) array<float, 4> : a",
+			a, b, target_results, 4);
+	}
+
+	// Test map
+	{
+		const float a[] = {1.0f, 2.0f, 3.0f, 4.0f};
+		const float b[] = {10.0f, 20.0f, 30.0f, 40.0f};
+		float target_results[] = {1.0f, 4.0f, 9.0f, 16.0f};
+
+		testFloatArray(
+			"def square(float x) float : x*x			\n\
+			def main(array<float, 4> a, array<float, 4> b) array<float, 4> : map(square, a)",
+			a, b, target_results, 4);
+	}
+
+	// Test map from one element type to another
+	{
+		const float a[] = {1.0f, 2.0f, 3.0f, 4.0f};
+		const float b[] = {10.0f, 20.0f, 30.0f, 40.0f};
+		float target_results[] = {1.0f, 2.0f, 3.0f, 4.0f};
+
+		testFloatArray(
+			"def squareToInt(float x) int : truncateToInt(x*x + 0.000001)			\n\
+			def sqrtToFloat(int i) float : sqrt(toFloat(i))							\n\
+			def main(array<float, 4> a, array<float, 4> b) array<float, 4> : map(sqrtToFloat, map(squareToInt, a))",
+			a, b, target_results, 4);
+	}
+
+	// Test map with more elems
+	{
+		const size_t N = 256;
+		std::vector<float> input(N, 2.0f);
+		std::vector<float> target_results(N, 4.0f);
+
+
+		testFloatArray(
+			"def square(float x) float : x*x			\n\
+			def main(array<float, 256> a, array<float, 256> b) array<float, 256> : map(square, a)",
+			&input[0], &input[0], &target_results[0], N);
+	}
+
+
+	// Test float arrays getting passed in to and returned from main function
+	{
+		const float a[] = {1.0f, 2.0f, 3.0f, 4.0f};
+		const float b[] = {10.0f, 20.0f, 30.0f, 40.0f};
+		float target_results[] = {11.f, 22.f, 33.f, 44.f};
+
+		testFloatArray("def main(array<float, 4> a, array<float, 4> b) array<float, 4> : [elem(a,0) + elem(b,0), elem(a,1) + elem(b,1), elem(a,2) + elem(b,2), elem(a,3) + elem(b,3)]a",
+			a, b, target_results, 4);
+	}
+
+
+
+	
+
+	// Test structure getting returned directly.
+	{
+		Float4Struct a(1.0f, -2.0f, 3.0f, -4.0f);
+		Float4Struct target_result(1.0f, -2.0f, 3.0f, -4.0f);
+		
+		testFloat4Struct(
+			"struct Float4Struct { vector<float, 4> v } \n\
+			def main(Float4Struct a, Float4Struct b) Float4Struct : \n\
+				a", 
+			a, a, target_result
+		);
+	}
+
+
+	
+
+	// Test Array of structs
+	testMainFloatArg(
+		"struct Pair { float a, float b }		\n\
+		def main(float x) float : b(elem([Pair(1.0, 2.0), Pair(3.0, 4.0)]a, 1)) ", 
+		10.0, 4.0f, INVALID_OPENCL);
+	
+	// Test mixing of int and float in an array - is invalid
+	testMainFloatArgInvalidProgram("def main(float x) float : elem([1.0, 2, 3.0, 4.0]a, 1) + x");
+	testMainFloatArgInvalidProgram("def main(float x) float : elem([1, 2.0, 3.0, 4.0]a, 1) + x");
+
+	// Test Array Literal
+	testMainFloatArg("def main(float x) float : elem([1.0, 2.0, 3.0, 4.0]a, 1) + x", 10.0, 12.f);
+
+	// Test Array Literal with one element
+	testMainFloatArg("def main(float x) float : elem([1.0]a, 0) + x", 10.0, 11.f);
+
+	/*
+TEMP OPENCL
+	// Test Array Literal with non-const value
+	testMainFloatArg("def main(float x) float : elem([x, x, x, x]a, 1) + x", 1.0, 2.f);
+	testMainFloatArg("def main(float x) float : elem([x, x+1.0, x+2.0, x+3.0]a, 2)", 1.0, 3.f);
+	*/
+	
+	// Test Array Literal of integers
+	testMainIntegerArg("def main(int x) int : elem([1, 2, 3, 4]a, 1) + x", 10, 12);
+
+
+	// Test array with let statement
+	testMainFloatArg(
+		"def main(float x) float :				\n\
+			let									\n\
+				a = [1.0, 2.0, 3.0, 4.0]a		\n\
+			in									\n\
+				elem(a, 0)",
+		0.0f, 1.0f);
+
+	// Passing array by argument
+	testMainFloatArg(
+		"def f(array<float, 4> a) float : elem(a, 1)		\n\
+		def main(float x) float :						\n\
+			f([1.0, 2.0, 3.0, 4.0]a) +  x",
+		10.0f, 12.0f);
+
+
+
+	// Test vector in structure
+	{
+		Float4Struct a(1, 2, 3, 4);
+		Float4Struct b(1, 2, 3, 4);
+		Float4Struct target_result(1, 2, 3, 4);
+		
+		 //Float8Struct([min(e0(a.v), e0(b.v)), min(e1(a.v), e1(b.v)),	min(e2(a.v), e2(b.v)),	min(e3(a.v), e3(b.v)), min(e4(a.v), e4(b.v)), min(e5(a.v), e5(b.v)), min(e6(a.v), e6(b.v)), min(e7(a.v), e7(b.v))]v ) 
+		testFloat4Struct(
+			"struct Float4Struct { vector<float, 4> v } \n\
+			def min(Float4Struct a, Float4Struct b) Float4Struct : Float4Struct(min(a.v, b.v)) \n\
+			def main(Float4Struct a, Float4Struct b) Float4Struct : \n\
+				min(a, b)", 
+			a, b, target_result
+		);
+	}
+
+
+	// Test vector in structure
+	{
+		Float8Struct a;
+		a.v.e[0] = 10;
+		a.v.e[1] = 2;
+		a.v.e[2] = 30;
+		a.v.e[3] = 4;
+		a.v.e[4] = 4;
+		a.v.e[5] = 5;
+		a.v.e[6] = 6;
+		a.v.e[7] = 7;
+
+		Float8Struct b;
+		b.v.e[0] = 1;
+		b.v.e[1] = 20;
+		b.v.e[2] = 3;
+		b.v.e[3] = 40;
+		b.v.e[4] = 4;
+		b.v.e[5] = 5;
+		b.v.e[6] = 6;
+		b.v.e[7] = 7;
+
+		Float8Struct target_result;
+		target_result.v.e[0] = 1;
+		target_result.v.e[1] = 2;
+		target_result.v.e[2] = 3;
+		target_result.v.e[3] = 4;
+		target_result.v.e[4] = 4;
+		target_result.v.e[5] = 5;
+		target_result.v.e[6] = 6;
+		target_result.v.e[7] = 7;
+		
+		 //Float8Struct([min(e0(a.v), e0(b.v)), min(e1(a.v), e1(b.v)),	min(e2(a.v), e2(b.v)),	min(e3(a.v), e3(b.v)), min(e4(a.v), e4(b.v)), min(e5(a.v), e5(b.v)), min(e6(a.v), e6(b.v)), min(e7(a.v), e7(b.v))]v ) 
+		testFloat8Struct(
+			"struct Float8Struct { vector<float, 8> v } \n\
+			def min(Float8Struct a, Float8Struct b) Float8Struct : Float8Struct(min(a.v, b.v)) \n\
+			def main(Float8Struct a, Float8Struct b) Float8Struct : \n\
+				min(a, b)", 
+			a, b, target_result
+		);
+	}
+
+
+	// Test alignment of structure elements when they are vectors
+	testMainFloatArg("struct vec4 { vector<float, 4> v }					\n\
+				   struct vec16 { vector<float, 16> v }					\n\
+				   struct large_struct { vec4 a, vec16 b }				\n\
+				   def main(float x) float : large_struct(vec4([x, x, x, x]v), vec16([x, x, x, x, x, x, x, x, x, x, x, x, x, x, x, x]v)).a.v.e0",
+				  3.0f, 3.0f);
+
+
+	//TEMP:
+	// Try dot product
+	testMainFloatArg("	def main(float x) float : \
+					 let v = [x, x, x, x]v in\
+					 dot(v, v)", 4.0f, 64.0f);
+
+	testMainFloatArg("	def main(float x) float : \
+					 let v = [x, x, x, x]v in\
+					 dot(v, v)", 2.0f, 16.0f);
+
+	testMainDoubleArg("	def main(double x) double : \
+					 let v = [x, x, x, x]v in\
+					 dot(v, v)", 4.0, 64.0);
+	
+
+	// Test avoidance of circular variable definition: 
+	testMainFloatArg("									\n\
+		def main(float x) float :		\n\
+			let							\n\
+				x = 2.0					\n\
+			in							\n\
+				x						",
+		2.0f,
+		2.0f
+	);
+
+	// Test avoidance of circular variable definition: the x(pos) expression was attempting to get the type of the 'x =' let node,
+	// which was not known yet as was being computed.  The solution adopted is to not try to bind to let variables that are ancestors of the current variable.
+	// Another solution could be to not try to bind to unbound variables.
+	testMainFloatArg("									\n\
+		struct vec3 { float x, float y, float z }		\n\
+		def vec3(float v) vec3 : vec3(v, v, v)			\n\
+		def eval(vec3 pos) vec3 :						\n\
+			let											\n\
+				x = sin(x(pos) * 1000.0)				\n\
+			in											\n\
+				vec3(0.1)								\n\
+		def main(float t) float: x(eval(vec3(t, t, t)))",
+		1.0f,
+		0.1f
+	);
+
+
+
+	
+	
+	// Test comparison vs addition precedence: addition should have higher precedence.
+	testMainFloatArg("def main(float x) float : if(x < 1.0 + 2.0, 5.0, 6.0)", 1.0f, 5.0f);
+
+
+
+
+	// Test capture of let variable.
+	
+	//NOTE: Disabled, because these tests leak due to call to allocateRefCountedStructure().
+	/*testMainFloat("	def main() float :                          \n\
+				  let blerg = 3.0 in                     \n\
+				  let f = \\() : blerg  in                    \n\
+				  f()", 3.0);
+	*/
+	
+
+	testMainFloatArg("def main(float x) float : sin(x)", 1.0f, std::sin(1.0f));
+
+
+	// Test boolean logical expressions
+	testMainFloat(" def main() float : if(true && true, 1.0, 2.0)", 1.0f);
+	testMainFloat(" def main() float : if(true && false, 1.0, 2.0)", 2.0f);
+	testMainFloat(" def main() float : if(true || false, 1.0, 2.0)", 1.0f);
+	testMainFloat(" def main() float : if(false || false, 1.0, 2.0)", 2.0f);
+
+
+
+
+
+	// Test 'if'
+	testMainInteger("def main() int : if(true, 2, 3)", 2);
+	testMainInteger("def main() int : if(false, 2, 3)", 3);
+
+	// Test 'if' with structures as the return type
+	testMainInteger(
+		"struct s { int a, int b }   \n\
+		def main() int : a(if(true, s(1, 2), s(3, 4)))", 
+		1);
+	testMainInteger(
+		"struct s { int a, int b }   \n\
+		def main() int : a(if(false, s(1, 2), s(3, 4)))", 
+		3);
+
+	// Test 'if' with vectors as the return type
+	testMainFloat(
+		"def main() float : e0(if(true, [1.0, 2.0, 3.0, 4.0]v, [10.0, 20.0, 30.0, 40.0]v))", 
+		1.0f);
+	testMainFloat(
+		"def main() float : e0(if(false, [1.0, 2.0, 3.0, 4.0]v, [10.0, 20.0, 30.0, 40.0]v))", 
+		10.0f);
+
+
+	// Test call to external function
+	testMainFloat("def main() float : testExternalFunc(3.0)", 9.0f);
+	testMainFloatArg("def main(float x) float : testExternalFunc(x)", 5.0f, 25.0f, INVALID_OPENCL);
+
+	// Check that we can do constant folding even with an external expression
+	testMainFloatArgCheckConstantFolded("def main(float x) float : testExternalFunc(3.0)", 5.0f, 9.0f, INVALID_OPENCL);
+	
+	// Simple test
+	testMainFloat("def main() float : 1.0", 1.0);
+
+	// Test addition expression
+	testMainFloat("def main() float : 1.0 + 2.0", 3.0);
+
+	// Test integer addition
+	testMainInteger("def main() int : 1 + 2", 3);
+
+	// Test multiple integer additions
+	testMainInteger("def main() int : 1 + 2 + 3", 6);
+	testMainInteger("def main() int : 1 + 2 + 3 + 4", 10);
+
+	// Test multiple integer subtractions
+	testMainInteger("def main() int : 1 - 2 - 3 - 4", 1 - 2 - 3 - 4);
+
+	// Test left-to-right associativity
+	// Note that right-to-left associativity here would give 2 - (3 + 4) = -5
+	assert(2 - 3 + 4 == (2 - 3) + 4);
+	assert(2 - 3 + 4 == 3);
+	testMainInteger("def main() int : 2 - 3 + 4", 3);
+
+
+	// Test multiplication expression
+	testMainFloat("def main() float : 3.0 * 2.0", 6.0);
+
+
+
+
+	// Test integer multiplication
+	testMainInteger("def main() int : 2 * 3", 6);
+
+	// Test multiple integer multiplication
+	testMainInteger("def main() int : 2 * 3 * 4 * 5", 2 * 3 * 4 * 5);
+
+	// Test left-to-right associativity of division
+	// 12 / 4 / 3 = (12 / 4) / 3 = 1
+	// whereas
+	// 12 / (4 / 3) = 12 / 1 = 12
+	testMainInteger("def main() int : 12 / 4 / 3", 1);
+
+
+	// Test float subtraction
+	testMainFloat("def main() float : 3.0 - 2.0", 1.0);
+
+	// Test integer subtraction
+	testMainInteger("def main() int : 2 - 3", -1);
+
+	// Test precedence
+	testMainInteger("def main() int : 2 + 3 * 4", 14);
+	testMainInteger("def main() int : 2 * 3 + 4", 10);
+
+	// Test parentheses controlling order of operation
+	testMainInteger("def main() int : (2 + 3) * 4", 20);
+	testMainInteger("def main() int : 2 * (3 + 4)", 14);
+
+
+	// Test unary minus in front of parenthesis
+	testMainInteger("def main() int : -(1 + 2)", -3);
+
+	// Test floating point unary minus
+	testMainFloat("def main() float : -(1.0 + 2.0)", -3.0);
+
+	// Test unary minus in front of var
+	testMainInteger("def f(int x) int : -x        def main() int : f(3)", -3);
+
+	// Test unary minus with space
+	testMainFloatArg("def main(float x) : - x", 10.f, -10.f);
+	// Test double unary minus
+	testMainFloatArg("def main(float x) : - -x", 10.f, 10.f);
+	testMainFloatArg("def main(float x) : --x", 10.f, 10.f);
+
+
+
+
+	// Test simple function call
+	testMainFloat("def f(float x) float : x        def main() float : f(3.0)", 3.0);
+
+	// Test function call with two parameters
+	testMainFloat("def f(float x, float y) float : x        def main() float : f(3.0, 4.0)", 3.0);
+	testMainFloat("def f(float x, float y) float : y        def main() float : f(3.0, 4.0)", 4.0);
+
+	// Test inferred return type (for f)
+	testMainFloat("def f(float x) : x        def main() float : f(3.0)", 3.0);
+
+	// Test two call levels of inferred return type (f, g)
+	testMainFloat("def g(float x) : x    def f(float x) : g(x)       def main() float : f(3.0)", 3.0);
+	testMainFloat("def f(float x) : x    def g(float x) : f(x)       def main() float : g(3.0)", 3.0);
+
+	// Test generic function
+	testMainFloat("def f<T>(T x) T : x        def main() float : f(2.0)", 2.0);
+
+	// Test generic function with inferred return type (f)
+	testMainFloat("def f<T>(T x) : x        def main() float : f(2.0)", 2.0);
+
+
+	// Test function overloading - call with int param, should select 1st overload
+	testMainFloat("def overloadedFunc(int x) float : 4.0 \
+				  def overloadedFunc(float x) float : 5.0 \
+				  def main() float: overloadedFunc(1)", 4.0f);
+
+	// Call with float param, should select 2nd overload.
+	testMainFloat("def overloadedFunc(int x) float : 4.0 \
+				  def overloadedFunc(float x) float : 5.0 \
+				  def main() float: overloadedFunc(1.0)", 5.0f);
+
+	// Test binding to different overloaded functions based on type parameter to generic function
+	testMainFloat("def overloadedFunc(int x) float : 4.0 \
+				  def overloadedFunc(float x) float : 5.0 \
+				  def f<T>(T x) float: overloadedFunc(x)\
+				  def main() float : f(1)", 4.0f);
+
+
+	// Test invalidity of recursive call in generic function.
+	testMainFloatArgInvalidProgram("def f<T>(T x) f(x)   def main(float x) float : f(x)");
+	testMainFloatArgInvalidProgram("def f<T>(T x) T : x*x / (f(2) + 3)   def main(float x) float : 1/ (f(2) + 3)");
+
+
+	// Call f with float param
+	testMainFloat("def overloadedFunc(int x) float : 4.0 \
+				  def overloadedFunc(float x) float : 5.0 \
+				  def f<T>(T x) float: overloadedFunc(x)\
+				  def main() float : f(1.0)", 5.0f);
+
+	
 	// Test structure being returned from main function
 	{
 		struct TestStruct
