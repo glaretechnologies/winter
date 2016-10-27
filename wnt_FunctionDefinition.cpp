@@ -97,6 +97,15 @@ TypeRef CapturedVar::type() const
 //----------------------------------------------------------------------------------
 
 
+static const std::vector<TypeVRef> makeArgTypeVector(const std::vector<FunctionDefinition::FunctionArg>& args)
+{
+	std::vector<TypeVRef> res;
+	res.reserve(args.size());
+	for(unsigned int i=0; i<args.size(); ++i)
+		res.push_back(args[i].type);
+	return res;
+}
+
 FunctionDefinition::FunctionDefinition(const SrcLocation& src_loc, int order_num_, const std::string& name, const std::vector<FunctionArg>& args_, 
 									   const ASTNodeRef& body_, const TypeRef& declared_rettype, 
 									   const BuiltInFunctionImplRef& impl
@@ -112,13 +121,10 @@ FunctionDefinition::FunctionDefinition(const SrcLocation& src_loc, int order_num
 	need_to_emit_captured_var_struct_version(false),
 	is_anon_func(false),
 	num_uses(0),
-	noinline(false)
+	noinline(false),
+	sig(name, makeArgTypeVector(args_))
 {
-	sig.name = name;
-	sig.param_types.resize(args_.size());
-	for(unsigned int i=0; i<args_.size(); ++i)
-		sig.param_types[i] = args_[i].type;
-
+	
 	// TODO: fix this, make into method
 	//function_type = TypeRef(new Function(sig.param_types, declared_rettype));
 
@@ -142,17 +148,13 @@ TypeRef FunctionDefinition::returnType() const
 
 TypeRef FunctionDefinition::type() const
 {
-	vector<TypeRef> arg_types(this->args.size());
-	for(size_t i=0; i<this->args.size(); ++i)
-		arg_types[i] = this->args[i].type;
-
 	//vector<TypeRef> captured_var_types;
 	//for(size_t i=0; i<this->captured_vars.size(); ++i)
 	//	captured_var_types.push_back(this->captured_vars[i].type());
 	const TypeRef return_type = this->returnType();
 	if(return_type.isNull()) return NULL;
 
-	return new Function(arg_types, return_type, /*captured_var_types, */true); //this->use_captured_vars);
+	return new Function(makeArgTypeVector(this->args), TypeVRef(return_type), /*captured_var_types, */true); //this->use_captured_vars);
 }
 
 
@@ -1006,7 +1008,7 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 		//bool hidden_voidptr_arg
 	) const
 {
-	const vector<TypeRef> arg_types = this->sig.param_types;
+	const vector<TypeVRef> arg_types = this->sig.param_types;
 
 	/*if(use_captured_vars) // !this->captured_vars.empty())
 	{
@@ -1017,11 +1019,14 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 		// Add pointer to base type structure.
 	}*/
 
+	TypeRef ret_type = returnType();
+	if(ret_type.isNull())
+		throw BaseException("Interal error: return type was NULL.");
 
 	llvm::FunctionType* functype = LLVMTypeUtils::llvmFunctionType(
 		arg_types, 
 		use_cap_var_struct_ptr, // this->use_captured_vars, // use captured var struct ptr arg
-		returnType(), 
+		TypeVRef(ret_type),
 		*module
 	);
 
@@ -1182,7 +1187,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	bool hidden_voidptr_arg, 
 	const llvm::DataLayout/*TargetData*/* target_data,
 	const CommonFunctions& common_functions,
-	std::set<Reference<const Type>, ConstTypeRefLessThan>& destructors_called_types,
+	std::set<VRef<const Type>, ConstTypeVRefLessThan>& destructors_called_types,
 	ProgramStats& stats,
 	bool emit_trace_code,
 	bool with_captured_var_struct_ptr
@@ -1297,9 +1302,13 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 					//}
 					//else
 					{
+						const TypeRef body_type = body->type();
+						if(body_type.isNull())
+							throw BaseException("Internal error: body type was null.");
+
 						// Load value
 						LLVMTypeUtils::createCollectionCopy(
-							body->type(), 
+							TypeVRef(body_type), 
 							return_val_ptr, // dest ptr
 							body_code, // src ptr
 							params
@@ -1522,15 +1531,19 @@ bool FunctionDefinition::isConstant() const
 }*/
 
 
-StructureTypeRef FunctionDefinition::getCapturedVariablesStructType() const
+StructureTypeVRef FunctionDefinition::getCapturedVariablesStructType() const
 {
-	vector<TypeRef> field_types;
+	vector<TypeVRef> field_types;
 	vector<string> field_names;
 
 	for(size_t i=0; i<this->captured_vars.size(); ++i)
 	{
 		// Get the type of the captured variable.
-		field_types.push_back(this->captured_vars[i].type());
+		const TypeRef field_type = this->captured_vars[i].type();
+		if(field_type.isNull())
+			throw BaseException("Error: field type for captured var is null.");
+
+		field_types.push_back(TypeVRef(field_type));
 		field_names.push_back("captured_var_" + toString((uint64)i));
 	}
 			

@@ -69,9 +69,9 @@ TypeRef ArrayLiteral::type() const
 
 	TypeRef array_type;
 	if(has_int_suffix)
-		array_type = new ArrayType(e0_type, this->int_suffix);
+		array_type = new ArrayType(TypeVRef(e0_type), this->int_suffix);
 	else
-		array_type = new ArrayType(e0_type, elements.size());
+		array_type = new ArrayType(TypeVRef(e0_type), elements.size());
 
 	array_type->address_space = "__constant";
 	return array_type;

@@ -45,16 +45,16 @@ llvm::Type* voidPtrType(llvm::LLVMContext& context);
 llvm::Type* getBaseCapturedVarStructType(llvm::Module& module);
 llvm::Type* getPtrToBaseCapturedVarStructType(llvm::Module& module);
 
-llvm::FunctionType* llvmFunctionType(const std::vector<TypeRef>& arg_types, 
+llvm::FunctionType* llvmFunctionType(const std::vector<TypeVRef>& arg_types, 
 									 bool captured_var_struct_ptr_arg,
-									 TypeRef return_type, 
+									 TypeVRef return_type, 
 									 llvm::Module& module
 									 //bool hidden_voidptr_arg
 									 );
 
 llvm::Value* createFieldLoad(llvm::Value* structure_ptr, int field_index, llvm::IRBuilder<>* builder, const llvm::Twine& name);
 
-void createCollectionCopy(const TypeRef& collection_type, llvm::Value* dest_ptr, llvm::Value* src_ptr, EmitLLVMCodeParams& params);
+void createCollectionCopy(const TypeVRef& collection_type, llvm::Value* dest_ptr, llvm::Value* src_ptr, EmitLLVMCodeParams& params);
 
 
 }; // end namespace LLVMTypeUtils

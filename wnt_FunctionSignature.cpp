@@ -35,10 +35,7 @@ const std::string FunctionSignature::toString() const
 
 	for(int i=0; i<(int)param_types.size(); ++i)
 	{
-		if(param_types[i].isNull())
-			s += "[Unknown]";
-		else
-			s += param_types[i]->toString();
+		s += param_types[i]->toString();
 		if(i < (int)param_types.size() - 1)
 			s += ", ";
 	}

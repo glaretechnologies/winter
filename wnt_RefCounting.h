@@ -49,11 +49,11 @@ namespace RefCounting
 // Emit LLVM code for incrStringRefCount(), incrVArrayRefCount() etc.. to the current LLVM module, store pointers to them in common_functions.
 void emitRefCountingFunctions(llvm::Module* module, const llvm::DataLayout* target_data, CommonFunctions& common_functions);
 
-void emitDecrementorForType(llvm::Module* module, const llvm::DataLayout* target_data, const CommonFunctions& common_functions, const ConstTypeRef& refcounted_type);
-void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_data, const CommonFunctions& common_functions, const ConstTypeRef& type);
+void emitDecrementorForType(llvm::Module* module, const llvm::DataLayout* target_data, const CommonFunctions& common_functions, const ConstTypeVRef& refcounted_type);
+void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_data, const CommonFunctions& common_functions, const ConstTypeVRef& type);
 
-llvm::Function* getOrInsertDecrementorForType(llvm::Module* module, const ConstTypeRef& type);
-llvm::Function* getOrInsertDestructorForType(llvm::Module* module, const ConstTypeRef& type);
+llvm::Function* getOrInsertDecrementorForType(llvm::Module* module, const ConstTypeVRef& type);
+llvm::Function* getOrInsertDestructorForType(llvm::Module* module, const ConstTypeVRef& type);
 
 } // end namespace RefCounting
 

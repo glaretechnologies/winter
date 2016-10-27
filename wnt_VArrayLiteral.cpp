@@ -69,7 +69,7 @@ TypeRef VArrayLiteral::type() const
 	const TypeRef e0_type = elements[0]->type();
 	if(e0_type.isNull()) return NULL;
 
-	return new VArrayType(elements[0]->type());
+	return new VArrayType(TypeVRef(elements[0]->type()));
 }
 
 

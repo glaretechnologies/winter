@@ -54,20 +54,20 @@ public:
 //private:
 	void addFunction(const FunctionDefinitionRef& f);
 	FunctionDefinitionRef makeConcreteFunction(Reference<FunctionDefinition> generic_func, 
-		std::vector<TypeRef> type_mappings);
+		std::vector<TypeVRef> type_mappings);
 
-	typedef std::map<std::string, std::vector<Reference<FunctionDefinition> > > NameToFuncMapType;
+	typedef std::map<std::string, std::vector<FunctionDefinitionRef> > NameToFuncMapType;
 	NameToFuncMapType name_to_functions_map;
-	typedef std::map<FunctionSignature, Reference<FunctionDefinition> > SigToFuncMapType;
+	typedef std::map<FunctionSignature, FunctionDefinitionRef> SigToFuncMapType;
 	SigToFuncMapType sig_to_function_map;
 
 	std::vector<FunctionDefinitionRef> anon_functions_to_codegen;
 
-	std::vector<Reference<FunctionDefinition> > unique_functions;
+	std::vector<FunctionDefinitionRef> unique_functions;
 
-	std::vector<Reference<FunctionDefinition> > unique_functions_no_codegen; // hang on to them, don't generate code for them though.
+	std::vector<FunctionDefinitionRef> unique_functions_no_codegen; // hang on to them, don't generate code for them though.
 
-	typedef std::map<FunctionSignature, ExternalFunctionRef > ExternalFuncMapType;
+	typedef std::map<FunctionSignature, ExternalFunctionRef> ExternalFuncMapType;
 	ExternalFuncMapType external_functions;
 
 	bool hidden_voidptr_arg;

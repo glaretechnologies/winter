@@ -114,7 +114,7 @@ void Linker::buildLLVMCode(llvm::Module* module, const llvm::DataLayout* target_
 	PlatformUtils::CPUInfo cpu_info;
 	PlatformUtils::getCPUInfo(cpu_info);
 
-	std::set<Reference<const Type>, ConstTypeRefLessThan> destructors_called_types;
+	std::set<VRef<const Type>, ConstTypeVRefLessThan> destructors_called_types;
 
 	for(Linker::SigToFuncMapType::iterator it = sig_to_function_map.begin(); it != sig_to_function_map.end(); ++it)
 	{
@@ -216,11 +216,10 @@ const std::string Linker::buildOpenCLCode()
 
 
 template <class BuiltInFuncType>
-static FunctionDefinitionRef makeBuiltInFuncDef(const std::string& name, const TypeRef& type, const TypeRef& return_type)
+static FunctionDefinitionRef makeBuiltInFuncDef(const std::string& name, const TypeVRef& type, const TypeVRef& return_type)
 {
-	vector<FunctionDefinition::FunctionArg> args(1);
-	args[0].name = "x";
-	args[0].type = type;
+	vector<FunctionDefinition::FunctionArg> args;
+	args.push_back(FunctionDefinition::FunctionArg(type, "x"));
 
 	FunctionDefinitionRef def = new FunctionDefinition(
 		SrcLocation::invalidLocation(),
@@ -243,6 +242,16 @@ FunctionDefinitionRef Linker::findMatchingFunctionSimple(const FunctionSignature
 		return sig_lookup_res->second;
 	else
 		return NULL;
+}
+
+
+static vector<FunctionDefinition::FunctionArg> makeFunctionArgPair(const std::string& arg0_name, const TypeVRef& type0, const std::string& arg1_name, const TypeVRef& type1)
+{
+	vector<FunctionDefinition::FunctionArg> args;
+	args.reserve(2);
+	args.push_back(FunctionDefinition::FunctionArg(type0, arg0_name));
+	args.push_back(FunctionDefinition::FunctionArg(type1, arg1_name));
+	return args;
 }
 
 
@@ -358,14 +367,14 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 				return def;
 			}
 
-			if(sig.param_types[0]->getType() == Type::IntType && sig.param_types[0].downcastToPtr<Int>()->numBits() == 32 && sig.name == "toInt64")
+			if(sig.param_types[0]->getType() == Type::IntType && sig.param_types[0].downcastToPtr<const Int>()->numBits() == 32 && sig.name == "toInt64")
 			{
 				FunctionDefinitionRef def = makeBuiltInFuncDef<ToInt64BuiltInFunc>(sig.name, sig.param_types[0], new Int(64));
 				this->sig_to_function_map.insert(std::make_pair(sig, def));
 				return def;
 			}
 
-			if(sig.param_types[0]->getType() == Type::IntType && sig.param_types[0].downcastToPtr<Int>()->numBits() == 64 && sig.name == "toInt32")
+			if(sig.param_types[0]->getType() == Type::IntType && sig.param_types[0].downcastToPtr<const Int>()->numBits() == 64 && sig.name == "toInt32")
 			{
 				FunctionDefinitionRef def = makeBuiltInFuncDef<ToInt32BuiltInFunc>(sig.name, sig.param_types[0], new Int(32));
 				this->sig_to_function_map.insert(std::make_pair(sig, def));
@@ -376,7 +385,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 		{
 			if(sig.name == "toInt")
 			{
-				TypeRef ret_type = new Int(64);
+				TypeVRef ret_type = new Int(64);
 				FunctionDefinitionRef def = makeBuiltInFuncDef<VoidPtrToInt64BuiltInFunc>(sig.name, sig.param_types[0], ret_type);
 				this->sig_to_function_map.insert(std::make_pair(sig, def));
 				return def;
@@ -388,7 +397,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 			if(sig.param_types[0]->getType() == Type::ArrayTypeType || sig.param_types[0]->getType() == Type::VArrayTypeType ||
 				sig.param_types[0]->getType() == Type::TupleTypeType || sig.param_types[0]->getType() == Type::VectorTypeType)
 			{
-				TypeRef ret_type = new Int(64);
+				TypeVRef ret_type = new Int(64);
 				FunctionDefinitionRef def = makeBuiltInFuncDef<LengthBuiltInFunc>(sig.name, sig.param_types[0], ret_type);
 				this->sig_to_function_map.insert(std::make_pair(sig, def));
 				return def;
@@ -402,11 +411,11 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 		{
 			if(sig.name == "map")
 			{
-				const Reference<ArrayType> array_type = sig.param_types[1].downcast<ArrayType>();
-				const TypeRef array_elem_type = array_type->elem_type;
+				const VRef<ArrayType> array_type = sig.param_types[1].downcast<ArrayType>();
+				const VRef<Type> array_elem_type = array_type->elem_type;
 
-				const Reference<Function> func_type = sig.param_types[0].downcast<Function>();
-				const TypeRef R = func_type->return_type;
+				const VRef<Function> func_type = sig.param_types[0].downcast<Function>();
+				const VRef<Type> R(func_type->return_type);
 			
 				// map(function<T, R>, array<T, N>) array<R, N>
 				if(func_type->arg_types.size() != 1)
@@ -418,11 +427,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 						"Function type: " + func_type->toString() + ",\n array_elem_type: " + array_elem_type->toString());
 				}
 
-				vector<FunctionDefinition::FunctionArg> args(2);
-				args[0].type = func_type;
-				args[0].name = "f";
-				args[1].type = array_type;
-				args[1].name = "array";
+				const vector<FunctionDefinition::FunctionArg> args = makeFunctionArgPair("f", func_type, "array", array_type);
 
 				FunctionDefinitionRef def = new FunctionDefinition(
 					SrcLocation::invalidLocation(),
@@ -446,14 +451,9 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 		{
 			if(sig.name == "elem")
 			{
-				vector<FunctionDefinition::FunctionArg> args(2);
-				args[0].name = "array";
-				args[0].type = sig.param_types[0];
-				args[1].name = "index";
-				args[1].type = sig.param_types[1];
+				const vector<FunctionDefinition::FunctionArg> args = makeFunctionArgPair("array", sig.param_types[0], "index", sig.param_types[1]);
 
-				TypeRef ret_type = sig.param_types[0].downcast<ArrayType>()->elem_type;
-				assert(ret_type.nonNull());
+				VRef<Type> ret_type = sig.param_types[0].downcast<ArrayType>()->elem_type;
 
 				FunctionDefinitionRef def = new FunctionDefinition(
 					SrcLocation::invalidLocation(),
@@ -475,14 +475,9 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 		{
 			if(sig.name == "elem")
 			{
-				vector<FunctionDefinition::FunctionArg> args(2);
-				args[0].name = "varray";
-				args[0].type = sig.param_types[0];
-				args[1].name = "index";
-				args[1].type = sig.param_types[1];
+				const vector<FunctionDefinition::FunctionArg> args = makeFunctionArgPair("varray", sig.param_types[0], "index", sig.param_types[1]);
 
-				TypeRef ret_type = sig.param_types[0].downcast<VArrayType>()->elem_type;
-				assert(ret_type.nonNull());
+				TypeVRef ret_type = sig.param_types[0].downcast<const VArrayType>()->elem_type;
 
 				FunctionDefinitionRef def = new FunctionDefinition(
 					SrcLocation::invalidLocation(),
@@ -505,11 +500,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 		{
 			if(sig.name == "inBounds")
 			{
-				vector<FunctionDefinition::FunctionArg> args(2);
-				args[0].name = "array";
-				args[0].type = sig.param_types[0];
-				args[1].name = "index";
-				args[1].type = sig.param_types[1];
+				const vector<FunctionDefinition::FunctionArg> args = makeFunctionArgPair("array", sig.param_types[0], "index", sig.param_types[1]);
 
 				TypeRef ret_type = new Bool();
 
@@ -533,11 +524,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 		{
 			if(sig.name == "inBounds")
 			{
-				vector<FunctionDefinition::FunctionArg> args(2);
-				args[0].name = "vector";
-				args[0].type = sig.param_types[0];
-				args[1].name = "index";
-				args[1].type = sig.param_types[1];
+				const vector<FunctionDefinition::FunctionArg> args = makeFunctionArgPair("vector", sig.param_types[0], "index", sig.param_types[1]);
 
 				TypeRef ret_type = new Bool();
 
@@ -560,11 +547,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 		{
 			if(sig.name == "elem")
 			{
-				vector<FunctionDefinition::FunctionArg> args(2);
-				args[0].name = "vector";
-				args[0].type = sig.param_types[0];
-				args[1].name = "index";
-				args[1].type = sig.param_types[1];
+				const vector<FunctionDefinition::FunctionArg> args = makeFunctionArgPair("vector", sig.param_types[0], "index", sig.param_types[1]);
 
 				FunctionDefinitionRef def = new FunctionDefinition(
 					SrcLocation::invalidLocation(),
@@ -585,11 +568,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 		{
 			if(sig.name == "elem")
 			{
-				vector<FunctionDefinition::FunctionArg> args(2);
-				args[0].name = "tuple";
-				args[0].type = sig.param_types[0];
-				args[1].name = "index";
-				args[1].type = sig.param_types[1];
+				const vector<FunctionDefinition::FunctionArg> args = makeFunctionArgPair("tuple", sig.param_types[0], "index", sig.param_types[1]);
 
 				FunctionDefinitionRef def = new FunctionDefinition(
 					call_src_location,
@@ -613,13 +592,9 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 		{
 			if(sig.name == "elem")
 			{
-				vector<FunctionDefinition::FunctionArg> args(2);
-				args[0].name = "array";
-				args[0].type = sig.param_types[0];
-				args[1].name = "index_vector";
-				args[1].type = sig.param_types[1];
-				
-				Reference<ArrayType> array_type = sig.param_types[0].downcast<ArrayType>();
+				const vector<FunctionDefinition::FunctionArg> args = makeFunctionArgPair("array", sig.param_types[0], "index_vector", sig.param_types[1]);
+
+				VRef<ArrayType> array_type = sig.param_types[0].downcast<ArrayType>();
 
 				TypeRef return_type = new VectorType(array_type->elem_type, sig.param_types[1].downcast<VectorType>()->num);
 
@@ -643,11 +618,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 		{
 			if(sig.name == "pow")
 			{
-				vector<FunctionDefinition::FunctionArg> args(2);
-				args[0].name = "x";
-				args[0].type = sig.param_types[0];
-				args[1].name = "y";
-				args[1].type = sig.param_types[1];
+				const vector<FunctionDefinition::FunctionArg> args = makeFunctionArgPair("x", sig.param_types[0], "y", sig.param_types[1]);
 
 				FunctionDefinitionRef def = new FunctionDefinition(
 					SrcLocation::invalidLocation(),
@@ -673,11 +644,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 			{
 				if(sig.name == "shuffle")
 				{
-					vector<FunctionDefinition::FunctionArg> args(2);
-					args[0].name = "x";
-					args[0].type = sig.param_types[0];
-					args[1].name = "y";
-					args[1].type = sig.param_types[1];
+					const vector<FunctionDefinition::FunctionArg> args = makeFunctionArgPair("x", sig.param_types[0], "y", sig.param_types[1]);
 
 					FunctionDefinitionRef def = new FunctionDefinition(
 						call_src_location,
@@ -709,11 +676,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 
 				if(sig.name == "min")
 				{
-					vector<FunctionDefinition::FunctionArg> args(2);
-					args[0].name = "x";
-					args[0].type = sig.param_types[0];
-					args[1].name = "y";
-					args[1].type = sig.param_types[1];
+					const vector<FunctionDefinition::FunctionArg> args = makeFunctionArgPair("x", sig.param_types[0], "y", sig.param_types[1]);
 
 					FunctionDefinitionRef def = new FunctionDefinition(
 						SrcLocation::invalidLocation(),
@@ -730,11 +693,9 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 				}
 				else if(sig.name == "max")
 				{
-					vector<FunctionDefinition::FunctionArg> args(2);
-					args[0].name = "x";
-					args[0].type = sig.param_types[0];
-					args[1].name = "y";
-					args[1].type = sig.param_types[1];
+					const vector<FunctionDefinition::FunctionArg> args = makeFunctionArgPair("x", sig.param_types[0], "y", sig.param_types[1]);
+
+					const TypeRef ret_type = sig.param_types[0];
 
 					FunctionDefinitionRef def = new FunctionDefinition(
 						SrcLocation::invalidLocation(),
@@ -758,11 +719,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 			{
 				if(sig.name == "pow")
 				{
-					vector<FunctionDefinition::FunctionArg> args(2);
-					args[0].name = "x";
-					args[0].type = sig.param_types[0];
-					args[1].name = "y";
-					args[1].type = sig.param_types[1];
+					const vector<FunctionDefinition::FunctionArg> args = makeFunctionArgPair("x", sig.param_types[0], "y", sig.param_types[1]);
 
 					FunctionDefinitionRef def = new FunctionDefinition(
 						SrcLocation::invalidLocation(),
@@ -779,11 +736,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 				}
 				else if(sig.name == "dot")
 				{
-					vector<FunctionDefinition::FunctionArg> args(2);
-					args[0].name = "x";
-					args[0].type = sig.param_types[0];
-					args[1].name = "y";
-					args[1].type = sig.param_types[1];
+					const vector<FunctionDefinition::FunctionArg> args = makeFunctionArgPair("x", sig.param_types[0], "y", sig.param_types[1]);
 
 					FunctionDefinitionRef def = new FunctionDefinition(
 						SrcLocation::invalidLocation(),
@@ -806,13 +759,9 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 			if(sig.param_types[1].downcastToPtr<Int>()->numBits() != 64)
 				throw BaseException("second argument to makeVArray() must have type int64.");
 
-			vector<FunctionDefinition::FunctionArg> args(2);
-			args[0].name = "element";
-			args[0].type = sig.param_types[0];
-			args[1].name = "count";
-			args[1].type = sig.param_types[1];
+			const vector<FunctionDefinition::FunctionArg> args = makeFunctionArgPair("element", sig.param_types[0], "count", sig.param_types[1]);
 
-			Reference<VArrayType> ret_type = new VArrayType(args[0].type);
+			VRef<VArrayType> ret_type = new VArrayType(args[0].type);
 
 			FunctionDefinitionRef def = new FunctionDefinition(
 				SrcLocation::invalidLocation(),
@@ -837,11 +786,11 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 
 	if(sig.name == "iterate" && (sig.param_types.size() >= 2) && sig.param_types[0]->getType() == Type::FunctionType)
 	{
-		const Reference<Function> func_type = sig.param_types[0].downcast<Function>();
-		const TypeRef state_type = sig.param_types[1];
+		const VRef<Function> func_type = sig.param_types[0].downcast<Function>();
+		const TypeVRef state_type = sig.param_types[1];
 
 		// Remaining args are invariant data args
-		vector<TypeRef> invariant_data_type;
+		vector<TypeVRef> invariant_data_type;
 		for(size_t i=2; i<sig.param_types.size(); ++i)
 			invariant_data_type.push_back(sig.param_types[i]);
 
@@ -879,11 +828,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 		if(func_type->return_type.downcast<TupleType>()->component_types[1]->getType() != Type::BoolType)
 			throw BaseException("function argument to iterate must return tuple<State, bool>");
 
-		vector<FunctionDefinition::FunctionArg> args(2);
-		args[0].type = func_type;
-		args[0].name = "f";
-		args[1].type = state_type;
-		args[1].name = "initial_state";
+		vector<FunctionDefinition::FunctionArg> args = makeFunctionArgPair("f", func_type, "initial_state", state_type);
 		for(size_t i=0; i<invariant_data_type.size(); ++i)
 			args.push_back(FunctionDefinition::FunctionArg(invariant_data_type[i], "invariant_data"));
 
@@ -906,9 +851,9 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 	}
 	if(sig.name == "fold" && sig.param_types.size() == 3 && sig.param_types[0]->getType() == Type::FunctionType && sig.param_types[1]->getType() == Type::ArrayTypeType)
 	{
-		const Reference<Function> func_type = sig.param_types[0].downcast<Function>();
-		const Reference<ArrayType> array_type = sig.param_types[1].downcast<ArrayType>();
-		const TypeRef state_type = sig.param_types[2];
+		const VRef<Function> func_type = sig.param_types[0].downcast<Function>();
+		const VRef<ArrayType> array_type = sig.param_types[1].downcast<ArrayType>();
+		const TypeVRef state_type = sig.param_types[2];
 			
 		// fold(function<State, T, State> f, array<T> array, State initial_state) State
 
@@ -924,13 +869,11 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 		if(*func_type->return_type != *state_type)
 			throw BaseException("Function argument to fold return type must be same as initial_state type.");
 
-		vector<FunctionDefinition::FunctionArg> args(3);
-		args[0].type = func_type;
-		args[0].name = "f";
-		args[1].type = array_type;
-		args[1].name = "array";
-		args[2].type = state_type;
-		args[2].name = "initial_state";
+		vector<FunctionDefinition::FunctionArg> args;
+		args.reserve(3);
+		args.push_back(FunctionDefinition::FunctionArg(func_type, "f"));
+		args.push_back(FunctionDefinition::FunctionArg(array_type, "array"));
+		args.push_back(FunctionDefinition::FunctionArg(state_type, "initial_state"));
 
 		FunctionDefinitionRef def = new FunctionDefinition(
 			SrcLocation::invalidLocation(),
@@ -954,9 +897,9 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 	// TODO: other types
 	if(sig.name == "update" && sig.param_types.size() == 3 && sig.param_types[0]->getType() == Type::ArrayTypeType && sig.param_types[1]->getType() == Type::IntType)
 	{
-		const TypeRef collection_type = sig.param_types[0];
-		const Reference<Int> index_type = sig.param_types[1].downcast<Int>();
-		const TypeRef value_type = sig.param_types[2];
+		const TypeVRef collection_type = sig.param_types[0];
+		const VRef<Int> index_type = sig.param_types[1].downcast<Int>();
+		const TypeVRef value_type = sig.param_types[2];
 			
 		// NOTE: only supported for arrays currently
 		if(collection_type->getType() == Type::ArrayTypeType)
@@ -968,13 +911,11 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 		else
 			throw BaseException("Invalid first argument to update."); // TODO: add error context
 
-		vector<FunctionDefinition::FunctionArg> args(3);
-		args[0].type = collection_type;
-		args[0].name = "c";
-		args[1].type = index_type;
-		args[1].name = "index";
-		args[2].type = value_type;
-		args[2].name = "newval";
+		vector<FunctionDefinition::FunctionArg> args;
+		args.reserve(3);
+		args.push_back(FunctionDefinition::FunctionArg(collection_type, "c"));
+		args.push_back(FunctionDefinition::FunctionArg(index_type, "index"));
+		args.push_back(FunctionDefinition::FunctionArg(value_type, "newval"));
 
 		FunctionDefinitionRef def = new FunctionDefinition(
 			SrcLocation::invalidLocation(),
@@ -1011,7 +952,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 			if(sig.param_types[0]->getType() == Type::VectorTypeType)
 			{
 
-				Reference<VectorType> vec_type(
+				VRef<VectorType> vec_type(
 					(VectorType*)(sig.param_types[0].getPointer()) // NOTE: dirty cast
 					);
 
@@ -1079,9 +1020,19 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 							match = false;
 					}
 
+
+					for(size_t i=0; i<type_mapping.size(); ++i)
+						if(type_mapping[i].isNull())
+							match = false; // TEMP check this
+					
 					if(match)
 					{
-						FunctionDefinitionRef new_concrete_func = makeConcreteFunction(funcs[z], type_mapping);
+						vector<TypeVRef> type_mapping_vrefs;
+						type_mapping_vrefs.reserve(type_mapping.size());
+						for(size_t i=0; i<type_mapping.size(); ++i)
+							type_mapping_vrefs.push_back(TypeVRef(type_mapping[i]));
+
+						FunctionDefinitionRef new_concrete_func = makeConcreteFunction(funcs[z], type_mapping_vrefs);
 						addFunction(new_concrete_func);
 						return new_concrete_func;
 					}
@@ -1127,10 +1078,11 @@ Reference<FunctionDefinition> Linker::findMatchingFunctionByName(const std::stri
 
 
 Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDefinition> generic_func, 
-		std::vector<TypeRef> type_mappings)
+		std::vector<TypeVRef> type_mappings)
 {
 	//std::cout << "Making concrete function from " << generic_func->sig.toString() << "\n";
-	vector<FunctionDefinition::FunctionArg> args = generic_func->args;
+	vector<FunctionDefinition::FunctionArg> args;
+	args.reserve(generic_func->args.size());
 	for(size_t i=0; i<generic_func->args.size(); ++i)
 	{
 		//args[i] = generic_func->args[i];
@@ -1141,7 +1093,7 @@ Reference<FunctionDefinition> Linker::makeConcreteFunction(Reference<FunctionDef
 			GenericType* gt = static_cast<GenericType*>(generic_func->args[i].type.getPointer());
 			
 			// Then replace with the bound concrete type.
-			args[i].type = type_mappings[gt->genericTypeParamIndex()];
+			args.push_back(FunctionDefinition::FunctionArg(type_mappings[gt->genericTypeParamIndex()], generic_func->args[i].name));
 		}
 	}
 

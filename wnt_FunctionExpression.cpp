@@ -231,12 +231,12 @@ bool FunctionExpression::doesFunctionTypeMatch(const TypeRef& type)
 }*/
 
 
-void FunctionExpression::tryCoerceIntArgsToDoubles(Linker& linker, const std::vector<TypeRef>& argtypes, int effective_callsite_order_num)
+void FunctionExpression::tryCoerceIntArgsToDoubles(Linker& linker, const std::vector<TypeVRef>& argtypes, int effective_callsite_order_num)
 {
 	if(this->static_target_function)
 		return;
 
-	vector<TypeRef> coerced_argtypes = argtypes;
+	vector<TypeVRef> coerced_argtypes = argtypes;
 
 	for(size_t i=0; i<argtypes.size(); ++i)
 	{
@@ -270,12 +270,12 @@ void FunctionExpression::tryCoerceIntArgsToDoubles(Linker& linker, const std::ve
 }
 
 
-void FunctionExpression::tryCoerceIntArgsToFloats(Linker& linker, const std::vector<TypeRef>& argtypes, int effective_callsite_order_num)
+void FunctionExpression::tryCoerceIntArgsToFloats(Linker& linker, const std::vector<TypeVRef>& argtypes, int effective_callsite_order_num)
 {
 	if(this->static_target_function)
 		return;
 
-	vector<TypeRef> coerced_argtypes = argtypes;
+	vector<TypeVRef> coerced_argtypes = argtypes;
 
 	for(size_t i=0; i<argtypes.size(); ++i)
 	{
@@ -319,93 +319,90 @@ void FunctionExpression::bindFunction(Linker& linker, TraversalPayload& payload,
 	// We want to find a function that matches our argument expression types, and the function name
 
 	{
-		vector<TypeRef> argtypes;
-		bool all_argtypes_nonnull = true;
+		vector<TypeVRef> argtypes;
 		for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
 		{
-			argtypes.push_back(this->argument_expressions[i]->type());
-			if(argtypes.back().isNull())
-				all_argtypes_nonnull = false;
+			const TypeRef arg_expr_type = this->argument_expressions[i]->type();
+			if(arg_expr_type.isNull())
+				return; // Don't try and bind if we have a null type
+			argtypes.push_back(TypeVRef(arg_expr_type));
 		}
 
-		if(all_argtypes_nonnull) // Don't try and bind if we have a null type
+		const FunctionSignature sig(this->static_function_name, argtypes);
+
+		// Work out effective call site position.
+		int effective_callsite_order_num = 1000000000;
+		if(payload.current_named_constant)
+			effective_callsite_order_num = payload.current_named_constant->order_num;
+		for(size_t z=0; z<payload.func_def_stack.size(); ++z)
+			effective_callsite_order_num = myMin(effective_callsite_order_num, payload.func_def_stack[z]->order_num);
+
+		// Try and resolve to internal function.
+		this->static_target_function = linker.findMatchingFunction(sig, this->srcLocation(), effective_callsite_order_num/*&payload.func_def_stack*/).getPointer();
+		if(this->static_target_function/* && isTargetDefinedBeforeAllInStack(payload.func_def_stack, target_function)*/) // Disallow recursion for now: Check the linked function is not the current function.
 		{
-			const FunctionSignature sig(this->static_function_name, argtypes);
+		}
+		else
+		{
+			// Try and promote integer args to double args.
+			// TODO: try all possible coercion combinations.
+			// This is not really the best way of doing this type coercion, the old approach of matching by name is better.
 
-			// Work out effective call site position.
-			int effective_callsite_order_num = 1000000000;
-			if(payload.current_named_constant)
-				effective_callsite_order_num = payload.current_named_constant->order_num;
-			for(size_t z=0; z<payload.func_def_stack.size(); ++z)
-				effective_callsite_order_num = myMin(effective_callsite_order_num, payload.func_def_stack[z]->order_num);
-
-			// Try and resolve to internal function.
-			this->static_target_function = linker.findMatchingFunction(sig, this->srcLocation(), effective_callsite_order_num/*&payload.func_def_stack*/).getPointer();
-			if(this->static_target_function/* && isTargetDefinedBeforeAllInStack(payload.func_def_stack, target_function)*/) // Disallow recursion for now: Check the linked function is not the current function.
+			if(linker.try_coerce_int_to_double_first)
 			{
+				tryCoerceIntArgsToDoubles(linker, argtypes, effective_callsite_order_num);
+				tryCoerceIntArgsToFloats(linker, argtypes, effective_callsite_order_num);
 			}
 			else
 			{
-				// Try and promote integer args to double args.
-				// TODO: try all possible coercion combinations.
-				// This is not really the best way of doing this type coercion, the old approach of matching by name is better.
-
-				if(linker.try_coerce_int_to_double_first)
-				{
-					tryCoerceIntArgsToDoubles(linker, argtypes, effective_callsite_order_num);
-					tryCoerceIntArgsToFloats(linker, argtypes, effective_callsite_order_num);
-				}
-				else
-				{
-					tryCoerceIntArgsToFloats(linker, argtypes, effective_callsite_order_num);
-					tryCoerceIntArgsToDoubles(linker, argtypes, effective_callsite_order_num);
-				}
-
-				/*vector<FunctionDefinitionRef> funcs;
-				linker.getFuncsWithMatchingName(sig.name, funcs);
-
-				vector<FunctionDefinitionRef> possible_matches;
-
-				for(size_t z=0; z<funcs.size(); ++z)
-					if(couldCoerceFunctionCall(argument_expressions, funcs[z]))
-						possible_matches.push_back(funcs[z]);
-
-				if(possible_matches.size() == 1)
-				{
-					for(size_t i=0; i<argument_expressions.size(); ++i)
-					{
-						if(	possible_matches[0]->args[i].type->getType() == Type::FloatType &&
-							argument_expressions[i]->nodeType() == ASTNode::IntLiteralType &&
-							isIntExactlyRepresentableAsFloat(static_cast<IntLiteral*>(argument_expressions[i].getPointer())->value))
-						{
-							// Replace int literal with float literal
-							this->argument_expressions[i] = ASTNodeRef(new FloatLiteral(
-								(float)static_cast<IntLiteral*>(argument_expressions[i].getPointer())->value,
-								argument_expressions[i]->srcLocation()
-								));
-						}
-					}
-
-				
-					this->target_function = possible_matches[0].getPointer();
-					this->binding_type = BoundToGlobalDef;
-				}
-				else if(possible_matches.size() > 1)
-				{
-					string s = "Found more than one possible match for overloaded function: \n";
-					for(size_t z=0; z<possible_matches.size(); ++z)
-						s += possible_matches[z]->sig.toString() + "\n";
-					throw BaseException(s + "." + errorContext(*this));
-				}*/
+				tryCoerceIntArgsToFloats(linker, argtypes, effective_callsite_order_num);
+				tryCoerceIntArgsToDoubles(linker, argtypes, effective_callsite_order_num);
 			}
 
-			if(this->static_target_function)
-				this->static_target_function->num_uses++;
+			/*vector<FunctionDefinitionRef> funcs;
+			linker.getFuncsWithMatchingName(sig.name, funcs);
 
-			//TEMP: don't fail now, maybe we can bind later.
-			//if(this->binding_type == Unbound)
-			//	throw BaseException("Failed to find function '" + sig.toString() + "'." + errorContext(*this));
-		} // end if all_argtypes_nonnull
+			vector<FunctionDefinitionRef> possible_matches;
+
+			for(size_t z=0; z<funcs.size(); ++z)
+				if(couldCoerceFunctionCall(argument_expressions, funcs[z]))
+					possible_matches.push_back(funcs[z]);
+
+			if(possible_matches.size() == 1)
+			{
+				for(size_t i=0; i<argument_expressions.size(); ++i)
+				{
+					if(	possible_matches[0]->args[i].type->getType() == Type::FloatType &&
+						argument_expressions[i]->nodeType() == ASTNode::IntLiteralType &&
+						isIntExactlyRepresentableAsFloat(static_cast<IntLiteral*>(argument_expressions[i].getPointer())->value))
+					{
+						// Replace int literal with float literal
+						this->argument_expressions[i] = ASTNodeRef(new FloatLiteral(
+							(float)static_cast<IntLiteral*>(argument_expressions[i].getPointer())->value,
+							argument_expressions[i]->srcLocation()
+							));
+					}
+				}
+
+				
+				this->target_function = possible_matches[0].getPointer();
+				this->binding_type = BoundToGlobalDef;
+			}
+			else if(possible_matches.size() > 1)
+			{
+				string s = "Found more than one possible match for overloaded function: \n";
+				for(size_t z=0; z<possible_matches.size(); ++z)
+					s += possible_matches[z]->sig.toString() + "\n";
+				throw BaseException(s + "." + errorContext(*this));
+			}*/
+		}
+
+		if(this->static_target_function)
+			this->static_target_function->num_uses++;
+
+		//TEMP: don't fail now, maybe we can bind later.
+		//if(this->binding_type == Unbound)
+		//	throw BaseException("Failed to find function '" + sig.toString() + "'." + errorContext(*this));
 	}
 }
 
@@ -708,9 +705,15 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 		{
 			//throw BaseException("Failed to find function '" + this->function_name + "' for the given argument types." + errorContext(*this));
 
-			vector<TypeRef> argtypes;
+			vector<TypeVRef> argtypes;
 			for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
-				argtypes.push_back(this->argument_expressions[i]->type()); // may be NULL
+			{
+				const TypeRef arg_expr_type = this->argument_expressions[i]->type(); // may be NULL
+				if(arg_expr_type.isNull())
+					throw BaseException("Failed to find function '" + this->static_function_name + "', argument " + toString(i + 1) + " had unknown type." + errorContext(*this));
+
+				argtypes.push_back(TypeVRef(arg_expr_type));
+			}
 
 			const FunctionSignature sig(this->static_function_name, argtypes);
 

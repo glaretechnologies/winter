@@ -62,7 +62,7 @@ bool testFuzzProgram(const std::string& src)
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
 		//vm_args.env = &test_env;
 		
-		const FunctionSignature mainsig("main", std::vector<TypeRef>(1, TypeRef(new Float())));
+		const FunctionSignature mainsig("main", std::vector<TypeVRef>(1, new Float()));
 
 		vm_args.entry_point_sigs.push_back(mainsig);
 
@@ -269,7 +269,7 @@ static bool testFuzzASTProgram(Reference<BufferRoot>& root)//const std::vector<F
 				vm_args.preconstructed_func_defs.push_back(root->top_level_defs[i].downcast<FunctionDefinition>());
 
 		
-		const FunctionSignature mainsig("main", std::vector<TypeRef>(1, TypeRef(new Float())));
+		const FunctionSignature mainsig("main", std::vector<TypeVRef>(1, new Float()));
 
 		vm_args.entry_point_sigs.push_back(mainsig);
 
@@ -728,8 +728,8 @@ public:
 						false // real_is_double
 					);
 
-					std::map<std::string, TypeRef> named_types;
-					std::vector<TypeRef> named_types_ordered;
+					std::map<std::string, TypeVRef> named_types;
+					std::vector<TypeVRef> named_types_ordered;
 					int function_order_num = 0;
 
 					root = lang_parser.parseBuffer(tokens,

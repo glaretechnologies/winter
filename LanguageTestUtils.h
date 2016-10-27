@@ -139,14 +139,15 @@ static TestResults testMainFloat(const std::string& src, float target_return_val
 		vm_args.floating_point_literals_default_to_double = false;
 		vm_args.real_is_double = false;
 
-		{
-			ExternalFunctionRef f(new ExternalFunction());
-			f->func = (void*)testExternalFunc;
-			f->interpreted_func = testExternalFuncInterpreted;
-			f->return_type = TypeRef(new Float());
-			f->sig = FunctionSignature("testExternalFunc", std::vector<TypeRef>(1, TypeRef(new Float())));
-			vm_args.external_functions.push_back(f);
-		}
+		//{
+		//	ExternalFunctionRef f = new ExternalFunction(
+		//		(void*)testExternalFunc,
+		//		testExternalFuncInterpreted,
+		//		FunctionSignature("testExternalFunc", std::vector<TypeVRef>(1, new Float())),
+		//		new Float() // ret type
+		//	);
+		//	vm_args.external_functions.push_back(f);
+		//}
 		//{
 		//	ExternalFunctionRef f(new ExternalFunction());
 		//	f->func = (void*)(float(*)(float))std::sin; //externalSin;
@@ -156,7 +157,7 @@ static TestResults testMainFloat(const std::string& src, float target_return_val
 		//	vm_args.external_functions.push_back(f);
 		//}
 
-		const FunctionSignature mainsig("main", std::vector<TypeRef>());
+		const FunctionSignature mainsig("main", std::vector<TypeVRef>());
 
 		vm_args.entry_point_sigs.push_back(mainsig);
 
@@ -236,7 +237,7 @@ static void testMainFloatArgInvalidProgram(const std::string& src)
 		vm_args.env = &test_env;
 		vm_args.real_is_double = false;
 
-		const FunctionSignature mainsig("main", std::vector<TypeRef>(1, TypeRef(new Float())));
+		const FunctionSignature mainsig("main", std::vector<TypeVRef>(1, new Float()));
 
 		vm_args.entry_point_sigs.push_back(mainsig);
 
@@ -297,18 +298,19 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 		vm_args.real_is_double = false;
 
 		{
-			ExternalFunctionRef f(new ExternalFunction());
-			f->func = (void*)testExternalFunc;
-			f->interpreted_func = testExternalFuncInterpreted;
-			f->return_type = TypeRef(new Float());
-			f->sig = FunctionSignature("testExternalFunc", std::vector<TypeRef>(1, TypeRef(new Float())));
+			ExternalFunctionRef f = new ExternalFunction(
+				(void*)testExternalFunc,
+				testExternalFuncInterpreted,
+				FunctionSignature("testExternalFunc", std::vector<TypeVRef>(1, new Float())),
+				new Float() // ret type
+			);
 			vm_args.external_functions.push_back(f);
 		}
-		const FunctionSignature mainsig("main", std::vector<TypeRef>(1, TypeRef(new Float())));
+		const FunctionSignature mainsig("main", std::vector<TypeVRef>(1, new Float()));
 
 		vm_args.entry_point_sigs.push_back(mainsig);
 
-		const FunctionSignature entryPoint2sig("entryPoint2", std::vector<TypeRef>(1, TypeRef(new Float())));
+		const FunctionSignature entryPoint2sig("entryPoint2", std::vector<TypeVRef>(1, new Float()));
 		vm_args.entry_point_sigs.push_back(entryPoint2sig);
 
 		VirtualMachine vm(vm_args);
@@ -486,15 +488,15 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 		vm_args.floating_point_literals_default_to_double = true;
 		vm_args.real_is_double = true;
 
-		{
+		/*{
 			ExternalFunctionRef f(new ExternalFunction());
 			f->func = (void*)testExternalFunc;
 			f->interpreted_func = testExternalFuncInterpreted;
 			f->return_type = TypeRef(new Float());
-			f->sig = FunctionSignature("testExternalFunc", std::vector<TypeRef>(1, TypeRef(new Float())));
+			f->sig = FunctionSignature("testExternalFunc", std::vector<TypeVRef>(1, new Float()));
 			vm_args.external_functions.push_back(f);
-		}
-		const FunctionSignature mainsig("main", std::vector<TypeRef>(1, TypeRef(new Double())));
+		}*/
+		const FunctionSignature mainsig("main", std::vector<TypeVRef>(1, new Double()));
 
 		vm_args.entry_point_sigs.push_back(mainsig);
 
@@ -704,7 +706,7 @@ static void testMainInteger(const std::string& src, int target_return_val)
 		VMConstructionArgs vm_args;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
 
-		const FunctionSignature mainsig("main", std::vector<TypeRef>());
+		const FunctionSignature mainsig("main", std::vector<TypeVRef>());
 
 		vm_args.entry_point_sigs.push_back(mainsig);
 
@@ -774,7 +776,7 @@ static void testMainStringArg(const std::string& src, const std::string& arg, co
 		vm_args.allow_unsafe_operations = (test_flags & ALLOW_UNSAFE) != 0;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
 
-		const FunctionSignature mainsig("main", std::vector<TypeRef>(1, new String()));
+		const FunctionSignature mainsig("main", std::vector<TypeVRef>(1, new String()));
 
 		vm_args.entry_point_sigs.push_back(mainsig);
 
@@ -885,7 +887,7 @@ static TestResults testMainIntegerArg(const std::string& src, int x, int target_
 		vm_args.allow_unsafe_operations = (test_flags & ALLOW_UNSAFE) != 0;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
 
-		const FunctionSignature mainsig("main", std::vector<TypeRef>(1, new Int()));
+		const FunctionSignature mainsig("main", std::vector<TypeVRef>(1, new Int()));
 
 		vm_args.entry_point_sigs.push_back(mainsig);
 
@@ -1049,7 +1051,7 @@ static void testMainInt64Arg(const std::string& src, int64 x, int64 target_retur
 		vm_args.allow_unsafe_operations = (test_flags & ALLOW_UNSAFE) != 0;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
 
-		const FunctionSignature mainsig("main", std::vector<TypeRef>(1, new Int(64)));
+		const FunctionSignature mainsig("main", std::vector<TypeVRef>(1, new Int(64)));
 
 		vm_args.entry_point_sigs.push_back(mainsig);
 
@@ -1123,7 +1125,7 @@ static void testMainInt16Arg(const std::string& src, int16 x, int16 target_retur
 		vm_args.allow_unsafe_operations = (test_flags & ALLOW_UNSAFE) != 0;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
 
-		const FunctionSignature mainsig("main", std::vector<TypeRef>(1, new Int(16)));
+		const FunctionSignature mainsig("main", std::vector<TypeVRef>(1, new Int(16)));
 
 		vm_args.entry_point_sigs.push_back(mainsig);
 
@@ -1197,7 +1199,7 @@ static void testMainUInt32Arg(const std::string& src, uint32 x, uint32 target_re
 		vm_args.allow_unsafe_operations = (test_flags & ALLOW_UNSAFE) != 0;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
 
-		const FunctionSignature mainsig("main", std::vector<TypeRef>(1, new Int(32, false)));
+		const FunctionSignature mainsig("main", std::vector<TypeVRef>(1, new Int(32, false)));
 
 		vm_args.entry_point_sigs.push_back(mainsig);
 
@@ -1275,7 +1277,7 @@ static void testMainIntegerArgInvalidProgram(const std::string& src)
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
 		vm_args.env = &test_env;
 
-		const FunctionSignature mainsig("main", std::vector<TypeRef>(1, TypeRef(new Int())));
+		const FunctionSignature mainsig("main", std::vector<TypeVRef>(1, new Int()));
 
 		vm_args.entry_point_sigs.push_back(mainsig);
 
@@ -1630,38 +1632,37 @@ static void testFloat4StructPairRetFloat(const std::string& src, const Float4Str
 
 
 		// Create Float4Struct type
-		TypeRef float_4_struct_type;
-		{
-			std::vector<std::string> field_names;
-			field_names.push_back("v");
-
-			std::vector<TypeRef> field_types;
-			field_types.push_back(TypeRef(new VectorType(TypeRef(new Float), 4)));
-
-			float_4_struct_type = new StructureType(
-				"Float4Struct", 
-				field_types, 
-				field_names
-			);
-		}
-
-		// Create Float4StructPair type
+	
 		std::vector<std::string> field_names;
-		field_names.push_back("a");
-		field_names.push_back("b");
+		field_names.push_back("v");
 
-		std::vector<TypeRef> field_types(2, float_4_struct_type);
+		std::vector<TypeVRef> field_types;
+		field_types.push_back(new VectorType(new Float, 4));
 
-		TypeRef Float4StructPair_type = new StructureType(
-			"Float4StructPair", 
+		TypeVRef float_4_struct_type = new StructureType(
+			"Float4Struct", 
 			field_types, 
 			field_names
+		);
+		
+
+		// Create Float4StructPair type
+		std::vector<std::string> field_names2;
+		field_names2.push_back("a");
+		field_names2.push_back("b");
+
+		std::vector<TypeVRef> field_types2(2, float_4_struct_type);
+
+		TypeVRef Float4StructPair_type = new StructureType(
+			"Float4StructPair", 
+			field_types2, 
+			field_names2
 		);
 
 		// Get main function
 		const FunctionSignature mainsig(
 			"main", 
-			std::vector<TypeRef>(2, Float4StructPair_type)
+			std::vector<TypeVRef>(2, Float4StructPair_type)
 		);
 
 		vm_args.entry_point_sigs.push_back(mainsig);
@@ -1731,20 +1732,20 @@ static void testVectorInStruct(const std::string& src, const StructWithVec& stru
 		field_names.push_back("b");
 		field_names.push_back("data2");
 
-		std::vector<TypeRef> field_types;
-		field_types.push_back(TypeRef(new VectorType(TypeRef(new Float), 4)));
-		field_types.push_back(TypeRef(new VectorType(TypeRef(new Float), 4)));
-		field_types.push_back(TypeRef(new Float));
+		std::vector<TypeVRef> field_types;
+		field_types.push_back(new VectorType(new Float, 4));
+		field_types.push_back(new VectorType(new Float, 4));
+		field_types.push_back(new Float);
 
 
 		// Get main function
 		const FunctionSignature mainsig(
 			"main", 
-			std::vector<TypeRef>(1, TypeRef(new StructureType(
+			std::vector<TypeVRef>(1, new StructureType(
 				"StructWithVec", 
 				field_types, 
 				field_names
-			)))
+			))
 		);
 
 		vm_args.entry_point_sigs.push_back(mainsig);
@@ -1820,11 +1821,11 @@ static void testFloat4Struct(const std::string& src, const Float4Struct& a, cons
 		std::vector<std::string> field_names;
 		field_names.push_back("v");
 
-		std::vector<TypeRef> field_types;
-		field_types.push_back(TypeRef(new VectorType(TypeRef(new Float), 4)));
+		std::vector<TypeVRef> field_types;
+		field_types.push_back(new VectorType(new Float, 4));
 
 
-		TypeRef float_4_struct_type = new StructureType(
+		TypeVRef float_4_struct_type = new StructureType(
 			"Float4Struct", 
 			field_types, 
 			field_names
@@ -1833,7 +1834,7 @@ static void testFloat4Struct(const std::string& src, const Float4Struct& a, cons
 		// Get main function
 		const FunctionSignature mainsig(
 			"main", 
-			std::vector<TypeRef>(2, float_4_struct_type)
+			std::vector<TypeVRef>(2, float_4_struct_type)
 		);
 
 		vm_args.entry_point_sigs.push_back(mainsig);
@@ -1884,11 +1885,11 @@ static void testFloat8Struct(const std::string& src, const Float8Struct& a, cons
 		std::vector<std::string> field_names;
 		field_names.push_back("v");
 
-		std::vector<TypeRef> field_types;
-		field_types.push_back(TypeRef(new VectorType(TypeRef(new Float), 8)));
+		std::vector<TypeVRef> field_types;
+		field_types.push_back(new VectorType(new Float, 8));
 
 
-		TypeRef float_8_struct_type = new StructureType(
+		TypeVRef float_8_struct_type = new StructureType(
 			"Float8Struct", 
 			field_types, 
 			field_names
@@ -1897,7 +1898,7 @@ static void testFloat8Struct(const std::string& src, const Float8Struct& a, cons
 		// Get main function
 		const FunctionSignature mainsig(
 			"main", 
-			std::vector<TypeRef>(2, float_8_struct_type)
+			std::vector<TypeVRef>(2, float_8_struct_type)
 		);
 
 		vm_args.entry_point_sigs.push_back(mainsig);
@@ -1949,7 +1950,7 @@ static void testIntArray(const std::string& src, const int* a, const int* b, con
 		// Get main function
 		const FunctionSignature mainsig(
 			"main", 
-			std::vector<TypeRef>(2, new ArrayType(new Int(), len)) // 2 float arrays of len elems each
+			std::vector<TypeVRef>(2, new ArrayType(new Int(), len)) // 2 float arrays of len elems each
 		);
 
 		vm_args.entry_point_sigs.push_back(mainsig);
@@ -2006,7 +2007,7 @@ static void testFloatArray(const std::string& src, const float* a, const float* 
 		// Get main function
 		const FunctionSignature mainsig(
 			"main", 
-			std::vector<TypeRef>(2, new ArrayType(new Float(), len)) // 2 float arrays of 4 elems each
+			std::vector<TypeVRef>(2, new ArrayType(new Float(), len)) // 2 float arrays of 4 elems each
 		);
 
 		vm_args.entry_point_sigs.push_back(mainsig);

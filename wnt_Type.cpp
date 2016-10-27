@@ -567,7 +567,7 @@ void Function::emitDestructorCall(EmitLLVMCodeParams& params, llvm::Value* value
 }
 
 
-void Function::getContainedTypesWithDestructors(std::set<ConstTypeRef, ConstTypeRefLessThan>& types) const
+void Function::getContainedTypesWithDestructors(std::set<ConstTypeVRef, ConstTypeVRefLessThan>& types) const
 {
 }
 
@@ -806,7 +806,7 @@ void VArrayType::emitDestructorCall(EmitLLVMCodeParams& params, llvm::Value* val
 }
 
 
-void VArrayType::getContainedTypesWithDestructors(std::set<ConstTypeRef, ConstTypeRefLessThan>& types) const
+void VArrayType::getContainedTypesWithDestructors(std::set<ConstTypeVRef, ConstTypeVRefLessThan>& types) const
 {
 	types.insert(elem_type);
 	elem_type->getContainedTypesWithDestructors(types);
@@ -844,7 +844,7 @@ const std::string Map::OpenCLCType() const
 //==========================================================================
 
 
-StructureType::StructureType(const std::string& name_, const std::vector<TypeRef>& component_types_, const std::vector<std::string>& component_names_) 
+StructureType::StructureType(const std::string& name_, const std::vector<TypeVRef>& component_types_, const std::vector<std::string>& component_names_) 
 :	Type(StructureTypeType), name(name_), component_types(component_types_), component_names(component_names_)
 {
 	//if(component_types_.size() != component_names_.size())
@@ -1125,7 +1125,7 @@ bool StructureType::hasDestructor() const
 }
 
 
-void StructureType::getContainedTypesWithDestructors(std::set<ConstTypeRef, ConstTypeRefLessThan>& types) const
+void StructureType::getContainedTypesWithDestructors(std::set<ConstTypeVRef, ConstTypeVRefLessThan>& types) const
 {
 	for(size_t i=0; i<component_types.size(); ++i)
 	{
@@ -1149,7 +1149,7 @@ bool StructureType::containsType(const Type& other_type) const
 //==========================================================================
 
 
-TupleType::TupleType(const std::vector<TypeRef>& component_types_) 
+TupleType::TupleType(const std::vector<TypeVRef>& component_types_) 
 :	Type(TupleTypeType), component_types(component_types_)
 {
 }
@@ -1372,7 +1372,7 @@ void TupleType::emitDestructorCall(EmitLLVMCodeParams& params, llvm::Value* valu
 }
 
 
-void TupleType::getContainedTypesWithDestructors(std::set<ConstTypeRef, ConstTypeRefLessThan>& types) const
+void TupleType::getContainedTypesWithDestructors(std::set<ConstTypeVRef, ConstTypeVRefLessThan>& types) const
 {
 	for(size_t i=0; i<component_types.size(); ++i)
 	{
@@ -1582,11 +1582,11 @@ llvm::Type* OpaqueStructureType::LLVMType(llvm::Module& module) const
 //===============================================================================
 
 
-TypeRef errorTypeSum(const TypeRef& t)
+TypeVRef errorTypeSum(const TypeVRef& t)
 {
-	vector<TypeRef> elem_types(2);
-	elem_types[0] = t;
-	elem_types[1] = new ErrorType();
+	vector<TypeVRef> elem_types;
+	elem_types.push_back(t);
+	elem_types.push_back(new ErrorType());
 	return new SumType(elem_types);
 }
 

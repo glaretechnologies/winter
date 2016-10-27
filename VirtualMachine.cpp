@@ -585,7 +585,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
 				(void*)allocateString,
 				allocateStringInterpreted, // interpreted func
-				FunctionSignature("allocateString", vector<TypeRef>(1, new OpaqueType())),
+				FunctionSignature("allocateString", vector<TypeVRef>(1, new OpaqueType())),
 				new String() // return type
 			)));
 			external_functions.back()->has_side_effects = true;
@@ -594,7 +594,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 
 		// Add freeString
 		{
-			vector<TypeRef> arg_types(1, new String());
+			vector<TypeVRef> arg_types(1, new String());
 			//arg_types.push_back(new VoidPtrType());
 			external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
 				(void*)freeString,
@@ -609,7 +609,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
 			(void*)stringLength,
 			stringLengthInterpreted, // interpreted func
-			FunctionSignature("length", vector<TypeRef>(1, new String())),
+			FunctionSignature("length", vector<TypeVRef>(1, new String())),
 			new Int() // return type
 		)));
 
@@ -617,7 +617,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
 			(void*)concatStrings,
 			concatStringsInterpreted, // interpreted func
-			FunctionSignature("concatStrings", vector<TypeRef>(2, new String())),
+			FunctionSignature("concatStrings", vector<TypeVRef>(2, new String())),
 			new String() // return type
 		)));
 
@@ -625,7 +625,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
 			(void*)charToString,
 			charToStringInterpreted, // interpreted func
-			FunctionSignature("toString", vector<TypeRef>(1, new CharType())),
+			FunctionSignature("toString", vector<TypeVRef>(1, new CharType())),
 			new String() // return type
 		)));
 
@@ -633,7 +633,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
 			(void*)codePoint,
 			codePointInterpreted, // interpreted func
-			FunctionSignature("codePoint", vector<TypeRef>(1, new CharType())),
+			FunctionSignature("codePoint", vector<TypeVRef>(1, new CharType())),
 			new Int() // return type
 		)));
 
@@ -651,7 +651,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
 				(void*)allocateVArray,
 				allocateVArrayInterpreted, // interpreted func
-				FunctionSignature("allocateVArray", vector<TypeRef>(2, new Int(64))),
+				FunctionSignature("allocateVArray", vector<TypeVRef>(2, new Int(64))),
 				new VArrayType(new Int()) //new OpaqueType() // return type.  Just make this a void*, will cast return value to correct type
 			)));
 			external_functions.back()->has_side_effects = true;
@@ -663,20 +663,20 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
 				(void*)freeVArray,
 				NULL, // interpreted func TEMP
-				FunctionSignature("freeVArray", vector<TypeRef>(1, new VArrayType(new Int()))), // new OpaqueType())),
+				FunctionSignature("freeVArray", vector<TypeVRef>(1, new VArrayType(new Int()))), // new OpaqueType())),
 				new Int() // return type
 			)));
 			external_functions.back()->has_side_effects = true;
 		}
 
-		const TypeRef dummy_func_type = Function::dummyFunctionType();
+		const TypeVRef dummy_func_type = Function::dummyFunctionType();
 
 		// Add allocateClosure
 		{
 			external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
 				(void*)allocateClosure,
 				allocateClosureInterpreted, // interpreted func
-				FunctionSignature("allocateClosure", vector<TypeRef>(1, new Int(64))),
+				FunctionSignature("allocateClosure", vector<TypeVRef>(1, new Int(64))),
 				dummy_func_type // return type
 			)));
 			external_functions.back()->has_side_effects = true;
@@ -688,7 +688,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
 				(void*)freeClosure,
 				NULL, // interpreted func TEMP
-				FunctionSignature("freeClosure", vector<TypeRef>(1, dummy_func_type)),
+				FunctionSignature("freeClosure", vector<TypeVRef>(1, dummy_func_type)),
 				new Int() // return type
 			)));
 			external_functions.back()->has_side_effects = true;
@@ -983,21 +983,21 @@ void VirtualMachine::doDeadFunctionEliminationPass(const VMConstructionArgs& arg
 
 	// TEMP HACK: add some special functions to reachable set.
 	{
-		const FunctionSignature allocateStringSig("allocateString", vector<TypeRef>(1, new OpaqueType()));
+		const FunctionSignature allocateStringSig("allocateString", vector<TypeVRef>(1, new OpaqueType()));
 		payload.reachable_nodes.insert(findMatchingFunction(allocateStringSig).getPointer());
 
-		vector<TypeRef> argtypes(1, new String());
+		vector<TypeVRef> argtypes(1, new String());
 		const FunctionSignature freeStringSig("freeString", argtypes);
 		payload.reachable_nodes.insert(findMatchingFunction(freeStringSig).getPointer());
 
-		payload.reachable_nodes.insert(findMatchingFunction(FunctionSignature("allocateVArray", vector<TypeRef>(2, new Int(64)))).getPointer());
+		payload.reachable_nodes.insert(findMatchingFunction(FunctionSignature("allocateVArray", vector<TypeVRef>(2, new Int(64)))).getPointer());
 
-		payload.reachable_nodes.insert(findMatchingFunction(FunctionSignature("freeVArray", vector<TypeRef>(1, new VArrayType(new Int())))).getPointer());
+		payload.reachable_nodes.insert(findMatchingFunction(FunctionSignature("freeVArray", vector<TypeVRef>(1, new VArrayType(new Int())))).getPointer());
 
-		payload.reachable_nodes.insert(findMatchingFunction(FunctionSignature("allocateClosure", vector<TypeRef>(1, new Int(64)))).getPointer());
+		payload.reachable_nodes.insert(findMatchingFunction(FunctionSignature("allocateClosure", vector<TypeVRef>(1, new Int(64)))).getPointer());
 
-		const TypeRef dummy_func_type = Function::dummyFunctionType();
-		payload.reachable_nodes.insert(findMatchingFunction(FunctionSignature("freeClosure", vector<TypeRef>(1, dummy_func_type))).getPointer());
+		const TypeVRef dummy_func_type = Function::dummyFunctionType();
+		payload.reachable_nodes.insert(findMatchingFunction(FunctionSignature("freeClosure", vector<TypeVRef>(1, dummy_func_type))).getPointer());
 	}
 
 	// Now remove any non-reachable functions and named constants from linker.top_level_defs
@@ -1059,7 +1059,7 @@ void VirtualMachine::doDeadFunctionEliminationPass(const VMConstructionArgs& arg
 
 void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vector<SourceBufferRef>& source_buffers, const std::vector<FunctionDefinitionRef>& preconstructed_func_defs)
 {
-	std::map<std::string, TypeRef> named_types;
+	std::map<std::string, TypeVRef> named_types;
 	int function_order_num = 0;
 
 	for(size_t i=0; i<preconstructed_func_defs.size(); ++i)
@@ -1370,21 +1370,21 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 
 		// TEMP HACK: add some special functions to reachable set.
 		{
-			const FunctionSignature allocateStringSig("allocateString", vector<TypeRef>(1, new OpaqueType()));
+			const FunctionSignature allocateStringSig("allocateString", vector<TypeVRef>(1, new OpaqueType()));
 			payload.reachable_nodes.insert(findMatchingFunction(allocateStringSig).getPointer());
 
-			vector<TypeRef> argtypes(1, new String());
+			vector<TypeVRef> argtypes(1, new String());
 			const FunctionSignature freeStringSig("freeString", argtypes);
 			payload.reachable_nodes.insert(findMatchingFunction(freeStringSig).getPointer());
 
-			payload.reachable_nodes.insert(findMatchingFunction(FunctionSignature("allocateVArray", vector<TypeRef>(2, new Int(64)))).getPointer());
+			payload.reachable_nodes.insert(findMatchingFunction(FunctionSignature("allocateVArray", vector<TypeVRef>(2, new Int(64)))).getPointer());
 
-			payload.reachable_nodes.insert(findMatchingFunction(FunctionSignature("freeVArray", vector<TypeRef>(1, new VArrayType(new Int())))).getPointer());
+			payload.reachable_nodes.insert(findMatchingFunction(FunctionSignature("freeVArray", vector<TypeVRef>(1, new VArrayType(new Int())))).getPointer());
 
-			payload.reachable_nodes.insert(findMatchingFunction(FunctionSignature("allocateClosure", vector<TypeRef>(1, new Int(64)))).getPointer());
+			payload.reachable_nodes.insert(findMatchingFunction(FunctionSignature("allocateClosure", vector<TypeVRef>(1, new Int(64)))).getPointer());
 
-			const TypeRef dummy_func_type = Function::dummyFunctionType();
-			payload.reachable_nodes.insert(findMatchingFunction(FunctionSignature("freeClosure", vector<TypeRef>(1, dummy_func_type))).getPointer());
+			const TypeVRef dummy_func_type = Function::dummyFunctionType();
+			payload.reachable_nodes.insert(findMatchingFunction(FunctionSignature("freeClosure", vector<TypeVRef>(1, dummy_func_type))).getPointer());
 		}
 
 		// Now remove any non-reachable functions and named constants from linker.top_level_defs
@@ -1462,27 +1462,27 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 	
 	CommonFunctions common_functions;
 	{
-		const FunctionSignature allocateStringSig("allocateString", vector<TypeRef>(1, new OpaqueType()));
+		const FunctionSignature allocateStringSig("allocateString", vector<TypeVRef>(1, new OpaqueType()));
 		common_functions.allocateStringFunc = findMatchingFunction(allocateStringSig).getPointer();
 		assert(common_functions.allocateStringFunc);
 
-		vector<TypeRef> argtypes(1, new String());
+		vector<TypeVRef> argtypes(1, new String());
 		const FunctionSignature freeStringSig("freeString", argtypes);
 		common_functions.freeStringFunc = findMatchingFunction(freeStringSig).getPointer();
 		assert(common_functions.freeStringFunc);
 
-		common_functions.allocateVArrayFunc = findMatchingFunction(FunctionSignature("allocateVArray", vector<TypeRef>(2, new Int(64)))).getPointer();
+		common_functions.allocateVArrayFunc = findMatchingFunction(FunctionSignature("allocateVArray", vector<TypeVRef>(2, new Int(64)))).getPointer();
 		assert(common_functions.allocateVArrayFunc);
 
-		common_functions.freeVArrayFunc = findMatchingFunction(FunctionSignature("freeVArray", vector<TypeRef>(1, new VArrayType(new Int()))))./*new OpaqueType*/getPointer();
+		common_functions.freeVArrayFunc = findMatchingFunction(FunctionSignature("freeVArray", vector<TypeVRef>(1, new VArrayType(new Int()))))./*new OpaqueType*/getPointer();
 		assert(common_functions.freeVArrayFunc);
 
 		
-		common_functions.allocateClosureFunc = findMatchingFunction(FunctionSignature("allocateClosure", vector<TypeRef>(1, new Int(64)))).getPointer();
+		common_functions.allocateClosureFunc = findMatchingFunction(FunctionSignature("allocateClosure", vector<TypeVRef>(1, new Int(64)))).getPointer();
 		assert(common_functions.allocateClosureFunc);
 
-		const TypeRef dummy_func_type = Function::dummyFunctionType();
-		common_functions.freeClosureFunc = findMatchingFunction(FunctionSignature("freeClosure", vector<TypeRef>(1, dummy_func_type))).getPointer();
+		const TypeVRef dummy_func_type = Function::dummyFunctionType();
+		common_functions.freeClosureFunc = findMatchingFunction(FunctionSignature("freeClosure", vector<TypeVRef>(1, dummy_func_type))).getPointer();
 		assert(common_functions.freeClosureFunc);
 	}
 

@@ -61,9 +61,8 @@ public:
 	class FunctionArg
 	{
 	public:
-		FunctionArg()/* : referenced(true)*/ {}
-		FunctionArg(TypeRef type_, const std::string& n) : type(type_), name(n)/*, referenced(true)*/ {}
-		TypeRef type;
+		FunctionArg(TypeVRef type_, const std::string& n) : type(type_), name(n)/*, referenced(true)*/ {}
+		TypeVRef type;
 		std::string name;
 
 		//bool isReferenced() const { return referenced; }
@@ -113,7 +112,7 @@ public:
 		bool hidden_voidptr_arg, 
 		const llvm::DataLayout* data_layout,
 		const CommonFunctions& common_functions,
-		std::set<Reference<const Type>, ConstTypeRefLessThan>& destructors_called_types,
+		std::set<VRef<const Type>, ConstTypeVRefLessThan>& destructors_called_types,
 		ProgramStats& stats,
 		bool emit_trace_code,
 		bool with_captured_var_struct_ptr
@@ -136,7 +135,7 @@ public:
 
 	// llvm::Type* getClosureStructLLVMType(llvm::LLVMContext& context) const;
 	TypeRef getFullClosureType() const;
-	Reference<StructureType> getCapturedVariablesStructType() const;
+	VRef<StructureType> getCapturedVariablesStructType() const;
 
 	// If the function is return by value, returns winter_index, else returns winter_index + 1
 	// as the zeroth index will be the sret pointer.

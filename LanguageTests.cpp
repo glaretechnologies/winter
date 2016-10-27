@@ -472,9 +472,9 @@ static void testDeadFunctionElimination()
 		VMConstructionArgs vm_args;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
 
-		const FunctionSignature mainsig("main", std::vector<TypeRef>(1, new Int(64)));
-		const FunctionSignature func_1_sig("func_1", std::vector<TypeRef>(1, new Int(64)));
-		const FunctionSignature func_2_sig("func_2", std::vector<TypeRef>(1, new Int(64)));
+		const FunctionSignature mainsig("main", std::vector<TypeVRef>(1, new Int(64)));
+		const FunctionSignature func_1_sig("func_1", std::vector<TypeVRef>(1, new Int(64)));
+		const FunctionSignature func_2_sig("func_2", std::vector<TypeVRef>(1, new Int(64)));
 
 		vm_args.entry_point_sigs.push_back(mainsig);
 		VirtualMachine vm(vm_args);
@@ -5081,7 +5081,6 @@ TEMP OPENCL
 
 
 	// Test call to external function
-	testMainFloat("def main() float : testExternalFunc(3.0)", 9.0f);
 	testMainFloatArg("def main(float x) float : testExternalFunc(x)", 5.0f, 25.0f, INVALID_OPENCL);
 
 	// Check that we can do constant folding even with an external expression

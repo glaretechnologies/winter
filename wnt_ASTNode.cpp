@@ -194,7 +194,7 @@ bool shouldFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
 }
 
 
-static ASTNodeRef makeLiteralASTNodeFromValue(const ValueRef& value, const SrcLocation& src_location, const TypeRef& type)
+static ASTNodeRef makeLiteralASTNodeFromValue(const ValueRef& value, const SrcLocation& src_location, const TypeVRef& type)
 {
 	switch(value->valueType())
 	{
@@ -277,7 +277,12 @@ ASTNodeRef foldExpression(ASTNodeRef& e, TraversalPayload& payload)
 
 	vmstate.func_args_start.pop_back();
 
-	const ASTNodeRef literal_node = makeLiteralASTNodeFromValue(retval, e->srcLocation(), e->type());
+	const TypeRef e_type = e->type();
+	assert(e_type.nonNull()); // This should have been checked in checkFoldExpression() etc..
+	if(e_type.isNull())
+		throw BaseException("Internal error: Expression type was null during constant folding.");
+
+	const ASTNodeRef literal_node = makeLiteralASTNodeFromValue(retval, e->srcLocation(), TypeVRef(e_type));
 	return literal_node;
 }
 

@@ -65,7 +65,7 @@ int main(int argc, char** argv)
 
 
 		// Get main function
-		FunctionSignature mainsig("main", std::vector<TypeRef>());
+		FunctionSignature mainsig("main", std::vector<TypeVRef>());
 		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
 
 

@@ -263,6 +263,10 @@ ${INDIGO_TRUNK_DIR}/utils/PrintOutput.cpp
 ${INDIGO_TRUNK_DIR}/utils/PrintOutput.h
 ${INDIGO_TRUNK_DIR}/utils/StandardPrintOutput.cpp
 ${INDIGO_TRUNK_DIR}/utils/StandardPrintOutput.h
+${INDIGO_TRUNK_DIR}/utils/Reference.cpp
+${INDIGO_TRUNK_DIR}/utils/Reference.h
+${INDIGO_TRUNK_DIR}/utils/ReferenceTest.cpp
+${INDIGO_TRUNK_DIR}/utils/ReferenceTest.h
 ${INDIGO_TRUNK_DIR}/utils/StringUtils.cpp
 ${INDIGO_TRUNK_DIR}/utils/StringUtils.h
 ${INDIGO_TRUNK_DIR}/utils/Task.cpp
@@ -273,6 +277,7 @@ ${INDIGO_TRUNK_DIR}/utils/TaskRunnerThread.cpp
 ${INDIGO_TRUNK_DIR}/utils/TaskRunnerThread.h
 ${INDIGO_TRUNK_DIR}/utils/Timer.cpp
 ${INDIGO_TRUNK_DIR}/utils/Timer.h
+${INDIGO_TRUNK_DIR}/utils/VRef.h
 ${INDIGO_TRUNK_DIR}/utils/UTF8Utils.cpp
 ${INDIGO_TRUNK_DIR}/utils/UTF8Utils.h
 )

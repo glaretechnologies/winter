@@ -1,12 +1,13 @@
 /*=====================================================================
 wnt_Type.h
 ----------
-Copyright Glare Technologies Limited 2014 -
+Copyright Glare Technologies Limited 2016 -
 =====================================================================*/
 #pragma once
 
 
 #include <utils/Reference.h>
+#include <utils/VRef.h>
 #include <utils/RefCounted.h>
 #include <vector>
 #include <string>
@@ -25,6 +26,7 @@ class EmitLLVMCodeParams;
 class EmitOpenCLCodeParams;
 class TupleType;
 struct ConstTypeRefLessThan;
+struct ConstTypeVRefLessThan;
 
 
 class Type : public RefCounted
@@ -73,7 +75,7 @@ public:
 	virtual void emitDestructorCall(EmitLLVMCodeParams& params, llvm::Value* value, const std::string& comment) const; // Default implementation does nothing.
 
 	virtual bool hasDestructor() const { return false; }
-	virtual void getContainedTypesWithDestructors(std::set<Reference<const Type>, ConstTypeRefLessThan>& types) const {}
+	virtual void getContainedTypesWithDestructors(std::set<VRef<const Type>, ConstTypeVRefLessThan>& types) const {}
 	virtual bool containsType(const Type& other_type) const { return false; }
 	virtual bool isHeapAllocated() const { return false; } // same as 'is refcounted'.
 
@@ -86,7 +88,9 @@ private:
 
 
 typedef Reference<Type> TypeRef;
+typedef VRef<Type> TypeVRef;
 typedef Reference<const Type> ConstTypeRef;
+typedef VRef<const Type> ConstTypeVRef;
 
 
 inline bool operator < (const Type& a, const Type& b);
@@ -225,15 +229,15 @@ public:
 class Function : public Type
 {
 public:
-	Function(const std::vector<TypeRef>& arg_types_, const TypeRef& return_type_, 
+	Function(const std::vector<TypeVRef>& arg_types_, const TypeVRef& return_type_, 
 		//const std::vector<TypeRef>& captured_var_types_,
 		bool use_captured_vars_) 
 		:	Type(FunctionType), arg_types(arg_types_), return_type(return_type_), 
 		//captured_var_types(captured_var_types_), 
 			use_captured_vars(use_captured_vars_){}
 
-	TypeRef return_type;
-	std::vector<TypeRef> arg_types;
+	TypeVRef return_type;
+	std::vector<TypeVRef> arg_types;
 	//std::vector<TypeRef> captured_var_types;
 	bool use_captured_vars;
 
@@ -243,7 +247,7 @@ public:
 	static int capturedVarStructIndex() { return 4; } // Index in closure struct of captured var structure.
 
 	// Use for passing to ref counting functions etc..
-	static Reference<Function> dummyFunctionType() { return new Function(std::vector<TypeRef>(), new Int(), true); }
+	static VRef<Function> dummyFunctionType() { return new Function(std::vector<TypeVRef>(), new Int(), true); }
 
 	virtual const std::string toString() const; // { return "function"; }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
@@ -259,7 +263,7 @@ public:
 	virtual void emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const;
 
 	virtual void emitDestructorCall(EmitLLVMCodeParams& params, llvm::Value* value, const std::string& comment) const;
-	virtual void getContainedTypesWithDestructors(std::set<ConstTypeRef, ConstTypeRefLessThan>& types) const;
+	virtual void getContainedTypesWithDestructors(std::set<ConstTypeVRef, ConstTypeVRefLessThan>& types) const;
 	virtual bool containsType(const Type& other_type) const;
 
 	virtual bool lessThan(const Type& b) const
@@ -305,7 +309,7 @@ public:
 class Map : public Type
 {
 public:
-	Map(const TypeRef& a, const TypeRef& b) : Type(MapType), from_type(a), to_type(b) {}
+	Map(const TypeVRef& a, const TypeVRef& b) : Type(MapType), from_type(a), to_type(b) {}
 
 	virtual const std::string toString() const { return "map<" + from_type->toString() + ", " + to_type->toString() + ">"; }
 	virtual bool lessThan(const Type& b) const
@@ -335,15 +339,15 @@ public:
 	virtual const std::string OpenCLCType() const;
 	virtual bool passByValue() const { return false; }
 
-	TypeRef from_type;
-	TypeRef to_type;
+	TypeVRef from_type;
+	TypeVRef to_type;
 };
 
 
 class ArrayType : public Type
 {
 public:
-	ArrayType(const TypeRef& elem_type_, size_t num_elems_) : Type(ArrayTypeType), elem_type(elem_type_), num_elems(num_elems_) { assert(elem_type_.nonNull()); }
+	ArrayType(const VRef<Type>& elem_type_, size_t num_elems_) : Type(ArrayTypeType), elem_type(elem_type_), num_elems(num_elems_) {}
 	virtual const std::string toString() const;
 	virtual bool lessThan(const Type& b) const
 	{
@@ -372,7 +376,7 @@ public:
 	virtual bool containsType(const Type& other_type) const;
 
 
-	TypeRef elem_type;
+	VRef<Type> elem_type;
 	size_t num_elems;
 };
 
@@ -381,7 +385,7 @@ public:
 class VArrayType : public Type
 {
 public:
-	VArrayType(const TypeRef& elem_type_) : Type(VArrayTypeType), elem_type(elem_type_) { assert(elem_type_.nonNull()); }
+	VArrayType(const TypeVRef& elem_type_) : Type(VArrayTypeType), elem_type(elem_type_) {}
 	virtual const std::string toString() const;
 	virtual bool lessThan(const Type& b) const
 	{
@@ -407,18 +411,18 @@ public:
 	virtual void emitDestructorCall(EmitLLVMCodeParams& params, llvm::Value* value, const std::string& comment) const;
 
 	virtual bool hasDestructor() const { return true; }
-	virtual void getContainedTypesWithDestructors(std::set<ConstTypeRef, ConstTypeRefLessThan>& types) const;
+	virtual void getContainedTypesWithDestructors(std::set<ConstTypeVRef, ConstTypeVRefLessThan>& types) const;
 	virtual bool containsType(const Type& other_type) const;
 	virtual bool isHeapAllocated() const { return true; }
 
-	TypeRef elem_type;
+	TypeVRef elem_type;
 };
 
 
 class StructureType : public Type
 {
 public:
-	StructureType(const std::string& name_, const std::vector<TypeRef>& component_types_, const std::vector<std::string>& component_names_);
+	StructureType(const std::string& name_, const std::vector<TypeVRef>& component_types_, const std::vector<std::string>& component_names_);
 
 	virtual const std::string toString() const;
 	virtual bool lessThan(const Type& b) const
@@ -447,7 +451,7 @@ public:
 	virtual void emitDestructorCall(EmitLLVMCodeParams& params, llvm::Value* value, const std::string& comment) const;
 
 	virtual bool hasDestructor() const;
-	virtual void getContainedTypesWithDestructors(std::set<ConstTypeRef, ConstTypeRefLessThan>& types) const;
+	virtual void getContainedTypesWithDestructors(std::set<ConstTypeVRef, ConstTypeVRefLessThan>& types) const;
 	virtual bool containsType(const Type& other_type) const;
 
 	const std::string definitionString() const; // Winter definition string, e.g "struct a { float b }"
@@ -457,17 +461,18 @@ public:
 	std::vector<Reference<TupleType> > getElementTupleTypes() const;
 
 	std::string name;
-	std::vector<TypeRef> component_types;
+	std::vector<TypeVRef> component_types;
 	std::vector<std::string> component_names;
 };
 
 typedef Reference<StructureType> StructureTypeRef;
+typedef VRef<StructureType> StructureTypeVRef;
 
 
 class TupleType : public Type
 {
 public:
-	TupleType(const std::vector<TypeRef>& component_types_);
+	TupleType(const std::vector<TypeVRef>& component_types_);
 
 	virtual const std::string toString() const;
 	virtual bool lessThan(const Type& b) const
@@ -512,11 +517,11 @@ public:
 	virtual void emitDestructorCall(EmitLLVMCodeParams& params, llvm::Value* value, const std::string& comment) const;
 	
 	virtual bool hasDestructor() const { return true; }
-	virtual void getContainedTypesWithDestructors(std::set<ConstTypeRef, ConstTypeRefLessThan>& types) const;
+	virtual void getContainedTypesWithDestructors(std::set<ConstTypeVRef, ConstTypeVRefLessThan>& types) const;
 	virtual bool containsType(const Type& other_type) const;
 
 
-	std::vector<TypeRef> component_types;
+	std::vector<TypeVRef> component_types;
 };
 
 typedef Reference<TupleType> TupleTypeRef;
@@ -525,7 +530,7 @@ typedef Reference<TupleType> TupleTypeRef;
 class VectorType : public Type
 {
 public:
-	VectorType(const TypeRef& elem_type_, unsigned int num_)
+	VectorType(const TypeVRef& elem_type_, unsigned int num_)
 	: Type(VectorTypeType), elem_type(elem_type_), num(num_) {}
 
 	virtual const std::string toString() const;
@@ -552,7 +557,7 @@ public:
 	virtual llvm::Type* LLVMType(llvm::Module& module) const;
 	virtual const std::string OpenCLCType() const;
 
-	TypeRef elem_type;
+	TypeVRef elem_type;
 	unsigned int num;
 };
 
@@ -584,7 +589,7 @@ public:
 class SumType : public Type
 {
 public:
-	SumType(const std::vector<TypeRef>& types_)
+	SumType(const std::vector<TypeVRef>& types_)
 	:	Type(SumTypeType), types(types_) {}
 
 	virtual const std::string toString() const;
@@ -623,7 +628,7 @@ public:
 	virtual llvm::Type* LLVMType(llvm::Module& module) const;
 	virtual const std::string OpenCLCType() const;
 
-	std::vector<TypeRef> types;
+	std::vector<TypeVRef> types;
 };
 
 
@@ -682,70 +687,77 @@ public:
 
 // Some utility methods:
 
-inline std::vector<TypeRef> typeSinglet(const TypeRef& a)
+inline std::vector<TypeVRef> typeSinglet(const TypeVRef& a)
 {
-	std::vector<TypeRef> v(1);
-	v[0] = a;
+	std::vector<TypeVRef> v;
+	v.reserve(1);
+	v.push_back(a);
 	return v;
 }
 
 
-inline std::vector<TypeRef> typePair(const TypeRef& a, const TypeRef& b)
+inline std::vector<TypeVRef> typePair(const TypeVRef& a, const TypeVRef& b)
 {
-	std::vector<TypeRef> v(2);
-	v[0] = a;
-	v[1] = b;
+	std::vector<TypeVRef> v;
+	v.reserve(2);
+	v.push_back(a);
+	v.push_back(b);
 	return v;
 }
 
 
-inline std::vector<TypeRef> typeTriplet(const TypeRef& a, const TypeRef& b, const TypeRef& c)
+inline std::vector<TypeVRef> typeTriplet(const TypeVRef& a, const TypeVRef& b, const TypeVRef& c)
 {
-	std::vector<TypeRef> v(3);
-	v[0] = a;
-	v[1] = b;
-	v[2] = c;
+	std::vector<TypeVRef> v;
+	v.reserve(3);
+	v.push_back(a);
+	v.push_back(b);
+	v.push_back(c);
 	return v;
 }
 
 
-inline std::vector<TypeRef> typeQuad(const TypeRef& a, const TypeRef& b, const TypeRef& c, const TypeRef& d)
+inline std::vector<TypeVRef> typeQuad(const TypeVRef& a, const TypeVRef& b, const TypeVRef& c, const TypeVRef& d)
 {
-	std::vector<TypeRef> v(4);
-	v[0] = a;
-	v[1] = b;
-	v[2] = c;
-	v[3] = d;
+	std::vector<TypeVRef> v;
+	v.reserve(4);
+	v.push_back(a);
+	v.push_back(b);
+	v.push_back(c);
+	v.push_back(d);
 	return v;
 }
 
 
-inline std::vector<TypeRef> typePentuplet(const TypeRef& a, const TypeRef& b, const TypeRef& c, const TypeRef& d, const TypeRef& e)
+inline std::vector<TypeVRef> typePentuplet(const TypeVRef& a, const TypeVRef& b, const TypeVRef& c, const TypeVRef& d, const TypeVRef& e)
 {
-	std::vector<TypeRef> v(5);
-	v[0] = a;
-	v[1] = b;
-	v[2] = c;
-	v[3] = d;
-	v[4] = e;
+	std::vector<TypeVRef> v;
+	v.reserve(5);
+	v.push_back(a);
+	v.push_back(b);
+	v.push_back(c);
+	v.push_back(d);
+	v.push_back(e);
 	return v;
 }
 
 
-inline std::vector<TypeRef> typeSextuplet(const TypeRef& a, const TypeRef& b, const TypeRef& c, const TypeRef& d, const TypeRef& e, const TypeRef& f)
+inline std::vector<TypeVRef> typeSextuplet(const TypeVRef& a, const TypeVRef& b, const TypeVRef& c, const TypeVRef& d, const TypeVRef& e, const TypeVRef& f)
 {
-	std::vector<TypeRef> v(6);
-	v[0] = a;
-	v[1] = b;
-	v[2] = c;
-	v[3] = d;
-	v[4] = e;
-	v[5] = f;
+	std::vector<TypeVRef> v;
+	v.reserve(6);
+	v.push_back(a);
+	v.push_back(b);
+	v.push_back(c);
+	v.push_back(d);
+	v.push_back(e);
+	v.push_back(f);
 	return v;
 }
 
 
-TypeRef errorTypeSum(const TypeRef& t);
+
+TypeVRef errorTypeSum(const TypeVRef& t);
 
 
 inline bool operator < (const Type& a, const Type& b)
@@ -773,13 +785,20 @@ struct TypeRefLessThan
 {
 	bool operator() (const TypeRef& a, const TypeRef& b) const { return *a < *b; }
 };
+struct TypeVRefLessThan
+{
+	bool operator() (const TypeVRef& a, const TypeVRef& b) const { return *a < *b; }
+};
 
 
 struct ConstTypeRefLessThan
 {
 	bool operator() (const Reference<const Type>& a, const Reference<const Type>& b) const { return *a < *b; }
 };
-
+struct ConstTypeVRefLessThan
+{
+	bool operator() (const VRef<const Type>& a, const VRef<const Type>& b) const { return *a < *b; }
+};
 
 inline bool isEqualToOrContains(const Type& a, const Type& b)
 {

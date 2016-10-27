@@ -81,8 +81,8 @@ public:
 private:
 	void checkInDomain(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	void bindFunction(Linker& linker, TraversalPayload& payload, std::vector<ASTNode*>& stack);
-	void tryCoerceIntArgsToDoubles(Linker& linker, const std::vector<TypeRef>& argtypes, int effective_callsite_order_num);
-	void tryCoerceIntArgsToFloats(Linker& linker, const std::vector<TypeRef>& argtypes, int effective_callsite_order_num);
+	void tryCoerceIntArgsToDoubles(Linker& linker, const std::vector<TypeVRef>& argtypes, int effective_callsite_order_num);
+	void tryCoerceIntArgsToFloats(Linker& linker, const std::vector<TypeVRef>& argtypes, int effective_callsite_order_num);
 public:
 
 	ASTNodeRef get_func_expr; // Expression that returns the function being called.

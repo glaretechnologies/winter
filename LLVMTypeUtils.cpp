@@ -100,9 +100,9 @@ llvm::Type* getPtrToBaseCapturedVarStructType(llvm::Module& module)
 }
 
 
-llvm::FunctionType* llvmFunctionType(const vector<TypeRef>& arg_types, 
+llvm::FunctionType* llvmFunctionType(const vector<TypeVRef>& arg_types, 
 									 bool captured_var_struct_ptr_arg,
-									 TypeRef return_type, 
+									 TypeVRef return_type, 
 									 llvm::Module& module)
 {
 	if(return_type->passByValue())
@@ -163,7 +163,7 @@ llvm::Value* createFieldLoad(llvm::Value* structure_ptr, int field_index,
 }
 
 
-void createCollectionCopy(const TypeRef& collection_type, llvm::Value* dest_ptr, llvm::Value* src_ptr, EmitLLVMCodeParams& params)
+void createCollectionCopy(const TypeVRef& collection_type, llvm::Value* dest_ptr, llvm::Value* src_ptr, EmitLLVMCodeParams& params)
 {
 	//if(collection_type->getType() == Type::ArrayTypeType)
 	//{

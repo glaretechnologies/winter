@@ -56,12 +56,14 @@ TupleLiteral::TupleLiteral(const std::vector<ASTNodeRef>& elems, const SrcLocati
 
 TypeRef TupleLiteral::type() const
 {
-	vector<TypeRef> component_types(elements.size());
-	for(size_t i=0; i<component_types.size(); ++i)
+	vector<TypeVRef> component_types;
+	component_types.reserve(elements.size());
+	for(size_t i=0; i<elements.size(); ++i)
 	{
-		component_types[i] = elements[i]->type();
-		if(component_types[i].isNull())
+		TypeRef t = elements[i]->type();
+		if(t.isNull())
 			return NULL;
+		component_types.push_back(TypeVRef(t));
 	}
 
 	return new TupleType(component_types);

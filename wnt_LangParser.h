@@ -33,7 +33,7 @@ public:
 class ParseInfo
 {
 public:
-	ParseInfo(unsigned int& i_, const std::vector<Reference<TokenBase> >& t, std::map<std::string, TypeRef>& named_types_,
+	ParseInfo(unsigned int& i_, const std::vector<Reference<TokenBase> >& t, std::map<std::string, TypeVRef>& named_types_,
 		std::vector<ASTNodeRef>& top_level_defs_,
 		int order_num_) 
 		: i(i_), tokens(t), named_types(named_types_), top_level_defs(top_level_defs_), order_num(order_num_)/*, else_token_present(false)*/ {}
@@ -42,7 +42,7 @@ public:
 	//const std::string* text_buffer;
 	const SourceBuffer* text_buffer;
 	unsigned int& i;
-	std::map<std::string, TypeRef>& named_types;
+	std::map<std::string, TypeVRef>& named_types;
 	std::vector<ASTNodeRef>& top_level_defs; // Either function definitions or named constants.
 	//bool else_token_present;
 	int order_num;
@@ -65,8 +65,8 @@ public:
 
 	Reference<BufferRoot> parseBuffer(const std::vector<Reference<TokenBase> >& tokens, 
 		const SourceBufferRef& source_buffer,
-		std::map<std::string, TypeRef>& named_types,
-		std::vector<TypeRef>& named_types_ordered_out,
+		std::map<std::string, TypeVRef>& named_types,
+		std::vector<TypeVRef>& named_types_ordered_out,
 		int& function_order_num
 	);
 
@@ -98,16 +98,16 @@ private:
 	ASTNodeRef parseVariableExpression(ParseInfo& parseinfo);
 	ASTNodeRef parseIfExpression(ParseInfo& parseinfo);
 
-	TypeRef parseType(ParseInfo& parseinfo);
-	TypeRef parseSumType(ParseInfo& parseinfo);
-	TypeRef parseElementaryType(ParseInfo& parseinfo);
-	TypeRef parseMapType(ParseInfo& parseinfo);
-	TypeRef parseArrayType(ParseInfo& parseinfo);
-	TypeRef parseVArrayType(ParseInfo& parseinfo);
-	TypeRef parseFunctionType(ParseInfo& parseinfo);
-	Reference<StructureType> parseStructType(ParseInfo& parseinfo);
-	TypeRef parseVectorType(ParseInfo& parseinfo);
-	TypeRef parseTupleType(ParseInfo& parseinfo);
+	TypeVRef parseType(ParseInfo& parseinfo);
+	TypeVRef parseSumType(ParseInfo& parseinfo);
+	TypeVRef parseElementaryType(ParseInfo& parseinfo);
+	TypeVRef parseMapType(ParseInfo& parseinfo);
+	TypeVRef parseArrayType(ParseInfo& parseinfo);
+	TypeVRef parseVArrayType(ParseInfo& parseinfo);
+	TypeVRef parseFunctionType(ParseInfo& parseinfo);
+	VRef<StructureType> parseStructType(ParseInfo& parseinfo);
+	TypeVRef parseVectorType(ParseInfo& parseinfo);
+	TypeVRef parseTupleType(ParseInfo& parseinfo);
 
 	ASTNodeRef parseLetBlock(ParseInfo& parseinfo);
 	ASTNodeRef parseExpression(ParseInfo& parseinfo);

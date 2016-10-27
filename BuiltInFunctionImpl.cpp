@@ -205,7 +205,7 @@ static llvm::Value* makeForLoop(llvm::IRBuilder<>& builder, llvm::Module* module
 
 
 
-Constructor::Constructor(Reference<StructureType>& struct_type_)
+Constructor::Constructor(VRef<StructureType>& struct_type_)
 :	BuiltInFunctionImpl(BuiltInType_Constructor),
 	struct_type(struct_type_)
 {
@@ -309,7 +309,7 @@ llvm::Value* GetField::emitLLVMCode(EmitLLVMCodeParams& params) const
 	}
 	else
 	{
-		const TypeRef field_type = this->struct_type->component_types[this->index];
+		const TypeVRef field_type = this->struct_type->component_types[this->index];
 		const std::string field_name = this->struct_type->component_names[this->index];
 
 		if(field_type->passByValue())
@@ -356,7 +356,7 @@ llvm::Value* GetField::emitLLVMCode(EmitLLVMCodeParams& params) const
 //------------------------------------------------------------------------------------
 
 
-UpdateElementBuiltInFunc::UpdateElementBuiltInFunc(const TypeRef& collection_type_)
+UpdateElementBuiltInFunc::UpdateElementBuiltInFunc(const TypeVRef& collection_type_)
 :	BuiltInFunctionImpl(BuiltInType_UpdateElementBuiltInFunc),
 	collection_type(collection_type_)
 {}
@@ -463,7 +463,7 @@ llvm::Value* GetTupleElementBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 	}
 	else
 	{
-		const TypeRef field_type = this->tuple_type->component_types[this->index];
+		const TypeVRef field_type = this->tuple_type->component_types[this->index];
 		const std::string field_name = "field " + ::toString(this->index);
 
 		if(field_type->passByValue())
@@ -749,7 +749,7 @@ llvm::Value* ArrayMapBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 		llvm::Type* voidptr = LLVMTypeUtils::voidPtrType(*params.context);
 
 		std::vector<llvm::Type*> arg_types(2, LLVMTypeUtils::voidPtrType(*params.context)); // void* output, void* input
-		const TypeRef int64_type = new Int(64);
+		const TypeVRef int64_type = new Int(64);
 		arg_types.push_back(int64_type->LLVMType(*params.module)); // array_size
 		arg_types.push_back(LLVMTypeUtils::voidPtrType(*params.context)); // map_function
 		arg_types.push_back(LLVMTypeUtils::voidPtrType(*params.context)); // work_function
@@ -803,7 +803,7 @@ llvm::Value* ArrayMapBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 //------------------------------------------------------------------------------------
 
 
-ArrayFoldBuiltInFunc::ArrayFoldBuiltInFunc(const Reference<Function>& func_type_, const Reference<ArrayType>& array_type_, const TypeRef& state_type_)
+ArrayFoldBuiltInFunc::ArrayFoldBuiltInFunc(const VRef<Function>& func_type_, const VRef<ArrayType>& array_type_, const TypeVRef& state_type_)
 :	BuiltInFunctionImpl(BuiltInType_ArrayFoldBuiltInFunc),
 	func_type(func_type_), array_type(array_type_), state_type(state_type_), specialised_f(NULL)
 {}
@@ -1202,7 +1202,7 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 //------------------------------------------------------------------------------------
 
 
-ArraySubscriptBuiltInFunc::ArraySubscriptBuiltInFunc(const Reference<ArrayType>& array_type_, const TypeRef& index_type_)
+ArraySubscriptBuiltInFunc::ArraySubscriptBuiltInFunc(const VRef<ArrayType>& array_type_, const TypeVRef& index_type_)
 :	BuiltInFunctionImpl(BuiltInType_ArraySubscriptBuiltInFunc),
 	array_type(array_type_), index_type(index_type_)
 {}
@@ -1267,7 +1267,7 @@ static llvm::Value* loadElement(EmitLLVMCodeParams& params, int arg_offset)
 
 
 // Returns a vector value
-static llvm::Value* loadGatherElements(EmitLLVMCodeParams& params, int arg_offset, const TypeRef& array_elem_type, int index_vec_num_elems)
+static llvm::Value* loadGatherElements(EmitLLVMCodeParams& params, int arg_offset, const TypeVRef& array_elem_type, int index_vec_num_elems)
 {
 	llvm::Value* array_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, arg_offset + 0);
 	llvm::Value* index_vec = LLVMTypeUtils::getNthArg(params.currently_building_func, arg_offset + 1);
@@ -1361,7 +1361,7 @@ llvm::Value* ArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 {
 	// Let's assume Arrays are always pass-by-pointer for now.
 
-	TypeRef field_type = this->array_type->elem_type;
+	TypeVRef field_type = this->array_type->elem_type;
 
 	// Bounds check the index
 	const int arg_offset = field_type->passByValue() ? 0 : 1;
@@ -1528,7 +1528,7 @@ llvm::Value* ArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 //------------------------------------------------------------------------------------
 
 
-VArraySubscriptBuiltInFunc::VArraySubscriptBuiltInFunc(const Reference<VArrayType>& array_type_, const TypeRef& index_type_)
+VArraySubscriptBuiltInFunc::VArraySubscriptBuiltInFunc(const VRef<VArrayType>& array_type_, const TypeVRef& index_type_)
 :	BuiltInFunctionImpl(BuiltInType_VArraySubscriptBuiltInFunc),
 	array_type(array_type_), index_type(index_type_)
 {}
@@ -1574,7 +1574,7 @@ llvm::Value* VArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 {
 	// Let's assume VArrays are always pass-by-pointer for now.
 
-	TypeRef field_type = this->array_type->elem_type;
+	TypeVRef field_type = this->array_type->elem_type;
 
 	const int arg_offset = field_type->passByValue() ? 0 : 1;
 	llvm::Value* index     = LLVMTypeUtils::getNthArg(params.currently_building_func, arg_offset + 1);
@@ -1641,7 +1641,7 @@ llvm::Value* VArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 //------------------------------------------------------------------------------------
 
 
-MakeVArrayBuiltInFunc::MakeVArrayBuiltInFunc(const Reference<VArrayType>& array_type_)
+MakeVArrayBuiltInFunc::MakeVArrayBuiltInFunc(const VRef<VArrayType>& array_type_)
 :	BuiltInFunctionImpl(BuiltInType_MakeVArrayBuiltInFunc),
 	array_type(array_type_)
 {
@@ -1715,7 +1715,7 @@ llvm::Value* MakeVArrayBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) con
 		false // use_cap_var_struct_ptr
 	);
 
-	const TypeRef elem_type = array_type->elem_type;
+	const TypeVRef elem_type = array_type->elem_type;
 
 	const uint64_t size_B = params.target_data->getTypeAllocSize(elem_type->LLVMType(*params.module)); // Get size of element
 	llvm::Value* size_B_constant = llvm::ConstantInt::get(*params.context, llvm::APInt(64, size_B, /*signed=*/false));
@@ -1783,7 +1783,7 @@ llvm::Value* MakeVArrayBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) con
 //------------------------------------------------------------------------------------
 
 
-VectorSubscriptBuiltInFunc::VectorSubscriptBuiltInFunc(const Reference<VectorType>& vec_type_, const TypeRef& index_type_)
+VectorSubscriptBuiltInFunc::VectorSubscriptBuiltInFunc(const VRef<VectorType>& vec_type_, const TypeVRef& index_type_)
 :	BuiltInFunctionImpl(BuiltInType_VectorSubscriptBuiltInFunc),
 	vec_type(vec_type_), index_type(index_type_)
 {}
@@ -1908,7 +1908,7 @@ llvm::Value* VectorSubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 //------------------------------------------------------------------------------------
 
 
-ArrayInBoundsBuiltInFunc::ArrayInBoundsBuiltInFunc(const Reference<ArrayType>& array_type_, const TypeRef& index_type_)
+ArrayInBoundsBuiltInFunc::ArrayInBoundsBuiltInFunc(const VRef<ArrayType>& array_type_, const TypeVRef& index_type_)
 :	BuiltInFunctionImpl(BuiltInType_ArrayInBoundsBuiltInFunc),
 	array_type(array_type_), index_type(index_type_)
 {}
@@ -1929,7 +1929,7 @@ llvm::Value* ArrayInBoundsBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) 
 {
 	// Let's assume Arrays are always pass-by-pointer for now.
 
-	TypeRef field_type = this->array_type->elem_type;
+	TypeVRef field_type = this->array_type->elem_type;
 
 	// Bounds check the index
 	const int arg_offset = field_type->passByValue() ? 0 : 1;
@@ -1946,7 +1946,7 @@ llvm::Value* ArrayInBoundsBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) 
 //------------------------------------------------------------------------------------
 
 
-VectorInBoundsBuiltInFunc::VectorInBoundsBuiltInFunc(const Reference<VectorType>& vector_type_, const TypeRef& index_type_)
+VectorInBoundsBuiltInFunc::VectorInBoundsBuiltInFunc(const VRef<VectorType>& vector_type_, const TypeVRef& index_type_)
 :	BuiltInFunctionImpl(BuiltInType_VectorInBoundsBuiltInFunc),
 	vector_type(vector_type_), index_type(index_type_)
 {}
@@ -1967,7 +1967,7 @@ llvm::Value* VectorInBoundsBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 {
 	// Let's assume Arrays are always pass-by-pointer for now.
 
-	TypeRef field_type = this->vector_type->elem_type;
+	TypeVRef field_type = this->vector_type->elem_type;
 
 	// Bounds check the index
 	const int arg_offset = field_type->passByValue() ? 0 : 1;
@@ -1984,7 +1984,7 @@ llvm::Value* VectorInBoundsBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 //------------------------------------------------------------------------------------
 
 
-IterateBuiltInFunc::IterateBuiltInFunc(const Reference<Function>& func_type_, const TypeRef& state_type_, const vector<TypeRef>& invariant_data_types_)
+IterateBuiltInFunc::IterateBuiltInFunc(const VRef<Function>& func_type_, const TypeVRef& state_type_, const vector<TypeVRef>& invariant_data_types_)
 :	BuiltInFunctionImpl(BuiltInType_IterateBuiltInFunc),
 	func_type(func_type_), state_type(state_type_), invariant_data_types(invariant_data_types_)
 {}
@@ -2729,7 +2729,7 @@ void ShuffleBuiltInFunc::setShuffleMask(const std::vector<int>& shuffle_mask_)
 //----------------------------------------------------------------------------------------------
 
 
-PowBuiltInFunc::PowBuiltInFunc(const TypeRef& type_)
+PowBuiltInFunc::PowBuiltInFunc(const TypeVRef& type_)
 :	BuiltInFunctionImpl(BuiltInType_PowBuiltInFunc),
 	type(type_)
 {}
@@ -2775,7 +2775,7 @@ llvm::Value* PowBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 //----------------------------------------------------------------------------------------------
 
 
-static llvm::Value* emitUnaryIntrinsic(EmitLLVMCodeParams& params, const TypeRef& type, llvm::Intrinsic::ID id)
+static llvm::Value* emitUnaryIntrinsic(EmitLLVMCodeParams& params, const TypeVRef& type, llvm::Intrinsic::ID id)
 {
 	assert(type->getType() == Type::FloatType || type->getType() == Type::DoubleType || (type->getType() == Type::VectorTypeType));
 
@@ -2792,7 +2792,7 @@ static llvm::Value* emitUnaryIntrinsic(EmitLLVMCodeParams& params, const TypeRef
 }
 
 
-SqrtBuiltInFunc::SqrtBuiltInFunc(const TypeRef& type_)
+SqrtBuiltInFunc::SqrtBuiltInFunc(const TypeVRef& type_)
 :	BuiltInFunctionImpl(BuiltInType_SqrtBuiltInFunc),
 	type(type_)
 {}
@@ -2840,7 +2840,7 @@ llvm::Value* SqrtBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 //----------------------------------------------------------------------------------------------
 
 
-ExpBuiltInFunc::ExpBuiltInFunc(const TypeRef& type_)
+ExpBuiltInFunc::ExpBuiltInFunc(const TypeVRef& type_)
 :	BuiltInFunctionImpl(BuiltInType_ExpBuiltInFunc),
 	type(type_)
 {}
@@ -2870,7 +2870,7 @@ llvm::Value* ExpBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 //----------------------------------------------------------------------------------------------
 
 
-LogBuiltInFunc::LogBuiltInFunc(const TypeRef& type_)
+LogBuiltInFunc::LogBuiltInFunc(const TypeVRef& type_)
 :	BuiltInFunctionImpl(BuiltInType_LogBuiltInFunc),
 	type(type_)
 {}
@@ -2900,7 +2900,7 @@ llvm::Value* LogBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 //----------------------------------------------------------------------------------------------
 
 
-SinBuiltInFunc::SinBuiltInFunc(const TypeRef& type_)
+SinBuiltInFunc::SinBuiltInFunc(const TypeVRef& type_)
 :	BuiltInFunctionImpl(BuiltInType_SinBuiltInFunc),
 	type(type_)
 {}
@@ -2930,7 +2930,7 @@ llvm::Value* SinBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 //----------------------------------------------------------------------------------------------
 
 
-CosBuiltInFunc::CosBuiltInFunc(const TypeRef& type_)
+CosBuiltInFunc::CosBuiltInFunc(const TypeVRef& type_)
 :	BuiltInFunctionImpl(BuiltInType_CosBuiltInFunc),
 	type(type_)
 {}
@@ -2960,7 +2960,7 @@ llvm::Value* CosBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 //----------------------------------------------------------------------------------------------
 
 
-AbsBuiltInFunc::AbsBuiltInFunc(const TypeRef& type_)
+AbsBuiltInFunc::AbsBuiltInFunc(const TypeVRef& type_)
 :	BuiltInFunctionImpl(BuiltInType_AbsBuiltInFunc),
 	type(type_)
 {}
@@ -2995,7 +2995,7 @@ llvm::Value* AbsBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 //----------------------------------------------------------------------------------------------
 
 
-FloorBuiltInFunc::FloorBuiltInFunc(const TypeRef& type_)
+FloorBuiltInFunc::FloorBuiltInFunc(const TypeVRef& type_)
 :	BuiltInFunctionImpl(BuiltInType_FloorBuiltInFunc),
 	type(type_)
 {}
@@ -3042,7 +3042,7 @@ llvm::Value* FloorBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 //----------------------------------------------------------------------------------------------
 
 
-CeilBuiltInFunc::CeilBuiltInFunc(const TypeRef& type_)
+CeilBuiltInFunc::CeilBuiltInFunc(const TypeVRef& type_)
 :	BuiltInFunctionImpl(BuiltInType_CeilBuiltInFunc),
 	type(type_)
 {}
@@ -3089,7 +3089,7 @@ llvm::Value* CeilBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 //----------------------------------------------------------------------------------------------
 
 
-SignBuiltInFunc::SignBuiltInFunc(const TypeRef& type_)
+SignBuiltInFunc::SignBuiltInFunc(const TypeVRef& type_)
 :	BuiltInFunctionImpl(BuiltInType_SignBuiltInFunc),
 	type(type_)
 {}
@@ -3161,13 +3161,13 @@ llvm::Value* SignBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 //----------------------------------------------------------------------------------------------
 
 
-TruncateToIntBuiltInFunc::TruncateToIntBuiltInFunc(const TypeRef& type_)
+TruncateToIntBuiltInFunc::TruncateToIntBuiltInFunc(const TypeVRef& type_)
 :	BuiltInFunctionImpl(BuiltInType_TruncateToIntBuiltInFunc),
 	type(type_)
 {}
 
 
-TypeRef TruncateToIntBuiltInFunc::getReturnType(const TypeRef& arg_type)
+TypeVRef TruncateToIntBuiltInFunc::getReturnType(const TypeVRef& arg_type)
 {
 	if(arg_type->getType() == Type::FloatType)
 		return new Int();
@@ -3203,7 +3203,7 @@ ValueRef TruncateToIntBuiltInFunc::invoke(VMState& vmstate)
 llvm::Value* TruncateToIntBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
 	// Work out destination type.
-	TypeRef dest_type = getReturnType(type);
+	TypeVRef dest_type = getReturnType(type);
 
 	// Get destination LLVM type
 	llvm::Type* dest_llvm_type = dest_type->LLVMType(*params.module);
@@ -3218,13 +3218,13 @@ llvm::Value* TruncateToIntBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) 
 //----------------------------------------------------------------------------------------------
 
 
-ToFloatBuiltInFunc::ToFloatBuiltInFunc(const TypeRef& type_)
+ToFloatBuiltInFunc::ToFloatBuiltInFunc(const TypeVRef& type_)
 :	BuiltInFunctionImpl(BuiltInType_ToFloatBuiltInFunc),
 	type(type_)
 {}
 
 
-TypeRef ToFloatBuiltInFunc::getReturnType(const TypeRef& arg_type)
+TypeVRef ToFloatBuiltInFunc::getReturnType(const TypeVRef& arg_type)
 {
 	if(arg_type->getType() == Type::IntType)
 		return new Float();
@@ -3248,7 +3248,7 @@ ValueRef ToFloatBuiltInFunc::invoke(VMState& vmstate)
 llvm::Value* ToFloatBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
 	// Work out destination type.
-	TypeRef dest_type = getReturnType(type);
+	TypeVRef dest_type = getReturnType(type);
 
 	// Get destination LLVM type
 	llvm::Type* dest_llvm_type = dest_type->LLVMType(*params.module);
@@ -3263,7 +3263,7 @@ llvm::Value* ToFloatBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 //----------------------------------------------------------------------------------------------
 
 
-ToInt64BuiltInFunc::ToInt64BuiltInFunc(const TypeRef& type_)
+ToInt64BuiltInFunc::ToInt64BuiltInFunc(const TypeVRef& type_)
 :	BuiltInFunctionImpl(BuiltInType_ToInt64BuiltInFunc),
 	type(type_)
 {}
@@ -3277,7 +3277,7 @@ ValueRef ToInt64BuiltInFunc::invoke(VMState& vmstate)
 
 llvm::Value* ToInt64BuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
-	TypeRef dest_type = new Int(64);
+	TypeVRef dest_type = new Int(64);
 
 	// Get destination LLVM type
 	llvm::Type* dest_llvm_type = dest_type->LLVMType(*params.module);
@@ -3292,7 +3292,7 @@ llvm::Value* ToInt64BuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 //----------------------------------------------------------------------------------------------
 
 
-ToInt32BuiltInFunc::ToInt32BuiltInFunc(const TypeRef& type_)
+ToInt32BuiltInFunc::ToInt32BuiltInFunc(const TypeVRef& type_)
 :	BuiltInFunctionImpl(BuiltInType_ToInt32BuiltInFunc),
 	type(type_)
 {}
@@ -3310,7 +3310,7 @@ ValueRef ToInt32BuiltInFunc::invoke(VMState& vmstate)
 
 llvm::Value* ToInt32BuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
-	TypeRef dest_type = new Int(32);
+	TypeVRef dest_type = new Int(32);
 
 	// Get destination LLVM type
 	llvm::Type* dest_llvm_type = dest_type->LLVMType(*params.module);
@@ -3325,7 +3325,7 @@ llvm::Value* ToInt32BuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 //----------------------------------------------------------------------------------------------
 
 
-VoidPtrToInt64BuiltInFunc::VoidPtrToInt64BuiltInFunc(const TypeRef& type)
+VoidPtrToInt64BuiltInFunc::VoidPtrToInt64BuiltInFunc(const TypeVRef& type)
 :	BuiltInFunctionImpl(BuiltInType_VoidPtrToInt64BuiltInFunc)	
 {}
 
@@ -3340,7 +3340,7 @@ ValueRef VoidPtrToInt64BuiltInFunc::invoke(VMState& vmstate)
 
 llvm::Value* VoidPtrToInt64BuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
-	TypeRef int_type = new Int(64, true);
+	TypeVRef int_type = new Int(64, true);
 	return params.builder->CreatePtrToInt(
 		LLVMTypeUtils::getNthArg(params.currently_building_func, 0), 
 		int_type->LLVMType(*params.module) // dest type
@@ -3351,7 +3351,7 @@ llvm::Value* VoidPtrToInt64BuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 //----------------------------------------------------------------------------------------------
 
 
-LengthBuiltInFunc::LengthBuiltInFunc(const TypeRef& type_)
+LengthBuiltInFunc::LengthBuiltInFunc(const TypeVRef& type_)
 :	BuiltInFunctionImpl(BuiltInType_LengthBuiltInFunc),
 	type(type_)
 {}

@@ -59,6 +59,7 @@ public:
 	VMConstructionArgs() : env(NULL), allow_unsafe_operations(false), emit_trace_code(false), build_llvm_code(true), floating_point_literals_default_to_double(true), 
 		try_coerce_int_to_double_first(true), real_is_double(true), opencl_double_support(true), comments_in_opencl_output(true), emit_in_bound_asserts(false), emit_opencl_printf_calls(true)
 		/*, add_opaque_env_arg(false)*/ {}
+
 	std::vector<ExternalFunctionRef> external_functions;
 	std::vector<SourceBufferRef> source_buffers;
 	std::vector<FunctionSignature> entry_point_sigs;
@@ -154,7 +155,7 @@ private:
 	std::string triple;
 	std::map<std::string, void*> func_map;
 
-	std::vector<TypeRef> named_types_ordered;
+	std::vector<TypeVRef> named_types_ordered;
 
 	VMConstructionArgs vm_args;
 

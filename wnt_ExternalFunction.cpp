@@ -10,14 +10,6 @@ Generated at Wed Oct 27 16:44:40 +1300 2010
 namespace Winter
 {
 
-	
-ExternalFunction::ExternalFunction()
-:	has_side_effects(false),
-	is_allocation_function(false)
-{
-
-}
-
 
 ExternalFunction::~ExternalFunction()
 {

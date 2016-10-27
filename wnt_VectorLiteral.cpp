@@ -63,9 +63,10 @@ VectorLiteral::VectorLiteral(const std::vector<ASTNodeRef>& elems, const SrcLoca
 
 TypeRef VectorLiteral::type() const
 {
-	TypeRef elem_type = elements[0]->type();
-	if(elem_type.isNull())
+	TypeRef elem_type_ = elements[0]->type();
+	if(elem_type_.isNull())
 		return NULL;
+	TypeVRef elem_type = TypeVRef(elem_type_);
 
 	if(has_int_suffix)
 		return new VectorType(elem_type, this->int_suffix);

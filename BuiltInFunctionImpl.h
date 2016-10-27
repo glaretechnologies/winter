@@ -80,13 +80,13 @@ typedef Reference<BuiltInFunctionImpl> BuiltInFunctionImplRef;
 class Constructor : public BuiltInFunctionImpl
 {
 public:
-	Constructor(Reference<StructureType>& struct_type);
+	Constructor(VRef<StructureType>& struct_type);
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual bool callIsExpensive() const { return false; }
 private:
-	Reference<StructureType> struct_type;
+	VRef<StructureType> struct_type;
 };
 
 
@@ -94,13 +94,13 @@ private:
 class GetField : public BuiltInFunctionImpl
 {
 public:
-	GetField(Reference<StructureType>& struct_type_, unsigned int index_) : BuiltInFunctionImpl(BuiltInType_GetField), struct_type(struct_type_), index(index_) {}
+	GetField(VRef<StructureType>& struct_type_, unsigned int index_) : BuiltInFunctionImpl(BuiltInType_GetField), struct_type(struct_type_), index(index_) {}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual bool callIsExpensive() const { return false; }
 //private:
-	Reference<StructureType> struct_type;
+	VRef<StructureType> struct_type;
 	unsigned int index;
 };
 
@@ -121,12 +121,12 @@ public:
 			return new_c
 		end
 	*/
-	UpdateElementBuiltInFunc(const TypeRef& collection_type/*, const TypeRef& value_type*/);
+	UpdateElementBuiltInFunc(const TypeVRef& collection_type/*, const TypeRef& value_type*/);
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 
-	TypeRef collection_type; // Should be one of array, vector, or tuple
+	TypeVRef collection_type; // Should be one of array, vector, or tuple
 	//TypeRef value_type; // T
 };
 
@@ -135,7 +135,7 @@ public:
 class GetTupleElementBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	GetTupleElementBuiltInFunc(const Reference<TupleType>& tuple_type_, unsigned int index_) : BuiltInFunctionImpl(BuiltInType_GetTupleElementBuiltInFunc), tuple_type(tuple_type_), index(index_) {}
+	GetTupleElementBuiltInFunc(const VRef<TupleType>& tuple_type_, unsigned int index_) : BuiltInFunctionImpl(BuiltInType_GetTupleElementBuiltInFunc), tuple_type(tuple_type_), index(index_) {}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -143,7 +143,7 @@ public:
 
 	void setIndex(unsigned int i) { index = i; }
 //private:
-	Reference<TupleType> tuple_type;
+	VRef<TupleType> tuple_type;
 	unsigned int index;
 };
 
@@ -152,13 +152,13 @@ public:
 class GetVectorElement : public BuiltInFunctionImpl
 {
 public:
-	GetVectorElement(Reference<VectorType>& vector_type_, unsigned int index_) : BuiltInFunctionImpl(BuiltInType_GetVectorElement), vector_type(vector_type_), index(index_) {}
+	GetVectorElement(VRef<VectorType>& vector_type_, unsigned int index_) : BuiltInFunctionImpl(BuiltInType_GetVectorElement), vector_type(vector_type_), index(index_) {}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual bool callIsExpensive() const { return false; }
 private:
-	Reference<VectorType> vector_type;
+	VRef<VectorType> vector_type;
 	unsigned int index;
 };
 
@@ -166,7 +166,7 @@ private:
 class ArrayMapBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	ArrayMapBuiltInFunc(const Reference<ArrayType>& from_type_, const Reference<Function>& func_type_) : BuiltInFunctionImpl(BuiltInType_ArrayMapBuiltInFunc), from_type(from_type_), func_type(func_type_), specialised_f(NULL) {}
+	ArrayMapBuiltInFunc(const VRef<ArrayType>& from_type_, const VRef<Function>& func_type_) : BuiltInFunctionImpl(BuiltInType_ArrayMapBuiltInFunc), from_type(from_type_), func_type(func_type_), specialised_f(NULL) {}
 
 	/*
 	map(function<T, R>, array<T, N>) array<R, N>
@@ -179,8 +179,8 @@ public:
 	void specialiseForFunctionArg(FunctionDefinition* f);
 private:
 	llvm::Value* insertWorkFunction(EmitLLVMCodeParams& params) const;
-	Reference<ArrayType> from_type; // from array type
-	Reference<Function> func_type;
+	VRef<ArrayType> from_type; // from array type
+	VRef<Function> func_type;
 
 	FunctionDefinition* specialised_f;
 };
@@ -210,7 +210,7 @@ public:
 			state = f(state, elem);
 		}
 	*/
-	ArrayFoldBuiltInFunc(const Reference<Function>& func_type_, const Reference<ArrayType>& array_type_, const TypeRef& state_type_);
+	ArrayFoldBuiltInFunc(const VRef<Function>& func_type_, const VRef<ArrayType>& array_type_, const TypeVRef& state_type_);
 
 	// Specialise for a particular first argument.
 	void specialiseForFunctionArg(FunctionDefinition* f);
@@ -218,9 +218,9 @@ public:
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
-	Reference<Function> func_type;
-	Reference<ArrayType> array_type;
-	TypeRef state_type;
+	VRef<Function> func_type;
+	VRef<ArrayType> array_type;
+	TypeVRef state_type;
 
 	FunctionDefinition* specialised_f;
 };
@@ -230,14 +230,14 @@ private:
 class ArraySubscriptBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	ArraySubscriptBuiltInFunc(const Reference<ArrayType>& array_type, const TypeRef& index_type);
+	ArraySubscriptBuiltInFunc(const VRef<ArrayType>& array_type, const TypeVRef& index_type);
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual bool callIsExpensive() const { return false; }
 private:
-	Reference<ArrayType> array_type;
-	TypeRef index_type;
+	VRef<ArrayType> array_type;
+	TypeVRef index_type;
 };
 
 
@@ -245,14 +245,14 @@ private:
 class VArraySubscriptBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	VArraySubscriptBuiltInFunc(const Reference<VArrayType>& array_type, const TypeRef& index_type);
+	VArraySubscriptBuiltInFunc(const VRef<VArrayType>& array_type, const TypeVRef& index_type);
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual bool callIsExpensive() const { return false; }
 private:
-	Reference<VArrayType> array_type;
-	TypeRef index_type;
+	VRef<VArrayType> array_type;
+	TypeVRef index_type;
 };
 
 
@@ -260,12 +260,12 @@ private:
 class MakeVArrayBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	MakeVArrayBuiltInFunc(const Reference<VArrayType>& array_type);
+	MakeVArrayBuiltInFunc(const VRef<VArrayType>& array_type);
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
-	Reference<VArrayType> array_type;
+	VRef<VArrayType> array_type;
 };
 
 
@@ -273,14 +273,14 @@ private:
 class VectorSubscriptBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	VectorSubscriptBuiltInFunc(const Reference<VectorType>& vec_type, const TypeRef& index_type);
+	VectorSubscriptBuiltInFunc(const VRef<VectorType>& vec_type, const TypeVRef& index_type);
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual bool callIsExpensive() const { return false; }
 private:
-	Reference<VectorType> vec_type;
-	TypeRef index_type;
+	VRef<VectorType> vec_type;
+	TypeVRef index_type;
 };
 
 
@@ -288,13 +288,13 @@ private:
 class ArrayInBoundsBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	ArrayInBoundsBuiltInFunc(const Reference<ArrayType>& array_type, const TypeRef& index_type);
+	ArrayInBoundsBuiltInFunc(const VRef<ArrayType>& array_type, const TypeVRef& index_type);
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
-	Reference<ArrayType> array_type;
-	TypeRef index_type;
+	VRef<ArrayType> array_type;
+	TypeVRef index_type;
 };
 
 
@@ -302,13 +302,13 @@ private:
 class VectorInBoundsBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	VectorInBoundsBuiltInFunc(const Reference<VectorType>& vector_type, const TypeRef& index_type);
+	VectorInBoundsBuiltInFunc(const VRef<VectorType>& vector_type, const TypeVRef& index_type);
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
-	Reference<VectorType> vector_type;
-	TypeRef index_type;
+	VRef<VectorType> vector_type;
+	TypeVRef index_type;
 };
 
 
@@ -345,7 +345,7 @@ public:
 	
 
 	*/
-	IterateBuiltInFunc(const Reference<Function>& func_type_, const TypeRef& state_type_, const std::vector<TypeRef>& invariant_data_types);
+	IterateBuiltInFunc(const VRef<Function>& func_type_, const TypeVRef& state_type_, const std::vector<TypeVRef>& invariant_data_types);
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -356,9 +356,9 @@ public:
 	);
 
 private:
-	Reference<Function> func_type;
-	TypeRef state_type;
-	std::vector<TypeRef> invariant_data_types; // may be empty.
+	VRef<Function> func_type;
+	TypeVRef state_type;
+	std::vector<TypeVRef> invariant_data_types; // may be empty.
 };
 
 
@@ -366,12 +366,12 @@ private:
 class DotProductBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	DotProductBuiltInFunc(const Reference<VectorType>& vector_type_) : BuiltInFunctionImpl(BuiltInType_DotProductBuiltInFunc), vector_type(vector_type_) {}
+	DotProductBuiltInFunc(const VRef<VectorType>& vector_type_) : BuiltInFunctionImpl(BuiltInType_DotProductBuiltInFunc), vector_type(vector_type_) {}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
-	Reference<VectorType> vector_type;
+	VRef<VectorType> vector_type;
 };
 
 
@@ -379,12 +379,12 @@ private:
 class VectorMinBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	VectorMinBuiltInFunc(const Reference<VectorType>& vector_type_) : BuiltInFunctionImpl(BuiltInType_VectorMinBuiltInFunc), vector_type(vector_type_) {}
+	VectorMinBuiltInFunc(const VRef<VectorType>& vector_type_) : BuiltInFunctionImpl(BuiltInType_VectorMinBuiltInFunc), vector_type(vector_type_) {}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
-	Reference<VectorType> vector_type;
+	VRef<VectorType> vector_type;
 };
 
 
@@ -392,12 +392,12 @@ private:
 class VectorMaxBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	VectorMaxBuiltInFunc(const Reference<VectorType>& vector_type_) : BuiltInFunctionImpl(BuiltInType_VectorMaxBuiltInFunc), vector_type(vector_type_) {}
+	VectorMaxBuiltInFunc(const VRef<VectorType>& vector_type_) : BuiltInFunctionImpl(BuiltInType_VectorMaxBuiltInFunc), vector_type(vector_type_) {}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
-	Reference<VectorType> vector_type;
+	VRef<VectorType> vector_type;
 };
 
 
@@ -405,9 +405,9 @@ private:
 class ShuffleBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	ShuffleBuiltInFunc(const Reference<VectorType>& vector_type_, 
+	ShuffleBuiltInFunc(const VRef<VectorType>& vector_type_, 
 		//const std::vector<int>& shuffle_mask_
-		const Reference<VectorType>& index_type_
+		const VRef<VectorType>& index_type_
 		) : BuiltInFunctionImpl(BuiltInType_ShuffleBuiltInFunc), 
 		vector_type(vector_type_), 
 		//shuffle_mask(shuffle_mask_) 
@@ -419,8 +419,8 @@ public:
 
 	void setShuffleMask(const std::vector<int>& shuffle_mask);
 private:
-	Reference<VectorType> vector_type;
-	Reference<VectorType> index_type;
+	VRef<VectorType> vector_type;
+	VRef<VectorType> index_type;
 	std::vector<int> shuffle_mask;
 };
 
@@ -428,134 +428,134 @@ private:
 class PowBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	PowBuiltInFunc(const TypeRef& type);
+	PowBuiltInFunc(const TypeVRef& type);
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
-	TypeRef type;
+	TypeVRef type;
 };
 
 
 class SqrtBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	SqrtBuiltInFunc(const TypeRef& type);
+	SqrtBuiltInFunc(const TypeVRef& type);
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
-	TypeRef type;
+	TypeVRef type;
 };
 
 
 class ExpBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	ExpBuiltInFunc(const TypeRef& type);
+	ExpBuiltInFunc(const TypeVRef& type);
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
-	TypeRef type;
+	TypeVRef type;
 };
 
 
 class LogBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	LogBuiltInFunc(const TypeRef& type);
+	LogBuiltInFunc(const TypeVRef& type);
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
-	TypeRef type;
+	TypeVRef type;
 };
 
 
 class SinBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	SinBuiltInFunc(const TypeRef& type);
+	SinBuiltInFunc(const TypeVRef& type);
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
-	TypeRef type;
+	TypeVRef type;
 };
 
 
 class CosBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	CosBuiltInFunc(const TypeRef& type);
+	CosBuiltInFunc(const TypeVRef& type);
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
-	TypeRef type;
+	TypeVRef type;
 };
 
 
 class AbsBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	AbsBuiltInFunc(const TypeRef& type);
+	AbsBuiltInFunc(const TypeVRef& type);
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
-	TypeRef type;
+	TypeVRef type;
 };
 
 
 class FloorBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	FloorBuiltInFunc(const TypeRef& type);
+	FloorBuiltInFunc(const TypeVRef& type);
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
-	TypeRef type;
+	TypeVRef type;
 };
 
 
 class CeilBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	CeilBuiltInFunc(const TypeRef& type);
+	CeilBuiltInFunc(const TypeVRef& type);
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
-	TypeRef type;
+	TypeVRef type;
 };
 
 
 class SignBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	SignBuiltInFunc(const TypeRef& type);
+	SignBuiltInFunc(const TypeVRef& type);
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
-	TypeRef type;
+	TypeVRef type;
 };
 
 
 class TruncateToIntBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	TruncateToIntBuiltInFunc(const TypeRef& type);
+	TruncateToIntBuiltInFunc(const TypeVRef& type);
 
-	static TypeRef getReturnType(const TypeRef& arg_type);
+	static TypeVRef getReturnType(const TypeVRef& arg_type);
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
-	TypeRef type;
+	TypeVRef type;
 };
 
 
@@ -563,14 +563,14 @@ private:
 class ToFloatBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	ToFloatBuiltInFunc(const TypeRef& type);
+	ToFloatBuiltInFunc(const TypeVRef& type);
 
-	static TypeRef getReturnType(const TypeRef& arg_type);
+	static TypeVRef getReturnType(const TypeVRef& arg_type);
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
-	TypeRef type;
+	TypeVRef type;
 };
 
 
@@ -578,12 +578,12 @@ private:
 class ToInt64BuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	ToInt64BuiltInFunc(const TypeRef& type);
+	ToInt64BuiltInFunc(const TypeVRef& type);
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
-	TypeRef type;
+	TypeVRef type;
 };
 
 
@@ -591,12 +591,12 @@ private:
 class ToInt32BuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	ToInt32BuiltInFunc(const TypeRef& type);
+	ToInt32BuiltInFunc(const TypeVRef& type);
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
-	TypeRef type;
+	TypeVRef type;
 };
 
 
@@ -604,7 +604,7 @@ private:
 class VoidPtrToInt64BuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	VoidPtrToInt64BuiltInFunc(const TypeRef& type);
+	VoidPtrToInt64BuiltInFunc(const TypeVRef& type);
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
@@ -614,12 +614,12 @@ public:
 class LengthBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	LengthBuiltInFunc(const TypeRef& type_);
+	LengthBuiltInFunc(const TypeVRef& type_);
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 
-	TypeRef type;
+	TypeVRef type;
 };
 
 

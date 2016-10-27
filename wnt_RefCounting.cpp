@@ -51,7 +51,7 @@ namespace RefCounting
 // Emit increment ref count function (incrStringRefCount etc..)
 // arg 0: pointer to refcounted value
 // Returns: void
-llvm::Function* emitIncrRefCountFunc(llvm::Module* module, const llvm::DataLayout* target_data, const string& func_name, const TypeRef& refcounted_type)
+llvm::Function* emitIncrRefCountFunc(llvm::Module* module, const llvm::DataLayout* target_data, const string& func_name, const ConstTypeVRef& refcounted_type)
 {
 	const std::vector<llvm::Type*> arg_types(1, refcounted_type->LLVMType(*module));
 
@@ -89,7 +89,7 @@ llvm::Function* emitIncrRefCountFunc(llvm::Module* module, const llvm::DataLayou
 
 
 */
-llvm::Function* getOrInsertDecrementorForType(llvm::Module* module, const ConstTypeRef& type)
+llvm::Function* getOrInsertDecrementorForType(llvm::Module* module, const ConstTypeVRef& type)
 {
 	llvm::FunctionType* functype = llvm::FunctionType::get(
 		llvm::Type::getVoidTy(module->getContext()), // return type
@@ -107,7 +107,7 @@ llvm::Function* getOrInsertDecrementorForType(llvm::Module* module, const ConstT
 }
 
 
-llvm::Function* getOrInsertDestructorForType(llvm::Module* module, const ConstTypeRef& type)
+llvm::Function* getOrInsertDestructorForType(llvm::Module* module, const ConstTypeVRef& type)
 {
 	llvm::FunctionType* functype = llvm::FunctionType::get(
 		llvm::Type::getVoidTy(module->getContext()), // return type
@@ -125,7 +125,7 @@ llvm::Function* getOrInsertDestructorForType(llvm::Module* module, const ConstTy
 }
 
 
-void emitFreeCall(llvm::Module* module, llvm::IRBuilder<>& builder, const CommonFunctions& common_functions, const ConstTypeRef& refcounted_type, llvm::Value* refcounted_val)
+void emitFreeCall(llvm::Module* module, llvm::IRBuilder<>& builder, const CommonFunctions& common_functions, const ConstTypeVRef& refcounted_type, llvm::Value* refcounted_val)
 {
 	if(refcounted_type->getType() == Type::VArrayTypeType)
 	{
@@ -171,7 +171,7 @@ void emitFreeCall(llvm::Module* module, llvm::IRBuilder<>& builder, const Common
 }
 
 
-void emitDecrementorForType(llvm::Module* module, const llvm::DataLayout* target_data, const CommonFunctions& common_functions, const ConstTypeRef& refcounted_type)
+void emitDecrementorForType(llvm::Module* module, const llvm::DataLayout* target_data, const CommonFunctions& common_functions, const ConstTypeVRef& refcounted_type)
 {
 	if(!refcounted_type->isHeapAllocated())
 		return;
@@ -266,7 +266,7 @@ void emitDecrementorForType(llvm::Module* module, const llvm::DataLayout* target
 }
 
 
-void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_data, const CommonFunctions& common_functions, const ConstTypeRef& type)
+void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_data, const CommonFunctions& common_functions, const ConstTypeVRef& type)
 {
 	//----------- Create the function ------------
 	llvm::Function* llvm_func = getOrInsertDestructorForType(module, type);
@@ -378,7 +378,7 @@ void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_
 
 	if(type->getType() == Type::VArrayTypeType)
 	{
-		const TypeRef elem_type = type.downcastToPtr<VArrayType>()->elem_type;
+		const TypeVRef elem_type = type.downcastToPtr<VArrayType>()->elem_type;
 
 		// Load number of elements
 		llvm::Value* num_elems_ptr = builder.CreateStructGEP(val, 1, "num elems ptr");
@@ -486,15 +486,15 @@ void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_
 
 void emitRefCountingFunctions(llvm::Module* module, const llvm::DataLayout* target_data, CommonFunctions& common_functions)
 {
-	const TypeRef string_type = new String();
+	const ConstTypeVRef string_type = new String();
 	common_functions.incrStringRefCountLLVMFunc = emitIncrRefCountFunc(module, target_data, "incrStringRefCount", string_type);
 
 	// Since the varray type is generic, incrVArrayRefCount will just take an varray<int> arg, and the calling code must cast to varray<int>.
-	const TypeRef dummy_varray_type = new VArrayType(new Int());
+	const ConstTypeVRef dummy_varray_type = new VArrayType(new Int());
 	common_functions.incrVArrayRefCountLLVMFunc = emitIncrRefCountFunc(module, target_data, "incrVArrayRefCount", dummy_varray_type);
 
 	// Since the closure type is generic, emitIncrRefCountFunc will just take dummy closure type arg, and the calling code must cast to it.
-	const TypeRef dummy_closure_type = Function::dummyFunctionType();
+	const ConstTypeVRef dummy_closure_type = Function::dummyFunctionType();
 	common_functions.incrClosureRefCountLLVMFunc = emitIncrRefCountFunc(module, target_data, "incrClosureRefCount", dummy_closure_type);
 }
 

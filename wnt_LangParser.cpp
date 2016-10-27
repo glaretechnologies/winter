@@ -73,8 +73,8 @@ static const SrcLocation prevTokenLoc(ParseInfo& p)
 
 Reference<BufferRoot> LangParser::parseBuffer(const std::vector<Reference<TokenBase> >& tokens, 
 										   const SourceBufferRef& source_buffer,
-										   std::map<std::string, TypeRef>& named_types,
-											std::vector<TypeRef>& named_types_ordered_out,
+										   std::map<std::string, TypeVRef>& named_types,
+											std::vector<TypeVRef>& named_types_ordered_out,
 											int& order_num)
 {
 	try
@@ -99,27 +99,25 @@ Reference<BufferRoot> LangParser::parseBuffer(const std::vector<Reference<TokenB
 			if(tokens[i]->isIdentifier() && tokens[i]->getIdentifierValue() == "def")
 			{
 				root->top_level_defs.push_back(parseFunctionDefinition(parseinfo));
-				parseinfo.generic_type_params.resize(0);
+				parseinfo.generic_type_params.clear();
 				parseinfo.order_num++;
 			}
 			else if(tokens[i]->isIdentifier() && tokens[i]->getIdentifierValue() == "struct")
 			{
 				const unsigned int struct_position = parseinfo.i;
-				Reference<StructureType> t = parseStructType(parseinfo);
+				VRef<StructureType> t = parseStructType(parseinfo);
 				
 				if(named_types.find(t->name) != named_types.end())
 					throw BaseException("struct with name '" + t->name + "' already defined: " + errorPosition(*parseinfo.text_buffer, struct_position));
 
-				named_types[t->name] = t;
+				named_types.insert(std::make_pair(t->name, t));
 				named_types_ordered_out.push_back(t);
 
 				// Make constructor function for this structure
-				vector<FunctionDefinition::FunctionArg> args(t->component_types.size());
-				for(unsigned int z=0; z<args.size(); ++z)
-				{
-					args[z].name = t->component_names[z];
-					args[z].type = t->component_types[z];
-				}
+				vector<FunctionDefinition::FunctionArg> args;
+				args.reserve(t->component_types.size());
+				for(unsigned int z=0; z<t->component_types.size(); ++z)
+					args.push_back(FunctionDefinition::FunctionArg(t->component_types[z], t->component_names[z]));
 
 				FunctionDefinitionRef cons = new FunctionDefinition(
 					SrcLocation::invalidLocation(),
@@ -133,9 +131,8 @@ Reference<BufferRoot> LangParser::parseBuffer(const std::vector<Reference<TokenB
 				root->top_level_defs.push_back(cons);
 
 				// Make field access functions
-				vector<FunctionDefinition::FunctionArg> getfield_args(1);
-				getfield_args[0].name = "s";
-				getfield_args[0].type = t;
+				vector<FunctionDefinition::FunctionArg> getfield_args;
+				getfield_args.push_back(FunctionDefinition::FunctionArg(t, "s"));
 
 				for(unsigned int i=0; i<t->component_types.size(); ++i)
 				{
@@ -877,14 +874,14 @@ ASTNodeRef LangParser::parseBasicExpression(ParseInfo& p)
 }
 
 
-TypeRef LangParser::parseSumType(ParseInfo& p)
+TypeVRef LangParser::parseSumType(ParseInfo& p)
 {
-	TypeRef t = parseElementaryType(p);
+	TypeVRef t = parseElementaryType(p);
 
 	if(!isTokenCurrent(OR_TOKEN, p))
 		return t;
 	
-	vector<TypeRef> types(1, t);
+	vector<TypeVRef> types(1, t);
 
 	while(isTokenCurrent(OR_TOKEN, p))
 	{
@@ -897,13 +894,13 @@ TypeRef LangParser::parseSumType(ParseInfo& p)
 }
 
 
-TypeRef LangParser::parseType(ParseInfo& p)
+TypeVRef LangParser::parseType(ParseInfo& p)
 {
 	return parseSumType(p);
 }
 
 
-TypeRef LangParser::parseElementaryType(ParseInfo& p)
+TypeVRef LangParser::parseElementaryType(ParseInfo& p)
 {
 	std::string t = parseIdentifier("type", p);
 
@@ -950,7 +947,7 @@ TypeRef LangParser::parseElementaryType(ParseInfo& p)
 		return new CharType();
 	else if(t == "opaque" || t == "voidptr")
 	{
-		TypeRef the_type = new OpaqueType();
+		TypeVRef the_type = new OpaqueType();
 		the_type->address_space = address_space;
 		return the_type;
 	}
@@ -962,7 +959,7 @@ TypeRef LangParser::parseElementaryType(ParseInfo& p)
 		return parseMapType(p);
 	else if(t == "array")
 	{
-		TypeRef the_type = parseArrayType(p);
+		TypeVRef the_type = parseArrayType(p);
 		the_type->address_space = address_space;
 		return the_type;
 	}
@@ -978,7 +975,7 @@ TypeRef LangParser::parseElementaryType(ParseInfo& p)
 	{
 		// Then this might be the name of a named type.
 		// So look up the named type map
-		std::map<std::string, TypeRef>::const_iterator res = p.named_types.find(t);
+		std::map<std::string, TypeVRef>::const_iterator res = p.named_types.find(t);
 		if(res == p.named_types.end())
 		{
 			// Not a named type, maybe it is a type parameter
@@ -988,7 +985,7 @@ TypeRef LangParser::parseElementaryType(ParseInfo& p)
 
 			// If it wasn't a generic type, then it's completely unknown, like a rolling stone.
 			//throw LangParserExcep("Unknown type '" + t + "'." + errorPositionPrevToken(p));
-			TypeRef the_type = new OpaqueStructureType(t);
+			TypeVRef the_type = new OpaqueStructureType(t);
 			the_type->address_space = address_space;
 			return the_type;
 		}
@@ -1002,15 +999,15 @@ TypeRef LangParser::parseElementaryType(ParseInfo& p)
 }
 
 
-TypeRef LangParser::parseMapType(ParseInfo& p)
+TypeVRef LangParser::parseMapType(ParseInfo& p)
 {
 	parseToken(LEFT_ANGLE_BRACKET_TOKEN, p);
 
-	TypeRef from = parseType(p);
+	TypeVRef from = parseType(p);
 
 	parseToken(COMMA_TOKEN, p);
 
-	TypeRef to = parseType(p);
+	TypeVRef to = parseType(p);
 
 	parseToken(RIGHT_ANGLE_BRACKET_TOKEN, p);
 
@@ -1018,11 +1015,11 @@ TypeRef LangParser::parseMapType(ParseInfo& p)
 }
 
 
-TypeRef LangParser::parseArrayType(ParseInfo& p)
+TypeVRef LangParser::parseArrayType(ParseInfo& p)
 {
 	parseToken(LEFT_ANGLE_BRACKET_TOKEN, p);
 
-	TypeRef t = parseType(p);
+	TypeVRef t = parseType(p);
 
 	parseToken(COMMA_TOKEN, p);
 
@@ -1034,11 +1031,11 @@ TypeRef LangParser::parseArrayType(ParseInfo& p)
 }
 
 
-TypeRef LangParser::parseVArrayType(ParseInfo& p)
+TypeVRef LangParser::parseVArrayType(ParseInfo& p)
 {
 	parseToken(LEFT_ANGLE_BRACKET_TOKEN, p);
 
-	TypeRef t = parseType(p);
+	TypeVRef t = parseType(p);
 
 	parseToken(RIGHT_ANGLE_BRACKET_TOKEN, p);
 
@@ -1046,11 +1043,11 @@ TypeRef LangParser::parseVArrayType(ParseInfo& p)
 }
 
 
-TypeRef LangParser::parseFunctionType(ParseInfo& p)
+TypeVRef LangParser::parseFunctionType(ParseInfo& p)
 {
 	parseToken(LEFT_ANGLE_BRACKET_TOKEN, p);
 
-	std::vector<TypeRef> types;
+	std::vector<TypeVRef> types;
 
 	types.push_back(parseType(p));
 
@@ -1063,20 +1060,20 @@ TypeRef LangParser::parseFunctionType(ParseInfo& p)
 
 	parseToken(RIGHT_ANGLE_BRACKET_TOKEN, p);
 
-	std::vector<TypeRef> arg_types;
+	std::vector<TypeVRef> arg_types;
 	for(int i=0; i<(int)types.size() - 1; ++i)
 		arg_types.push_back(types[i]);
 
-	return TypeRef(new Function(
+	return new Function(
 		arg_types, 
 		types.back(), 
 		//vector<TypeRef>(), // captured var types
 		false // use_captured_vars
-	));
+	);
 }
 
 
-Reference<StructureType> LangParser::parseStructType(ParseInfo& p)
+VRef<StructureType> LangParser::parseStructType(ParseInfo& p)
 {
 	parseAndCheckIdentifier("struct", p);
 
@@ -1084,7 +1081,7 @@ Reference<StructureType> LangParser::parseStructType(ParseInfo& p)
 
 	parseToken(OPEN_BRACE_TOKEN, p);
 
-	std::vector<TypeRef> types;
+	std::vector<TypeVRef> types;
 	std::vector<string> names;
 
 	types.push_back(parseType(p));
@@ -1104,11 +1101,11 @@ Reference<StructureType> LangParser::parseStructType(ParseInfo& p)
 }
 
 
-TypeRef LangParser::parseVectorType(ParseInfo& p)
+TypeVRef LangParser::parseVectorType(ParseInfo& p)
 {
 	parseToken(LEFT_ANGLE_BRACKET_TOKEN, p);
 
-	TypeRef t = parseType(p);
+	TypeVRef t = parseType(p);
 
 	parseToken(COMMA_TOKEN, p);
 
@@ -1124,11 +1121,11 @@ TypeRef LangParser::parseVectorType(ParseInfo& p)
 }
 
 
-TypeRef LangParser::parseTupleType(ParseInfo& p)
+TypeVRef LangParser::parseTupleType(ParseInfo& p)
 {
 	parseToken(LEFT_ANGLE_BRACKET_TOKEN, p);
 
-	std::vector<TypeRef> types;
+	std::vector<TypeVRef> types;
 
 	types.push_back(parseType(p));
 
@@ -1832,8 +1829,6 @@ FunctionDefinitionRef LangParser::parseAnonFunction(ParseInfo& p)
 
 void LangParser::parseParameterList(ParseInfo& p, std::vector<FunctionDefinition::FunctionArg>& args_out)
 {
-	args_out.resize(0);
-
 	parseToken(OPEN_PARENTHESIS_TOKEN, p);
 
 	while(1)
@@ -1846,12 +1841,10 @@ void LangParser::parseParameterList(ParseInfo& p, std::vector<FunctionDefinition
 			break;
 		}
 
-		TypeRef param_type = parseType(p);
+		TypeVRef param_type = parseType(p);
 		const std::string param_name = parseIdentifier("parameter name", p);
 
-		args_out.push_back(FunctionDefinition::FunctionArg());
-		args_out.back().name = param_name;
-		args_out.back().type = param_type;
+		args_out.push_back(FunctionDefinition::FunctionArg(param_type, param_name));
 
 		if(p.i >= p.tokens.size())
 		{

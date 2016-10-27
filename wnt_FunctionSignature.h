@@ -24,8 +24,7 @@ FunctionSignature
 class FunctionSignature
 {
 public:
-	FunctionSignature(){}
-	FunctionSignature(const std::string& name_, const std::vector<TypeRef>& param_types_) 
+	FunctionSignature(const std::string& name_, const std::vector<TypeVRef>& param_types_) 
 	:	name(name_), param_types(param_types_) 
 	{}
 
@@ -38,7 +37,7 @@ public:
 	const std::string typeMangledName() const; // Return something like f_float_int
 
 	std::string name;
-	std::vector<TypeRef> param_types;
+	std::vector<TypeVRef> param_types;
 };
 
 
