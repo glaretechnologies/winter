@@ -1345,7 +1345,7 @@ static void testMainStruct(const std::string& src, const StructType& target_retu
 		VMConstructionArgs vm_args;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
 
-		const FunctionSignature mainsig("main", std::vector<TypeRef>());
+		const FunctionSignature mainsig("main", std::vector<TypeVRef>());
 
 		vm_args.entry_point_sigs.push_back(mainsig);
 
@@ -1429,9 +1429,9 @@ static void testMainStructInputAndOutput(const std::string& src, const InStructT
 		// Get main function
 		const FunctionSignature mainsig(
 			"main", 
-			std::vector<TypeRef>(1, TypeRef(new StructureType(
+			std::vector<TypeVRef>(1, TypeVRef(new StructureType(
 				"TestStructIn", 
-				std::vector<TypeRef>(2, TypeRef(new Float)), 
+				std::vector<TypeVRef>(2, TypeVRef(new Float)), 
 				field_names
 			)))
 		);
