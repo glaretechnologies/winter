@@ -77,99 +77,92 @@ Reference<BufferRoot> LangParser::parseBuffer(const std::vector<Reference<TokenB
 											std::vector<TypeVRef>& named_types_ordered_out,
 											int& order_num)
 {
-	try
-	{
-		Reference<BufferRoot> root = new BufferRoot(SrcLocation(0, source_buffer.getPointer()));
+	Reference<BufferRoot> root = new BufferRoot(SrcLocation(0, source_buffer.getPointer()));
 
-		unsigned int i = 0;
+	unsigned int i = 0;
 
-		ParseInfo parseinfo(i, tokens, named_types, root->top_level_defs, order_num);
-		parseinfo.text_buffer = source_buffer.getPointer();
+	ParseInfo parseinfo(i, tokens, named_types, root->top_level_defs, order_num);
+	parseinfo.text_buffer = source_buffer.getPointer();
 
-		// NEW: go through buffer and see if there is a 'else' token
-		/*for(size_t z=0; z<tokens.size(); ++z)
-			if(tokens[z]->getType() == IDENTIFIER_TOKEN && tokens[z]->getIdentifierValue() == "else")
-			{
-				parseinfo.else_token_present = true;
-				break;
-			}*/
-
-		while(i < tokens.size())
+	// NEW: go through buffer and see if there is a 'else' token
+	/*for(size_t z=0; z<tokens.size(); ++z)
+		if(tokens[z]->getType() == IDENTIFIER_TOKEN && tokens[z]->getIdentifierValue() == "else")
 		{
-			if(tokens[i]->isIdentifier() && tokens[i]->getIdentifierValue() == "def")
-			{
-				root->top_level_defs.push_back(parseFunctionDefinition(parseinfo));
-				parseinfo.generic_type_params.clear();
-				parseinfo.order_num++;
-			}
-			else if(tokens[i]->isIdentifier() && tokens[i]->getIdentifierValue() == "struct")
-			{
-				const unsigned int struct_position = parseinfo.i;
-				VRef<StructureType> t = parseStructType(parseinfo);
+			parseinfo.else_token_present = true;
+			break;
+		}*/
+
+	while(i < tokens.size())
+	{
+		if(tokens[i]->isIdentifier() && tokens[i]->getIdentifierValue() == "def")
+		{
+			root->top_level_defs.push_back(parseFunctionDefinition(parseinfo));
+			parseinfo.generic_type_params.clear();
+			parseinfo.order_num++;
+		}
+		else if(tokens[i]->isIdentifier() && tokens[i]->getIdentifierValue() == "struct")
+		{
+			const unsigned int struct_position = parseinfo.i;
+			VRef<StructureType> t = parseStructType(parseinfo);
 				
-				if(named_types.find(t->name) != named_types.end())
-					throw BaseException("struct with name '" + t->name + "' already defined: " + errorPosition(*parseinfo.text_buffer, struct_position));
+			if(named_types.find(t->name) != named_types.end())
+				throw BaseException("struct with name '" + t->name + "' already defined: " + errorPosition(*parseinfo.text_buffer, struct_position));
 
-				named_types.insert(std::make_pair(t->name, t));
-				named_types_ordered_out.push_back(t);
+			named_types.insert(std::make_pair(t->name, t));
+			named_types_ordered_out.push_back(t);
 
-				// Make constructor function for this structure
-				vector<FunctionDefinition::FunctionArg> args;
-				args.reserve(t->component_types.size());
-				for(unsigned int z=0; z<t->component_types.size(); ++z)
-					args.push_back(FunctionDefinition::FunctionArg(t->component_types[z], t->component_names[z]));
+			// Make constructor function for this structure
+			vector<FunctionDefinition::FunctionArg> args;
+			args.reserve(t->component_types.size());
+			for(unsigned int z=0; z<t->component_types.size(); ++z)
+				args.push_back(FunctionDefinition::FunctionArg(t->component_types[z], t->component_names[z]));
 
-				FunctionDefinitionRef cons = new FunctionDefinition(
+			FunctionDefinitionRef cons = new FunctionDefinition(
+				SrcLocation::invalidLocation(),
+				parseinfo.order_num, // order number
+				t->name, // name
+				args, // arguments
+				ASTNodeRef(), // body expr
+				t, // declard return type
+				new Constructor(t) // built in func impl.
+			);
+			root->top_level_defs.push_back(cons);
+
+			// Make field access functions
+			vector<FunctionDefinition::FunctionArg> getfield_args;
+			getfield_args.push_back(FunctionDefinition::FunctionArg(t, "s"));
+
+			for(unsigned int i=0; i<t->component_types.size(); ++i)
+			{
+				FunctionDefinitionRef def(new FunctionDefinition(
 					SrcLocation::invalidLocation(),
 					parseinfo.order_num, // order number
-					t->name, // name
-					args, // arguments
+					t->component_names[i], // name
+					getfield_args, // args
 					ASTNodeRef(), // body expr
-					t, // declard return type
-					new Constructor(t) // built in func impl.
-				);
-				root->top_level_defs.push_back(cons);
+					t->component_types[i], // return type
+					new GetField(t, i) // impl
+				));
 
-				// Make field access functions
-				vector<FunctionDefinition::FunctionArg> getfield_args;
-				getfield_args.push_back(FunctionDefinition::FunctionArg(t, "s"));
-
-				for(unsigned int i=0; i<t->component_types.size(); ++i)
-				{
-					FunctionDefinitionRef def(new FunctionDefinition(
-						SrcLocation::invalidLocation(),
-						parseinfo.order_num, // order number
-						t->component_names[i], // name
-						getfield_args, // args
-						ASTNodeRef(), // body expr
-						t->component_types[i], // return type
-						new GetField(t, i) // impl
-					));
-
-					root->top_level_defs.push_back(def);
-				}
-
-				parseinfo.order_num++;
+				root->top_level_defs.push_back(def);
 			}
-			else if(tokens[i]->isIdentifier())
-			{
-				// Parse named constant, e.g. "DOZEN = 12"
-				root->top_level_defs.push_back(parseNamedConstant(parseinfo));
-				parseinfo.order_num++;
-			}
-			else
-				throw LangParserExcep("Expected 'def'." + errorPosition(*source_buffer, tokens[i]->char_index));
+
+			parseinfo.order_num++;
 		}
-
-		// Update order_num
-		order_num = parseinfo.order_num;
-
-		return root;
+		else if(tokens[i]->isIdentifier())
+		{
+			// Parse named constant, e.g. "DOZEN = 12"
+			root->top_level_defs.push_back(parseNamedConstant(parseinfo));
+			parseinfo.order_num++;
+		}
+		else
+			throw LangParserExcep("Expected 'def'." + errorPosition(*source_buffer, tokens[i]->char_index));
 	}
-	catch(TokenBaseExcep& e)
-	{
-		throw LangParserExcep("TokenBaseExcep: " + e.what());
-	}
+
+	// Update order_num
+	order_num = parseinfo.order_num;
+
+	return root;
 }
 
 
@@ -235,6 +228,13 @@ void LangParser::parseToken(unsigned int token_type, ParseInfo& p)
 }
 
 
+void LangParser::skipExpectedToken(unsigned int token_type, ParseInfo& p)
+{
+	assert(isTokenCurrent(token_type, p));
+	p.i++;
+}
+
+
 bool LangParser::isTokenCurrent(unsigned int token_type, ParseInfo& p)
 {
 	return p.i < p.tokens.size() && p.tokens[p.i]->getType() == token_type;
@@ -296,7 +296,7 @@ ASTNodeRef LangParser::parseFieldExpression(ParseInfo& p)
 	{
 		SrcLocation src_loc = locationForParseInfo(p);
 
-		parseToken(DOT_TOKEN, p);
+		skipExpectedToken(DOT_TOKEN, p);
 
 		const std::string field_name = parseIdentifier("field name", p);
 
@@ -355,7 +355,7 @@ ASTNodeRef LangParser::parseIfExpression(ParseInfo& p)
 	{
 		unsigned int open_paren_pos = p.i;
 
-		p.i++; // Advance
+		skipExpectedToken(OPEN_PARENTHESIS_TOKEN, p);
 
 		// We are either parsing an old form of if: 'if(a, b, c)', or the new form with the condition expression in parens: 'if (a) then b else c' or 'if (a_0) binop a_1 then b else c'
 		// We can distinguish the two by parsing the condition 'a', then seeing if the next token is ','.
@@ -479,7 +479,7 @@ FunctionDefinitionRef LangParser::parseFunctionDefinitionGivenName(const std::st
 		p.generic_type_params.resize(0);
 		if(isTokenCurrent(LEFT_ANGLE_BRACKET_TOKEN, p))
 		{
-			parseToken(LEFT_ANGLE_BRACKET_TOKEN, p);
+			skipExpectedToken(LEFT_ANGLE_BRACKET_TOKEN, p);
 
 			const std::string type_param_name = parseIdentifier("type parameter", p);
 			generic_type_param_names.push_back(type_param_name);
@@ -487,7 +487,7 @@ FunctionDefinitionRef LangParser::parseFunctionDefinitionGivenName(const std::st
 
 			while(isTokenCurrent(COMMA_TOKEN, p))
 			{
-				parseToken(COMMA_TOKEN, p);
+				skipExpectedToken(COMMA_TOKEN, p);
 				const std::string type_param_name = parseIdentifier("type parameter", p);
 				generic_type_param_names.push_back(type_param_name);
 				p.generic_type_params.push_back(type_param_name);
@@ -512,7 +512,7 @@ FunctionDefinitionRef LangParser::parseFunctionDefinitionGivenName(const std::st
 		bool noinline = false;
 		if(isTokenCurrent(EXCLAMATION_MARK_TOKEN, p))
 		{
-			parseToken(EXCLAMATION_MARK_TOKEN, p);
+			skipExpectedToken(EXCLAMATION_MARK_TOKEN, p);
 
 			const std::string attribute = parseIdentifier("attribute", p);
 			if(attribute == "noinline")
@@ -533,9 +533,9 @@ FunctionDefinitionRef LangParser::parseFunctionDefinitionGivenName(const std::st
 				return_type = parseType(p);
 		
 			if(isTokenCurrent(COLON_TOKEN, p))
-				parseToken(COLON_TOKEN, p);
+				skipExpectedToken(COLON_TOKEN, p);
 			else if(isTokenCurrent(RIGHT_ARROW_TOKEN, p))
-				parseToken(RIGHT_ARROW_TOKEN, p);
+				skipExpectedToken(RIGHT_ARROW_TOKEN, p);
 			else
 				throw LangParserExcep("Error occurred while parsing anon function: expected ':' or '->'" + errorPosition(p));
 		}
@@ -885,7 +885,7 @@ TypeVRef LangParser::parseSumType(ParseInfo& p)
 
 	while(isTokenCurrent(OR_TOKEN, p))
 	{
-		parseToken(OR_TOKEN, p);
+		skipExpectedToken(OR_TOKEN, p);
 
 		types.push_back(parseElementaryType(p));
 	}
@@ -1053,7 +1053,7 @@ TypeVRef LangParser::parseFunctionType(ParseInfo& p)
 
 	while(isTokenCurrent(COMMA_TOKEN, p))
 	{
-		parseToken(COMMA_TOKEN, p);
+		skipExpectedToken(COMMA_TOKEN, p);
 
 		types.push_back(parseType(p));
 	}
@@ -1089,7 +1089,7 @@ VRef<StructureType> LangParser::parseStructType(ParseInfo& p)
 
 	while(isTokenCurrent(COMMA_TOKEN, p))
 	{
-		parseToken(COMMA_TOKEN, p);
+		skipExpectedToken(COMMA_TOKEN, p);
 
 		types.push_back(parseType(p));
 		names.push_back(parseIdentifier("field name", p));
@@ -1131,7 +1131,7 @@ TypeVRef LangParser::parseTupleType(ParseInfo& p)
 
 	while(isTokenCurrent(COMMA_TOKEN, p))
 	{
-		parseToken(COMMA_TOKEN, p);
+		skipExpectedToken(COMMA_TOKEN, p);
 
 		types.push_back(parseType(p));
 	}
@@ -1165,7 +1165,7 @@ a + b + c = (a + b) + c
 
 		if(isTokenCurrent(PLUS_TOKEN, p))
 		{
-			parseToken(PLUS_TOKEN, p);
+			skipExpectedToken(PLUS_TOKEN, p);
 
 			Reference<AdditionExpression> addexpr = new AdditionExpression(loc, left, parseMulDivExpression(p));
 			
@@ -1173,7 +1173,7 @@ a + b + c = (a + b) + c
 		}
 		else if(isTokenCurrent(MINUS_TOKEN, p))
 		{
-			parseToken(MINUS_TOKEN, p);
+			skipExpectedToken(MINUS_TOKEN, p);
 
 			Reference<SubtractionExpression> e = new SubtractionExpression(loc, left, parseMulDivExpression(p));
 			
@@ -1196,14 +1196,14 @@ ASTNodeRef LangParser::parseMulDivExpression(ParseInfo& p)
 
 		if(isTokenCurrent(ASTERISK_TOKEN, p))
 		{
-			parseToken(ASTERISK_TOKEN, p);
+			skipExpectedToken(ASTERISK_TOKEN, p);
 
 			Reference<MulExpression> expr = new MulExpression(loc, left, parseUnaryExpression(p));
 			left = expr;
 		}
 		else if(isTokenCurrent(FORWARDS_SLASH_TOKEN, p))
 		{
-			parseToken(FORWARDS_SLASH_TOKEN, p);
+			skipExpectedToken(FORWARDS_SLASH_TOKEN, p);
 
 			Reference<DivExpression> expr = new DivExpression(loc, left, parseUnaryExpression(p));
 			left = expr;
@@ -1223,7 +1223,7 @@ ASTNodeRef LangParser::parseBinaryLogicalExpression(ParseInfo& p)
 
 		if(isTokenCurrent(AND_TOKEN, p))
 		{
-			parseToken(AND_TOKEN, p);
+			skipExpectedToken(AND_TOKEN, p);
 
 			left = new BinaryBooleanExpr(
 				BinaryBooleanExpr::AND,
@@ -1234,7 +1234,7 @@ ASTNodeRef LangParser::parseBinaryLogicalExpression(ParseInfo& p)
 		}
 		else if(isTokenCurrent(OR_TOKEN, p))
 		{
-			parseToken(OR_TOKEN, p);
+			skipExpectedToken(OR_TOKEN, p);
 
 			left = new BinaryBooleanExpr(
 				BinaryBooleanExpr::OR,
@@ -1258,7 +1258,7 @@ ASTNodeRef LangParser::parseShiftExpression(ParseInfo& p)
 
 		if(isTokenCurrent(LEFT_SHIFT_TOKEN, p))
 		{
-			parseToken(LEFT_SHIFT_TOKEN, p);
+			skipExpectedToken(LEFT_SHIFT_TOKEN, p);
 
 			left = new BinaryBitwiseExpression(
 				BinaryBitwiseExpression::BITWISE_LEFT_SHIFT,
@@ -1269,7 +1269,7 @@ ASTNodeRef LangParser::parseShiftExpression(ParseInfo& p)
 		}
 		else if(isTokenCurrent(RIGHT_SHIFT_TOKEN, p))
 		{
-			parseToken(RIGHT_SHIFT_TOKEN, p);
+			skipExpectedToken(RIGHT_SHIFT_TOKEN, p);
 
 			left = new BinaryBitwiseExpression(
 				BinaryBitwiseExpression::BITWISE_RIGHT_SHIFT,
@@ -1294,7 +1294,7 @@ ASTNodeRef LangParser::parseBinaryBitwiseExpression(ParseInfo& p)
 
 		if(isTokenCurrent(BITWISE_AND_TOKEN, p))
 		{
-			parseToken(BITWISE_AND_TOKEN, p);
+			skipExpectedToken(BITWISE_AND_TOKEN, p);
 
 			left = new BinaryBitwiseExpression(
 				BinaryBitwiseExpression::BITWISE_AND,
@@ -1305,7 +1305,7 @@ ASTNodeRef LangParser::parseBinaryBitwiseExpression(ParseInfo& p)
 		}
 		else if(isTokenCurrent(BITWISE_OR_TOKEN, p))
 		{
-			parseToken(BITWISE_OR_TOKEN, p);
+			skipExpectedToken(BITWISE_OR_TOKEN, p);
 
 			left = new BinaryBitwiseExpression(
 				BinaryBitwiseExpression::BITWISE_OR,
@@ -1316,7 +1316,7 @@ ASTNodeRef LangParser::parseBinaryBitwiseExpression(ParseInfo& p)
 		}
 		else if(isTokenCurrent(BITWISE_XOR_TOKEN, p))
 		{
-			parseToken(BITWISE_XOR_TOKEN, p);
+			skipExpectedToken(BITWISE_XOR_TOKEN, p);
 
 			left = new BinaryBitwiseExpression(
 				BinaryBitwiseExpression::BITWISE_XOR,
@@ -1337,7 +1337,7 @@ ASTNodeRef LangParser::parseTernaryConditionalExpression(ParseInfo& p)
 
 	if(isTokenCurrent(QUESTION_MARK_TOKEN, p))
 	{
-		advance(p);
+		skipExpectedToken(QUESTION_MARK_TOKEN, p);
 
 		ASTNodeRef then_expr = parseTernaryConditionalExpression(p);
 
@@ -1367,7 +1367,7 @@ ASTNodeRef LangParser::parseComparisonExpression(ParseInfo& p)
 		const unsigned int token = comparison_tokens[i];
 		if(isTokenCurrent(token, p))
 		{
-			parseToken(token, p);
+			skipExpectedToken(token, p);
 
 			Reference<TokenBase> token_ref = makeTokenObject(token, p.tokens[p.i - 1]->char_index);
 
@@ -1459,7 +1459,7 @@ ASTNodeRef LangParser::parseHighPrecedenceExpression(ParseInfo& p)
 
 			if(isTokenCurrent(CLOSE_SQUARE_BRACKET_TOKEN, p))
 			{
-				parseToken(CLOSE_SQUARE_BRACKET_TOKEN, p);
+				skipExpectedToken(CLOSE_SQUARE_BRACKET_TOKEN, p);
 
 				if(isTokenCurrent(IDENTIFIER_TOKEN, p))
 				{

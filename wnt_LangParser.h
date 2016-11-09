@@ -91,6 +91,7 @@ private:
 
 	//void parseToken(const std::vector<Reference<TokenBase> >& tokens, const char* text_buffer, unsigned int token_type, const std::string& type_name, unsigned int& i);
 	void parseToken(unsigned int token_type, ParseInfo& parseinfo);
+	inline void skipExpectedToken(unsigned int token_type, ParseInfo& parseinfo);
 	bool isTokenCurrent(unsigned int token_type, ParseInfo& parseinfo);
 	void advance(ParseInfo& parseinfo);
 

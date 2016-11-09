@@ -186,7 +186,6 @@ set(WINTER_FILES
 "${winterdir}/FuzzTests.cpp"
 "${winterdir}/BaseException.h"
 "${winterdir}/BuiltInFunctionImpl.h"
-"${winterdir}/GeneratedTokens.h"
 "${winterdir}/LanguageTests.h"
 "${winterdir}/LanguageTestUtils.h"
 "${winterdir}/Linker.h"
