@@ -5319,7 +5319,7 @@ TEMP OPENCL
 
 	// Winter::fuzzTests();
 
-	conPrint("===================All LanguageTests passed.  Elapsed: " + timer.elapsedString() + " =============================");
+	conPrint("=================== All Winter tests passed.  Elapsed: " + timer.elapsedString() + " =============================");
 }
 
 

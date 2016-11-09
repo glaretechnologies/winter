@@ -113,12 +113,19 @@ static ValueRef testExternalFuncInterpreted(const std::vector<ValueRef>& arg_val
 //}
 
 
+static void testPrint(const std::string& s)
+{
+	// Actually printing out stuff makes the tests dramatically slower to run (like 1.7s -> 6s)
+	// std::cout << (s + "\n");
+}
+
+
 typedef float(WINTER_JIT_CALLING_CONV * float_void_func)(void* env);
 
 
 TestResults testMainFloat(const std::string& src, float target_return_val)
 {
-	std::cout << "===================== Winter testMainFloat() =====================" << std::endl;
+	testPrint("===================== Winter testMainFloat() =====================");
 	try
 	{
 		TestEnv test_env;
@@ -217,7 +224,7 @@ TestResults testMainFloat(const std::string& src, float target_return_val)
 
 void testMainFloatArgInvalidProgram(const std::string& src)
 {
-	std::cout << "===================== Winter testMainFloatArgInvalidProgram() =====================" << std::endl;
+	testPrint("===================== Winter testMainFloatArgInvalidProgram() =====================");
 	try
 	{
 		TestEnv test_env;
@@ -252,14 +259,14 @@ void testMainFloatArgInvalidProgram(const std::string& src)
 	catch(Winter::BaseException& e)
 	{
 		// Expected.
-		std::cout << "Expected exception occurred: " << e.what() << std::endl;
+		testPrint("Expected exception occurred: " + e.what());
 	}
 }
 
 
 static TestResults doTestMainFloatArg(const std::string& src, float argument, float target_return_val, bool check_constant_folded_to_literal, uint32 test_flags)
 {
-	std::cout << "===================== Winter testMainFloatArg() =====================" << std::endl;
+	testPrint("===================== Winter testMainFloatArg() =====================");
 	try
 	{
 		TestEnv test_env;
@@ -466,7 +473,7 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 
 static TestResults doTestMainDoubleArg(const std::string& src, double argument, double target_return_val, bool check_constant_folded_to_literal, uint32 test_flags)
 {
-	std::cout << "===================== Winter doTestMainDoubleArg() =====================" << std::endl;
+	testPrint("===================== Winter doTestMainDoubleArg() =====================");
 	try
 	{
 		TestEnv test_env;
@@ -691,7 +698,7 @@ void testMainFloatArgCheckConstantFolded(const std::string& src, float argument,
 
 void testMainInteger(const std::string& src, int target_return_val)
 {
-	std::cout << "===================== Winter testMainInteger() =====================" << std::endl;
+	testPrint("===================== Winter testMainInteger() =====================");
 	try
 	{
 		VMConstructionArgs vm_args;
@@ -760,7 +767,7 @@ void testMainInteger(const std::string& src, int target_return_val)
 
 void testMainStringArg(const std::string& src, const std::string& arg, const std::string& target_return_val, uint32 test_flags)
 {
-	std::cout << "===================== Winter testMainStringArg() =====================" << std::endl;
+	testPrint("===================== Winter testMainStringArg() =====================");
 	try
 	{
 		VMConstructionArgs vm_args;
@@ -871,7 +878,7 @@ void testMainStringArg(const std::string& src, const std::string& arg, const std
 
 TestResults testMainIntegerArg(const std::string& src, int x, int target_return_val, uint32 test_flags)
 {
-	std::cout << "===================== Winter testMainIntegerArg() =====================" << std::endl;
+	testPrint("===================== Winter testMainIntegerArg() =====================");
 	try
 	{
 		VMConstructionArgs vm_args;
@@ -1034,7 +1041,7 @@ TestResults testMainIntegerArg(const std::string& src, int x, int target_return_
 
 void testMainInt64Arg(const std::string& src, int64 x, int64 target_return_val, uint32 test_flags)
 {
-	std::cout << "===================== Winter testMainInt64Arg() =====================" << std::endl;
+	testPrint("===================== Winter testMainInt64Arg() =====================");
 	try
 	{
 		VMConstructionArgs vm_args;
@@ -1108,7 +1115,7 @@ void testMainInt64Arg(const std::string& src, int64 x, int64 target_return_val, 
 
 void testMainInt16Arg(const std::string& src, int16 x, int16 target_return_val, uint32 test_flags)
 {
-	std::cout << "===================== Winter testMainInt16Arg() =====================" << std::endl;
+	testPrint("===================== Winter testMainInt16Arg() =====================");
 	try
 	{
 		VMConstructionArgs vm_args;
@@ -1182,7 +1189,7 @@ void testMainInt16Arg(const std::string& src, int16 x, int16 target_return_val, 
 
 void testMainUInt32Arg(const std::string& src, uint32 x, uint32 target_return_val, uint32 test_flags)
 {
-	std::cout << "===================== Winter testMainUInt32Arg() =====================" << std::endl;
+	testPrint("===================== Winter testMainUInt32Arg() =====================");
 	try
 	{
 		VMConstructionArgs vm_args;
@@ -1256,7 +1263,7 @@ void testMainUInt32Arg(const std::string& src, uint32 x, uint32 target_return_va
 
 void testMainIntegerArgInvalidProgram(const std::string& src)
 {
-	std::cout << "===================== Winter testMainIntegerArgInvalidProgram() =====================" << std::endl;
+	testPrint("===================== Winter testMainIntegerArgInvalidProgram() =====================");
 	try
 	{
 		TestEnv test_env;
@@ -1284,7 +1291,7 @@ void testMainIntegerArgInvalidProgram(const std::string& src)
 	catch(Winter::BaseException& e)
 	{
 		// Expected.
-		std::cout << "Expected exception occurred: " << e.what() << std::endl;
+		testPrint("Expected exception occurred: " + e.what());
 	}
 }
 
@@ -1320,7 +1327,7 @@ static void bleh(StructType* s)
 template <class StructType>
 static void testMainStruct(const std::string& src, const StructType& target_return_val)
 {
-	std::cout << "===================== Winter testMainStruct() =====================" << std::endl;
+	testPrint("===================== Winter testMainStruct() =====================");
 	try
 	{
 		VMConstructionArgs vm_args;
@@ -1397,7 +1404,7 @@ static void testMainStruct(const std::string& src, const StructType& target_retu
 template <class InStructType, class OutStructType>
 static void testMainStructInputAndOutput(const std::string& src, const InStructType& struct_in, const OutStructType& target_return_val)
 {
-	std::cout << "===================== Winter testMainStructInputAndOutput() =====================" << std::endl;
+	testPrint("===================== Winter testMainStructInputAndOutput() =====================");
 	try
 	{
 		VMConstructionArgs vm_args;
@@ -1513,7 +1520,7 @@ inline bool epsEqual(const Float8Struct& a, const Float8Struct& b)
 
 void testFloat4StructPairRetFloat(const std::string& src, const Float4StructPair& a, const Float4StructPair& b, float target_return_val)
 {
-	std::cout << "===================== Winter testFloat4StructPairRetFloat() =====================" << std::endl;
+	testPrint("===================== Winter testFloat4StructPairRetFloat() =====================");
 	try
 	{
 		VMConstructionArgs vm_args;
@@ -1612,7 +1619,7 @@ void testFloat4StructPairRetFloat(const std::string& src, const Float4StructPair
 
 void testVectorInStruct(const std::string& src, const StructWithVec& struct_in, const StructWithVec& target_return_val)
 {
-	std::cout << "===================== Winter testVectorInStruct() =====================" << std::endl;
+	testPrint("===================== Winter testVectorInStruct() =====================");
 	try
 	{
 		VMConstructionArgs vm_args;
@@ -1702,7 +1709,7 @@ void testVectorInStruct(const std::string& src, const StructWithVec& struct_in, 
 
 void testFloat4Struct(const std::string& src, const Float4Struct& a, const Float4Struct& b, const Float4Struct& target_return_val)
 {
-	std::cout << "===================== Winter testFloat4Struct() =====================" << std::endl;
+	testPrint("===================== Winter testFloat4Struct() =====================");
 	try
 	{
 		VMConstructionArgs vm_args;
@@ -1767,7 +1774,7 @@ void testFloat4Struct(const std::string& src, const Float4Struct& a, const Float
 
 void testFloat8Struct(const std::string& src, const Float8Struct& a, const Float8Struct& b, const Float8Struct& target_return_val)
 {
-	std::cout << "===================== Winter testFloat8Struct() =====================" << std::endl;
+	testPrint("===================== Winter testFloat8Struct() =====================");
 	try
 	{
 		VMConstructionArgs vm_args;
@@ -1831,7 +1838,7 @@ void testFloat8Struct(const std::string& src, const Float8Struct& a, const Float
 
 void testIntArray(const std::string& src, const int* a, const int* b, const int* target_return_val, size_t len, uint32 test_flags)
 {
-	std::cout << "===================== Winter testIntArray() =====================" << std::endl;
+	testPrint("===================== Winter testIntArray() =====================");
 	try
 	{
 		VMConstructionArgs vm_args;
@@ -1888,7 +1895,7 @@ void testIntArray(const std::string& src, const int* a, const int* b, const int*
 
 void testFloatArray(const std::string& src, const float* a, const float* b, const float* target_return_val, size_t len)
 {
-	std::cout << "===================== Winter testFloatArray() =====================" << std::endl;
+	testPrint("===================== Winter testFloatArray() =====================");
 	try
 	{
 		VMConstructionArgs vm_args;
@@ -1925,9 +1932,9 @@ void testFloatArray(const std::string& src, const float* a, const float* b, cons
 		Timer timer;
 		f(jitted_result_ptr, a, b, &test_env);
 		const double elapsed = timer.elapsed();
-		std::cout << "JITed code elapsed: " << elapsed << " s" << std::endl;
+		testPrint("JITed code elapsed: " + toString(elapsed) + " s");
 		const double bandwidth = len * sizeof(float) / elapsed;
-		std::cout << "JITed bandwidth: " << (bandwidth * 1.0e-9) << " GiB/s" << std::endl;
+		testPrint("JITed bandwidth: " + toString(bandwidth * 1.0e-9) + " GiB/s");
 
 		// Check JIT'd result.
 		for(size_t i=0; i<len; ++i)
