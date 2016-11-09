@@ -40,17 +40,23 @@ int main(int argc, char** argv)
 
 	if(std::string(argv[1]) == "--test")
 	{
+#if BUILD_TESTS
 		LanguageTests::run();
+#endif
 		return 0;
 	}
 	else if(std::string(argv[1]) == "--fuzz")
 	{
+#if BUILD_TESTS
 		fuzzTests();
+#endif
 		return 0;
 	}
 	else if(std::string(argv[1]) == "--astfuzz")
 	{
+#if BUILD_TESTS
 		doASTFuzzTests();
+#endif
 		return 0;
 	}
 

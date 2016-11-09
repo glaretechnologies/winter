@@ -6,6 +6,12 @@ Copyright Glare Technologies Limited 2015 -
 #pragma once
 
 
+#include <string>
+
+
+#if BUILD_TESTS
+
+
 namespace Winter
 {
 
@@ -23,4 +29,9 @@ void doASTFuzzTests();
 
 bool testFuzzProgram(const std::string& src);
 
+
 } // end namespace Winter
+
+
+#endif // #if BUILD_TESTS
+

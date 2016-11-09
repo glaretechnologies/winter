@@ -40,6 +40,7 @@ Copyright Glare Technologies Limited 2015 -
 #include "../../indigo/trunk/opencl/OpenCLBuffer.h"
 #endif
 
+
 #if BUILD_TESTS
 
 

@@ -20,6 +20,9 @@
 #include <utils/TaskManager.h>
 #include <utils/MemMappedFile.h>
 #include <utils/FileUtils.h>
+#include <utils/ConPrint.h>
+#include <utils/StringUtils.h>
+#include <utils/Vector.h>
 #include <unordered_set>
 
 
@@ -43,7 +46,7 @@ void doTestAssert(bool expr, const char* test, long line, const char* file)
 {
 	if(!expr)
 	{
-		std::cerr << std::string("Test assertion failed: " + std::string(file) + ", line " + toString((int)line) + ":\n" + std::string(test)) << std::endl;
+		conPrint("Test assertion failed: " + std::string(file) + ", line " + toString((int)line) + ":\n" + std::string(test));
 		exit(1);
 	}
 }
@@ -485,7 +488,7 @@ static void testDeadFunctionElimination()
 	}
 	catch(Winter::BaseException& e)
 	{
-		std::cerr << e.what() << std::endl;
+		conPrint(e.what());
 		assert(0);
 		exit(1);
 	}
@@ -1090,7 +1093,7 @@ static void testFuzzingIssues()
 		1 - (1 * 1 - 1)) * ((1 + 1) * 1)) - 1 * (1 + ((1 * 1) + (1 * 1)))) - 1 * 1)))) *\n\
 		 1) - 1 - 1 - 1))");
 
-	std::cout << timer.elapsedString() << std::endl;
+	//std::cout << timer.elapsedString() << std::endl;
 
 
 	testMainIntegerArgInvalidProgram("def f<T>(T x) : x ()        def main() float : 0  +  f(2.0)");
@@ -5316,7 +5319,7 @@ TEMP OPENCL
 
 	// Winter::fuzzTests();
 
-	std::cout << "===================All LanguageTests passed.  Elapsed: " << timer.elapsedString() << " =============================" << std::endl;
+	conPrint("===================All LanguageTests passed.  Elapsed: " + timer.elapsedString() + " =============================");
 }
 
 

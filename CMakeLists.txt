@@ -160,6 +160,7 @@ set(winterdir ".")
 
 set(WINTER_FILES
 "${winterdir}/BuiltInFunctionImpl.cpp"
+"${winterdir}/LanguageTestUtils.cpp"
 "${winterdir}/LanguageTests.cpp"
 "${winterdir}/Linker.cpp"
 "${winterdir}/LLVMTypeUtils.cpp"

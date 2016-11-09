@@ -15,9 +15,13 @@ public:
 	LanguageTests();
 	~LanguageTests();
 
+#if BUILD_TESTS
 	static void doLLVMInit();
 	
+
 	static void run();
+#endif
+
 private:
 };
 
