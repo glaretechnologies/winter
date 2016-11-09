@@ -33,7 +33,7 @@ public:
 	inline unsigned int getType() const { return type; }
 
 	inline bool isIdentifier() const { return type == IDENTIFIER_TOKEN; }
-	inline bool isLiteral() const { return type >= FLOAT_LITERAL_TOKEN && type <= CHAR_LITERAL_TOKEN; }
+	inline bool isLiteral() const { return type <= CHAR_LITERAL_TOKEN; }
 	
 	inline const std::string& getIdentifierValue() const;
 	inline double getFloatLiteralValue() const;
