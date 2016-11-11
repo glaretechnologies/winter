@@ -1363,7 +1363,7 @@ static void testMainStruct(const std::string& src, const StructType& target_retu
 		// Check JIT'd result.
 		if(!epsEqual(jitted_result, target_return_val))
 		{
-			std::cerr << "Test failed: jitted_result != target_return_val  " << std::endl;
+			stdErrPrint("Test failed: jitted_result != target_return_val  ");
 			assert(0);
 			exit(1);
 		}
@@ -1447,7 +1447,7 @@ static void testMainStructInputAndOutput(const std::string& src, const InStructT
 		// Check JIT'd result.
 		if(!epsEqual(jitted_result, target_return_val))
 		{
-			std::cerr << "Test failed: jitted_result != target_return_val  " << std::endl;
+			stdErrPrint("Test failed: jitted_result != target_return_val");
 			assert(0);
 			exit(1);
 		}
