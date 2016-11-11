@@ -36,7 +36,6 @@ Copyright Glare Technologies Limited 2015 -
 #ifdef _MSC_VER
 #pragma warning(pop) // Re-enable warnings
 #endif
-//#include <iostream>
 
 
 using std::vector;

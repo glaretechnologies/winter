@@ -30,7 +30,6 @@ extern "C"
 #include <Vector.h>
 #include <ConPrint.h>
 #include <Platform.h>
-#include <iostream>
 //#include "utils/Obfuscator.h"
 
 
@@ -178,7 +177,7 @@ TestResults testMainFloat(const std::string& src, float target_return_val)
 		// Check JIT'd result.
 		if(!epsEqual(jitted_result, target_return_val))
 		{
-			std::cerr << "Test failed: JIT'd main returned " << jitted_result << ", target was " << target_return_val << std::endl;
+			stdErrPrint("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
 			assert(0);
 			exit(1);
 		}
@@ -195,7 +194,7 @@ TestResults testMainFloat(const std::string& src, float target_return_val)
 		
 		if(retval->valueType() != Value::ValueType_Float)
 		{
-			std::cerr << "main() Return value was of unexpected type." << std::endl;
+			stdErrPrint("main() Return value was of unexpected type.");
 			assert(0);
 			exit(1);
 		}
@@ -203,7 +202,7 @@ TestResults testMainFloat(const std::string& src, float target_return_val)
 
 		if(!epsEqual(val->value, target_return_val))
 		{
-			std::cerr << "Test failed: main returned " << val->value << ", target was " << target_return_val << std::endl;
+			stdErrPrint("Test failed: main returned " + toString(val->value) + ", target was " + toString(target_return_val));
 			assert(0);
 			exit(1);
 		}
@@ -215,7 +214,7 @@ TestResults testMainFloat(const std::string& src, float target_return_val)
 	}
 	catch(Winter::BaseException& e)
 	{
-		std::cerr << e.what() << std::endl;
+		stdErrPrint(e.what());
 		assert(0);
 		exit(1);
 	}
@@ -252,7 +251,7 @@ void testMainFloatArgInvalidProgram(const std::string& src)
 
 		vm.getJittedFunction(mainsig);
 
-		std::cerr << "Test failed: Expected compilation failure." << std::endl;
+		stdErrPrint("Test failed: Expected compilation failure.");
 		assert(0);
 		exit(1);
 	}
@@ -335,7 +334,7 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 		// Check JIT'd result.
 		if(!epsEqual(jitted_result, target_return_val))
 		{
-			std::cerr << "Test failed: JIT'd main returned " << jitted_result << ", target was " << target_return_val << std::endl;
+			stdErrPrint("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
 			assert(0);
 			exit(1);
 		}
@@ -351,7 +350,7 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 		
 		if(retval->valueType() != Value::ValueType_Float)
 		{
-			std::cerr << "main() Return value was of unexpected type." << std::endl;
+			stdErrPrint("main() Return value was of unexpected type.");
 			assert(0);
 			exit(1);
 		}
@@ -359,7 +358,7 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 
 		if(!epsEqual(val->value, target_return_val))
 		{
-			std::cerr << "Test failed: main returned " << val->value << ", target was " << target_return_val << std::endl;
+			stdErrPrint("Test failed: main returned " + toString(val->value) + ", target was " + toString(target_return_val));
 			assert(0);
 			exit(1);
 		}
@@ -458,13 +457,13 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 	}
 	catch(Winter::BaseException& e)
 	{
-		std::cerr << e.what() << std::endl;
+		stdErrPrint(e.what());
 		assert(0);
 		exit(1);
 	}
 	catch(Indigo::Exception& e)
 	{
-		std::cerr << e.what() << std::endl;
+		stdErrPrint(e.what());
 		assert(0);
 		exit(1);
 	}
@@ -522,7 +521,7 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 		// Check JIT'd result.
 		if(!epsEqual(jitted_result, target_return_val))
 		{
-			std::cerr << "Test failed: JIT'd main returned " << jitted_result << ", target was " << target_return_val << std::endl;
+			stdErrPrint("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
 			assert(0);
 			exit(1);
 		}
@@ -538,7 +537,7 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 		
 		if(retval->valueType() != Value::ValueType_Double)
 		{
-			std::cerr << "main() Return value was of unexpected type." << std::endl;
+			stdErrPrint("main() Return value was of unexpected type.");
 			assert(0);
 			exit(1);
 		}
@@ -546,7 +545,7 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 
 		if(!epsEqual(val->value, target_return_val))
 		{
-			std::cerr << "Test failed: main returned " << val->value << ", target was " << target_return_val << std::endl;
+			stdErrPrint("Test failed: main returned " + toString(val->value) + ", target was " + toString(target_return_val));
 			assert(0);
 			exit(1);
 		}
@@ -648,13 +647,13 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 	}
 	catch(Winter::BaseException& e)
 	{
-		std::cerr << e.what() << std::endl;
+		stdErrPrint(e.what());
 		assert(0);
 		exit(1);
 	}
 	catch(Indigo::Exception& e)
 	{
-		std::cerr << e.what() << std::endl;
+		stdErrPrint(e.what());
 		assert(0);
 		exit(1);
 	}
@@ -725,7 +724,7 @@ void testMainInteger(const std::string& src, int target_return_val)
 		// Check JIT'd result.
 		if(jitted_result != target_return_val)
 		{
-			std::cerr << "Test failed: JIT'd main returned " << jitted_result << ", target was " << target_return_val << std::endl;
+			stdErrPrint("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
 			assert(0);
 			exit(1);
 		}
@@ -740,7 +739,7 @@ void testMainInteger(const std::string& src, int target_return_val)
 		
 		if(retval->valueType() != Value::ValueType_Int)
 		{
-			std::cerr << "main() Return value was of unexpected type." << std::endl;
+			stdErrPrint("main() Return value was of unexpected type.");
 			assert(0);
 			exit(1);
 		}
@@ -748,7 +747,7 @@ void testMainInteger(const std::string& src, int target_return_val)
 
 		if(val->value != target_return_val)
 		{
-			std::cerr << "Test failed: main returned " << val->value << ", target was " << target_return_val << std::endl;
+			stdErrPrint("Test failed: main returned " + toString(val->value) + ", target was " + toString(target_return_val));
 			assert(0);
 			exit(1);
 		}
@@ -758,7 +757,7 @@ void testMainInteger(const std::string& src, int target_return_val)
 	}
 	catch(Winter::BaseException& e)
 	{
-		std::cerr << e.what() << std::endl;
+		stdErrPrint(e.what());
 		assert(0);
 		exit(1);
 	}
@@ -805,7 +804,7 @@ void testMainStringArg(const std::string& src, const std::string& arg, const std
 
 		if(jitted_result->len != target_return_val.size())
 		{
-			std::cerr << "Test failed: JIT'd main returned string with length " << jitted_result->len << ", target was " << target_return_val.size() << std::endl;
+			stdErrPrint("Test failed: JIT'd main returned string with length " + toString(jitted_result->len) + ", target was " + toString(target_return_val.size()));
 			assert(0);
 			exit(1);
 		}
@@ -818,7 +817,7 @@ void testMainStringArg(const std::string& src, const std::string& arg, const std
 		// Check JIT'd result.
 		if(result_str != target_return_val)
 		{
-			std::cerr << "Test failed: JIT'd main returned " << result_str << ", target was " << target_return_val << std::endl;
+			stdErrPrint("Test failed: JIT'd main returned " + result_str + ", target was " + target_return_val);
 			assert(0);
 			exit(1);
 		}
@@ -848,7 +847,7 @@ void testMainStringArg(const std::string& src, const std::string& arg, const std
 		
 		if(retval->valueType() != Value::ValueType_String)
 		{
-			std::cerr << "main() Return value was of unexpected type." << std::endl;
+			stdErrPrint("main() Return value was of unexpected type.");
 			assert(0);
 			exit(1);
 		}
@@ -856,20 +855,20 @@ void testMainStringArg(const std::string& src, const std::string& arg, const std
 
 		if(val->value != target_return_val)
 		{
-			std::cerr << "Test failed: main returned " << val->value << ", target was " << target_return_val << std::endl;
+			stdErrPrint("Test failed: main returned " + val->value + ", target was " + target_return_val);
 			assert(0);
 			exit(1);
 		}
 	}
 	catch(Winter::BaseException& e)
 	{
-		std::cerr << e.what() << std::endl;
+		stdErrPrint(e.what());
 		assert(0);
 		exit(1);
 	}
 	catch(Indigo::Exception& e)
 	{
-		std::cerr << e.what() << std::endl;
+		stdErrPrint(e.what());
 		assert(0);
 		exit(1);
 	}
@@ -906,7 +905,7 @@ TestResults testMainIntegerArg(const std::string& src, int x, int target_return_
 		// Check JIT'd result.
 		if(jitted_result != target_return_val)
 		{
-			std::cerr << "Test failed: JIT'd main returned " << jitted_result << ", target was " << target_return_val << std::endl;
+			stdErrPrint("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
 			assert(0);
 			exit(1);
 		}
@@ -922,7 +921,7 @@ TestResults testMainIntegerArg(const std::string& src, int x, int target_return_
 		
 		if(retval->valueType() != Value::ValueType_Int)
 		{
-			std::cerr << "main() Return value was of unexpected type." << std::endl;
+			stdErrPrint("main() Return value was of unexpected type.");
 			assert(0);
 			exit(1);
 		}
@@ -930,7 +929,7 @@ TestResults testMainIntegerArg(const std::string& src, int x, int target_return_
 
 		if(val->value != target_return_val)
 		{
-			std::cerr << "Test failed: main returned " << val->value << ", target was " << target_return_val << std::endl;
+			stdErrPrint("Test failed: main returned " + toString(val->value) + ", target was " + toString(target_return_val));
 			assert(0);
 			exit(1);
 		}
@@ -1026,13 +1025,13 @@ TestResults testMainIntegerArg(const std::string& src, int x, int target_return_
 	}
 	catch(Winter::BaseException& e)
 	{
-		std::cerr << e.what() << std::endl;
+		stdErrPrint(e.what());
 		assert(0);
 		exit(1);
 	}
 	catch(Indigo::Exception& e)
 	{
-		std::cerr << e.what() << std::endl;
+		stdErrPrint(e.what());
 		assert(0);
 		exit(1);
 	}
@@ -1069,7 +1068,7 @@ void testMainInt64Arg(const std::string& src, int64 x, int64 target_return_val, 
 		// Check JIT'd result.
 		if(jitted_result != target_return_val)
 		{
-			std::cerr << "Test failed: JIT'd main returned " << jitted_result << ", target was " << target_return_val << std::endl;
+			stdErrPrint("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
 			assert(0);
 			exit(1);
 		}
@@ -1085,7 +1084,7 @@ void testMainInt64Arg(const std::string& src, int64 x, int64 target_return_val, 
 		
 		if(retval->valueType() != Value::ValueType_Int)
 		{
-			std::cerr << "main() Return value was of unexpected type." << std::endl;
+			stdErrPrint("main() Return value was of unexpected type.");
 			assert(0);
 			exit(1);
 		}
@@ -1093,20 +1092,20 @@ void testMainInt64Arg(const std::string& src, int64 x, int64 target_return_val, 
 
 		if(val->value != target_return_val)
 		{
-			std::cerr << "Test failed: main returned " << val->value << ", target was " << target_return_val << std::endl;
+			stdErrPrint("Test failed: main returned " + toString(val->value) + ", target was " + toString(target_return_val));
 			assert(0);
 			exit(1);
 		}
 	}
 	catch(Winter::BaseException& e)
 	{
-		std::cerr << e.what() << std::endl;
+		stdErrPrint(e.what());
 		assert(0);
 		exit(1);
 	}
 	catch(Indigo::Exception& e)
 	{
-		std::cerr << e.what() << std::endl;
+		stdErrPrint(e.what());
 		assert(0);
 		exit(1);
 	}
@@ -1143,7 +1142,7 @@ void testMainInt16Arg(const std::string& src, int16 x, int16 target_return_val, 
 		// Check JIT'd result.
 		if(jitted_result != target_return_val)
 		{
-			std::cerr << "Test failed: JIT'd main returned " << jitted_result << ", target was " << target_return_val << std::endl;
+			stdErrPrint("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
 			assert(0);
 			exit(1);
 		}
@@ -1159,7 +1158,7 @@ void testMainInt16Arg(const std::string& src, int16 x, int16 target_return_val, 
 		
 		if(retval->valueType() != Value::ValueType_Int)
 		{
-			std::cerr << "main() Return value was of unexpected type." << std::endl;
+			stdErrPrint("main() Return value was of unexpected type.");
 			assert(0);
 			exit(1);
 		}
@@ -1167,20 +1166,20 @@ void testMainInt16Arg(const std::string& src, int16 x, int16 target_return_val, 
 
 		if(val->value != target_return_val)
 		{
-			std::cerr << "Test failed: main returned " << val->value << ", target was " << target_return_val << std::endl;
+			stdErrPrint("Test failed: main returned " + toString(val->value) + ", target was " + toString(target_return_val));
 			assert(0);
 			exit(1);
 		}
 	}
 	catch(Winter::BaseException& e)
 	{
-		std::cerr << e.what() << std::endl;
+		stdErrPrint(e.what());
 		assert(0);
 		exit(1);
 	}
 	catch(Indigo::Exception& e)
 	{
-		std::cerr << e.what() << std::endl;
+		stdErrPrint(e.what());
 		assert(0);
 		exit(1);
 	}
@@ -1217,7 +1216,7 @@ void testMainUInt32Arg(const std::string& src, uint32 x, uint32 target_return_va
 		// Check JIT'd result.
 		if(jitted_result != target_return_val)
 		{
-			std::cerr << "Test failed: JIT'd main returned " << jitted_result << ", target was " << target_return_val << std::endl;
+			stdErrPrint("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
 			assert(0);
 			exit(1);
 		}
@@ -1233,7 +1232,7 @@ void testMainUInt32Arg(const std::string& src, uint32 x, uint32 target_return_va
 		
 		if(retval->valueType() != Value::ValueType_Int)
 		{
-			std::cerr << "main() Return value was of unexpected type." << std::endl;
+			stdErrPrint("main() Return value was of unexpected type.");
 			assert(0);
 			exit(1);
 		}
@@ -1241,20 +1240,20 @@ void testMainUInt32Arg(const std::string& src, uint32 x, uint32 target_return_va
 
 		if(val->value != target_return_val)
 		{
-			std::cerr << "Test failed: main returned " << val->value << ", target was " << target_return_val << std::endl;
+			stdErrPrint("Test failed: main returned " + toString(val->value) + ", target was " + toString(target_return_val));
 			assert(0);
 			exit(1);
 		}
 	}
 	catch(Winter::BaseException& e)
 	{
-		std::cerr << e.what() << std::endl;
+		stdErrPrint(e.what());
 		assert(0);
 		exit(1);
 	}
 	catch(Indigo::Exception& e)
 	{
-		std::cerr << e.what() << std::endl;
+		stdErrPrint(e.what());
 		assert(0);
 		exit(1);
 	}
@@ -1284,7 +1283,7 @@ void testMainIntegerArgInvalidProgram(const std::string& src)
 
 		vm.getJittedFunction(mainsig);
 
-		std::cerr << "Test failed: Expected compilation failure." << std::endl;
+		stdErrPrint("Test failed: Expected compilation failure.");
 		assert(0);
 		exit(1);
 	}
@@ -1394,7 +1393,7 @@ static void testMainStruct(const std::string& src, const StructType& target_retu
 	}
 	catch(Winter::BaseException& e)
 	{
-		std::cerr << e.what() << std::endl;
+		stdErrPrint(e.what());
 		assert(0);
 		exit(1);
 	}
@@ -1478,7 +1477,7 @@ static void testMainStructInputAndOutput(const std::string& src, const InStructT
 	}
 	catch(Winter::BaseException& e)
 	{
-		std::cerr << e.what() << std::endl;
+		stdErrPrint(e.what());
 		assert(0);
 		exit(1);
 	}
@@ -1580,7 +1579,7 @@ void testFloat4StructPairRetFloat(const std::string& src, const Float4StructPair
 		// Check JIT'd result.
 		if(!epsEqual(jitted_result, target_return_val))
 		{
-			std::cerr << "Test failed: jitted_result != target_return_val  " << std::endl;
+			stdErrPrint("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
 			assert(0);
 			exit(1);
 		}
@@ -1610,7 +1609,7 @@ void testFloat4StructPairRetFloat(const std::string& src, const Float4StructPair
 	}
 	catch(Winter::BaseException& e)
 	{
-		std::cerr << e.what() << std::endl;
+		stdErrPrint(e.what());
 		assert(0);
 		exit(1);
 	}
@@ -1670,7 +1669,7 @@ void testVectorInStruct(const std::string& src, const StructWithVec& struct_in, 
 		// Check JIT'd result.
 		if(!epsEqual(jitted_result, target_return_val))
 		{
-			std::cerr << "Test failed: jitted_result != target_return_val  " << std::endl;
+			stdErrPrint("Test failed: JIT'd main returned value != expected.");
 			assert(0);
 			exit(1);
 		}
@@ -1700,7 +1699,7 @@ void testVectorInStruct(const std::string& src, const StructWithVec& struct_in, 
 	}
 	catch(Winter::BaseException& e)
 	{
-		std::cerr << e.what() << std::endl;
+		stdErrPrint(e.what());
 		assert(0);
 		exit(1);
 	}
@@ -1758,14 +1757,14 @@ void testFloat4Struct(const std::string& src, const Float4Struct& a, const Float
 		// Check JIT'd result.
 		if(!epsEqual(jitted_result, target_return_val))
 		{
-			std::cerr << "Test failed: jitted_result != target_return_val  " << std::endl;
+			stdErrPrint("Test failed: JIT'd main returned different value than target.");
 			assert(0);
 			exit(1);
 		}
 	}
 	catch(Winter::BaseException& e)
 	{
-		std::cerr << e.what() << std::endl;
+		stdErrPrint(e.what());
 		assert(0);
 		exit(1);
 	}
@@ -1822,14 +1821,14 @@ void testFloat8Struct(const std::string& src, const Float8Struct& a, const Float
 		// Check JIT'd result.
 		if(!epsEqual(jitted_result, target_return_val))
 		{
-			std::cerr << "Test failed: jitted_result != target_return_val  " << std::endl;
+			stdErrPrint("Test failed: jitted_result != target_return_val");
 			assert(0);
 			exit(1);
 		}
 	}
 	catch(Winter::BaseException& e)
 	{
-		std::cerr << e.what() << std::endl;
+		stdErrPrint(e.what());
 		assert(0);
 		exit(1);
 	}
@@ -1875,10 +1874,10 @@ void testIntArray(const std::string& src, const int* a, const int* b, const int*
 		{
 			if(jitted_result[i] != target_return_val[i])
 			{
-				std::cerr << "Test failed: jitted_result[i] != target_return_val[i]  " << std::endl;
-				std::cerr << "i: " << i << std::endl;
-				std::cerr << "jitted_result[i]: " << jitted_result[i] << std::endl;
-				std::cerr << "target_return_val[i]: " << target_return_val[i] << std::endl;
+				stdErrPrint("Test failed: jitted_result[i] != target_return_val[i]");
+				stdErrPrint("i: " + toString(i));
+				stdErrPrint("jitted_result[i]: " + toString(jitted_result[i]));
+				stdErrPrint("target_return_val[i]: " + toString(target_return_val[i]));
 				assert(0);
 				exit(1);
 			}
@@ -1886,7 +1885,7 @@ void testIntArray(const std::string& src, const int* a, const int* b, const int*
 	}
 	catch(Winter::BaseException& e)
 	{
-		std::cerr << e.what() << std::endl;
+		stdErrPrint(e.what());
 		assert(0);
 		exit(1);
 	}
@@ -1941,7 +1940,7 @@ void testFloatArray(const std::string& src, const float* a, const float* b, cons
 		{
 			if(!epsEqual(jitted_result[i], target_return_val[i]))
 			{
-				std::cerr << "Test failed: jitted_result != target_return_val  " << std::endl;
+				stdErrPrint("Test failed: jitted_result != target_return_val  ");
 				assert(0);
 				exit(1);
 			}
@@ -1949,7 +1948,7 @@ void testFloatArray(const std::string& src, const float* a, const float* b, cons
 	}
 	catch(Winter::BaseException& e)
 	{
-		std::cerr << e.what() << std::endl;
+		stdErrPrint(e.what());
 		assert(0);
 		exit(1);
 	}

@@ -7,7 +7,6 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "VirtualMachine.h"
 
 
-#include <iostream>
 #include <cassert>
 #include <fstream>
 #include "utils/FileUtils.h"
@@ -17,6 +16,7 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "utils/TaskManager.h"
 #include "utils/Exception.h"
 #include "utils/Timer.h"
+#include "utils/ConPrint.h"
 #include "wnt_Lexer.h"
 #include "TokenBase.h"
 #include "wnt_LangParser.h"
@@ -77,7 +77,6 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #ifdef _MSC_VER
 #pragma warning(pop) // Re-enable warnings
 #endif
-#include <iostream>
 
 
 using std::vector;
@@ -461,7 +460,7 @@ void execArrayMap(void* output, void* input, size_t array_size, void* map_functi
 
 static void tracePrintFloat(const char* var_name, float x)
 {
-	std::cout << std::string(var_name) << " = " << toString(x) << std::endl;
+	conPrint(std::string(var_name) + " = " + toString(x));
 }
 
 
@@ -1600,7 +1599,7 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 			);
 		if(ver_errors)
 		{
-			std::cout << "Module verification errors: " << error_str << std::endl;
+			conPrint("Module verification errors: " + error_str);
 			{
 				std::ofstream f("verification_errors.txt");
 				f << error_str;
@@ -1695,10 +1694,10 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 		// Run module optimisation.  This may remove some functions, so we have to be careful accessing llvm functions from now on.
 		{
 			if(verbose)
-				std::cout << "Optimising module... " << std::endl;
+				conPrint("Optimising module... ");
 			const bool changed = pm.run(*this->llvm_module);
 			if(verbose)
-				std::cout << "Done. (changed = " + toString(changed) + ")" << std::endl;
+				conPrint("Done. (changed = " + toString(changed) + ")");
 		}
 
 		optimiseFunctions(fpm, this->llvm_module, verbose);
@@ -1728,7 +1727,7 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 			);
 		if(ver_errors)
 		{
-			std::cout << "Module verification errors: " << error_str << std::endl;
+			conPrint("Module verification errors: " + error_str);
 			this->llvm_module->dump();
 			throw BaseException("Module verification errors: " + error_str);
 		}

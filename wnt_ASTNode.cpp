@@ -28,10 +28,12 @@ File created by ClassTemplate on Wed Jun 11 03:55:25 2008
 #include "LLVMTypeUtils.h"
 #include "ProofUtils.h"
 #include "utils/StringUtils.h"
+#include "utils/ConPrint.h"
 #include "maths/mathstypes.h"
 #include "maths/vec2.h"
 #include <xmmintrin.h> // SSE header file
 #include <ostream>
+#include <iostream>
 #ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
 #endif
@@ -53,7 +55,6 @@ File created by ClassTemplate on Wed Jun 11 03:55:25 2008
 #ifdef _MSC_VER
 #pragma warning(pop) // Re-enable warnings
 #endif
-#include <iostream>
 
 
 using std::vector;
@@ -382,7 +383,7 @@ void checkInlineExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector
 		if(target_func && !target_func->noinline && !target_func->isExternalFunction() && target_func->body.nonNull()) // If is potentially inlinable:
 		{
 			const bool verbose = false;
-			if(verbose) std::cout << "\n=================== Considering inlining function call =====================\n";
+			if(verbose) conPrint("\n=================== Considering inlining function call =====================\n");
 			
 			const int call_count = payload.calls_to_func_count[target_func];
 			
@@ -431,24 +432,24 @@ void checkInlineExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector
 				}
 			}
 
-			if(verbose) std::cout << "target: " + target_func->sig.toString() + ", call_count=" << call_count << ", beta reduction=" << boolToString(is_beta_reduction) << 
-				", is_target_func_just_a_call: " << boolToString(is_target_func_just_a_call) << ", are_arg_expressions_expensive: " << boolToString(are_arg_expressions_expensive) << "\n";
+			if(verbose) conPrint("target: " + target_func->sig.toString() + ", call_count=" + toString(call_count) + ", beta reduction=" + boolToString(is_beta_reduction) +
+				", is_target_func_just_a_call: " + boolToString(is_target_func_just_a_call) + ", are_arg_expressions_expensive: " + boolToString(are_arg_expressions_expensive) + "\n");
 
 
 			const bool should_inline = (is_beta_reduction || (call_count <= 1) || is_target_func_just_a_call) && !are_arg_expressions_expensive;
 			if(should_inline)
 			{
-				if(verbose) std::cout << "------------original expr----------: " << std::endl;
+				if(verbose) conPrint("------------original expr----------: ");
 				if(verbose) e->print(0, std::cout);
 
-				if(verbose) std::cout << "------------original target function body-----------: " << std::endl;
+				if(verbose) conPrint("------------original target function body-----------: ");
 				if(verbose) target_func->body->print(0, std::cout);
 
 				// Replace e with a copy of the target function body.
 				ASTNodeRef cloned_body = cloneASTNodeSubtree(target_func->body);
 				e = cloned_body;
 
-				if(verbose) std::cout << "------------new expr: (cloned function body)-----------: " << std::endl;
+				if(verbose) conPrint("------------new expr: (cloned function body)-----------: ");
 				if(verbose) e->print(0, std::cout);
 
 
@@ -478,7 +479,7 @@ void checkInlineExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector
 
 				checkSubstituteVariable(e, sub_payload); // e itself might be a variable that needs substituting.
 
-				if(verbose) std::cout << "------------Substituted expression-----------: " << std::endl;
+				if(verbose) conPrint("------------Substituted expression-----------: ");
 				if(verbose) e->print(0, std::cout);
 
 
@@ -493,12 +494,12 @@ void checkInlineExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector
 				
 				if(!payload.func_def_stack.empty())
 				{
-					if(verbose) std::cout << "------------Full function-----------: " << std::endl;
+					if(verbose) conPrint("------------Full function-----------: ");
 					if(verbose) payload.func_def_stack[0]->print(0, std::cout);
 				}
 				else if(payload.current_named_constant)
 				{
-					if(verbose) std::cout << "------------Full named constant-----------: " << std::endl;
+					if(verbose) conPrint("------------Full named constant-----------: ");
 					if(verbose) payload.current_named_constant->print(0, std::cout);
 				}
 				else
@@ -513,7 +514,7 @@ void checkInlineExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector
 					e->traverse(temp_payload, stack);
 				}
 
-				if(verbose) std::cout << "------------Rebound expression-----------: " << std::endl;
+				if(verbose) conPrint("------------Rebound expression-----------: ");
 				if(verbose) e->print(0, std::cout);
 
 				
@@ -522,7 +523,7 @@ void checkInlineExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector
 			}
 			else
 			{
-				if(verbose) std::cout << "not inlining.\n";
+				if(verbose) conPrint("not inlining.\n");
 			}
 		}
 	}

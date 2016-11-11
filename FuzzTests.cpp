@@ -44,9 +44,6 @@ Copyright Glare Technologies Limited 2015 -
 #if BUILD_TESTS
 
 
-#include <iostream>
-
-
 namespace Winter
 {
 
@@ -97,7 +94,7 @@ bool testFuzzProgram(const std::string& src)
 		
 		if(retval->valueType() != Value::ValueType_Float)
 		{
-			std::cerr << "main() Return value was of unexpected type." << std::endl;
+			stdErrPrint("main() Return value was of unexpected type.");
 			assert(0);
 			exit(1);
 		}
@@ -105,7 +102,7 @@ bool testFuzzProgram(const std::string& src)
 
 		if(isNAN(val->value) && isNAN(jitted_result))
 		{
-			std::cout << "both values are NaN" << std::endl;
+			conPrint("both values are NaN");
 		}
 		else if(val->value == jitted_result)
 		{
@@ -114,7 +111,7 @@ bool testFuzzProgram(const std::string& src)
 		{
 			if(!epsEqual(val->value, jitted_result))
 			{
-				std::cerr << "Test failed: main returned " << val->value << ", jitted_result was " << jitted_result << std::endl;
+				stdErrPrint("Test failed: main returned " + toString(val->value) + ", jitted_result was " + toString(jitted_result));
 				assert(0);
 				exit(1);
 			}
@@ -231,7 +228,7 @@ bool testFuzzProgram(const std::string& src)
 	{
 		if(e.what() == "Module verification errors.")
 		{
-			std::cerr << "Module verification errors while compiling " << src << std::endl;
+			stdErrPrint("Module verification errors while compiling " + src);
 			assert(0);
 			exit(1);
 		}
@@ -304,7 +301,7 @@ static bool testFuzzASTProgram(Reference<BufferRoot>& root)//const std::vector<F
 		
 		if(retval->valueType() != Value::ValueType_Float)
 		{
-			std::cerr << "main() Return value was of unexpected type." << std::endl;
+			stdErrPrint("main() Return value was of unexpected type.");
 			assert(0);
 			exit(1);
 		}
@@ -312,7 +309,7 @@ static bool testFuzzASTProgram(Reference<BufferRoot>& root)//const std::vector<F
 
 		if(!((val->value == jitted_result) || epsEqual(val->value, jitted_result))) // val->value == jitted_result handles Inf == Inf case.
 		{
-			std::cerr << "Test failed: main returned " << val->value << ", jitted_result was " << jitted_result << std::endl;
+			stdErrPrint("Test failed: main returned " + toString(val->value) + ", jitted_result was " + toString(jitted_result));
 			assert(0);
 			exit(1);
 		}
@@ -430,12 +427,12 @@ static bool testFuzzASTProgram(Reference<BufferRoot>& root)//const std::vector<F
 	{
 		if(e.what() == "Module verification errors.")
 		{
-			std::cerr << "Module verification errors while compiling AST program." << std::endl;
+			stdErrPrint("Module verification errors while compiling AST program.");
 			assert(0);
 			exit(1);
 		}
 		// Compile failure when fuzzing is alright.
-		std::cerr << e.what() << std::endl;
+		stdErrPrint(e.what());
 		return false;
 	}
 	catch(Indigo::Exception& )
@@ -829,7 +826,7 @@ public:
 			if(print_timer.elapsed() > 2.0)
 			{
 				const double tests_per_sec = i / timer.elapsed();
-				std::cout << (std::string("Iterations: ") + toString(i) + ", num_tested: " + toString(num_tested) + ", num valid: " + toString(num_valid_programs) + ", Test speed: " + doubleToStringNDecimalPlaces(tests_per_sec, 1) + " tests/s\n");
+				conPrint(std::string("Iterations: ") + toString(i) + ", num_tested: " + toString(num_tested) + ", num valid: " + toString(num_valid_programs) + ", Test speed: " + doubleToStringNDecimalPlaces(tests_per_sec, 1) + " tests/s\n");
 				print_timer.reset();
 			}
 		}
@@ -969,7 +966,7 @@ done:
 				outfile << "-------------------------------\n" << s << std::endl;
 				if(!outfile)
 				{
-					std::cout << "Writing to fuzz output failed!" << std::endl;
+					stdErrPrint("Writing to fuzz output failed!");
 					exit(1);
 				}
 
@@ -983,14 +980,14 @@ done:
 						outfile.open(fuzz_output_path, std::ios_base::out | std::ios_base::trunc);
 						if(!outfile)
 						{
-							std::cout << "Failed to re-open fuzz output." << std::endl;
+							stdErrPrint("Failed to re-open fuzz output.");
 							exit(1);
 						}
 					}
 				}
 				catch(FileUtils::FileUtilsExcep& e)
 				{
-					std::cerr << "FileUtilsExcep: " + e.what() << std::endl;
+					stdErrPrint("FileUtilsExcep: " + e.what());
 					exit(1);
 				}
 
@@ -1002,7 +999,7 @@ done:
 			if(print_timer.elapsed() > 2.0)
 			{
 				const double tests_per_sec = i / timer.elapsed();
-				std::cout << (std::string("Thread iters: ") + toString(i) + ", Total num tested: " + toString(num_tested) + ", Test speed: " + doubleToStringNDecimalPlaces(tests_per_sec, 1) + " tests/s\n");
+				conPrint(std::string("Thread iters: ") + toString(i) + ", Total num tested: " + toString(num_tested) + ", Test speed: " + doubleToStringNDecimalPlaces(tests_per_sec, 1) + " tests/s\n");
 				print_timer.reset();
 
 				// Disabled PlatformUtils::getMemoryUsage() for now, since it requires linking to Psapi.lib, which is tricky to do with CMake and the SDK Lib.
@@ -1107,7 +1104,7 @@ void doASTFuzzTests()
 		int rng_seed = 10;
 		for(int stage=0; stage<1000000; ++stage)
 		{
-			std::cout << "=========================== Stage " << stage << "===========================================" << std::endl;
+			conPrint("=========================== Stage " + toString(stage) + "===========================================");
 
 			Mutex tested_programs_mutex;
 			std::unordered_set<uint64> tested_program_hashes;
@@ -1130,7 +1127,7 @@ void doASTFuzzTests()
 	}
 	catch(FileUtils::FileUtilsExcep& e)
 	{
-		std::cerr << "Test failed: " << e.what() << std::endl;
+		stdErrPrint("Test failed: " + e.what());
 		assert(0);
 		exit(1);
 	}
@@ -1216,7 +1213,7 @@ void fuzzTests()
 		int rng_seed = 290;
 		for(int stage=0; stage<1000000; ++stage)
 		{
-			std::cout << "=========================== Stage " << stage << "===========================================" << std::endl;
+			conPrint("=========================== Stage " + toString(stage) + "===========================================");
 
 			Mutex tested_programs_mutex;
 			std::unordered_set<uint64> tested_program_hashes;
@@ -1241,7 +1238,7 @@ void fuzzTests()
 	}
 	catch(FileUtils::FileUtilsExcep& e)
 	{
-		std::cerr << "Test failed: " << e.what() << std::endl;
+		stdErrPrint("Test failed: " + e.what());
 		assert(0);
 		exit(1);
 	}
