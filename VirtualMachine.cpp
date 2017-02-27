@@ -891,9 +891,9 @@ bool VirtualMachine::doInliningPass()
 	// Rebind, some function expressions may be statically bound now.
 	if(tree_changed)
 	{
-		TraversalPayload payload(TraversalPayload::BindVariables);
+		TraversalPayload payload2(TraversalPayload::BindVariables);
 		for(size_t i=0; i<linker.top_level_defs.size(); ++i)
-			linker.top_level_defs[i]->traverse(payload, stack);
+			linker.top_level_defs[i]->traverse(payload2, stack);
 	}
 
 	return tree_changed;
@@ -1916,9 +1916,9 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 			// Collect any tuple types used in external functions
 			if(f->isExternalFunction())
 			{
-				for(unsigned int i=0; i<f->args.size(); ++i)
-					if(f->args[i].type->getType() == Type::TupleTypeType)
-						params.tuple_types_used.insert(f->args[i].type.downcast<TupleType>());
+				for(unsigned int z=0; z<f->args.size(); ++z)
+					if(f->args[z].type->getType() == Type::TupleTypeType)
+						params.tuple_types_used.insert(f->args[z].type.downcast<TupleType>());
 				
 				if(f->returnType()->getType() == Type::TupleTypeType)
 					params.tuple_types_used.insert(f->returnType().downcast<TupleType>());

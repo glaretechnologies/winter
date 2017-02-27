@@ -132,16 +132,16 @@ Reference<BufferRoot> LangParser::parseBuffer(const std::vector<Reference<TokenB
 			vector<FunctionDefinition::FunctionArg> getfield_args;
 			getfield_args.push_back(FunctionDefinition::FunctionArg(t, "s"));
 
-			for(unsigned int i=0; i<t->component_types.size(); ++i)
+			for(unsigned int z=0; z<t->component_types.size(); ++z)
 			{
 				FunctionDefinitionRef def(new FunctionDefinition(
 					SrcLocation::invalidLocation(),
 					parseinfo.order_num, // order number
-					t->component_names[i], // name
+					t->component_names[z], // name
 					getfield_args, // args
 					ASTNodeRef(), // body expr
-					t->component_types[i], // return type
-					new GetField(t, i) // impl
+					t->component_types[z], // return type
+					new GetField(t, z) // impl
 				));
 
 				root->top_level_defs.push_back(def);
@@ -391,7 +391,7 @@ ASTNodeRef LangParser::parseIfExpression(ParseInfo& p)
 			assert(p.tokens[p.i]->getType() == OPEN_PARENTHESIS_TOKEN);
 			
 			// Parse condition
-			ASTNodeRef condition = parseExpression(p);
+			condition = parseExpression(p);
 
 			// Parse optional 'then'
 			if(p.i < p.tokens.size() && p.tokens[p.i]->isIdentifier() && p.tokens[p.i]->getIdentifierValue() == "then")
@@ -488,9 +488,9 @@ FunctionDefinitionRef LangParser::parseFunctionDefinitionGivenName(const std::st
 			while(isTokenCurrent(COMMA_TOKEN, p))
 			{
 				skipExpectedToken(COMMA_TOKEN, p);
-				const std::string type_param_name = parseIdentifier("type parameter", p);
-				generic_type_param_names.push_back(type_param_name);
-				p.generic_type_params.push_back(type_param_name);
+				const std::string type_param_name2 = parseIdentifier("type parameter", p);
+				generic_type_param_names.push_back(type_param_name2);
+				p.generic_type_params.push_back(type_param_name2);
 			}
 
 			parseToken(RIGHT_ANGLE_BRACKET_TOKEN, p);
