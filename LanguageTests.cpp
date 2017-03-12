@@ -3452,6 +3452,10 @@ static void testStructs()
 	}
 
 
+	// Test parsing of empty structs
+	testMainFloat("struct EmptyStruct { } \
+				  def main() float : 2.0f", 2.0f);
+
 	// Test struct
 	testMainFloat("struct Complex { float re, float im } \
 				  def main() float : re(Complex(2.0, 3.0))", 2.0f);

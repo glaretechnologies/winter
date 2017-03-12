@@ -1084,15 +1084,18 @@ VRef<StructureType> LangParser::parseStructType(ParseInfo& p)
 	std::vector<TypeVRef> types;
 	std::vector<string> names;
 
-	types.push_back(parseType(p));
-	names.push_back(parseIdentifier("field name", p));
-
-	while(isTokenCurrent(COMMA_TOKEN, p))
+	if(!isTokenCurrent(CLOSE_BRACE_TOKEN, p))
 	{
-		skipExpectedToken(COMMA_TOKEN, p);
-
 		types.push_back(parseType(p));
 		names.push_back(parseIdentifier("field name", p));
+
+		while(isTokenCurrent(COMMA_TOKEN, p))
+		{
+			skipExpectedToken(COMMA_TOKEN, p);
+
+			types.push_back(parseType(p));
+			names.push_back(parseIdentifier("field name", p));
+		}
 	}
 
 	parseToken(CLOSE_BRACE_TOKEN, p);
