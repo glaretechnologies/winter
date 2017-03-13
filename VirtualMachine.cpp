@@ -1577,10 +1577,10 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 
 		if(ver_errors)
 		{
-			std::cout << "Module verification errors." << std::endl;
+			//std::cout << "Module verification errors." << std::endl;
 			//this->llvm_module->dump();
-			std::cout << "------errors:------" << std::endl;
-			std::cout << error_string_stream_str << std::endl;
+			//std::cout << "------errors:------" << std::endl;
+			//std::cout << error_string_stream_str << std::endl;
 
 			//TEMP: write to disk
 			/*{
@@ -1714,7 +1714,7 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 		);
 		if(ver_errors)
 		{
-			std::cout << "Module verification errors." << std::endl;
+			conPrint("Module verification errors.");
 			this->llvm_module->dump();
 			throw BaseException("Module verification errors.");
 		}

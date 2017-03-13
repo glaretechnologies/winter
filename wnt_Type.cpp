@@ -1546,7 +1546,7 @@ llvm::Type* ErrorType::LLVMType(llvm::Module& module) const
 
 
 OpaqueStructureType::OpaqueStructureType(const std::string& name_)
-:	Type(StructureTypeType), name(name_)
+:	Type(StructureTypeType), name(name_) // NOTE: should be OpaqueStructureTypeType?  breaks getTexCoords linking tho.
 {}
 
 
