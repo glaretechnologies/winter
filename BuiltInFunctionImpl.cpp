@@ -3261,6 +3261,51 @@ llvm::Value* ToFloatBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 //----------------------------------------------------------------------------------------------
 
 
+ToDoubleBuiltInFunc::ToDoubleBuiltInFunc(const TypeVRef& type_)
+:	BuiltInFunctionImpl(BuiltInType_ToDoubleBuiltInFunc),
+	type(type_)
+{}
+
+
+TypeVRef ToDoubleBuiltInFunc::getReturnType(const TypeVRef& arg_type)
+{
+	if(arg_type->getType() == Type::IntType)
+		return new Double();
+	else if(arg_type->getType() == Type::VectorTypeType) // If vector of ints
+		return new VectorType(new Double(), arg_type.downcast<VectorType>()->num);
+	else
+	{
+		assert(0);
+		return NULL;
+	}
+}
+
+
+ValueRef ToDoubleBuiltInFunc::invoke(VMState& vmstate)
+{
+	const IntValue* a = checkedCast<const IntValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
+	return new DoubleValue((double)a->value);
+}
+
+
+llvm::Value* ToDoubleBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	// Work out destination type.
+	TypeRef dest_type = getReturnType(type);
+
+	// Get destination LLVM type
+	llvm::Type* dest_llvm_type = dest_type->LLVMType(*params.module);
+
+	return params.builder->CreateSIToFP(
+		LLVMTypeUtils::getNthArg(params.currently_building_func, 0), 
+		dest_llvm_type // dest type
+	);
+}
+
+
+//----------------------------------------------------------------------------------------------
+
+
 ToInt64BuiltInFunc::ToInt64BuiltInFunc(const TypeVRef& type_)
 :	BuiltInFunctionImpl(BuiltInType_ToInt64BuiltInFunc),
 	type(type_)

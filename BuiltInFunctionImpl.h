@@ -54,6 +54,7 @@ public:
 		BuiltInType_SignBuiltInFunc,
 		BuiltInType_TruncateToIntBuiltInFunc,
 		BuiltInType_ToFloatBuiltInFunc,
+		BuiltInType_ToDoubleBuiltInFunc,
 		BuiltInType_ToInt64BuiltInFunc,
 		BuiltInType_ToInt32BuiltInFunc,
 		BuiltInType_VoidPtrToInt64BuiltInFunc,
@@ -564,6 +565,21 @@ class ToFloatBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
 	ToFloatBuiltInFunc(const TypeVRef& type);
+
+	static TypeVRef getReturnType(const TypeVRef& arg_type);
+
+	virtual ValueRef invoke(VMState& vmstate);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+private:
+	TypeVRef type;
+};
+
+
+// Integer to double conversion
+class ToDoubleBuiltInFunc : public BuiltInFunctionImpl
+{
+public:
+	ToDoubleBuiltInFunc(const TypeVRef& type);
 
 	static TypeVRef getReturnType(const TypeVRef& arg_type);
 

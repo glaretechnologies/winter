@@ -1149,7 +1149,7 @@ static void testFuzzingIssues()
 	testMainFloatArgInvalidProgram("def main(float x) float : toFloat(truncateToInt(3.1)-x)");
 	testMainFloatArgInvalidProgram("def main(float x) float : toFloat(truncateToInt(3.1)/x)");
 
-	
+
 	// Test circular reference between a named constant and function.
 	testMainIntegerArgInvalidProgram("TEN = main(0)		def main(int x) : TEN + x");
 
@@ -3964,11 +3964,15 @@ void LanguageTests::run()
 
 	testMainInt16Arg("def main(int16 x) : [10i16, 11i16]a[0]", 1, 10);
 	//testMainInt16Arg("def main(int16 x) : [65535i16, 11i16]a[0]", 1, 65535);
-	
+
 
 	// Test toFloat(int16)
 	//testMainInt16Arg("def main(int16 x) int16 : toInt16(1.0f + toFloat(x))", 2, 3); // TODO: add truncateToInt16
 	testMainFloatArg("def main(float x) float : x + toFloat(4i16)", 2.0f, 6.0f);
+
+	// Test toDouble(int)
+	testMainDoubleArg("def main(double x) double : x + toDouble(8)", 2.0, 10.0);
+
 
 	// ===================================================================
 	// Test 'real' type.

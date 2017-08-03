@@ -367,6 +367,13 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 				return def;
 			}
 
+			if(sig.name == "toDouble")
+			{
+				FunctionDefinitionRef def = makeBuiltInFuncDef<ToDoubleBuiltInFunc>(sig.name, sig.param_types[0], ToDoubleBuiltInFunc::getReturnType(sig.param_types[0]));
+				this->sig_to_function_map.insert(std::make_pair(sig, def));
+				return def;
+			}
+
 			if(sig.param_types[0]->getType() == Type::IntType && sig.param_types[0].downcastToPtr<const Int>()->numBits() == 32 && sig.name == "toInt64")
 			{
 				FunctionDefinitionRef def = makeBuiltInFuncDef<ToInt64BuiltInFunc>(sig.name, sig.param_types[0], new Int(64));
