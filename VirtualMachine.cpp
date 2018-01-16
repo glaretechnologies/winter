@@ -17,6 +17,7 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "utils/Exception.h"
 #include "utils/Timer.h"
 #include "utils/ConPrint.h"
+#include "utils/PlatformUtils.h"
 #include "wnt_Lexer.h"
 #include "TokenBase.h"
 #include "wnt_LangParser.h"
@@ -740,11 +741,23 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 #endif
 			if(USE_MCJIT) this->triple.append("-elf"); // MCJIT requires the -elf suffix currently, see https://groups.google.com/forum/#!topic/llvm-dev/DOmHEXhNNWw
 
+
+			PlatformUtils::CPUInfo cpu_info;
+			PlatformUtils::getCPUInfo(cpu_info);
+
+			// There is an issue with LLVM, that if it encounters a newer CPU model than it knows about, then it just returns 
+			// "x86-64", which has less feature support than we actually have.  So in this case just use "corei7" which should give us the features we need.
+			std::string cpu_name;
+			if(cpu_info.family == 6 && cpu_info.model > 70)
+				cpu_name = "corei7";
+			else
+				cpu_name = llvm::sys::getHostCPUName();
+
 			// Select the host computer architecture as the target.
 			this->target_machine = engine_builder.selectTarget(
 				llvm::Triple(this->triple), // target triple
 				"",  // march
-				llvm::sys::getHostCPUName(), // mcpu - e.g. "corei7", "core-avx2"
+				cpu_name, // mcpu - e.g. "corei7", "core-avx2"
 				llvm::SmallVector<std::string, 4>());
 
 			// Enable floating point op fusion, to allow for FMA codegen.
