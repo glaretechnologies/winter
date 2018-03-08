@@ -1308,9 +1308,10 @@ static void testNamedConstants()
 					   def main(int x) int : TEN + x", 3, 13);
 
 	// Test named constants with optional declared type.
-	//testMainIntegerArg("int TEN = 10			\n\
-	//				   def main(int x) int : TEN + x", 3, 13);
-	
+	/*testMainIntegerArg("int TEN = 10			\n\
+					   def main(int x) int : TEN + x", 3, 13);
+	*/
+
 	// Test int->float type coercion to match declared type for named constants with optional declared type.
 	testMainFloatArg("float TEN = 10			\n\
 					   def main(float x) float : TEN + x", 1.f, 11.f);
@@ -1318,10 +1319,11 @@ static void testNamedConstants()
 
 	// Test with a function call on a structure
 	// TODO: make this work
-	//testMainFloatArgCheckConstantFolded("struct S { float x }		\n\
-	//				 def f(S s) S : S(s.x + 1.0)		\n\
-	//				 float X = f(S(1)).x			\n\
-	//				 def main(float x) float : X", 1.f, 2.f);
+	/*testMainFloatArgCheckConstantFolded("struct S { float x }		\n\
+					 def f(S s) S : S(s.x + 1.0)		\n\
+					 float X = f(S(1)).x			\n\
+					 def main(float x) float : X", 1.f, 2.f);
+	*/
 
 	// test invalidity of two named constants with same name.
 	testMainFloatArgInvalidProgram("z = 1     z = 2               def main(float x) float : x");
@@ -1573,8 +1575,8 @@ static void testTuples()
 	testMainFloatArg("def main(float x) float :  elem((x + 1.0, x + 2.0), 1)", 1.0f, 3.0f);
 
 	// Test tuples being returned from a function
-//	testMainFloatArg("def f(float x) tuple<float> : [x]t   \n\
-//		def main(float x) float :  elem(f(x), 0)", 1.0f, 1.0f);
+	/*testMainFloatArg("def f(float x) tuple<float> : [x]t   \n\
+		def main(float x) float :  elem(f(x), 0)", 1.0f, 1.0f);*/
 	testMainFloatArg("def f(float x) tuple<float, float> : (x, x)   \n\
 		def main(float x) float :  elem(f(x), 0)", 1.0f, 1.0f);
 	testMainFloatArg("def f(float x) tuple<float, float> : (x, x + 1.0)   \n\
@@ -2712,21 +2714,21 @@ static void testLetBlocks()
 
 
 	// Test two let clauses where one refers to the other (reverse order)
-	//testMainFloat("def f() float : \
-	//			  let	\
-	//				z = y \
-	//				y = 2.0 \
-	//			  in \
-	//				y \
-	//			  def main() float : f()", 2.0);
+	/*testMainFloat("def f() float : \
+				  let	\
+					z = y \
+					y = 2.0 \
+				  in \
+					y \
+				  def main() float : f()", 2.0);
 
-	//testMainFloat("def f() float : \
-	//			  let	\
-	//				z = y \
-	//				y = 2.0 \
-	//			  in \
-	//				y \
-	//			  def main() float : f()", 2.0);
+	testMainFloat("def f() float : \
+				  let	\
+					z = y \
+					y = 2.0 \
+				  in \
+					y \
+				  def main() float : f()", 2.0);*/
 
 	// Test nested let blocks
 	testMainFloat("def f() float :				\n\
@@ -2934,10 +2936,10 @@ static void testLambdaExpressionsAndClosures()
 
 
 	// Test generic lambda!!!
-	//testMainFloat("def makeLambda() : \\<T>(T x) : x*x    \n\
-	//				def main() float :           \n\
-	//				let f = makeLambda()  in   \n\
-	//			  f(2.0)", 4.0f);
+	/*testMainFloat("def makeLambda() : \\<T>(T x) : x*x    \n\
+					def main() float :           \n\
+					let f = makeLambda()  in   \n\
+				  f(2.0)", 4.0f);*/
 
 	// Test Lambda passed as a function arg
 	testMainFloat("def g(function<float, float> f, float x) : f(x)			\n\
