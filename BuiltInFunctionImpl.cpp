@@ -3231,7 +3231,7 @@ TypeVRef ToFloatBuiltInFunc::getReturnType(const TypeVRef& arg_type)
 	else
 	{
 		assert(0);
-		return NULL;
+		throw BaseException("ToFloatBuiltInFunc::getReturnType todo");
 	}
 }
 
@@ -3251,10 +3251,36 @@ llvm::Value* ToFloatBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	// Get destination LLVM type
 	llvm::Type* dest_llvm_type = dest_type->LLVMType(*params.module);
 
-	return params.builder->CreateSIToFP(
-		LLVMTypeUtils::getNthArg(params.currently_building_func, 0), 
-		dest_llvm_type // dest type
-	);
+	if(type->getType() == Type::IntType)
+	{
+		if(type.downcastToPtr<Int>()->is_signed)
+			return params.builder->CreateSIToFP(
+				LLVMTypeUtils::getNthArg(params.currently_building_func, 0),
+				dest_llvm_type // dest type
+			);
+		else
+			return params.builder->CreateUIToFP(
+				LLVMTypeUtils::getNthArg(params.currently_building_func, 0),
+				dest_llvm_type // dest type
+			);
+	}
+	else if(type->getType() == Type::VectorTypeType) 
+	{
+		// TODO: TEST THIS vector stuff.  quite possible doesn't work.
+
+		if(type.downcastToPtr<VectorType>()->elem_type.downcastToPtr<Int>()->is_signed)
+			return params.builder->CreateSIToFP(
+				LLVMTypeUtils::getNthArg(params.currently_building_func, 0),
+				dest_llvm_type // dest type
+			);
+		else
+			return params.builder->CreateUIToFP(
+				LLVMTypeUtils::getNthArg(params.currently_building_func, 0),
+				dest_llvm_type // dest type
+			);
+	}
+	else
+		throw BaseException("ToFloatBuiltInFunc::emitLLVMCode todo");
 }
 
 

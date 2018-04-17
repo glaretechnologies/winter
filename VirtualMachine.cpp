@@ -1993,6 +1993,7 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 	std::string built_in_func_code = 
 		"// Winter built-in functions \n"
 		"float toFloat_int_(int x) { return (float)x; } \n"
+		"float toFloat_uint_(uint x) { return (float)x; } \n"
 		"int truncateToInt_float_(float x) { return (int)x; } \n"
 		"int8 truncateToInt_vector_float__8__(float8 v) { return convert_int8(v); }  \n"
 		"long toInt_opaque_(void* p) { return (long)p; }  \n"

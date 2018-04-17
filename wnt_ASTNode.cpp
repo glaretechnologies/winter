@@ -1287,13 +1287,30 @@ void IntLiteral::print(int depth, std::ostream& s) const
 
 std::string IntLiteral::sourceString() const
 {
-	return toString(this->value); // TODO: handle bitness and is_signed suffix
+	if(num_bits == 32)
+	{
+		if(is_signed)
+			return toString(this->value);
+		else
+			return toString(this->value) + "u";
+	}
+	else
+	{
+		if(is_signed)
+			return toString(this->value) + "i" + toString(num_bits);
+		else
+			return toString(this->value) + "u" + toString(num_bits);
+	}
 }
 
 
 std::string IntLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
-	return toString(this->value); // TODO: handle bitness and is_signed suffix
+	// NOTE: How does OpenCL handle literals with num bits > 32?
+	if(is_signed)
+		return toString(this->value);
+	else
+		return toString(this->value) + "u";
 }
 
 
