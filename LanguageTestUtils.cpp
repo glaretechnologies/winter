@@ -20,6 +20,7 @@ extern "C"
 #include "TokenBase.h"
 #include "wnt_LangParser.h"
 #include "wnt_ASTNode.h"
+#include "wnt_MathsFuncs.h"
 #include "VMState.h"
 #include "Linker.h"
 #include "Value.h"
@@ -263,7 +264,8 @@ void testMainFloatArgInvalidProgram(const std::string& src)
 }
 
 
-static TestResults doTestMainFloatArg(const std::string& src, float argument, float target_return_val, bool check_constant_folded_to_literal, uint32 test_flags)
+static TestResults doTestMainFloatArg(const std::string& src, float argument, float target_return_val, 
+	bool check_constant_folded_to_literal, uint32 test_flags)
 {
 	testPrint("===================== Winter testMainFloatArg() =====================");
 	try
@@ -293,6 +295,9 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 		vm_args.floating_point_literals_default_to_double = false;
 		vm_args.try_coerce_int_to_double_first = false;
 		vm_args.real_is_double = false;
+
+		if(test_flags & INCLUDE_EXTERNAL_MATHS_FUNCS)
+			MathsFuncs::appendExternalMathsFuncs(vm_args.external_functions);
 
 		{
 			ExternalFunctionRef f = new ExternalFunction(
@@ -484,6 +489,10 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 		vm_args.allow_unsafe_operations = (test_flags & ALLOW_UNSAFE) != 0;
 		vm_args.floating_point_literals_default_to_double = true;
 		vm_args.real_is_double = true;
+
+		if(test_flags & INCLUDE_EXTERNAL_MATHS_FUNCS)
+			MathsFuncs::appendExternalMathsFuncs(vm_args.external_functions);
+
 
 		/*{
 			ExternalFunctionRef f(new ExternalFunction());
@@ -883,6 +892,10 @@ TestResults testMainIntegerArg(const std::string& src, int x, int target_return_
 		VMConstructionArgs vm_args;
 		vm_args.allow_unsafe_operations = (test_flags & ALLOW_UNSAFE) != 0;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
+
+		if(test_flags & INCLUDE_EXTERNAL_MATHS_FUNCS)
+			MathsFuncs::appendExternalMathsFuncs(vm_args.external_functions);
+
 
 		const FunctionSignature mainsig("main", std::vector<TypeVRef>(1, new Int()));
 

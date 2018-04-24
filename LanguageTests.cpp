@@ -2330,6 +2330,58 @@ static void testMathsFunctions()
 }
 
 
+static void testExternalMathsFunctions()
+{
+	// tan
+	testMainFloatArg("def main(float x) float : tan(x)", 0.3f, std::tan(0.3f), INCLUDE_EXTERNAL_MATHS_FUNCS);
+	testMainDoubleArg("def main(double x) double : tan(x)", 0.3, std::tan(0.3), INCLUDE_EXTERNAL_MATHS_FUNCS);
+
+	// asin
+	testMainFloatArg("def main(float x) float : asin(x)", 0.3f, std::asin(0.3f), INCLUDE_EXTERNAL_MATHS_FUNCS);
+	testMainDoubleArg("def main(double x) double : asin(x)", 0.3, std::asin(0.3), INCLUDE_EXTERNAL_MATHS_FUNCS);
+	
+	// acos
+	testMainFloatArg("def main(float x) float : acos(x)", 0.3f, std::acos(0.3f), INCLUDE_EXTERNAL_MATHS_FUNCS);
+	testMainDoubleArg("def main(double x) double : acos(x)", 0.3, std::acos(0.3), INCLUDE_EXTERNAL_MATHS_FUNCS);
+	
+	// atan
+	testMainFloatArg("def main(float x) float : atan(x)", 0.3f, std::atan(0.3f), INCLUDE_EXTERNAL_MATHS_FUNCS);
+	testMainDoubleArg("def main(double x) double : atan(x)", 0.3, std::atan(0.3), INCLUDE_EXTERNAL_MATHS_FUNCS);
+
+	// atan2
+	testMainFloatArg("def main(float x) float : atan2(x, 0.4f)", 0.3f, std::atan2(0.3f, 0.4f), INCLUDE_EXTERNAL_MATHS_FUNCS);
+	testMainDoubleArg("def main(double x) double : atan2(x, 0.4)", 0.3, std::atan2(0.3, 0.4), INCLUDE_EXTERNAL_MATHS_FUNCS);
+	
+	// float mod
+	testMainFloatArg("def main(float x) float : mod(1.7, 1.2)", -2.8f, Maths::floatMod(1.7f, 1.2f), INCLUDE_EXTERNAL_MATHS_FUNCS);
+	testMainFloatArg("def main(float x) float : mod(1.7, x)", 1.1f, Maths::floatMod(1.7f, 1.1f), INCLUDE_EXTERNAL_MATHS_FUNCS);
+	testMainFloatArg("def main(float x) float : mod(-1.7, x)", 1.1f, Maths::floatMod(-1.7f, 1.1f), INCLUDE_EXTERNAL_MATHS_FUNCS);
+	testMainDoubleArg("def main(double x) double : mod(-1.7, x)", 1.1, Maths::doubleMod(-1.7, 1.1), INCLUDE_EXTERNAL_MATHS_FUNCS);
+
+	// int mod
+	testMainIntegerArg("def main(int x) int : mod(-5, x)", 4, 3, INCLUDE_EXTERNAL_MATHS_FUNCS);
+	testMainIntegerArg("def main(int x) int : mod(5, x)", 4, 1, INCLUDE_EXTERNAL_MATHS_FUNCS);
+	testMainIntegerArg("def main(int x) int : mod(5, 4)", 4, 1, INCLUDE_EXTERNAL_MATHS_FUNCS);
+	testMainIntegerArg("def main(int x) int : mod(5, x)", 3, 2, INCLUDE_EXTERNAL_MATHS_FUNCS);
+
+	// isFinite
+	testMainFloatArg("def main(float x) float : isFinite(x) ? 1.0 : 0.0", 10.f, 1.0f, INCLUDE_EXTERNAL_MATHS_FUNCS);
+	testMainDoubleArg("def main(double x) double : isFinite(x) ? 1.0 : 0.0", 10, 1.0, INCLUDE_EXTERNAL_MATHS_FUNCS);
+	testMainFloatArg("def main(float x) float : isFinite(x) ? 1.0 : 0.0", std::numeric_limits<float>::infinity(), 0.0f, INCLUDE_EXTERNAL_MATHS_FUNCS);
+	testMainFloatArg("def main(float x) float : isFinite(x) ? 1.0 : 0.0", -std::numeric_limits<float>::infinity(), 0.0f, INCLUDE_EXTERNAL_MATHS_FUNCS);
+	testMainFloatArg("def main(float x) float : isFinite(x) ? 1.0 : 0.0", std::numeric_limits<float>::quiet_NaN(), 0.0f, INCLUDE_EXTERNAL_MATHS_FUNCS);
+	testMainDoubleArg("def main(double x) double : isFinite(x) ? 1.0 : 0.0", std::numeric_limits<double>::quiet_NaN(), 0.0, INCLUDE_EXTERNAL_MATHS_FUNCS);
+
+	// isNAN
+	testMainFloatArg("def main(float x) float : isNAN(x) ? 1.0 : 0.0", 10.f, 0.0f, INCLUDE_EXTERNAL_MATHS_FUNCS);
+	testMainDoubleArg("def main(double x) double : isNAN(x) ? 1.0 : 0.0", 10, 0.0, INCLUDE_EXTERNAL_MATHS_FUNCS);
+	testMainFloatArg("def main(float x) float : isNAN(x) ? 1.0 : 0.0", std::numeric_limits<float>::infinity(), 0.0f, INCLUDE_EXTERNAL_MATHS_FUNCS);
+	testMainFloatArg("def main(float x) float : isNAN(x) ? 1.0 : 0.0", -std::numeric_limits<float>::infinity(), 0.0f, INCLUDE_EXTERNAL_MATHS_FUNCS);
+	testMainFloatArg("def main(float x) float : isNAN(x) ? 1.0 : 0.0", std::numeric_limits<float>::quiet_NaN(), 1.0f, INCLUDE_EXTERNAL_MATHS_FUNCS);
+	testMainDoubleArg("def main(double x) double : isNAN(x) ? 1.0 : 0.0", std::numeric_limits<double>::quiet_NaN(), 1.0, INCLUDE_EXTERNAL_MATHS_FUNCS);
+}
+
+
 static void testOperatorOverloading()
 {
 	// =================================================================== 
@@ -3925,6 +3977,8 @@ void LanguageTests::run()
 	stringTests();
 	
 	testMathsFunctions();
+	
+	testExternalMathsFunctions();
 
 	testOperatorOverloading();
 
@@ -4140,8 +4194,8 @@ void LanguageTests::run()
 	testMainFloatArgInvalidProgram("def main(float x) float :  x [bleh");
 
 	testMainIntegerArg("def f(int x) tuple<int, int> : [1, 2]t		   def main(int x) int : f(x)[0]", 10, 1);
-		//testMainIntegerArg("def f(int x) tuple<int, int> : if x < 0 [1, 2]t else [3, 4]t			\n\
-		//			   def main(int x) int : f(x)[0]", 10, 3);
+	/*testMainIntegerArg("def f(int x) tuple<int, int> : if x < 0 [1, 2]t else [3, 4]t			\n\
+					   def main(int x) int : f(x)[0]", 10, 3);*/
 
 	testMainIntegerArg("def f(int x) tuple<int> : if x < 0 [1]t else [3]t			\n\
 					   def main(int x) int : f(x)[0]", 10, 3);

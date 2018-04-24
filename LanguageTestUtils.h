@@ -15,6 +15,7 @@ namespace Winter
 
 const uint32 INVALID_OPENCL = 1; // Flag value
 const uint32 ALLOW_UNSAFE = 2; // Flag value
+const uint32 INCLUDE_EXTERNAL_MATHS_FUNCS = 32; // Flag value
 
 
 struct TestResults
