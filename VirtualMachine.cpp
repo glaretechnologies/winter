@@ -551,6 +551,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 		true, // hidden_voidptr_arg
 		args.try_coerce_int_to_double_first,
 		args.emit_in_bound_asserts,
+		args.real_is_double,
 		args.env
 	),
 	//env(args.env),

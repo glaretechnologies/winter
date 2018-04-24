@@ -4038,6 +4038,12 @@ void LanguageTests::run()
 	testMainFloatArg("def main(real x) real :  x", 1.0f, 1.0f);
 	testMainDoubleArg("def main(real x) real :  x", 1.0f, 1.0f);
 
+	// test toReal()
+	testMainFloatArg("def main(float x) float :  x + toReal(10)", 1.0f, 11.0f);
+	testMainFloatArg("def main(float x) float :  toReal(truncateToInt(x))", 3.1f, 3.0f);
+	testMainDoubleArg("def main(double x) double :  x + toReal(10)", 1.0, 11.0);
+	testMainDoubleArg("def main(double x) double :  toReal(truncateToInt(x))", 3.1, 3.0);
+
 
 
 	// ===================================================================

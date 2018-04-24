@@ -24,7 +24,8 @@ class ExternalFunction;
 class Linker
 {
 public:
-	Linker(bool hidden_voidptr_arg, bool try_coerce_int_to_double_first, bool emit_in_bound_asserts, void* env);
+	Linker(bool hidden_voidptr_arg, bool try_coerce_int_to_double_first, bool emit_in_bound_asserts, 
+		bool real_is_double, void* env);
 	~Linker();
 
 	void addFunctions(const std::vector<FunctionDefinitionRef>& func_defs);
@@ -73,6 +74,7 @@ public:
 	bool hidden_voidptr_arg;
 	bool try_coerce_int_to_double_first;
 	bool emit_in_bound_asserts;
+	bool real_is_double;
 	void* env;
 };
 

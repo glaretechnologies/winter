@@ -22,10 +22,12 @@ namespace Winter
 {
 
 
-Linker::Linker(bool hidden_voidptr_arg_, bool try_coerce_int_to_double_first_, bool emit_in_bound_asserts_, void* env_)
+Linker::Linker(bool hidden_voidptr_arg_, bool try_coerce_int_to_double_first_, bool emit_in_bound_asserts_, 
+	bool real_is_double_, void* env_)
 :	hidden_voidptr_arg(hidden_voidptr_arg_),
 	try_coerce_int_to_double_first(try_coerce_int_to_double_first_),
 	emit_in_bound_asserts(emit_in_bound_asserts_),
+	real_is_double(real_is_double_),
 	env(env_)
 {}
 
@@ -370,6 +372,18 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 			if(sig.name == "toDouble")
 			{
 				FunctionDefinitionRef def = makeBuiltInFuncDef<ToDoubleBuiltInFunc>(sig.name, sig.param_types[0], ToDoubleBuiltInFunc::getReturnType(sig.param_types[0]));
+				this->sig_to_function_map.insert(std::make_pair(sig, def));
+				return def;
+			}
+
+			if(sig.name == "toReal")
+			{
+				FunctionDefinitionRef def;
+				if(real_is_double)
+					def = makeBuiltInFuncDef<ToDoubleBuiltInFunc>(sig.name, sig.param_types[0], ToDoubleBuiltInFunc::getReturnType(sig.param_types[0]));
+				else
+					def = makeBuiltInFuncDef<ToFloatBuiltInFunc>(sig.name, sig.param_types[0], ToFloatBuiltInFunc::getReturnType(sig.param_types[0]));
+
 				this->sig_to_function_map.insert(std::make_pair(sig, def));
 				return def;
 			}
