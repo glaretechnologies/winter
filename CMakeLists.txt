@@ -13,14 +13,18 @@ set(WINTER_USE_OPENCL TRUE)
 if(WIN32)
 	if(CMAKE_CL_64)
 		set(WINTER_64_BIT TRUE)
+		set(WINTER_BITNESS 64)
 		set(PROJECT_NAME "winter64")
 	else()
 		set(WINTER_64_BIT FALSE)
+		set(WINTER_BITNESS 32)
 		set(PROJECT_NAME "winter32")
 	endif()
 else()
 	#linux stuff goes here
 	set(WINTER_64_BIT FALSE)
+	set(WINTER_BITNESS 64)
+	set(PROJECT_NAME "winter64")
 endif()
 
 # Set the real project name
@@ -62,53 +66,21 @@ string(REPLACE "." "_" LLVM_VERSION_PATH ${LLVM_VERSION})
 set(LIBS_ENV "D:/programming")
 
 if(WIN32)
-	# VS subdir
-	if(MSVC_VERSION EQUAL 1500) # VS2008
-		set(VS_SUB_DIR "vs2008")
-	elseif(MSVC_VERSION EQUAL 1600) # VS2010
-		set(VS_SUB_DIR "vs2010")
+	if(MSVC_VERSION EQUAL 1600) # VS2012
+		set(INDIGO_VS_VER 2010)
 	elseif(MSVC_VERSION EQUAL 1700) # VS2012
-		set(VS_SUB_DIR "vs2012")
-	endif()
-		
-	if(WINTER_64_BIT)
-		if(MSVC_VERSION EQUAL 1500) # VS2008
-			set(llvmdir "${LIBS_ENV}/llvm/llvm_${LLVM_VERSION_PATH}_install_vs2008_64")
-		elseif(MSVC_VERSION EQUAL 1600) # VS2010
-			set(llvmdir "${LIBS_ENV}/llvm/llvm_${LLVM_VERSION_PATH}_install_vs2010_64")
-		elseif(MSVC_VERSION EQUAL 1700) # VS2012
-			set(llvmdir "${LIBS_ENV}/llvm/llvm_${LLVM_VERSION_PATH}_install_vs2012_64")
-		elseif(MSVC_VERSION EQUAL 1800) # VS2013
-			set(llvmdir "${LIBS_ENV}/llvm/llvm_${LLVM_VERSION_PATH}_install_vs2013_64")
-		else()
-			message(FATAL_ERROR "unhandled MSVC version")
-		endif()
-		
-		#message("llvmdir: ${llvmdir}")
-	
-		
-		# Set the output directory.  Cmake will append the configuration string to this.
-#		set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "$ENV{INDIGO_OUTPUT}/${VS_SUB_DIR}/indigo_x64")
-#		set (CMAKE_LIBRARY_OUTPUT_DIRECTORY "$ENV{INDIGO_OUTPUT}/${VS_SUB_DIR}/indigo_x64")
-#		set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY "$ENV{INDIGO_OUTPUT}/${VS_SUB_DIR}/indigo_x64")
+		set(INDIGO_VS_VER 2012)
+	elseif(MSVC_VERSION EQUAL 1800) # VS2013
+		set(INDIGO_VS_VER 2013)
+	elseif(MSVC_VERSION EQUAL 1900) # VS2015
+		set(INDIGO_VS_VER 2015)
+	elseif(MSVC_VERSION EQUAL 1911 OR MSVC_VERSION EQUAL 1912) # VS2017
+		set(INDIGO_VS_VER 2017)
 	else()
-		if(MSVC_VERSION EQUAL 1500) # VS2008
-			set(llvmdir "${LIBS_ENV}/llvm/llvm_${LLVM_VERSION_PATH}_install_vs2008_32")
-		elseif(MSVC_VERSION EQUAL 1600) # VS2010
-			set(llvmdir "${LIBS_ENV}/llvm/llvm_${LLVM_VERSION_PATH}_install_vs2010_32")
-		elseif(MSVC_VERSION EQUAL 1700) # VS2012
-			set(llvmdir "${LIBS_ENV}/llvm/llvm_${LLVM_VERSION_PATH}_install_vs2012_32")
-		elseif(MSVC_VERSION EQUAL 1800) # VS2013
-			set(llvmdir "${LIBS_ENV}/llvm/llvm_${LLVM_VERSION_PATH}_install_vs2013_32")
-		else()
-			message(FATAL_ERROR "unhandled MSVC version")
-		endif()
-		
-		# Set the output directory.  Cmake will append the configuration string to this.
-#		set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "$ENV{INDIGO_OUTPUT}/${VS_SUB_DIR}/indigo_x86")
-#		set (CMAKE_LIBRARY_OUTPUT_DIRECTORY "$ENV{INDIGO_OUTPUT}/${VS_SUB_DIR}/indigo_x86")
-#		set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY "$ENV{INDIGO_OUTPUT}/${VS_SUB_DIR}/indigo_x86")	
+		message(FATAL_ERROR "Unhandled MSVC version")
 	endif()
+	
+	set(llvmdir "${LIBS_ENV}/llvm/llvm_${LLVM_VERSION_PATH}_install_vs${INDIGO_VS_VER}_${WINTER_BITNESS}")
 	
 else() # Mac or Linux.
 	set(llvmdir "${LIBS_ENV}/llvm/llvm_${LLVM_VERSION_PATH}_install")
@@ -325,6 +297,8 @@ if(WINTER_USE_OPENCL)
 	${INDIGO_TRUNK_DIR}/opencl/OpenCLBuffer.h
 	${INDIGO_TRUNK_DIR}/opencl/OpenCLContext.cpp
 	${INDIGO_TRUNK_DIR}/opencl/OpenCLContext.h
+	${INDIGO_TRUNK_DIR}/opencl/OpenCLPlatform.cpp
+	${INDIGO_TRUNK_DIR}/opencl/OpenCLPlatform.h
 	${INDIGO_TRUNK_DIR}/opencl/OpenCLProgram.cpp
 	${INDIGO_TRUNK_DIR}/opencl/OpenCLProgram.h
 	${INDIGO_TRUNK_DIR}/opencl/OpenCLCommandQueue.cpp
@@ -345,7 +319,8 @@ ${llvmdir}/include
 ${INDIGO_TRUNK_DIR}
 ${INDIGO_TRUNK_DIR}/utils
 ${INDIGO_TRUNK_DIR}/maths
-${INDIGO_TRUNK_DIR}/zstd-1.0.0/lib/common/
+${INDIGO_TRUNK_DIR}/zstd-1.0.0/lib/common
+${INDIGO_TRUNK_DIR}/opencl/khronos
 ${WINTER_INCLUDE_DIRS}
 )
 
