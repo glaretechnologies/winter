@@ -3786,6 +3786,22 @@ static void testVectors()
 }
 
 
+static void testFunctionRedefinition()
+{
+	// Disallow definition of same function (with same signature) twice.
+	testMainFloatArgInvalidProgram("def f(float x) : x   def f(float x) : x     def main(float x) float : f(2.0)");
+}
+
+
+static void testUseOfLaterDefinition()
+{
+	testMainFloatArgInvalidProgram(
+		"def main(float x) float : f(2.0f)  \n"
+		"def f(float x) : x"
+	);
+}
+
+
 void LanguageTests::run()
 {
 	Timer timer;
@@ -3991,6 +4007,10 @@ void LanguageTests::run()
 	testStructs();
 
 	testVectors();
+
+	testFunctionRedefinition();
+
+	testUseOfLaterDefinition();
 
 
 	// TODO: why is this vector being parsed as doubles?

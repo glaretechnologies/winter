@@ -282,7 +282,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 	if(sig_lookup_res != sig_to_function_map.end())
 	{
 		if(sig_lookup_res->second->order_num >= effective_callsite_order_num && effective_callsite_order_num != -1)
-			throw BaseException("Tried to refer to a function defined later: " + sig.toString());
+			throw BaseException("Tried to refer to a function defined later: " + sig.toString() + errorContext(call_src_location) + "\ntried to call function defined later: " + errorContext(*sig_lookup_res->second));
 		//if(sig_lookup_res->second->order_num < effective_callsite_order_num || effective_callsite_order_num == -1) //  !func_def_stack || isTargetDefinedBeforeAllInStack(*func_def_stack, sig_lookup_res->second->order_num))
 		return sig_lookup_res->second;
 	}

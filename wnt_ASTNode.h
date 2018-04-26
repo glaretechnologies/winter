@@ -52,6 +52,7 @@ class TraversalPayload;
 class LetBlock;
 class NamedConstant;
 struct ProgramStats;
+class SrcLocation;
 
 
 typedef std::map<ASTNode*, ASTNode*> CloneMapType;
@@ -155,6 +156,7 @@ void doImplicitIntToFloatTypeCoercionForFloatReturn(Reference<ASTNode>& expr, Tr
 void doImplicitIntToDoubleTypeCoercionForDoubleReturn(Reference<ASTNode>& expr, TraversalPayload& payload);
 const std::string errorContext(const ASTNode* n);
 const std::string errorContext(const ASTNode& n);
+const std::string errorContext(const SrcLocation& src_location);
 const std::string errorContext(const ASTNode& n, TraversalPayload& payload);
 bool isTargetDefinedBeforeAllInStack(const std::vector<FunctionDefinition*>& func_def_stack, int target_function_order_num);
 bool expressionIsWellTyped(ASTNode& e, TraversalPayload& payload_);

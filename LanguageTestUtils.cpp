@@ -116,7 +116,7 @@ static ValueRef testExternalFuncInterpreted(const std::vector<ValueRef>& arg_val
 static void testPrint(const std::string& s)
 {
 	// Actually printing out stuff makes the tests dramatically slower to run (like 1.7s -> 6s)
-	// std::cout << (s + "\n");
+	// conPrint(s);
 }
 
 

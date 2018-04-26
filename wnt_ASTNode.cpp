@@ -1140,11 +1140,17 @@ const std::string errorContext(const ASTNode& n)
 	s +=  "In function " + payload.func_def_stack[i]->sig.toString();
 	}*/
 
-	const SourceBuffer* source_buffer = n.srcLocation().source_buffer;
+	return errorContext(n.srcLocation());
+}
+
+
+const std::string errorContext(const SrcLocation& src_location)
+{
+	const SourceBuffer* source_buffer = src_location.source_buffer;
 	if(source_buffer == NULL)
 		return "Invalid Location";
 
-	return Diagnostics::positionString(*source_buffer, n.srcLocation().char_index);
+	return Diagnostics::positionString(*source_buffer, src_location.char_index);
 }
 
 
