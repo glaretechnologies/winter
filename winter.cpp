@@ -9,6 +9,7 @@ Copyright Glare Technologies Limited 2015 -
 #include "TokenBase.h"
 #include "wnt_LangParser.h"
 #include "wnt_ASTNode.h"
+#include "wnt_MathsFuncs.h"
 #include "VMState.h"
 #include "Linker.h"
 #include "Value.h"
@@ -67,6 +68,9 @@ int main(int argc, char** argv)
 
 		VMConstructionArgs vm_args;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer(argv[1], filecontents)));
+
+		MathsFuncs::appendExternalMathsFuncs(vm_args.external_functions);
+
 		VirtualMachine vm(vm_args);
 
 
