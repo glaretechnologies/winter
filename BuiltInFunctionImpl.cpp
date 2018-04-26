@@ -2259,8 +2259,8 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	else
 	{
 		// Copy from state_alloca to return_ptr
-		llvm::Value* running_state = params.builder->CreateLoad(state_alloca);
-		params.builder->CreateStore(running_state, return_ptr);
+		llvm::Value* running_state_ = params.builder->CreateLoad(state_alloca);
+		params.builder->CreateStore(running_state_, return_ptr);
 		return return_ptr;
 	}
 }

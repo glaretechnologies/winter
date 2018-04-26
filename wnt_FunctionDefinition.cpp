@@ -852,8 +852,8 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		);
 
 		llvm::Value* func_field_ptr = params.builder->CreateStructGEP(closure_pointer, Function::functionPtrIndex(), "function_field_ptr");
-		llvm::StoreInst* store_inst = params.builder->CreateStore(func, func_field_ptr); // Do the store.
-		addMetaDataCommentToInstruction(params, store_inst, "Store function pointer in closure");
+		llvm::StoreInst* store_inst_ = params.builder->CreateStore(func, func_field_ptr); // Do the store.
+		addMetaDataCommentToInstruction(params, store_inst_, "Store function pointer in closure");
 	}
 
 	// Store captured vars in closure.
@@ -887,13 +887,13 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			val = params.let_values[let_node];
 
 			// NOTE: This code is duplicated from Variable.  de-duplicate.
-			TypeRef cap_var_type = this->captured_vars[i].type();
+			TypeRef cap_var_type_win = this->captured_vars[i].type();
 
 			if(let_node->vars.size() > 1)
 			{
 				// Destructuring assignment, we just want to return the individual tuple element.
 				// Value should be a pointer to a tuple struct.
-				if(cap_var_type->passByValue())
+				if(cap_var_type_win->passByValue())
 				{
 					llvm::Value* tuple_elem = params.builder->CreateLoad(params.builder->CreateStructGEP(val, this->captured_vars[i].let_var_index, "tuple_elem_ptr"));
 					val = tuple_elem;
@@ -929,9 +929,9 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		
 		// store in captured var structure field
 		llvm::Value* field_ptr = params.builder->CreateStructGEP(captured_var_struct_ptr, (unsigned int)i, "captured_var_" + toString(i) + "_field_ptr");
-		llvm::StoreInst* store_inst = params.builder->CreateStore(val, field_ptr);
+		llvm::StoreInst* store_inst_ = params.builder->CreateStore(val, field_ptr);
 
-		addMetaDataCommentToInstruction(params, store_inst, "Store captured var " + toString(i) + " in closure");
+		addMetaDataCommentToInstruction(params, store_inst_, "Store captured var " + toString(i) + " in closure");
 
 		// If the captured var is a ref-counted type, we need to increment its reference count, since the struct now holds a reference to it. 
 		captured_var_struct_type->component_types[i]->emitIncrRefCount(params, val, "Capture var ref count increment");
@@ -976,9 +976,9 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		builder.CreateRetVoid();
 
 		// Store a pointer to the destructor in the closure.
-		llvm::StoreInst* store_inst = params.builder->CreateStore(destructor, params.builder->CreateStructGEP(closure_pointer, Function::destructorPtrIndex(), "destructor ptr"));
+		llvm::StoreInst* store_inst_ = params.builder->CreateStore(destructor, params.builder->CreateStructGEP(closure_pointer, Function::destructorPtrIndex(), "destructor ptr"));
 
-		addMetaDataCommentToInstruction(params, store_inst, "Store destructor in closure");
+		addMetaDataCommentToInstruction(params, store_inst_, "Store destructor in closure");
 	}
 
 

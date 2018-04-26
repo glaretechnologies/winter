@@ -608,16 +608,16 @@ static ASTNodeRef buildRandomASSubTree(BuildRandomSubTreeArgs& args, MTwister& r
 				case ASTNode::ComparisonExpressionType:
 					{
 						Reference<TokenBase> token;
-						const float z = rng.unitRandom();
-						if(z < 1.f/6)
+						const float q = rng.unitRandom();
+						if(q < 1.f/6)
 							token = new LEFT_ANGLE_BRACKET_Token(0);
-						else if(z < 2.f/6)
+						else if(q < 2.f/6)
 							token = new RIGHT_ANGLE_BRACKET_Token(0);
-						else if(z < 3.f/6)
+						else if(q < 3.f/6)
 							token = new DOUBLE_EQUALS_Token(0);
-						else if(z < 4.f/6)
+						else if(q < 4.f/6)
 							token = new NOT_EQUALS_Token(0);
-						else if(z < 5.f/6)
+						else if(q < 5.f/6)
 							token = new LESS_EQUAL_Token(0);
 						else
 							token = new GREATER_EQUAL_Token(0);
@@ -738,12 +738,12 @@ public:
 					);
 
 					// Try and find function 'main'
-					for(size_t i=0; i<root->top_level_defs.size(); ++i)
+					for(size_t z=0; z<root->top_level_defs.size(); ++z)
 					{
-						if(root->top_level_defs[i]->nodeType() == ASTNode::FunctionDefinitionType)
+						if(root->top_level_defs[z]->nodeType() == ASTNode::FunctionDefinitionType)
 						{
-							if(root->top_level_defs[i].downcastToPtr<FunctionDefinition>()->sig.name == "main")
-								main_def = root->top_level_defs[i].downcast<FunctionDefinition>();
+							if(root->top_level_defs[z].downcastToPtr<FunctionDefinition>()->sig.name == "main")
+								main_def = root->top_level_defs[z].downcast<FunctionDefinition>();
 						}
 					}
 				}
@@ -972,7 +972,7 @@ done:
 
 				try
 				{
-					const size_t MAX_FUZZ_OUTPUT_FILE_SIZE = 20000000;
+					const int64 MAX_FUZZ_OUTPUT_FILE_SIZE = 20000000;
 					if(outfile.tellp() > MAX_FUZZ_OUTPUT_FILE_SIZE)
 					{
 						// Close, then re-open with truncation to clear the file.
