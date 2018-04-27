@@ -1456,28 +1456,25 @@ ASTNodeRef LangParser::parseHighPrecedenceExpression(ParseInfo& p)
 		}
 		else if(isTokenCurrent(OPEN_SQUARE_BRACKET_TOKEN, p))
 		{
-			p.i++; // Skip OPEN_SQUARE_BRACKET_TOKEN
+			// Parse subscript (indexing) expression, e.g. '[' expr ']'
+			// We may have to backtrack if this turns out to be an array literal (e.g. "[1]a")
+
+			skipExpectedToken(OPEN_SQUARE_BRACKET_TOKEN, p);
 
 			ASTNodeRef index_expr = parseExpression(p);
 
 			if(isTokenCurrent(CLOSE_SQUARE_BRACKET_TOKEN, p))
 			{
-				skipExpectedToken(CLOSE_SQUARE_BRACKET_TOKEN, p);
-
-				if(isTokenCurrent(IDENTIFIER_TOKEN, p))
+				if(p.tokens[p.i].downcastToPtr<CLOSE_SQUARE_BRACKET_Token>()->suffix.size())
 				{
-					const std::string& id = p.tokens[p.i]->getIdentifierValue();
-					if(id == "a" || id == "v" || id == "t")
-					{
-						// This was a one-element collection literal, e.g "[1]a"
-						// Back-track
-						p.i = initial_pos;
-						return left;
-						//ASTNodeRef literal = parseArrayOrVectorLiteralOrArraySubscriptExpression(p);
-					}
+					// This was a one-element collection literal, e.g "[1]a", then back-track.
+					p.i = initial_pos;
+					return left;
 				}
 
-				// Could either return a FunctionExpression for 'elem', or a ArraySubscript ASTNode.
+				skipExpectedToken(CLOSE_SQUARE_BRACKET_TOKEN, p);
+
+				// Could either return a FunctionExpression for 'elem', or an ArraySubscript ASTNode.
 				left = new FunctionExpression(loc, "elem", left, index_expr);
 			}
 			else if(isTokenCurrent(COMMA_TOKEN, p)) // Then this was actually a collection literal after another expression, e.g. : " x < y [a, b, c]a" etc..
@@ -1585,7 +1582,12 @@ ASTNodeRef LangParser::parseArrayOrVectorOrTupleLiteral(ParseInfo& p)
 		parseToken(COMMA_TOKEN, p);
 	}
 
-	parseToken(CLOSE_SQUARE_BRACKET_TOKEN, p);
+	if(!isTokenCurrent(CLOSE_SQUARE_BRACKET_TOKEN, p))
+		throw LangParserExcep("Expected " + tokenName(CLOSE_SQUARE_BRACKET_TOKEN) + ", found " + tokenDescription(p.tokens[p.i]) + "." + errorPosition(p));
+
+	const std::string& suffix = p.tokens[p.i].downcastToPtr<CLOSE_SQUARE_BRACKET_Token>()->suffix;
+
+	skipExpectedToken(CLOSE_SQUARE_BRACKET_TOKEN, p);
 
 	/*const bool is_subscript_operator = elems.size() == 1 && !isTokenCurrent(IDENTIFIER_TOKEN, p);
 
@@ -1598,52 +1600,50 @@ ASTNodeRef LangParser::parseArrayOrVectorOrTupleLiteral(ParseInfo& p)
 		return func_expr;
 	}*/
 
-	//if(isTokenCurrent(IDENTIFIER_TOKEN, p))
-	const std::string id = parseIdentifier("square bracket literal suffix", p);
-	if(hasPrefix(id, "a"))
+	if(hasPrefix(suffix, "a"))
 	{
 		int int_suffix = 0;
 		bool has_int_suffix = false;
-		Parser temp_p(id.c_str(), (int)id.size());
+		Parser temp_p(suffix.c_str(), (int)suffix.size());
 		temp_p.advance(); // Advance past 'a'
 		if(!temp_p.eof())
 		{
 			has_int_suffix = true;
 			if(!temp_p.parseInt(int_suffix))
-				throw LangParserExcep("Invalid square bracket literal suffix '" + id + "'.");
+				throw LangParserExcep("Invalid square bracket literal suffix '" + suffix + "'.");
 		}
 		return ASTNodeRef(new ArrayLiteral(elems, loc, has_int_suffix, int_suffix));
 	}
-	else if(hasPrefix(id, "va"))
+	else if(hasPrefix(suffix, "va"))
 	{
 		int int_suffix = 0;
 		bool has_int_suffix = false;
-		Parser temp_p(id.c_str(), (int)id.size());
+		Parser temp_p(suffix.c_str(), (int)suffix.size());
 		temp_p.advance(); // Advance past 'v'
 		temp_p.advance(); // Advance past 'a'
 		if(!temp_p.eof())
 		{
 			has_int_suffix = true;
 			if(!temp_p.parseInt(int_suffix))
-				throw LangParserExcep("Invalid square bracket literal suffix '" + id + "'.");
+				throw LangParserExcep("Invalid square bracket literal suffix '" + suffix + "'.");
 		}
 		return new VArrayLiteral(elems, loc, has_int_suffix, int_suffix);
 	}
-	else if(hasPrefix(id, "v"))
+	else if(hasPrefix(suffix, "v"))
 	{
 		int int_suffix = 0;
 		bool has_int_suffix = false;
-		Parser temp_p(id.c_str(), (int)id.size());
+		Parser temp_p(suffix.c_str(), (int)suffix.size());
 		temp_p.advance(); // Advance past 'v'
 		if(!temp_p.eof())
 		{
 			has_int_suffix = true;
 			if(!temp_p.parseInt(int_suffix))
-				throw LangParserExcep("Invalid square bracket literal suffix '" + id + "'.");
+				throw LangParserExcep("Invalid square bracket literal suffix '" + suffix + "'.");
 		}
 		return ASTNodeRef(new VectorLiteral(elems, loc, has_int_suffix, int_suffix));
 	}
-	if(hasPrefix(id, "t"))
+	if(hasPrefix(suffix, "t"))
 	{
 		return ASTNodeRef(new TupleLiteral(elems, loc));
 	}
@@ -1652,7 +1652,7 @@ ASTNodeRef LangParser::parseArrayOrVectorOrTupleLiteral(ParseInfo& p)
 		//if(elems.size() > 1)
 		//{
 		//	// This is definitely a vector or array literal without the suffix.
-			throw LangParserExcep("Unknown square bracket literal suffix '" + id + "'.");
+			throw LangParserExcep("Unknown square bracket literal suffix '" + suffix + "'.");
 		/*}
 		else
 		{

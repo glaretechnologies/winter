@@ -2916,6 +2916,34 @@ static void testLetBlocks()
 					y \
 				  def main() float : f()", 2.0);
 
+	// Test array subscripting in let clause
+	testMainFloatArg("						\n\
+		def f(array<float, 4> a) float : 	\n\
+			let								\n\
+				v = a[0]					\n\
+				v1 = a[1]					\n\
+				v2 = a[2]					\n\
+			in								\n\
+				v							\n\
+		def main(float y) float	:			\n\
+			f([y,y,y,y]a)",
+		1.0f,
+		1.0f
+	);
+
+	// Test also that the second let clause with var name 'a' does not get interpreted as a suffix for an array literal on '[0]',
+	testMainFloatArg("									\n\
+		def f(array<float, 4> the_array) float : 		\n\
+			let											\n\
+				v = the_array[0]						\n\
+				a = the_array[1]						\n\
+			in											\n\
+				v										\n\
+		def main(float y) float	:						\n\
+			f([y,y,y,y]a)",
+		1.0f,
+		1.0f
+	);
 }
 
 
@@ -3999,7 +4027,7 @@ void LanguageTests::run()
 	testOperatorOverloading();
 
 	testComparisons();
-	
+
 	testLetBlocks();
 	
 	testLambdaExpressionsAndClosures();

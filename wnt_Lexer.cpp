@@ -430,8 +430,31 @@ void Lexer::process(const SourceBufferRef& src, std::vector<Reference<TokenBase>
 		}
 		else if(parser.current() == ']')
 		{
-			tokens_out.push_back(new CLOSE_SQUARE_BRACKET_Token(parser.currentPos()));
+			Reference<CLOSE_SQUARE_BRACKET_Token> t = new CLOSE_SQUARE_BRACKET_Token(parser.currentPos());
+
 			parser.advance();
+			// Parse option suffix for array, vector, varray and tuple literals.
+			if(parser.currentIsChar('a') || parser.currentIsChar('v') || parser.currentIsChar('t'))
+			{
+				// Parse suffix
+				t->suffix.push_back(parser.current());
+				parser.advance();
+
+				if(t->suffix[0] == 'v' && parser.currentIsChar('a')) // Parse 'va' suffix
+				{
+					t->suffix.push_back(parser.current());
+					parser.advance();
+				}
+
+				// Parse optional numerical suffix on the suffix.
+				while(parser.notEOF() && isNumeric(parser.current()))
+				{
+					t->suffix.push_back(parser.current());
+					parser.advance();
+				}
+			}
+
+			tokens_out.push_back(t);
 		}
 		else if(parser.current() == '{')
 		{

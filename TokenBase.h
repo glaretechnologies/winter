@@ -206,6 +206,7 @@ class CLOSE_SQUARE_BRACKET_Token : public TokenBase
 {
 public:
 	CLOSE_SQUARE_BRACKET_Token(unsigned int char_index) : TokenBase(char_index, CLOSE_SQUARE_BRACKET_TOKEN) {}
+	std::string suffix;
 };
 
 

@@ -65,21 +65,23 @@ parseExpression
 |
 parseLetBLock
 |
-----------------------------------------	    
+----------------------------------------
 |                                      |
 |                                    parseLet
 parseTernaryConditionalExpression
-parseBinaryLogicalExpression       
-parseComparisonExpression        
+parseBinaryLogicalExpression
+parseBinaryBitwiseExpression
+parseComparisonExpression
+parseShiftExpression
 parseAddSubExpression
 parseMulDivExpression
 parseUnaryExpression
-parseHighPrecedenceExpression (function call, array subscript, field access)
+parseHighPrecedenceExpression (function call, array subscript  (or one element array literal??), field access)
 parseBasicExpression
 |
-------------------------------------------------------------------------------------------------
-|                   |                             |                        |
-parseLiteral	parseIfExpression     parseVariableExpression   parseMapLiteralExpression	   parseArrayOrVectorLiteralOrArraySubscriptExpression
+-------------------------------------------------------------------------------------------------------------------------------------
+|                   |                             |                      |                                    |                     |
+parseLiteral   parseIfExpression   parseVariableExpression   parseMapLiteralExpression    parseArrayOrVectorOrTupleLiteral   parseAnonFunction
 
 
 
