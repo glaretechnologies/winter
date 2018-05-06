@@ -2366,20 +2366,43 @@ llvm::Value* DotProductBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) con
 	llvm::Value* a = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
 	llvm::Value* b = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
 
-	// If have SSE4.1 and this is a 4-vector, using DPPS instruction
+	// If have SSE4.1 and this is a 4-vector of floats, using DPPS instruction
 	if(vector_type->elem_type->getType() == Type::FloatType && this->vector_type->num == 4 && params.cpu_info->sse4_1)
 	{
 		// Emit dot product intrinsic
-		vector<llvm::Value*> args;
+		llvm::SmallVector<llvm::Value*, 3> args;
 		args.push_back(a);
 		args.push_back(b);
 #if TARGET_LLVM_VERSION <= 34
-		args.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(32, 255))); // SSE DPPS control bits
+		args.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(/*num bits=*/32, 255))); // SSE DPPS control bits
 #else
-		args.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(8, 255))); // SSE DPPS control bits
+		args.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(/*num bits=*/8, 255))); // SSE DPPS control bits
 #endif
 
 		llvm::Function* dot_func = llvm::Intrinsic::getDeclaration(params.module, llvm::Intrinsic::x86_sse41_dpps);
+
+		// dot product intrinsic returns a 4-vector.
+		llvm::Value* vector_res = params.builder->CreateCall(dot_func, args, "Vector_res");
+
+		return params.builder->CreateExtractElement(
+			vector_res, // vec
+			llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0)) // index
+		);
+	}
+	// If have SSE4.1 and this is a 2-vector of doubles, using DPPD instruction
+	else if(vector_type->elem_type->getType() == Type::DoubleType && this->vector_type->num == 2 && params.cpu_info->sse4_1)
+	{
+		// Emit dot product intrinsic
+		llvm::SmallVector<llvm::Value*, 3> args;
+		args.push_back(a);
+		args.push_back(b);
+#if TARGET_LLVM_VERSION <= 34
+		args.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(/*num bits=*/32, 255))); // SSE DPPD control bits
+#else
+		args.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(/*num bits=*/8, 255))); // SSE DPPD control bits
+#endif
+
+		llvm::Function* dot_func = llvm::Intrinsic::getDeclaration(params.module, llvm::Intrinsic::x86_sse41_dppd);
 
 		// dot product intrinsic returns a 4-vector.
 		llvm::Value* vector_res = params.builder->CreateCall(dot_func, args, "Vector_res");

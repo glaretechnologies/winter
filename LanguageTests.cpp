@@ -5116,6 +5116,15 @@ TEMP OPENCL
 	testMainDoubleArg("	def main(double x) double : \
 					 let v = [x, x, x, x]v in\
 					 dot(v, v)", 4.0, 64.0);
+
+	// 2-vector dot product
+	testMainFloatArg("def main(float x) float : \
+					 let v = [x, x]v in\
+					 dot(v, v)", 4.0f, 32.0f);
+
+	testMainDoubleArg("def main(double x) double : \
+					 let v = [x, x]v in\
+					 dot(v, v)", 4.0, 32.0);
 	
 
 	// Test avoidance of circular variable definition: 
