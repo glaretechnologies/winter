@@ -18,6 +18,7 @@ Generated at 2011-04-25 19:15:40 +0100
 #include "Value.h"
 #include "Linker.h"
 #include "BuiltInFunctionImpl.h"
+#include "LLVMUtils.h"
 #include "LLVMTypeUtils.h"
 #include "utils/StringUtils.h"
 #ifdef _MSC_VER // If compiling with Visual C++
@@ -831,14 +832,14 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 
 	// Set the reference count in the closure to 1
-	llvm::Value* closure_ref_count_ptr = params.builder->CreateStructGEP(closure_pointer, 0, "closure_ref_count_ptr");
+	llvm::Value* closure_ref_count_ptr = LLVMUtils::createStructGEP(params.builder, closure_pointer, 0, "closure_ref_count_ptr");
 	llvm::Value* one = llvm::ConstantInt::get(*params.context, llvm::APInt(64, 1, /*signed=*/true));
 	llvm::StoreInst* store_inst = params.builder->CreateStore(one, closure_ref_count_ptr);
 	addMetaDataCommentToInstruction(params, store_inst, "Set initial ref count to 1");
 	
 
 	// Set the flags
-	llvm::Value* flags_ptr = params.builder->CreateStructGEP(closure_pointer, 1, "closure_flags_ptr");
+	llvm::Value* flags_ptr = LLVMUtils::createStructGEP(params.builder, closure_pointer, 1, "closure_flags_ptr");
 	llvm::Value* flags_contant_val = llvm::ConstantInt::get(*params.context, llvm::APInt(64, initial_flags));
 	llvm::StoreInst* store_flags_inst = params.builder->CreateStore(flags_contant_val, flags_ptr);
 	addMetaDataCommentToInstruction(params, store_flags_inst, "set initial flags to " + toString(initial_flags));
@@ -851,14 +852,14 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			true // use_cap_var_struct_ptr: Since we're storing a func ptr, it will be passed the captured var struct on usage.
 		);
 
-		llvm::Value* func_field_ptr = params.builder->CreateStructGEP(closure_pointer, Function::functionPtrIndex(), "function_field_ptr");
+		llvm::Value* func_field_ptr = LLVMUtils::createStructGEP(params.builder, closure_pointer, Function::functionPtrIndex(), "function_field_ptr");
 		llvm::StoreInst* store_inst_ = params.builder->CreateStore(func, func_field_ptr); // Do the store.
 		addMetaDataCommentToInstruction(params, store_inst_, "Store function pointer in closure");
 	}
 
 	// Store captured vars in closure.
 	
-	llvm::Value* captured_var_struct_ptr = params.builder->CreateStructGEP(closure_pointer, Function::capturedVarStructIndex(), "captured_var_struct_ptr");
+	llvm::Value* captured_var_struct_ptr = LLVMUtils::createStructGEP(params.builder, closure_pointer, Function::capturedVarStructIndex(), "captured_var_struct_ptr");
 
 	// for each captured var
 	for(size_t i=0; i<this->captured_vars.size(); ++i)
@@ -895,12 +896,12 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 				// Value should be a pointer to a tuple struct.
 				if(cap_var_type_win->passByValue())
 				{
-					llvm::Value* tuple_elem = params.builder->CreateLoad(params.builder->CreateStructGEP(val, this->captured_vars[i].let_var_index, "tuple_elem_ptr"));
+					llvm::Value* tuple_elem = params.builder->CreateLoad(LLVMUtils::createStructGEP(params.builder, val, this->captured_vars[i].let_var_index, "tuple_elem_ptr"));
 					val = tuple_elem;
 				}
 				else
 				{
-					llvm::Value* tuple_elem = params.builder->CreateStructGEP(val, this->captured_vars[i].let_var_index, "tuple_elem_ptr");
+					llvm::Value* tuple_elem = LLVMUtils::createStructGEP(params.builder, val, this->captured_vars[i].let_var_index, "tuple_elem_ptr");
 					val = tuple_elem;
 				}
 			}
@@ -917,7 +918,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			
 			llvm::Value* current_func_captured_var_struct = params.builder->CreateBitCast(base_current_func_captured_var_struct, LLVMTypeUtils::pointerType(actual_cap_var_struct_type), "actual_cap_var_struct_type");
 
-			llvm::Value* field_ptr = params.builder->CreateStructGEP(current_func_captured_var_struct, this->captured_vars[i].free_index);
+			llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, current_func_captured_var_struct, this->captured_vars[i].free_index);
 			
 			val = params.builder->CreateLoad(field_ptr);
 		}
@@ -928,7 +929,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 		
 		// store in captured var structure field
-		llvm::Value* field_ptr = params.builder->CreateStructGEP(captured_var_struct_ptr, (unsigned int)i, "captured_var_" + toString(i) + "_field_ptr");
+		llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, captured_var_struct_ptr, (unsigned int)i, "captured_var_" + toString(i) + "_field_ptr");
 		llvm::StoreInst* store_inst_ = params.builder->CreateStore(val, field_ptr);
 
 		addMetaDataCommentToInstruction(params, store_inst_, "Store captured var " + toString(i) + " in closure");
@@ -976,7 +977,10 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		builder.CreateRetVoid();
 
 		// Store a pointer to the destructor in the closure.
-		llvm::StoreInst* store_inst_ = params.builder->CreateStore(destructor, params.builder->CreateStructGEP(closure_pointer, Function::destructorPtrIndex(), "destructor ptr"));
+		llvm::StoreInst* store_inst_ = params.builder->CreateStore(destructor, LLVMUtils::createStructGEP(params.builder, 
+			closure_pointer, 
+			Function::destructorPtrIndex(), 
+			"destructor ptr"));
 
 		addMetaDataCommentToInstruction(params, store_inst_, "Store destructor in closure");
 	}
@@ -999,6 +1003,17 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 	) const
 {
 	return getOrInsertFunction(module, false);
+}
+
+
+static void setArgumentAttributes(llvm::LLVMContext* context, llvm::Function::arg_iterator it, unsigned int index, llvm::AttrBuilder& attr_builder)
+{
+#if TARGET_LLVM_VERSION >= 60
+		it->addAttrs(attr_builder);
+#else
+		llvm::AttributeSet set = llvm::AttributeSet::get(*context, index, attr_builder);
+		it->addAttr(set);
+#endif
 }
 
 
@@ -1095,9 +1110,15 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 
 	llvm::Function* llvm_func = static_cast<llvm::Function*>(llvm_func_constant);
 
-	llvm::AttributeSet attributes = llvm::AttributeSet::get(
+#if TARGET_LLVM_VERSION >= 60
+	typedef	llvm::AttributeList UseAttributeList;
+#else
+	typedef llvm::AttributeSet UseAttributeList;
+#endif
+
+	UseAttributeList attributes = UseAttributeList::get(
 		module->getContext(),
-		llvm::AttributeSet::FunctionIndex, // Index
+		UseAttributeList::FunctionIndex, // Index
 		function_attr_builder);
 
 
@@ -1107,7 +1128,7 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 	// If this is an external allocation function, mark the result as noalias.
 	if(external_function.nonNull() && external_function->is_allocation_function)
 	{
-		llvm_func->addAttribute(llvm::AttributeSet::ReturnIndex, llvm::Attribute::NoAlias);
+		llvm_func->addAttribute(UseAttributeList::ReturnIndex, llvm::Attribute::NoAlias);
 	}
 
 	
@@ -1137,8 +1158,7 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 			llvm::AttrBuilder builder;
 			builder.addAttribute(llvm::Attribute::StructRet);
 			builder.addAttribute(llvm::Attribute::NoAlias);
-			llvm::AttributeSet set = llvm::AttributeSet::get(module->getContext(), 1, builder);
-			AI->addAttr(set);
+			setArgumentAttributes(&module->getContext(), AI, 1, builder);
 		}
 		else if(winter_arg_index >= (int)this->args.size())
 		{
@@ -1150,10 +1170,10 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 
 			builder.addAttribute(llvm::Attribute::ReadOnly); // From LLVM Lang ref: 
 			// "On an argument, this attribute indicates that the function does not write through this pointer argument, even though it may write to the memory that the pointer points to."
-
+			
 			builder.addAttribute(llvm::Attribute::NoAlias);
-			llvm::AttributeSet set = llvm::AttributeSet::get(module->getContext(), 1 + i, builder); // "the attributes for the parameters start at  index `1'." - Attributes.h
-			AI->addAttr(set);
+
+			setArgumentAttributes(&module->getContext(), AI, /*index=*/i + 1, builder); // "the attributes for the parameters start at  index `1'." - Attributes.h
 		}
 		else
 		{
@@ -1163,13 +1183,9 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 			if(!this->args[winter_arg_index].type->passByValue()) // If pointer arg:
 			{
 				llvm::AttrBuilder builder;
-
 				builder.addAttribute(llvm::Attribute::ReadOnly);
-
 				builder.addAttribute(llvm::Attribute::NoAlias);
-
-				llvm::AttributeSet set = llvm::AttributeSet::get(module->getContext(), 1 + i, builder);
-				AI->addAttr(set);
+				setArgumentAttributes(&module->getContext(), AI, /*index=*/i + 1, builder);
 			}
 
 			//if(this->args[i-1].type->getType() == Type::OpaqueTypeType)
@@ -1221,7 +1237,11 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	flags.setNoInfs();
 	flags.setNoSignedZeros();
 
+#if TARGET_LLVM_VERSION >= 60
+	builder.setFastMathFlags(flags);
+#else
 	builder.SetFastMathFlags(flags);
+#endif
 
 	// const bool nsz = builder.getFastMathFlags().noSignedZeros();
 

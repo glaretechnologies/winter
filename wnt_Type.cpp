@@ -90,7 +90,11 @@ llvm::Value* Float::getInvalidLLVMValue(llvm::Module& module) const // For array
 {
 	return llvm::ConstantFP::get(
 		module.getContext(), 
+#if TARGET_LLVM_VERSION >= 60
+		llvm::APFloat::getSNaN(llvm::APFloat::IEEEsingle())
+#else
 		llvm::APFloat::getSNaN(llvm::APFloat::IEEEsingle)
+#endif
 	);
 }
 
@@ -129,7 +133,11 @@ llvm::Value* Double::getInvalidLLVMValue(llvm::Module& module) const // For arra
 {
 	return llvm::ConstantFP::get(
 		module.getContext(), 
+#if TARGET_LLVM_VERSION >= 60
+		llvm::APFloat::getSNaN(llvm::APFloat::IEEEdouble())
+#else
 		llvm::APFloat::getSNaN(llvm::APFloat::IEEEdouble)
+#endif
 	);
 }
 

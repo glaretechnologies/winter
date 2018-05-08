@@ -15,6 +15,7 @@ Copyright Glare Technologies Limited 2016 -
 #include "Value.h"
 #include "Linker.h"
 #include "BuiltInFunctionImpl.h"
+#include "LLVMUtils.h"
 #include "LLVMTypeUtils.h"
 #include "ProofUtils.h"
 #include "utils/StringUtils.h"
@@ -387,10 +388,11 @@ static void emitTracePrintCall(EmitLLVMCodeParams& params, const string& var_nam
 	llvm::Value* string_global = params.builder->CreateGlobalString(var_name);
 
 	// Get a pointer to the zeroth elem
-	llvm::Value* elem_0 = params.builder->CreateStructGEP(string_global, 0);
+	llvm::Value* elem_0 = LLVMUtils::createStructGEP(params.builder, string_global, 0);
 
 	llvm::Function* f = getOrInsertTracePrintFloatCall(params.module);
-	params.builder->CreateCall2(f, elem_0, float_value);
+	llvm::Value* args[2] = { elem_0, float_value };
+	params.builder->CreateCall(f, args);
 }
 
 

@@ -23,8 +23,6 @@ namespace llvm { class Function; };
 namespace llvm { class Value; };
 namespace llvm { class Module; };
 namespace llvm { class LLVMContext; };
-namespace llvm { template<bool preserveNames> class IRBuilderDefaultInserter; };
-namespace llvm { template<bool preserveNames, typename T, typename Inserter > class IRBuilder; };
 namespace PlatformUtils { class CPUInfo; }
 
 

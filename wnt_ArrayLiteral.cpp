@@ -13,6 +13,7 @@ Copyright Glare Technologies Limited 2015 -
 #include "Value.h"
 #include "Linker.h"
 #include "BuiltInFunctionImpl.h"
+#include "LLVMUtils.h"
 #include "LLVMTypeUtils.h"
 #include "ProofUtils.h"
 #include "utils/StringUtils.h"
@@ -340,7 +341,11 @@ llvm::Value* ArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 				array_llvm_values
 			)
 		);
+#if TARGET_LLVM_VERSION >= 60
+		global->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global); // Mark as unnamed_addr - this means the address is not significant, so multiple arrays with the same contents can be combined.
+#else
 		global->setUnnamedAddr(true); // Mark as unnamed_addr - this means the address is not significant, so multiple arrays with the same contents can be combined.
+#endif
 
 		return global;
 	}
@@ -372,7 +377,7 @@ llvm::Value* ArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 		// NOTE: could optimise this more (share value etc..)
 		for(int i=0; i<int_suffix; ++i)
 		{
-			llvm::Value* element_ptr = params.builder->CreateStructGEP(array_addr, i);
+			llvm::Value* element_ptr = LLVMUtils::createStructGEP(params.builder, array_addr, i);
 
 			if(this->elements[0]->type()->passByValue())
 			{
@@ -396,7 +401,7 @@ llvm::Value* ArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 	{
 		for(unsigned int i=0; i<this->elements.size(); ++i)
 		{
-			llvm::Value* element_ptr = params.builder->CreateStructGEP(array_addr, i);
+			llvm::Value* element_ptr = LLVMUtils::createStructGEP(params.builder, array_addr, i);
 
 			if(this->elements[i]->type()->passByValue())
 			{

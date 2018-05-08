@@ -14,6 +14,7 @@ Copyright Glare Technologies Limited 2015 -
 #include "Value.h"
 #include "Linker.h"
 #include "BuiltInFunctionImpl.h"
+#include "LLVMUtils.h"
 #include "LLVMTypeUtils.h"
 #include "ProofUtils.h"
 #include "maths/mathstypes.h"
@@ -562,7 +563,7 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 		);
 
 		// Load the value from the correct field.
-		llvm::Value* field_ptr = params.builder->CreateStructGEP(cap_var_structure, this->free_index);
+		llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, cap_var_structure, this->free_index);
 
 		llvm::Value* field = params.builder->CreateLoad(field_ptr);
 
@@ -593,7 +594,7 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 			// Value should be a pointer to a tuple struct.
 			if(type()->passByValue())
 			{
-				llvm::Value* tuple_elem = params.builder->CreateLoad(params.builder->CreateStructGEP(value, this->let_var_index, "tuple_elem_ptr"));
+				llvm::Value* tuple_elem = params.builder->CreateLoad(LLVMUtils::createStructGEP(params.builder, value, this->let_var_index, "tuple_elem_ptr"));
 
 				// Increment reference count
 				if(params.emit_refcounting_code)
@@ -603,7 +604,7 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 			}
 			else
 			{
-				llvm::Value* tuple_elem = params.builder->CreateStructGEP(value, this->let_var_index, "tuple_elem_ptr");
+				llvm::Value* tuple_elem = LLVMUtils::createStructGEP(params.builder, value, this->let_var_index, "tuple_elem_ptr");
 
 				// Increment reference count
 				if(params.emit_refcounting_code)

@@ -14,6 +14,7 @@ Copyright Glare Technologies Limited 2015 -
 #include "Value.h"
 #include "Linker.h"
 #include "BuiltInFunctionImpl.h"
+#include "LLVMUtils.h"
 #include "LLVMTypeUtils.h"
 #include "ProofUtils.h"
 #include "utils/StringUtils.h"
@@ -229,7 +230,8 @@ llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 			)
 		);
 
-		llvm::CallInst* call_inst = params.builder->CreateCall2(allocateVArrayLLVMFunc, size_B_constant, num_elems, "varray_literal");
+		llvm::Value* args[2] = { size_B_constant, num_elems };
+		llvm::CallInst* call_inst = params.builder->CreateCall(allocateVArrayLLVMFunc, args, "varray_literal");
 
 		// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
 		call_inst->setCallingConv(llvm::CallingConv::C);
@@ -274,7 +276,7 @@ llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 
 
 	// Set the reference count to 1
-	llvm::Value* ref_ptr = params.builder->CreateStructGEP(varray_ptr, 0, "varray_literal_ref_ptr");
+	llvm::Value* ref_ptr = LLVMUtils::createStructGEP(params.builder, varray_ptr, 0, "varray_literal_ref_ptr");
 	llvm::Value* one = llvm::ConstantInt::get(
 		*params.context,
 		llvm::APInt(64, 1, 
@@ -285,7 +287,7 @@ llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 	addMetaDataCommentToInstruction(params, store_inst, "VArray literal set initial ref count to 1");
 
 	// Set VArray length
-	llvm::Value* length_ptr = params.builder->CreateStructGEP(varray_ptr, 1, "varray_literal_length_ptr");
+	llvm::Value* length_ptr = LLVMUtils::createStructGEP(params.builder, varray_ptr, 1, "varray_literal_length_ptr");
 	llvm::Value* length_constant_int = llvm::ConstantInt::get(
 		*params.context,
 		llvm::APInt(64, this->elements.size(), 
@@ -296,13 +298,13 @@ llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 	addMetaDataCommentToInstruction(params, store_length_inst, "VArray literal set initial length count to " + ::toString(this->elements.size()));
 
 	// Set the flags
-	llvm::Value* flags_ptr = params.builder->CreateStructGEP(varray_ptr, 2, "varray_literal_flags_ptr");
+	llvm::Value* flags_ptr = LLVMUtils::createStructGEP(params.builder, varray_ptr, 2, "varray_literal_flags_ptr");
 	llvm::Value* flags_contant_val = llvm::ConstantInt::get(*params.context, llvm::APInt(64, initial_flags));
 	llvm::StoreInst* store_flags_inst = params.builder->CreateStore(flags_contant_val, flags_ptr);
 	addMetaDataCommentToInstruction(params, store_flags_inst, "VArray literal set initial flags to " + toString(initial_flags));
 
 
-	llvm::Value* data_ptr = params.builder->CreateStructGEP(varray_ptr, 3, "varray_literal_data_ptr");
+	llvm::Value* data_ptr = LLVMUtils::createStructGEP(params.builder, varray_ptr, 3, "varray_literal_data_ptr");
 
 	//data_ptr->dump();
 	//data_ptr->getType()->dump();
@@ -314,7 +316,7 @@ llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 		// NOTE: could optimise this more (share value etc..)
 		for(int i=0; i<int_suffix; ++i)
 		{
-			llvm::Value* element_ptr = params.builder->CreateStructGEP(data_ptr, i);
+			llvm::Value* element_ptr = LLVMUtils::createStructGEP(params.builder, data_ptr, i);
 
 			if(this->elements[0]->type()->passByValue())
 			{

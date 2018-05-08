@@ -20,6 +20,7 @@ Generated at 2011-04-30 18:53:38 +0100
 #include "Value.h"
 #include "Linker.h"
 #include "BuiltInFunctionImpl.h"
+#include "LLVMUtils.h"
 #include "LLVMTypeUtils.h"
 #include "ProofUtils.h"
 #include "wnt_IfExpression.h"
@@ -1770,11 +1771,11 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		closure_pointer = this->get_func_expr->emitLLVMCode(params, NULL);
 
 		// Get the actual function pointer from the closure
-		llvm::Value* target_llvm_func_ptr = params.builder->CreateStructGEP(closure_pointer, Function::functionPtrIndex(), "function_ptr_ptr");
+		llvm::Value* target_llvm_func_ptr = LLVMUtils::createStructGEP(params.builder, closure_pointer, Function::functionPtrIndex(), "function_ptr_ptr");
 		target_llvm_func = params.builder->CreateLoad(target_llvm_func_ptr, "function_ptr");
 
 		// Get the captured var struct from the closure
-		captured_var_struct_ptr = params.builder->CreateStructGEP(closure_pointer, Function::capturedVarStructIndex(), "captured_var_struct_ptr"); // field index
+		captured_var_struct_ptr = LLVMUtils::createStructGEP(params.builder, closure_pointer, Function::capturedVarStructIndex(), "captured_var_struct_ptr"); // field index
 	}
 	else // else if this->static_target_function:
 	{
@@ -1794,7 +1795,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			llvm::Value* result;
 			if(field_type->passByValue())
 			{
-				llvm::Value* field_ptr = params.builder->CreateStructGEP(struct_ptr, field_index, get_field_func->struct_type->name + "." + field_name + " ptr");
+				llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, struct_ptr, field_index, get_field_func->struct_type->name + "." + field_name + " ptr");
 				llvm::Value* loaded_val = params.builder->CreateLoad(field_ptr, field_name);
 
 				// TEMP NEW: increment ref count if this is a string
@@ -1805,7 +1806,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			}
 			else
 			{
-				result = params.builder->CreateStructGEP(struct_ptr, field_index, get_field_func->struct_type->name + "." + field_name + " ptr");
+				result = LLVMUtils::createStructGEP(params.builder, struct_ptr, field_index, get_field_func->struct_type->name + "." + field_name + " ptr");
 			}
 
 			field_type->emitIncrRefCount(params, result, "GetField " + get_field_func->struct_type->name + "." + field_name + " result increment");
@@ -1833,7 +1834,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			llvm::Value* result;
 			if(field_type->passByValue())
 			{
-				llvm::Value* field_ptr = params.builder->CreateStructGEP(struct_ptr, field_index, field_name + " ptr");
+				llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, struct_ptr, field_index, field_name + " ptr");
 				llvm::Value* loaded_val = params.builder->CreateLoad(field_ptr, field_name);
 
 				// TEMP NEW: increment ref count if this is a string
@@ -1844,7 +1845,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			}
 			else
 			{
-				result = params.builder->CreateStructGEP(struct_ptr, field_index, field_name + " ptr");
+				result = LLVMUtils::createStructGEP(params.builder, struct_ptr, field_index, field_name + " ptr");
 			}
 
 			field_type->emitIncrRefCount(params, result, "GetTupleElement " + get_field_func->tuple_type->toString() + " " + field_name + " result increment");

@@ -52,7 +52,7 @@ llvm::FunctionType* llvmFunctionType(const std::vector<TypeVRef>& arg_types,
 									 //bool hidden_voidptr_arg
 									 );
 
-llvm::Value* createFieldLoad(llvm::Value* structure_ptr, int field_index, llvm::IRBuilder<>* builder, const llvm::Twine& name);
+//llvm::Value* createFieldLoad(llvm::Value* structure_ptr, int field_index, llvm::IRBuilder<>* builder, const llvm::Twine& name);
 
 void createCollectionCopy(const TypeVRef& collection_type, llvm::Value* dest_ptr, llvm::Value* src_ptr, EmitLLVMCodeParams& params);
 

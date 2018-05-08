@@ -13,6 +13,7 @@ Generated at 2011-04-25 19:15:40 +0100
 #include "Value.h"
 #include "Linker.h"
 #include "BuiltInFunctionImpl.h"
+#include "LLVMUtils.h"
 #include "LLVMTypeUtils.h"
 #include "utils/StringUtils.h"
 #ifdef _MSC_VER // If compiling with Visual C++
@@ -72,7 +73,7 @@ llvm::Function* emitIncrRefCountFunc(llvm::Module* module, const llvm::DataLayou
 	llvm::IRBuilder<> builder(block);
 		
 	llvm::Value* refcounted_val = LLVMTypeUtils::getNthArg(llvm_func, 0); // Get arg 0.
-	llvm::Value* ref_ptr = builder.CreateStructGEP(refcounted_val, 0, "ref_ptr"); // Get pointer to ref count
+	llvm::Value* ref_ptr = LLVMUtils::createStructGEP(&builder, refcounted_val, 0, "ref_ptr"); // Get pointer to ref count
 	llvm::Value* ref_count = builder.CreateLoad(ref_ptr, "ref_count"); // Load the ref count
 	llvm::Value* one = llvm::ConstantInt::get(module->getContext(), llvm::APInt(64, 1, /*signed=*/true));
 	llvm::Value* new_ref_count = builder.CreateAdd(ref_count, one, "incremented_ref_count");
@@ -186,12 +187,12 @@ void emitDecrementorForType(llvm::Module* module, const llvm::DataLayout* target
 	llvm::Value* refcounted_val = LLVMTypeUtils::getNthArg(llvm_func, 0);
 
 	// Load ref count
-	llvm::Value* ref_ptr = builder.CreateStructGEP(refcounted_val, 0, "ref_ptr");
+	llvm::Value* ref_ptr = LLVMUtils::createStructGEP(&builder, refcounted_val, 0, "ref_ptr");
 	llvm::Value* ref_count = builder.CreateLoad(ref_ptr, "ref_count");
 
 	// Load flags
 	const int flags_index = refcounted_type->getType() == Type::FunctionType ? 1 : 2;
-	llvm::Value* flags_ptr = builder.CreateStructGEP(refcounted_val, flags_index, "flags_ptr");
+	llvm::Value* flags_ptr = LLVMUtils::createStructGEP(&builder, refcounted_val, flags_index, "flags_ptr");
 	llvm::Value* flags_val = builder.CreateLoad(flags_ptr, "flags_val");
 
 
@@ -288,7 +289,7 @@ void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_
 			if(struct_type->component_types[i]->hasDestructor())
 			{
 				// Get a pointer to the field memory.
-				llvm::Value* field_ptr = builder.CreateStructGEP(struct_ptr, (unsigned int)i, struct_type->name + "." + struct_type->component_names[i] + " ptr");
+				llvm::Value* field_ptr = LLVMUtils::createStructGEP(&builder, struct_ptr, (unsigned int)i, struct_type->name + "." + struct_type->component_names[i] + " ptr");
 				
 				// If the field type is heap allocated, this means that the element is just a pointer to the field value.
 				// So we need to load the pointer from the structure.
@@ -326,7 +327,7 @@ void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_
 			if(tuple_type->component_types[i]->hasDestructor())
 			{
 				// Get a pointer to the field memory.
-				llvm::Value* field_ptr = builder.CreateStructGEP(struct_ptr, (unsigned int)i, tuple_type->toString() + ".field_" + ::toString(i) + " ptr");
+				llvm::Value* field_ptr = LLVMUtils::createStructGEP(&builder, struct_ptr, (unsigned int)i, tuple_type->toString() + ".field_" + ::toString(i) + " ptr");
 				
 				if(tuple_type->component_types[i]->isHeapAllocated())
 				{
@@ -356,11 +357,11 @@ void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_
 		llvm::Value* closure = LLVMTypeUtils::getNthArg(llvm_func, 0);
 
 		// Load the destructor ptr
-		llvm::Value* destructor_ptr_ptr = builder.CreateStructGEP(closure, Function::destructorPtrIndex(), "destructor_ptr_ptr");
+		llvm::Value* destructor_ptr_ptr = LLVMUtils::createStructGEP(&builder, closure, Function::destructorPtrIndex(), "destructor_ptr_ptr");
 		llvm::Value* destructor_ptr = builder.CreateLoad(destructor_ptr_ptr, 0, "destructor_ptr");
 
 		// Get a pointer to the captured var struct (at the end of the closure)
-		llvm::Value* cap_var_struct_ptr = builder.CreateStructGEP(closure, Function::capturedVarStructIndex(), "cap_var_struct_ptr");
+		llvm::Value* cap_var_struct_ptr = LLVMUtils::createStructGEP(&builder, closure, Function::capturedVarStructIndex(), "cap_var_struct_ptr");
 
 		// Call the destructor!
 		builder.CreateCall(destructor_ptr, cap_var_struct_ptr);
@@ -381,7 +382,7 @@ void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_
 		const TypeVRef elem_type = type.downcastToPtr<VArrayType>()->elem_type;
 
 		// Load number of elements
-		llvm::Value* num_elems_ptr = builder.CreateStructGEP(val, 1, "num elems ptr");
+		llvm::Value* num_elems_ptr = LLVMUtils::createStructGEP(&builder, val, 1, "num elems ptr");
 		llvm::Value* num_elems = builder.CreateLoad(num_elems_ptr);
 
 		// If elements have destructors, loop over them and call the destructor for each one.
@@ -413,7 +414,7 @@ void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_
 			//---------------------
 
 			// Get ptr to varray element
-			llvm::Value* data_ptr = builder.CreateStructGEP(val, 3, "data_ptr"); // [0 x VArray<T>]*
+			llvm::Value* data_ptr = LLVMUtils::createStructGEP(&builder, val, 3, "data_ptr"); // [0 x VArray<T>]*
 
 			//data_ptr->getType()->dump();
 			//std::cout << std::endl;

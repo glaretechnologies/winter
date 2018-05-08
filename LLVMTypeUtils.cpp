@@ -12,7 +12,6 @@ Generated at Wed Oct 20 15:22:37 +1300 2010
 #pragma warning(push, 0) // Disable warnings
 #endif
 #include "llvm/IR/Module.h"
-#include "llvm/PassManager.h"
 #include <llvm/IR/DataLayout.h>
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/IPO.h"
@@ -151,16 +150,16 @@ llvm::FunctionType* llvmFunctionType(const vector<TypeVRef>& arg_types,
 }
 
 
-llvm::Value* createFieldLoad(llvm::Value* structure_ptr, int field_index, 
-							 llvm::IRBuilder<>* builder, const llvm::Twine& name)
-{
-	llvm::Value* field_ptr = builder->CreateStructGEP(structure_ptr, 
-		field_index, // field index
-		name
-	);
-
-	return builder->CreateLoad(field_ptr, name);
-}
+//llvm::Value* createFieldLoad(llvm::Value* structure_ptr, int field_index, 
+//							 llvm::IRBuilder<>* builder, const llvm::Twine& name)
+//{
+//	llvm::Value* field_ptr = builder->CreateStructGEP(structure_ptr->get, structure_ptr, 
+//		field_index, // field index
+//		name
+//	);
+//
+//	return builder->CreateLoad(field_ptr, name);
+//}
 
 
 void createCollectionCopy(const TypeVRef& collection_type, llvm::Value* dest_ptr, llvm::Value* src_ptr, EmitLLVMCodeParams& params)

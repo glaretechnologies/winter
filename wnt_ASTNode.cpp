@@ -25,6 +25,7 @@ File created by ClassTemplate on Wed Jun 11 03:55:25 2008
 #include "VMState.h"
 #include "Linker.h"
 #include "BuiltInFunctionImpl.h"
+#include "LLVMUtils.h"
 #include "LLVMTypeUtils.h"
 #include "ProofUtils.h"
 #include "utils/StringUtils.h"
@@ -1570,7 +1571,7 @@ llvm::Value* StringLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 	llvm::Value* string_global = params.builder->CreateGlobalString(this->value);
 
 	// Get a pointer to the zeroth elem
-	llvm::Value* elem_0 = params.builder->CreateStructGEP(string_global, 0);
+	llvm::Value* elem_0 = LLVMUtils::createStructGEP(params.builder, string_global, 0);
 
 
 	const bool alloc_on_heap = mayEscapeCurrentlyBuildingFunction(params, this->type());
@@ -1629,7 +1630,10 @@ llvm::Value* StringLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 		//	"string_stack_space"
 		//);
 		llvm::Value* alloca_ptr = entry_block_builder.Insert(new llvm::AllocaInst(
-			llvm::Type::getInt8Ty(*params.context), // byte
+			llvm::Type::getInt8Ty(*params.context), // type - byte
+#if TARGET_LLVM_VERSION >= 60
+			0, // address space
+#endif
 			llvm::ConstantInt::get(*params.context, llvm::APInt(64, total_string_size_B, true)), // number of bytes needed.
 			8, // alignment
 			"string_stack_space"
@@ -1642,7 +1646,7 @@ llvm::Value* StringLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 		string_value = params.builder->CreatePointerCast(alloca_ptr, string_type);
 
 		// Emit a memcpy from the global data to the string value
-		llvm::Value* data_ptr = params.builder->CreateStructGEP(string_value, 3, "string_literal_data_ptr");
+		llvm::Value* data_ptr = LLVMUtils::createStructGEP(params.builder, string_value, 3, "string_literal_data_ptr");
 
 		params.builder->CreateMemCpy(data_ptr, elem_0, value.size(), /*align=*/1);
 
@@ -1651,19 +1655,19 @@ llvm::Value* StringLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 
 
 	// Set the reference count to 1
-	llvm::Value* ref_ptr = params.builder->CreateStructGEP(string_value, 0, "string_ref_ptr");
+	llvm::Value* ref_ptr = LLVMUtils::createStructGEP(params.builder, string_value, 0, "string_ref_ptr");
 	llvm::Value* one = llvm::ConstantInt::get(*params.context, llvm::APInt(64, 1, /*signed=*/true));
 	llvm::StoreInst* store_inst = params.builder->CreateStore(one, ref_ptr);
 	addMetaDataCommentToInstruction(params, store_inst, "string literal set intial ref count to 1");
 
 	// Set the length field
-	llvm::Value* len_ptr = params.builder->CreateStructGEP(string_value, 1, "string_len_ptr");
+	llvm::Value* len_ptr = LLVMUtils::createStructGEP(params.builder, string_value, 1, "string_len_ptr");
 	llvm::Value* len_val = llvm::ConstantInt::get(*params.context, llvm::APInt(64, this->value.size(), /*signed=*/true));
 	llvm::StoreInst* len_store_inst = params.builder->CreateStore(len_val, len_ptr);
 	addMetaDataCommentToInstruction(params, len_store_inst, "string literal set intial length to " + toString(this->value.size()));
 
 	// Set the flags
-	llvm::Value* flags_ptr = params.builder->CreateStructGEP(string_value, 2, "string_literal_flags_ptr");
+	llvm::Value* flags_ptr = LLVMUtils::createStructGEP(params.builder, string_value, 2, "string_literal_flags_ptr");
 	llvm::Value* flags_contant_val = llvm::ConstantInt::get(*params.context, llvm::APInt(64, initial_flags));
 	llvm::StoreInst* store_flags_inst = params.builder->CreateStore(flags_contant_val, flags_ptr);
 	addMetaDataCommentToInstruction(params, store_flags_inst, "string literal set intial flags to " + toString(initial_flags));

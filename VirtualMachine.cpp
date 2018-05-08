@@ -40,9 +40,12 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "llvm/Analysis/Verifier.h"
 #include "llvm/ExecutionEngine/ObjectImage.h"
 #endif
-#include "llvm/PassManager.h"
 #include "llvm/IR/Module.h"
+#if TARGET_LLVM_VERSION >= 60
+#include "llvm/IR/LegacyPassManager.h"
+#else
 #include "llvm/PassManager.h"
+#endif
 #include "llvm/IR/DataLayout.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/IPO.h"
@@ -55,12 +58,15 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#if TARGET_LLVM_VERSION >= 60
+#include "llvm/Analysis/TargetLibraryInfo.h"
+#else
 #include "llvm/Target/TargetLibraryInfo.h"
+#endif
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/ExecutionEngine/MCJIT.h"
 #include "llvm/ExecutionEngine/JITEventListener.h"
-#include "llvm/MC/MCDisassembler.h"
 #include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/MC/MCAsmInfo.h"
@@ -70,7 +76,6 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "llvm/MC/MCInstPrinter.h"
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/Support/SourceMgr.h"
-#include "llvm/Support/MemoryObject.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/DynamicLibrary.h"
@@ -479,6 +484,12 @@ public:
 		if(res != func_map->end())
 			return (uint64_t)res->second;
 
+		// We generally want to explictly find and return the function pointer here, instead of falling back to using
+		// llvm::sys::DynamicLibrary::SearchForAddressOfSymbol().  This is because SearchForAddressOfSymbol() just does
+		// a search through loaded DLLs, which may be slow, and may not give the symbol that we want.
+		// For example "sin" looked up with SearchForAddressOfSymbol() was returning a sin function from ucrtbase(d).dll,
+		// which is slower than the sin function explicitly returned below.
+
 		if(name == "execArrayMap")
 			return (uint64_t)execArrayMap;
 		if(name == "tracePrintFloat")
@@ -493,8 +504,24 @@ public:
 			return (uint64_t)powf;
 		else if(name == "expf")
 			return (uint64_t)expf;
+		else if(name == "exp2f")
+			return (uint64_t)exp2f;
 		else if(name == "logf")
 			return (uint64_t)logf;
+		
+		else if(name == "sin")
+			return (uint64_t)static_cast<double(*)(double)>(sin); // Use static_cast to pick the correct overload.
+		else if(name == "cos")
+			return (uint64_t)static_cast<double(*)(double)>(cos);
+		else if(name == "pow")
+			return (uint64_t)static_cast<double(*)(double, double)>(pow);
+		else if(name == "exp")
+			return (uint64_t)static_cast<double(*)(double)>(exp);
+		else if(name == "exp2")
+			return (uint64_t)static_cast<double(*)(double)>(exp2);
+		else if(name == "log")
+			return (uint64_t)static_cast<double(*)(double)>(log);
+
 		else if(name == "memcpy")
 			return (uint64_t)memcpy;
 
@@ -507,6 +534,8 @@ public:
 			return (uint64_t)powf;
 		else if(name == "_expf")
 			return (uint64_t)expf;
+		else if(name == "_exp2f")
+			return (uint64_t)exp2f;
 		else if(name == "_logf")
 			return (uint64_t)logf;
 		else if(name == "_memcpy")
@@ -520,18 +549,18 @@ public:
 			return (uint64_t)static_cast<double(*)(double, double)>(pow);
 		else if(name == "_exp")
 			return (uint64_t)static_cast<double(*)(double)>(exp);
+		else if(name == "_exp2")
+			return (uint64_t)static_cast<double(*)(double)>(exp2);
 		else if(name == "_log")
 			return (uint64_t)static_cast<double(*)(double)>(log);
 #if defined(OSX)
 		else if(name == "_memset_pattern16")
 			return (uint64_t)memset_pattern16;
-		else if(name == "_exp2f")
-			return (uint64_t)exp2f;
-		else if(name == "_exp2")
-			return (uint64_t)static_cast<double(*)(double)>(exp2);
 #endif
 
 		// If function was not in func_map (i.e. was not an 'external' function), then use normal symbol resolution, for functions like sinf, cosf etc..
+
+		// conPrint("Warning, falling back to DynamicLibrary::SearchForAddressOfSymbol() for name '" + name + "'...");
 
 		void* f = llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(name);
 
@@ -857,7 +886,14 @@ void VirtualMachine::addExternalFunction(const ExternalFunctionRef& f, llvm::LLV
 }
 
 
-static void optimiseFunctions(llvm::FunctionPassManager& fpm, llvm::Module* module, bool verbose)
+#if TARGET_LLVM_VERSION >= 60
+#define PASS_MANANGER_NAMESPACE llvm::legacy
+#else
+#define PASS_MANANGER_NAMESPACE llvm
+#endif
+
+
+static void optimiseFunctions(PASS_MANANGER_NAMESPACE::FunctionPassManager& fpm, llvm::Module* module, bool verbose)
 {
 	fpm.doInitialization();
 
@@ -1468,9 +1504,35 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 }
 
 
+#if TARGET_LLVM_VERSION >= 60
+struct GlobalValueInternaliser
+{
+	bool operator() (const llvm::GlobalValue& global_val)
+	{
+		if(llvm::isa<llvm::Function>(&global_val))
+			return entry_point_funcs.count(llvm::cast<llvm::Function>(&global_val)) != 0;
+		else
+			return false;
+	}
+
+	std::set<const llvm::Function*> entry_point_funcs;
+};
+#endif
+
+
+static const llvm::DataLayout* getDataLayout(llvm::ExecutionEngine* llvm_exec_engine)
+{
+#if TARGET_LLVM_VERSION >= 60
+	return &llvm_exec_engine->getDataLayout();
+#else
+	return  llvm_exec_engine->getDataLayout();
+#endif
+}
+
+
 void VirtualMachine::build(const VMConstructionArgs& args)
 {
-	this->llvm_module->setDataLayout(this->llvm_exec_engine->getDataLayout()->getStringRepresentation());
+	this->llvm_module->setDataLayout(getDataLayout(llvm_exec_engine)->getStringRepresentation());
 
 	
 	CommonFunctions common_functions;
@@ -1499,7 +1561,7 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 		assert(common_functions.freeClosureFunc);
 	}
 
-	RefCounting::emitRefCountingFunctions(this->llvm_module, this->llvm_exec_engine->getDataLayout(), common_functions);
+	RefCounting::emitRefCountingFunctions(this->llvm_module, getDataLayout(llvm_exec_engine), common_functions);
 	
 
 
@@ -1518,7 +1580,7 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 
 	linker.buildLLVMCode(
 		this->llvm_module,
-		this->llvm_exec_engine->getDataLayout(),
+		getDataLayout(llvm_exec_engine),
 		common_functions,
 		this->stats,
 		args.emit_trace_code
@@ -1644,35 +1706,41 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 	// Do LLVM optimisations
 	if(optimise)
 	{
-		llvm::FunctionPassManager fpm(this->llvm_module);
+		PASS_MANANGER_NAMESPACE::FunctionPassManager fpm(this->llvm_module);
 
 		// Set up the optimizer pipeline.  Start with registering info about how the
 		// target lays out data structures.
 #if TARGET_LLVM_VERSION <= 34
 		fpm.add(new llvm::DataLayout(*this->llvm_exec_engine->getDataLayout()));
-#else
+#elif TARGET_LLVM_VERSION <= 36
 		fpm.add(new llvm::DataLayoutPass());
+#else
+		this->llvm_module->setDataLayout(this->target_machine->createDataLayout());
 #endif
+		
+#if TARGET_LLVM_VERSION <= 36
 		//std:: cout << ("Setting triple to " + this->triple) << std::endl;
 		fpm.add(new llvm::TargetLibraryInfo(llvm::Triple(this->triple)));
+#endif
 
-		llvm::PassManager pm;
+		PASS_MANANGER_NAMESPACE::PassManager pm;
 #if TARGET_LLVM_VERSION <= 34
 		pm.add(new llvm::DataLayout(*this->llvm_exec_engine->getDataLayout()));
-#else
+#elif TARGET_LLVM_VERSION <= 36
 		pm.add(new llvm::DataLayoutPass());
 #endif
 
+#if TARGET_LLVM_VERSION <= 36
 		pm.add(new llvm::TargetLibraryInfo(llvm::Triple(this->triple)));
 
 		// Required for loop vectorisation to work properly.
 		target_machine->addAnalysisPasses(fpm);
 		target_machine->addAnalysisPasses(pm);
+#endif
 
 		llvm::PassManagerBuilder builder;
 
 		// Turn on vectorisation!
-		builder.BBVectorize = false; // Disabled due to being buggy: https://llvm.org/bugs/show_bug.cgi?id=23845
 		builder.SLPVectorize = true;
 		builder.LoopVectorize = true;
 
@@ -1683,6 +1751,8 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 		// Do internalize pass.  This pass has to be added before the other optimisation passes or it won't do anything.
 		{
 			// Build list of functions with external linkage (entry points)
+
+			std::set<const llvm::Function*> entry_point_funcs;
 			
 			std::vector<std::string> export_list_strings;
 			for(unsigned int i=0; i<args.entry_point_sigs.size(); ++i)
@@ -1690,14 +1760,23 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 				FunctionDefinitionRef func = linker.findMatchingFunctionSimple(args.entry_point_sigs[i]);
 
 				if(func.nonNull() && func->built_llvm_function)
+				{
+					entry_point_funcs.insert(func->built_llvm_function);
 					export_list_strings.push_back(func->built_llvm_function->getName()); // NOTE: is LLVM func built yet?
+				}
 			}
 
+#if TARGET_LLVM_VERSION >= 60
+			GlobalValueInternaliser internaliser;
+			internaliser.entry_point_funcs = entry_point_funcs;
+			pm.add(llvm::createInternalizePass(internaliser));
+#else
 			std::vector<const char*> export_list;
 			for(unsigned int i=0; i<export_list_strings.size(); ++i)
 				export_list.push_back(export_list_strings[i].c_str());
 
 			pm.add(llvm::createInternalizePass(export_list));
+#endif
 		}
 		
 		builder.populateFunctionPassManager(fpm);
@@ -1729,7 +1808,9 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 		if(ver_errors)
 		{
 			conPrint("Module verification errors.");
+#if !defined(NDEBUG) // llvm::Module::dump() is only implemented in debug mode.
 			this->llvm_module->dump();
+#endif
 			throw BaseException("Module verification errors.");
 		}
 #else
@@ -2098,13 +2179,9 @@ void* VirtualMachine::getJittedFunction(const FunctionSignature& sig)
 // Writes the assembly for the module to disk at filename.  Throws Winter::BaseException on failure.
 void VirtualMachine::compileToNativeAssembly(llvm::Module* mod, const std::string& filename) 
 {
+#if TARGET_LLVM_VERSION <= 36
 	target_machine->setAsmVerbosityDefault(true);
-
-	llvm::PassManager pm;
-#if TARGET_LLVM_VERSION < 36
-	pm.add(new llvm::DataLayout(*this->llvm_exec_engine->getDataLayout()));
 #endif
-	pm.add(new llvm::TargetLibraryInfo(llvm::Triple(this->triple)));
 
 	std::string err;
 #if TARGET_LLVM_VERSION >= 36
@@ -2119,6 +2196,21 @@ void VirtualMachine::compileToNativeAssembly(llvm::Module* mod, const std::strin
 		throw Winter::BaseException("Error when opening file to print assembly to: " + err);
 
 
+	PASS_MANANGER_NAMESPACE::PassManager pm;
+#if TARGET_LLVM_VERSION < 36
+	pm.add(new llvm::DataLayout(*this->llvm_exec_engine->getDataLayout()));
+#endif
+	
+#if TARGET_LLVM_VERSION >= 60
+	if (this->target_machine->addPassesToEmitFile(
+		pm, 
+		raw_out,
+		llvm::TargetMachine::CGFT_AssemblyFile
+	))
+		throw Winter::BaseException("Unable to emit assembly file!");
+#else
+	pm.add(new llvm::TargetLibraryInfo(llvm::Triple(this->triple)));
+
 	llvm::formatted_raw_ostream out(raw_out, llvm::formatted_raw_ostream::PRESERVE_STREAM);
 
 	if (this->target_machine->addPassesToEmitFile(
@@ -2127,6 +2219,7 @@ void VirtualMachine::compileToNativeAssembly(llvm::Module* mod, const std::strin
 		llvm::TargetMachine::CGFT_AssemblyFile
 	))
 		throw Winter::BaseException("Unable to emit assembly file!");
+#endif
 
 	pm.run(*mod);
 }

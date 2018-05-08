@@ -13,6 +13,7 @@ Copyright Glare Technologies Limited 2015 -
 #include "Value.h"
 #include "Linker.h"
 #include "BuiltInFunctionImpl.h"
+#include "LLVMUtils.h"
 #include "LLVMTypeUtils.h"
 #include "ProofUtils.h"
 #include "utils/StringUtils.h"
@@ -265,7 +266,7 @@ llvm::Value* TupleLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 	for(unsigned int i=0; i<tuple_type->component_types.size(); ++i)
 	{
 		// Get the pointer to the structure field.
-		llvm::Value* field_ptr = params.builder->CreateStructGEP(result_struct_val, i);
+		llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, result_struct_val, i);
 
 		llvm::Value* arg_value_or_ptr = this->elements[i]->emitLLVMCode(params);
 
