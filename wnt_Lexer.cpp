@@ -506,11 +506,11 @@ void Lexer::process(const SourceBufferRef& src, std::vector<Reference<TokenBase>
 
 			if(parser.notEOF() && parser.current() == '=')
 			{
-				tokens_out.push_back(new DOUBLE_EQUALS_Token(parser.currentPos()));
+				tokens_out.push_back(new DOUBLE_EQUALS_Token(parser.currentPos() - 1));
 				parser.advance();
 			}
 			else
-				tokens_out.push_back(new EQUALS_Token(parser.currentPos()));
+				tokens_out.push_back(new EQUALS_Token(parser.currentPos() - 1));
 				
 		}
 		else if(parser.current() == '!')
@@ -518,12 +518,12 @@ void Lexer::process(const SourceBufferRef& src, std::vector<Reference<TokenBase>
 			parser.advance();
 			if(parser.currentIsChar('='))
 			{
-				tokens_out.push_back(new NOT_EQUALS_Token(parser.currentPos()));
+				tokens_out.push_back(new NOT_EQUALS_Token(parser.currentPos() - 1));
 				parser.advance();
 			}
 			else
 			{
-				tokens_out.push_back(new EXCLAMATION_MARK_Token(parser.currentPos()));
+				tokens_out.push_back(new EXCLAMATION_MARK_Token(parser.currentPos() - 1));
 			}
 		}
 		else if(parser.current() == '.')
@@ -547,48 +547,48 @@ void Lexer::process(const SourceBufferRef& src, std::vector<Reference<TokenBase>
 			parser.advance();
 			if(parser.currentIsChar('&'))
 			{
-				tokens_out.push_back(new AND_Token(parser.currentPos()));
+				tokens_out.push_back(new AND_Token(parser.currentPos() - 1));
 				parser.advance();
 			}
 			else
-				tokens_out.push_back(new BITWISE_AND_Token(parser.currentPos()));
+				tokens_out.push_back(new BITWISE_AND_Token(parser.currentPos() - 1));
 		}
 		else if(parser.current() == '<')
 		{
 			parser.advance(); // Consume the '<'.
 			if(parser.currentIsChar('='))
 			{
+				tokens_out.push_back(new LESS_EQUAL_Token(parser.currentPos() - 1));
 				parser.advance();
-				tokens_out.push_back(new LESS_EQUAL_Token(parser.currentPos()));
 			}
 			else if(parser.currentIsChar('<'))
 			{
+				tokens_out.push_back(new LEFT_SHIFT_Token(parser.currentPos() - 1));
 				parser.advance();
-				tokens_out.push_back(new LEFT_SHIFT_Token(parser.currentPos()));
 			}
 			else
-				tokens_out.push_back(new LEFT_ANGLE_BRACKET_Token(parser.currentPos()));
+				tokens_out.push_back(new LEFT_ANGLE_BRACKET_Token(parser.currentPos() - 1));
 		}
 		else if(parser.current() == '>')
 		{
 			parser.advance(); // Consume the '>'.
 			if(parser.currentIsChar('='))
 			{
+				tokens_out.push_back(new GREATER_EQUAL_Token(parser.currentPos() - 1));
 				parser.advance();
-				tokens_out.push_back(new GREATER_EQUAL_Token(parser.currentPos()));
 			}
 			else if(parser.currentIsChar('>'))
 			{
+				tokens_out.push_back(new RIGHT_SHIFT_Token(parser.currentPos() - 1));
 				parser.advance();
-				tokens_out.push_back(new RIGHT_SHIFT_Token(parser.currentPos()));
 			}
 			else
-				tokens_out.push_back(new RIGHT_ANGLE_BRACKET_Token(parser.currentPos()));
+				tokens_out.push_back(new RIGHT_ANGLE_BRACKET_Token(parser.currentPos() - 1));
 		}
 		else if(parser.current() == '^')
 		{
-			parser.advance();
 			tokens_out.push_back(new BITWISE_XOR_Token(parser.currentPos()));
+			parser.advance();
 		}
 		else if(parser.current() == '?')
 		{

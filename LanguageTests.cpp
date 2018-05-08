@@ -2638,6 +2638,17 @@ static void testComparisons()
 
 
 	// ===================================================================
+	// Test invalid types for comparisons
+	// ===================================================================
+
+	// comparing different types
+	testMainFloatArgInvalidProgram("def main() float : if 1.0 == [1.0]a then 10.0 else 20.0");
+
+	// Comparisons between vectors are not currently supported.
+	testMainFloatArgInvalidProgram("def main() float : if [1.0, 2.0]v == [1.0, 2.0]v then 10.0 else 20.0");
+
+
+	// ===================================================================
 	// Test implicit conversions from int to float in comparisons
 	// ===================================================================
 	// Comparison between two literals:

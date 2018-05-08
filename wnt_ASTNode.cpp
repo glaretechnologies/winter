@@ -4343,7 +4343,7 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 		}
 		else
 		{
-			throw BaseException("Type '" + this->type()->toString() + "' does not define Comparison operators. (First child type: " + a_type->toString() + ")." + errorContext(*this, payload));
+			throw BaseException("Type '" + a_type->toString() + "' does not define comparison operators." + errorContext(*this, payload));
 		}
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
