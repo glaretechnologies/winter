@@ -188,7 +188,7 @@ BindInfo doBind(const std::vector<ASTNode*>& stack, int s, const std::string& na
 				// it also prevent y from binding to the y from the line below. (which could cause a cycle of references)
 
 				// If the stack entry at the next level down is a let AST node, and the current variable lies is in the value expression for it:
-				if((s + 1 < stack.size()) && (stack[s+1]->nodeType() == ASTNode::LetType) && (let_block->lets[i].getPointer() == stack[s+1]))
+				if((s + 1 < (int)stack.size()) && (stack[s+1]->nodeType() == ASTNode::LetType) && (let_block->lets[i].getPointer() == stack[s+1]))
 				{
 					// We have reached the let expression for the current variable we are tring to bind.
 

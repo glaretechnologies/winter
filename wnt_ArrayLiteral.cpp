@@ -312,7 +312,7 @@ llvm::Value* ArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 				throw BaseException("Internal error: expected constant.");
 
 			array_llvm_values.resize(int_suffix);
-			for(size_t i=0; i<int_suffix; ++i)
+			for(int i=0; i<int_suffix; ++i)
 				array_llvm_values[i] = static_cast<llvm::Constant*>(element_0_value);
 		}
 		else

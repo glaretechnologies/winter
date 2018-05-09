@@ -159,7 +159,7 @@ std::string VectorLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 	{
 		// "(float4)(1.0f, 2.0f, 3.0f, 4.0)"
 		std::string s = "(" + elem_typename + toString(this->int_suffix) + ")(";
-		for(size_t i=0; i<this->int_suffix; ++i)
+		for(int i=0; i<this->int_suffix; ++i)
 		{
 			s += elements[0]->emitOpenCLC(params);
 			if(i + 1 < this->int_suffix)

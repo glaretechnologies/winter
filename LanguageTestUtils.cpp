@@ -1335,15 +1335,18 @@ static void bleh(StructType* s)
 //#define CLASS_ALIGN_32 class __attribute__ ((aligned (32)))
 //#endif
 
+// Do explicit template instantiation
+template void testMainStruct(const std::string& src, const TestStruct& target_return_val);
 
 template <class StructType>
-static void testMainStruct(const std::string& src, const StructType& target_return_val)
+void testMainStruct(const std::string& src, const StructType& target_return_val)
 {
 	testPrint("===================== Winter testMainStruct() =====================");
 	try
 	{
 		VMConstructionArgs vm_args;
-		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
+		vm_args.floating_point_literals_default_to_double = false;
+		vm_args.source_buffers.push_back(new SourceBuffer("buffer", src));
 
 		const FunctionSignature mainsig("main", std::vector<TypeVRef>());
 
@@ -1374,9 +1377,9 @@ static void testMainStruct(const std::string& src, const StructType& target_retu
 		std::cout << jitted_result.d << std::endl;*/
 
 		// Check JIT'd result.
-		if(!epsEqual(jitted_result, target_return_val))
+		if(!(jitted_result == target_return_val)) //!epsEqual(jitted_result, target_return_val))
 		{
-			stdErrPrint("Test failed: jitted_result != target_return_val  ");
+			stdErrPrint("Test failed: jitted_result != target_return_val");
 			assert(0);
 			exit(1);
 		}
@@ -1413,14 +1416,19 @@ static void testMainStruct(const std::string& src, const StructType& target_retu
 }
 
 
+// Do explicit template instantiation
+template void testMainStructInputAndOutput(const std::string& src, const TestStructIn& struct_in, const TestStruct& target_return_val);
+
+
 template <class InStructType, class OutStructType>
-static void testMainStructInputAndOutput(const std::string& src, const InStructType& struct_in, const OutStructType& target_return_val)
+void testMainStructInputAndOutput(const std::string& src, const InStructType& struct_in, const OutStructType& target_return_val)
 {
 	testPrint("===================== Winter testMainStructInputAndOutput() =====================");
 	try
 	{
 		VMConstructionArgs vm_args;
-		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
+		vm_args.floating_point_literals_default_to_double = false;
+		vm_args.source_buffers.push_back(new SourceBuffer("buffer", src));
 
 		std::vector<std::string> field_names;
 		field_names.push_back("x");
@@ -1458,7 +1466,7 @@ static void testMainStructInputAndOutput(const std::string& src, const InStructT
 		f(&jitted_result, &aligned_struct_in, &test_env);
 
 		// Check JIT'd result.
-		if(!epsEqual(jitted_result, target_return_val))
+		if(!(jitted_result == target_return_val))
 		{
 			stdErrPrint("Test failed: jitted_result != target_return_val");
 			assert(0);
@@ -1536,7 +1544,7 @@ void testFloat4StructPairRetFloat(const std::string& src, const Float4StructPair
 	try
 	{
 		VMConstructionArgs vm_args;
-		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
+		vm_args.source_buffers.push_back(new SourceBuffer("buffer", src));
 		vm_args.floating_point_literals_default_to_double = false;
 		vm_args.real_is_double = false;
 
@@ -1635,7 +1643,8 @@ void testVectorInStruct(const std::string& src, const StructWithVec& struct_in, 
 	try
 	{
 		VMConstructionArgs vm_args;
-		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
+		vm_args.floating_point_literals_default_to_double = false;
+		vm_args.source_buffers.push_back(new SourceBuffer("buffer", src));
 
 		std::vector<std::string> field_names;
 		field_names.push_back("a");

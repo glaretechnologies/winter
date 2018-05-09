@@ -116,6 +116,24 @@ struct StructWithVec
 };
 
 
+struct TestStruct
+{
+	float a;
+	float b;
+	float c;
+	float d;
+
+	bool operator == (const TestStruct& other) const { return (a == other.a) && (b == other.b); }
+};
+
+
+struct TestStructIn
+{
+	float x;
+	float y;
+};
+
+
 TestResults testMainFloat(const std::string& src, float target_return_val);
 void testMainFloatArgInvalidProgram(const std::string& src);
 TestResults testMainFloatArg(const std::string& src, float argument, float target_return_val, uint32 test_flags = 0);
@@ -135,6 +153,12 @@ void testFloat4Struct(const std::string& src, const Float4Struct& a, const Float
 void testFloat8Struct(const std::string& src, const Float8Struct& a, const Float8Struct& b, const Float8Struct& target_return_val);
 void testIntArray(const std::string& src, const int* a, const int* b, const int* target_return_val, size_t len, uint32 test_flags = 0);
 void testFloatArray(const std::string& src, const float* a, const float* b, const float* target_return_val, size_t len);
+
+template <class StructType>
+void testMainStruct(const std::string& src, const StructType& target_return_val);
+
+template <class InStructType, class OutStructType>
+void testMainStructInputAndOutput(const std::string& src, const InStructType& struct_in, const OutStructType& target_return_val);
 
 
 } // end namespace Winter

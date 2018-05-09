@@ -5354,16 +5354,6 @@ TEMP OPENCL
 	
 	// Test structure being returned from main function
 	{
-		struct TestStruct
-		{
-			float a;
-			float b;
-			float c;
-			float d;
-
-			bool operator == (const TestStruct& other) const { return (a == other.a) && (b == other.b); }
-		};
-
 		TestStruct target_result;
 		target_result.a = 1;
 		target_result.b = 2;
@@ -5372,35 +5362,14 @@ TEMP OPENCL
 
 		std::string test_func = "struct TestStruct { float a, float b, float c, float d } \
 			def main() TestStruct : TestStruct(1.0, 2.0, 3.0, 4.0)";
-		//testMainStruct<TestStruct>(test_func, target_result);
-
-		test_func = "struct TestStruct { float a, float b, float c, float d } \
-			def main() TestStruct : TestStruct(1.0, 2.0, 3.0, 4.0)";
-		//testMainStruct<TestStruct>(test_func, target_result);
-
+		testMainStruct<TestStruct>(test_func, target_result);
 	}
 	{
-		struct TestStruct
-		{
-			float a;
-			float b;
-			float c;
-			float d;
-
-			bool operator == (const TestStruct& other) const { return (a == other.a) && (b == other.b); }
-		};
-
 		TestStruct target_result;
 		target_result.a = 5;
 		target_result.b = 6;
 		target_result.c = 3;
 		target_result.d = 4;
-
-		struct TestStructIn
-		{
-			float x;
-			float y;
-		};
 
 		TestStructIn in;
 		in.x = 5;
@@ -5409,15 +5378,12 @@ TEMP OPENCL
 		std::string test_func = "struct TestStruct { float a, float b, float c, float d } \
 			struct TestStructIn { float x, float y } \
 			def main(TestStructIn in_s) TestStruct : TestStruct(x(in_s), y(in_s), 3.0, 4.0)";
-		//testMainStructInputAndOutput(test_func, in, target_result);
+		testMainStructInputAndOutput(test_func, in, target_result);
 	}
 
 	
-
 	// Test vector in structure
 	{
-
-
 		StructWithVec in;
 		in.a.e[0] = 1;
 		in.a.e[1] = 2;
@@ -5445,17 +5411,14 @@ TEMP OPENCL
 		target_result.data2 = 10;
 
 		testVectorInStruct(
-							"struct StructWithVec { vector<float, 4> a, vector<float, 4> b, float data2 } \n\
-							def main(StructWithVec in_s) StructWithVec : \n\
-								StructWithVec(  \n\
-								a(in_s) + b(in_s), #[e0(a(in_s)) + e0(b(in_s)), e1(a(in_s)) + e1(b(in_s)), e2(a(in_s)) + e2(b(in_s)), e3(a(in_s)) + e3(b(in_s))]v, \n\
-								a(in_s), \n\
-								data2(in_s))", 
-							in, target_result);
+			"struct StructWithVec { vector<float, 4> a, vector<float, 4> b, float data2 } \n\
+			def main(StructWithVec in_s) StructWithVec : \n\
+				StructWithVec(  \n\
+				a(in_s) + b(in_s), #[e0(a(in_s)) + e0(b(in_s)), e1(a(in_s)) + e1(b(in_s)), e2(a(in_s)) + e2(b(in_s)), e3(a(in_s)) + e3(b(in_s))]v, \n\
+				a(in_s), \n\
+				data2(in_s))", 
+			in, target_result);
 	}
-
-
-	// Winter::fuzzTests();
 
 	conPrint("=================== All Winter tests passed.  Elapsed: " + timer.elapsedString() + " =============================");
 }

@@ -438,7 +438,7 @@ static bool varWithNameIsInScope(const std::string& name, TraversalPayload& payl
 				//	z = y
 				//	y = x
 				// it also prevent y from binding to the y from the line below. (which could cause a cycle of references)
-				if((s + 1 < stack.size()) && (stack[s+1]->nodeType() == ASTNode::LetType) && (let_block->lets[i].getPointer() == stack[s+1]))
+				if((s + 1 < (int)stack.size()) && (stack[s+1]->nodeType() == ASTNode::LetType) && (let_block->lets[i].getPointer() == stack[s+1]))
 				{
 					// We have reached the let expression for the current variable we are tring to bind, so don't try and bind with let variables equal to or past this one.
 					break;
