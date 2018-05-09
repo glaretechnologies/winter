@@ -503,7 +503,7 @@ public:
 			return (uint64_t)powf;
 		else if(name == "expf")
 			return (uint64_t)expf;
-#if !defined(_MSC_VER) || (_MSC_VER >= 1700) // Visual Studio 2010 doesn't define exp2f
+#if !defined(_MSC_VER) || (_MSC_VER >= 1900) // Visual Studio versions before 2015 don't define exp2f.
 		else if(name == "exp2f")
 			return (uint64_t)exp2f;
 #endif
@@ -518,7 +518,7 @@ public:
 			return (uint64_t)static_cast<double(*)(double, double)>(pow);
 		else if(name == "exp")
 			return (uint64_t)static_cast<double(*)(double)>(exp);
-#if !defined(_MSC_VER) || (_MSC_VER >= 1700) // Visual Studio 2010 doesn't define exp2
+#if !defined(_MSC_VER) || (_MSC_VER >= 1900) // Visual Studio versions before 2015 don't define exp2.
 		else if(name == "exp2")
 			return (uint64_t)static_cast<double(*)(double)>(exp2);
 #endif
@@ -537,7 +537,7 @@ public:
 			return (uint64_t)powf;
 		else if(name == "_expf")
 			return (uint64_t)expf;
-#if !defined(_MSC_VER) || (_MSC_VER >= 1700) // Visual Studio 2010 doesn't define exp2
+#if !defined(_MSC_VER) || (_MSC_VER >= 1900) // Visual Studio versions before 2015 don't define exp2f.
 		else if(name == "_exp2f")
 			return (uint64_t)exp2f;
 #endif
@@ -554,7 +554,7 @@ public:
 			return (uint64_t)static_cast<double(*)(double, double)>(pow);
 		else if(name == "_exp")
 			return (uint64_t)static_cast<double(*)(double)>(exp);
-#if !defined(_MSC_VER) || (_MSC_VER >= 1700) // Visual Studio 2010 doesn't define exp2
+#if !defined(_MSC_VER) || (_MSC_VER >= 1900) // Visual Studio versions before 2015 don't define exp2.
 		else if(name == "_exp2")
 			return (uint64_t)static_cast<double(*)(double)>(exp2);
 #endif
