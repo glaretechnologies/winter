@@ -1064,10 +1064,12 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 
 	// NOTE: It looks like function attributes are being removed from function declarations in the IR, when the function is not called anywhere.
 	
-	// We can only mark a function as readonly (or readnone) if the return type is pass by value, otherwise this function will need to write through the SRET argument.
+	
 	llvm::AttrBuilder function_attr_builder;
 	function_attr_builder.addAttribute(llvm::Attribute::NoUnwind); // Does not throw exceptions
-	if(this->returnType()->passByValue())
+	
+	// We can only mark a function as readonly (or readnone) if the return type is pass by value, otherwise this function will need to write through the SRET argument.
+	/*if(this->returnType()->passByValue())
 	{
 		bool has_ptr_arg = false;
 		for(unsigned int i=0; i<arg_types.size(); ++i)
@@ -1081,14 +1083,14 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 		{}
 		else
 		{
-			//if(has_ptr_arg)
-			//	function_attr_builder.addAttribute(llvm::Attribute::ReadOnly); // This attribute indicates that the function does not write through any pointer arguments etc..
-			//else
-			//TEMP	function_attr_builder.addAttribute(llvm::Attribute::ReadNone); // Function computes its result based strictly on its arguments, without dereferencing any pointer arguments etc..
+			if(has_ptr_arg)
+				function_attr_builder.addAttribute(llvm::Attribute::ReadOnly); // This attribute indicates that the function does not write through any pointer arguments etc..
+			else
+				function_attr_builder.addAttribute(llvm::Attribute::ReadNone); // Function computes its result based strictly on its arguments, without dereferencing any pointer arguments etc..
 
-			//NOTE: can't have readnone when we're doing heap allocs
+			//NOTE: can't have readnone when we're doing heap allocs, like having a varray in function body.  Fix this stuff up?
 		}
-	}
+	}*/
 
 	std::string use_name = this->sig.typeMangledName();
 	if(use_cap_var_struct_ptr)

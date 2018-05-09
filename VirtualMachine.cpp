@@ -495,7 +495,6 @@ public:
 		if(name == "tracePrintFloat")
 			return (uint64_t)tracePrintFloat;
 
-		// For some reason, DynamicLibrary::SearchForAddressOfSymbol() doesn't seem to work on Windows 32-bit.  So just manually resolve these symbols.
 		if(name == "sinf")
 			return (uint64_t)sinf;
 		else if(name == "cosf")
@@ -538,8 +537,10 @@ public:
 			return (uint64_t)powf;
 		else if(name == "_expf")
 			return (uint64_t)expf;
+#if !defined(_MSC_VER) || (_MSC_VER >= 1700) // Visual Studio 2010 doesn't define exp2
 		else if(name == "_exp2f")
 			return (uint64_t)exp2f;
+#endif
 		else if(name == "_logf")
 			return (uint64_t)logf;
 		else if(name == "_memcpy")
@@ -553,8 +554,10 @@ public:
 			return (uint64_t)static_cast<double(*)(double, double)>(pow);
 		else if(name == "_exp")
 			return (uint64_t)static_cast<double(*)(double)>(exp);
+#if !defined(_MSC_VER) || (_MSC_VER >= 1700) // Visual Studio 2010 doesn't define exp2
 		else if(name == "_exp2")
 			return (uint64_t)static_cast<double(*)(double)>(exp2);
+#endif
 		else if(name == "_log")
 			return (uint64_t)static_cast<double(*)(double)>(log);
 #if defined(OSX)
@@ -2038,7 +2041,7 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 	std::string constructor_code = "// Constructor OpenCL code, from VirtualMachine::buildOpenCLCode()\n";
 
 	// Spit out structure definitions and constructors
-	for(auto i = 0; i != named_types_ordered.size(); ++i)
+	for(size_t i = 0; i != named_types_ordered.size(); ++i)
 		if(named_types_ordered[i]->getType() == Type::StructureTypeType)
 		{
 			StructureType* struct_type = static_cast<StructureType*>(named_types_ordered[i].getPointer());

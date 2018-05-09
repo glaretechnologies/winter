@@ -540,7 +540,7 @@ void checkSubstituteVariable(ASTNodeRef& e, TraversalPayload& payload)
 		if(var->binding_type == Variable::ArgumentVariable && var->bound_function == payload.func_args_to_sub)
 		{
 			// Replace the variable with the argument value.	
-			if(var->arg_index >= payload.variable_substitutes.size())
+			if(var->arg_index >= (int)payload.variable_substitutes.size())
 				return; // May be out of bounds for invalid programs.
 			e = cloneASTNodeSubtree(payload.variable_substitutes[var->arg_index]);
 
