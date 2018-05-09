@@ -149,23 +149,12 @@ std::string VectorLiteral::sourceString() const
 
 std::string VectorLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
-	//return "";
-	/*if(elements.size() == 4)
-	{
-		return "(float4)(" + elements[0]->emitOpenCLC(params) + ", " + elements[1]->emitOpenCLC(params) + ", " + elements[2]->emitOpenCLC(params) + ", " + elements[3]->emitOpenCLC(params) + ")";
-	}
-	else
-	{
-		assert(0);
-		return "";
-	}*/
-
 	// TODO: check vector width
 
 	if(!(this->elements[0]->type()->getType() == Type::FloatType || this->elements[0]->type()->getType() == Type::DoubleType || (this->elements[0]->type()->getType() == Type::IntType && this->elements[0]->type().downcastToPtr<Int>()->numBits() == 32)))
 		throw BaseException("Only vectors of float or int32 supported for OpenCL currently.");
 
-	const std::string elem_typename = this->elements[0]->type()->OpenCLCType(); //this->elements[0]->type()->getType() == Type::FloatType ? "float" : "int";
+	const std::string elem_typename = this->elements[0]->type()->OpenCLCType();
 	if(has_int_suffix)
 	{
 		// "(float4)(1.0f, 2.0f, 3.0f, 4.0)"
@@ -321,37 +310,6 @@ bool VectorLiteral::areAllElementsConstant() const
 
 llvm::Value* VectorLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
-	// Check if all elements in the array are constant.  If so, use a constant global array.
-	/*if(this->areAllElementsConstant())
-	{
-		vector<llvm::Constant*> llvm_values(this->elements.size());
-
-		for(size_t i=0; i<elements.size(); ++i)
-		{
-			VMState vm_state(true); // hidden_voidptr_arg
-			vm_state.func_args_start.push_back(0);
-			vm_state.argument_stack.push_back(ValueRef(new VoidPtrValue(NULL)));
-			ValueRef value = this->elements[i]->exec(vm_state);
-			llvm_values[i] = value->getConstantLLVMValue(params, this->type().downcast<VectorType>()->t);
-		}
-
-		assert(this->type()->LLVMType(*params.context)->isVectorTy());
-
-		llvm::GlobalVariable* global = new llvm::GlobalVariable(
-			*params.module,
-			this->type()->LLVMType(*params.context), // This type (vector type)
-			true, // is constant
-			llvm::GlobalVariable::InternalLinkage,
-			llvm::ConstantVector::get(
-				llvm_values
-			)
-		);
-
-		global->dump();//TEMP
-
-		return params.builder->CreateLoad(global);
-	}*/
-
 	if(has_int_suffix)
 	{
 		return params.builder->CreateVectorSplat(
@@ -362,7 +320,32 @@ llvm::Value* VectorLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 	}
 	else
 	{
-		//NOTE TODO: Can just use get() here to create the constant vector immediately?
+		// Check if all elements in the array are constant.  If so, use llvm::ConstantVector::get().
+		// NOTE: this seems to result in exactly the same ugly IR as below:
+		//  %.splatinsert = insertelement <4 x float> undef, float %x, i32 0
+		//  %.splat = shufflevector <4 x float> %.splatinsert, <4 x float> undef, <4 x i32> zeroinitializer
+		//  %0 = fmul nnan ninf nsz <4 x float> %.splat, <float 1.000000e+00, float 2.000000e+00, float 3.000000e+00, float 4.000000e+00>
+		/*if(this->areAllElementsConstant())
+		{
+			llvm::SmallVector<llvm::Constant*, 8> llvm_constants(this->elements.size());
+
+			bool are_all_elems_llvm_constants = true;
+			for(size_t i=0; i<elements.size(); ++i)
+			{
+				llvm::Value* v = this->elements[i]->emitLLVMCode(params);
+				if(llvm::isa<llvm::Constant>(v))
+					llvm_constants[i] = llvm::cast<llvm::Constant>(v);
+				else
+					are_all_elems_llvm_constants = false;
+			}
+
+			if(are_all_elems_llvm_constants)
+			{
+				llvm::Value* code = llvm::ConstantVector::get(llvm_constants);
+				code->dump();
+				return code;
+			}
+		}*/
 
 		// Start with a vector of Undefs.
 		llvm::Value* v = llvm::ConstantVector::getSplat(
@@ -382,7 +365,6 @@ llvm::Value* VectorLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 				llvm::ConstantInt::get(*params.context, llvm::APInt(32, i)) // index
 			);
 		}
-
 		return vec;
 	}
 }
