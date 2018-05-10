@@ -57,8 +57,8 @@ class VMConstructionArgs
 {
 public:
 	VMConstructionArgs() : env(NULL), allow_unsafe_operations(false), emit_trace_code(false), build_llvm_code(true), floating_point_literals_default_to_double(true), 
-		try_coerce_int_to_double_first(true), real_is_double(true), opencl_double_support(true), comments_in_opencl_output(true), emit_in_bound_asserts(false), emit_opencl_printf_calls(true)
-		/*, add_opaque_env_arg(false)*/ {}
+		try_coerce_int_to_double_first(true), real_is_double(true), opencl_double_support(true), comments_in_opencl_output(true), emit_in_bound_asserts(false), emit_opencl_printf_calls(true),
+		small_code_model(false)/*, add_opaque_env_arg(false)*/ {}
 
 	std::vector<ExternalFunctionRef> external_functions;
 	std::vector<SourceBufferRef> source_buffers;
@@ -92,6 +92,9 @@ public:
 
 	// if true, printf calls will be emitted in the body of print() methods.
 	bool emit_opencl_printf_calls; // True by default.
+
+	// If true, the small code model for code generation is used.
+	bool small_code_model; // False by default.
 };
 
 
@@ -143,6 +146,14 @@ private:
 	bool doDeadCodeEliminationPass();
 	void doDeadFunctionEliminationPass(const VMConstructionArgs& args);
 
+	struct AllocationBlock
+	{
+		uint8_t* alloced_mem;
+		size_t size;
+	};
+
+	friend class WinterMemoryManager;
+
 	std::vector<ExternalFunctionRef> external_functions;
 	//ASTNodeRef rootref;
 	Linker linker;
@@ -160,6 +171,8 @@ private:
 	VMConstructionArgs vm_args;
 
 	ProgramStats stats;
+
+	std::vector<AllocationBlock> jit_mem_blocks;
 };
 
 

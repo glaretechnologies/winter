@@ -1,6 +1,6 @@
 /*=====================================================================
-LanguageTests.h
----------------
+PerfTests.h
+-----------
 Copyright Glare Technologies Limited 2018 -
 =====================================================================*/
 #pragma once
@@ -10,23 +10,16 @@ namespace Winter
 {
 
 
-class LanguageTests
+class PerfTests
 {
 public:
-	LanguageTests();
-	~LanguageTests();
+	PerfTests();
+	~PerfTests();
 
-#if BUILD_TESTS
 	static void doLLVMInit();
 	
-
 	static void run();
-#endif
-
-private:
 };
 
 
 }
-
-

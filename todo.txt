@@ -1,3 +1,9 @@
+TODO: Does engine_builder.setOptLevel(llvm::CodeGenOpt::Aggressive); do anything?
+
+TODO: test exp2 usage with old VS builds.
+
+TODO: define == and != operators for ?all? types, including vector types.
+
 TODO integer divison in Winter should use //
 
 TODO: Make a new AST Node for lambda expression, instead of just using a FunctionDefinition AST node.
@@ -26,8 +32,6 @@ TODO: need i32 -> i64 coercion
 
 TODO: need some way of making e.g. varrays with no elements.  Can't have a literal with no elements because then we don't know the type.
 
-
-TODO: use CreateCall2() instead of CreateCall etc..  (only do once we know that void* hidden args won't be required to be appended?)
 
 TODO: fold specialisation requires that each fold built-in be unique.
 

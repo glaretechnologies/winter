@@ -97,9 +97,6 @@ static const bool DUMP_MODULE_IR = false; // Dumps to "unoptimised_module_IR.txt
 static const bool DUMP_ASSEMBLY = false; // Dumpts to "module_assembly.txt" in current working dir.
 
 
-static const bool USE_MCJIT = true;
-
-
 //=====================================================================================
 
 
@@ -477,6 +474,89 @@ class WinterMemoryManager : public llvm::SectionMemoryManager
 public:
 	virtual ~WinterMemoryManager() {}
 
+	bool use_small_code_model;
+	std::vector<VirtualMachine::AllocationBlock> blocks;
+	
+
+	uint8_t* allocateSection(void* suggested_addr, uintptr_t Size, unsigned Alignment)
+	{
+#ifdef _WIN32
+		uint8_t* p = (uint8_t*)::VirtualAlloc(
+			suggested_addr,
+			Size, // size
+			MEM_RESERVE | MEM_COMMIT, // allocation type
+			PAGE_READWRITE // memory protection flags
+		);
+
+		if(p)
+		{
+			blocks.push_back(VirtualMachine::AllocationBlock());
+			blocks.back().alloced_mem = p;
+			blocks.back().size = Size;
+		}
+		else
+			throw Winter::BaseException("allocateSection(): Allocation failed.");
+
+		return p;
+#else
+		throw Winter::BaseException("allocateSection(): not implemented.");
+#endif
+	}
+
+
+	virtual uint8_t* allocateCodeSection(uintptr_t Size, unsigned Alignment,
+		unsigned SectionID,
+		llvm::StringRef SectionName)
+	{
+		if(use_small_code_model)
+		{
+			const size_t desired_addr = 0x80000000 + blocks.size() * 0x100000;
+			uint8* p = allocateSection(
+				(void*)desired_addr, // desired starting address
+				Size, Alignment);
+			return p;
+		}
+		else
+			return llvm::SectionMemoryManager::allocateCodeSection(Size, Alignment, SectionID, SectionName);
+	}
+
+
+	virtual uint8_t* allocateDataSection(uintptr_t Size, unsigned Alignment,
+		unsigned SectionID,
+		llvm::StringRef SectionName,
+		bool isReadOnly)
+	{
+		if(use_small_code_model)
+		{
+			const size_t desired_addr = 0x81000000 + blocks.size() * 0x100000;
+			uint8* p = allocateSection(
+				(void*)desired_addr, // desired starting address
+				Size, Alignment);
+			return p;
+		}
+		else
+			return llvm::SectionMemoryManager::allocateDataSection(Size, Alignment, SectionID, SectionName, isReadOnly);
+	}
+
+
+	virtual bool finalizeMemory(std::string *ErrMsg = 0)
+	{
+		if(use_small_code_model)
+		{
+			for(size_t i=0; i<blocks.size(); ++i)
+			{
+				DWORD OldFlags;
+				if(!VirtualProtect(blocks[i].alloced_mem, blocks[i].size, PAGE_EXECUTE_READ, &OldFlags))
+					throw Winter::BaseException("VirtualProtect failed.");
+
+				FlushInstructionCache(GetCurrentProcess(), blocks[i].alloced_mem, blocks[i].size);
+			}
+
+			return false;
+		}
+		else
+			return llvm::SectionMemoryManager::finalizeMemory(ErrMsg);
+	}
 
 	virtual uint64_t getSymbolAddress(const std::string& name)
 	{
@@ -754,20 +834,20 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 #endif
 			engine_builder.setEngineKind(llvm::EngineKind::JIT);
 #if TARGET_LLVM_VERSION <= 34
-			if(USE_MCJIT) engine_builder.setUseMCJIT(true);
+			engine_builder.setUseMCJIT(true);
 #endif
+			if(args.small_code_model)
+				engine_builder.setCodeModel(llvm::CodeModel::Small);
 
 
-			if(USE_MCJIT)
-			{
-				WinterMemoryManager* mem_manager = new WinterMemoryManager();
-				mem_manager->func_map = &func_map;
+			WinterMemoryManager* mem_manager = new WinterMemoryManager();
+			mem_manager->use_small_code_model = args.small_code_model;
+			mem_manager->func_map = &func_map;
 #if TARGET_LLVM_VERSION >= 36
-				engine_builder.setMCJITMemoryManager(std::unique_ptr<llvm::SectionMemoryManager>(mem_manager));
+			engine_builder.setMCJITMemoryManager(std::unique_ptr<llvm::SectionMemoryManager>(mem_manager));
 #else
-				engine_builder.setMCJITMemoryManager(mem_manager);
+			engine_builder.setMCJITMemoryManager(mem_manager);
 #endif
-			}
 
 			// OSX_DEPLOYMENT_TARGET should correspond to the version number in the -mmacosx-version-min
 			// flag passed to the compiler.
@@ -776,7 +856,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 #else
 			this->triple = llvm::sys::getProcessTriple();
 #endif
-			if(USE_MCJIT) this->triple.append("-elf"); // MCJIT requires the -elf suffix currently, see https://groups.google.com/forum/#!topic/llvm-dev/DOmHEXhNNWw
+			this->triple.append("-elf"); // MCJIT requires the -elf suffix currently, see https://groups.google.com/forum/#!topic/llvm-dev/DOmHEXhNNWw
 
 
 			PlatformUtils::CPUInfo cpu_info;
@@ -820,6 +900,8 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 				addExternalFunction(this->external_functions[i], *this->llvm_context, *this->llvm_module);
 
 			this->build(args);
+
+			jit_mem_blocks.insert(jit_mem_blocks.end(), mem_manager->blocks.begin(), mem_manager->blocks.end());
 		}
 	}
 	catch(BaseException& e)
@@ -843,6 +925,14 @@ VirtualMachine::~VirtualMachine()
 	delete this->llvm_exec_engine;
 
 	delete llvm_context;
+
+	for(size_t i=0; i<jit_mem_blocks.size(); ++i)
+	{
+#ifdef _WIN32
+		if(::VirtualFree(jit_mem_blocks[i].alloced_mem, 0, MEM_RELEASE) == 0)
+			conPrint("Error: VirtualFree failed: " + PlatformUtils::getLastErrorString());
+#endif
+	}
 }
 
 
@@ -873,23 +963,15 @@ void VirtualMachine::addExternalFunction(const ExternalFunctionRef& f, llvm::LLV
 		module
 	);
 
-	llvm::Function* llvm_f = static_cast<llvm::Function*>(module.getOrInsertFunction(
+	module.getOrInsertFunction(
 		makeSafeStringForFunctionName(f->sig.toString()), // Name
 		llvm_f_type // Type
-	));
+	);
 
-	if(USE_MCJIT)
-	{
-		func_map[makeSafeStringForFunctionName(f->sig.toString())] = f->func;
+	func_map[makeSafeStringForFunctionName(f->sig.toString())] = f->func;
 
-		// On OS X, the requested symbol names seem to have an underscore prepended, so add an entry with a leading underscore.
-		func_map["_" + makeSafeStringForFunctionName(f->sig.toString())] = f->func;
-	}
-	else
-	{
-		// This doesn't seem to work with MCJIT:
-		this->llvm_exec_engine->addGlobalMapping(llvm_f, f->func);
-	}
+	// On OS X, the requested symbol names seem to have an underscore prepended, so add an entry with a leading underscore.
+	func_map["_" + makeSafeStringForFunctionName(f->sig.toString())] = f->func;
 }
 
 

@@ -16,6 +16,7 @@ Copyright Glare Technologies Limited 2015 -
 #include "LanguageTests.h"
 #include "VirtualMachine.h"
 #include "FuzzTests.h"
+#include "PerfTests.h"
 #include "utils/FileUtils.h"
 #include "utils/Clock.h"
 #include <iostream>
@@ -51,6 +52,11 @@ int main(int argc, char** argv)
 #if BUILD_TESTS
 		fuzzTests();
 #endif
+		return 0;
+	}
+	else if(std::string(argv[1]) == "--perftest")
+	{
+		PerfTests::run();
 		return 0;
 	}
 	else if(std::string(argv[1]) == "--astfuzz")

@@ -201,6 +201,8 @@ set(WINTER_FILES
 "${winterdir}/wnt_MathsFuncs.h"
 "${winterdir}/LLVMUtils.cpp"
 "${winterdir}/LLVMUtils.h"
+"${winterdir}/PerfTests.cpp"
+"${winterdir}/PerfTests.h"
 )
 
 

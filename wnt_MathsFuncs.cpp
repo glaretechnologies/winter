@@ -169,71 +169,75 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 	TypeVRef int_type = new Int();
 	TypeVRef bool_type = new Bool();
 
+	// NOTE: for maths functions, Using e.g. tanf is faster than std::tan.
+	// This is because (with MSVC at least), Using std::tan just results in a call to std::tan from the winter code,
+	// which then in turn calls tanf, resulting in an extra call.
+
 	external_functions.push_back(new ExternalFunction(
-		(void*)(float(*)(float))std::tan, // func
+		tanf, // func
 		tanFloatInterpreted, // interpreted func
 		FunctionSignature("tan", vector<TypeVRef>(1, float_type)), // function signature
 		float_type // return type
 	));
 
 	external_functions.push_back(new ExternalFunction(
-		(void*)(double(*)(double))std::tan, // func
+		(void*)(double(*)(double))tan, // func - Use cast to pick the correct overload.
 		tanDoubleInterpreted, // interpreted func
 		FunctionSignature("tan", vector<TypeVRef>(1, double_type)), // function signature
 		double_type // return type
 	));
 
 	external_functions.push_back(new ExternalFunction(
-		(void*)(float(*)(float))std::asin,
+		asinf,
 		asinInterpreted,
 		FunctionSignature("asin", vector<TypeVRef>(1, float_type)),
 		float_type
 	));
 
 	external_functions.push_back(new ExternalFunction(
-		(void*)(double(*)(double))std::asin,
+		(void*)(double(*)(double))asin,
 		asinDoubleInterpreted,
 		FunctionSignature("asin", vector<TypeVRef>(1, double_type)),
 		double_type
 	));
 
 	external_functions.push_back(new ExternalFunction(
-		(void*)(float(*)(float))std::acos,
+		acosf,
 		acosInterpreted,
 		FunctionSignature("acos", vector<TypeVRef>(1, float_type)),
 		float_type
 	));
 
 	external_functions.push_back(new ExternalFunction(
-		(void*)(double(*)(double))std::acos,
+		(void*)(double(*)(double))acos,
 		acosDoubleInterpreted,
 		FunctionSignature("acos", vector<TypeVRef>(1, double_type)),
 		double_type
 	));
 
 	external_functions.push_back(new ExternalFunction(
-		(void*)(float(*)(float))std::atan,
+		atanf,
 		atanInterpreted,
 		FunctionSignature("atan", vector<TypeVRef>(1, float_type)),
 		float_type
 	));
 
 	external_functions.push_back(new ExternalFunction(
-		(void*)(double(*)(double))std::atan,
+		(void*)(double(*)(double))atan,
 		atanDoubleInterpreted,
 		FunctionSignature("atan", vector<TypeVRef>(1, double_type)),
 		double_type
 	));
 
 	external_functions.push_back(new ExternalFunction(
-		(void*)(float(*)(float, float))std::atan2,
+		atan2f,
 		atan2Interpreted,
 		FunctionSignature("atan2", vector<TypeVRef>(2, float_type)),
 		float_type
 	));
 
 	external_functions.push_back(new ExternalFunction(
-		(void*)(double(*)(double, double))std::atan2,
+		(void*)(double(*)(double, double))atan2,
 		atan2DoubleInterpreted,
 		FunctionSignature("atan2", vector<TypeVRef>(2, double_type)),
 		double_type
