@@ -543,6 +543,7 @@ public:
 	{
 		if(use_small_code_model)
 		{
+#ifdef _WIN32
 			for(size_t i=0; i<blocks.size(); ++i)
 			{
 				DWORD OldFlags;
@@ -551,7 +552,7 @@ public:
 
 				FlushInstructionCache(GetCurrentProcess(), blocks[i].alloced_mem, blocks[i].size);
 			}
-
+#endif
 			return false;
 		}
 		else
