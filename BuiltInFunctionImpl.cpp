@@ -419,9 +419,10 @@ llvm::Value* UpdateElementBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) 
 		params.builder->CreateMemCpy(return_ptr, struct_ptr, size, 4);
 
 		// Update element with new val
-		vector<llvm::Value*> indices(2);
-		indices[0] = llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0)); // get the zero-th array
-		indices[1] = index; // get the indexed element in the array
+		llvm::Value* indices[] = {
+			llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0)), // get the zero-th array
+			index // get the indexed element in the array
+		};
 		llvm::Value* new_elem_ptr = params.builder->CreateInBoundsGEP(return_ptr, indices, "new elem ptr");
 
 		params.builder->CreateStore(newval, new_elem_ptr);
@@ -590,14 +591,15 @@ public:
 	virtual llvm::Value* emitLoopBody(llvm::IRBuilder<>& builder, llvm::Module* module, /*llvm::Value* loop_value_var, */llvm::Value* i)
 	{
 		// Load element from input array
-		vector<llvm::Value*> indices(2);
-		indices[0] = llvm::ConstantInt::get(module->getContext(), llvm::APInt(64, 0)); // get the zero-th array
-		indices[1] = i; // get the indexed element in the array
+		llvm::Value* indices[] = {
+			llvm::ConstantInt::get(module->getContext(), llvm::APInt(64, 0)), // get the zero-th array
+			i // get the indexed element in the array
+		};
 
 		llvm::Value* elem_ptr = builder.CreateInBoundsGEP(input_array, indices);
 		llvm::Value* elem = builder.CreateLoad(elem_ptr);
 
-		llvm::Value* args[2] = { elem, captured_var_struct_ptr };
+		llvm::Value* args[] = { elem, captured_var_struct_ptr };
 
 		// Call function on element
 		llvm::Value* mapped_elem = builder.CreateCall(
@@ -773,7 +775,7 @@ llvm::Value* ArrayMapBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 		llvm::Function* llvm_func = static_cast<llvm::Function*>(llvm_func_constant);
 
-		vector<llvm::Value*> args;
+		llvm::SmallVector<llvm::Value*, 8> args;
 		args.push_back(params.builder->CreatePointerCast(return_ptr, voidptr)); // output
 		args.push_back(params.builder->CreatePointerCast(input_array, voidptr)); // input
 		args.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(64, this->from_type->num_elems))); // array_size
@@ -940,9 +942,10 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 
 		//TEMP: assuming array elements (T) are pass by value.
 		assert(array_type->elem_type->passByValue());
-		vector<llvm::Value*> indices(2);
-		indices[0] = llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0)); // get the zero-th array
-		indices[1] = loop_index_var; // get the indexed element in the array
+		llvm::Value* indices[] = {
+			llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0)), // get the zero-th array
+			loop_index_var // get the indexed element in the array
+		};
 
 		llvm::Value* array_elem_ptr = params.builder->CreateInBoundsGEP(array_arg, indices, "array elem ptr");
 		llvm::Value* array_elem = params.builder->CreateLoad(array_elem_ptr, "array elem");
@@ -1099,9 +1102,10 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 
 	//TEMP: assuming array elements (T) are pass by value.
 	assert(array_type->elem_type->passByValue());
-	vector<llvm::Value*> indices(2);
-	indices[0] = llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0)); // get the zero-th array
-	indices[1] = loop_index_var; // get the indexed element in the array
+	llvm::Value* indices[] = {
+		llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0)), // get the zero-th array
+		loop_index_var // get the indexed element in the array
+	};
 
 	llvm::Value* array_elem_ptr = params.builder->CreateInBoundsGEP(array_arg, indices, "array elem ptr");
 	llvm::Value* array_elem = params.builder->CreateLoad(array_elem_ptr, "array elem");
@@ -2190,7 +2194,7 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	//=========================== Emit the body of the loop. =========================
 
 	// Call function f
-	vector<llvm::Value*> args;
+	llvm::SmallVector<llvm::Value*, 8> args;
 	args.push_back(tuple_alloca); // SRET return value arg
 	args.push_back(state_type->passByValue() ? params.builder->CreateLoad(state_alloca) : state_alloca); // current state
 	args.push_back(loop_index_var); // iteration
@@ -2715,8 +2719,8 @@ llvm::Value* ShuffleBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	{
 		assert(0);
 
-		std::vector<llvm::Constant*> elems(index_type->num);
-		for(size_t i=0; i<index_type->num; ++i)
+		llvm::SmallVector<llvm::Constant*, 8> elems(index_type->num);
+		for(unsigned int i=0; i<index_type->num; ++i)
 			elems[i] = llvm::ConstantInt::get(
 				*params.context, 
 				llvm::APInt(
@@ -2730,13 +2734,13 @@ llvm::Value* ShuffleBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	}
 	else
 	{
-		std::vector<llvm::Constant*> elems(shuffle_mask.size());
+		llvm::SmallVector<llvm::Constant*, 8> elems((unsigned int)shuffle_mask.size());
 		for(size_t i=0; i<shuffle_mask.size(); ++i)
 		{
 			if(shuffle_mask[i] < 0 || shuffle_mask[i] >= (int)vector_type->num)
 				throw BaseException("Shuffle mask index " + toString(shuffle_mask[i]) + " out of bounds: " + errorContext(params.currently_building_func_def));
 
-			elems[i] = llvm::ConstantInt::get(
+			elems[(unsigned int)i] = llvm::ConstantInt::get(
 				*params.context, 
 				llvm::APInt(
 					32, // num bits
@@ -2758,6 +2762,7 @@ void ShuffleBuiltInFunc::setShuffleMask(const std::vector<int>& shuffle_mask_)
 {
 	shuffle_mask = shuffle_mask_;
 }
+
 
 //----------------------------------------------------------------------------------------------
 
@@ -2813,9 +2818,9 @@ static llvm::Value* emitUnaryIntrinsic(EmitLLVMCodeParams& params, const TypeVRe
 {
 	assert(type->getType() == Type::FloatType || type->getType() == Type::DoubleType || (type->getType() == Type::VectorTypeType));
 
-	vector<llvm::Value*> args(1, LLVMTypeUtils::getNthArg(params.currently_building_func, 0));
+	llvm::Value* args[] = { LLVMTypeUtils::getNthArg(params.currently_building_func, 0) };
 
-	vector<llvm::Type*> types(1, type->LLVMType(*params.module));
+	llvm::Type* types[] = { type->LLVMType(*params.module) };
 
 	llvm::Function* func = llvm::Intrinsic::getDeclaration(params.module, id, types);
 
@@ -3163,7 +3168,7 @@ ValueRef SignBuiltInFunc::invoke(VMState& vmstate)
 
 llvm::Value* SignBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
-	vector<llvm::Type*> types(1, this->type->LLVMType(*params.module));
+	llvm::Type* types[] = {this->type->LLVMType(*params.module)};
 
 	llvm::Function* func = llvm::Intrinsic::getDeclaration(params.module, llvm::Intrinsic::copysign, types);
 

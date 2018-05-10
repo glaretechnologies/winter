@@ -1,7 +1,7 @@
 /*=====================================================================
 VirtualMachine.h
--------------------
-Copyright Glare Technologies Limited 2015 -
+----------------
+Copyright Glare Technologies Limited 2018 -
 Generated at Mon Sep 13 22:23:44 +1200 2010
 =====================================================================*/
 #pragma once
@@ -30,7 +30,7 @@ class FunctionSignature;
 class FunctionDefinition;
 
 
-#if (defined(WIN32) || defined(WIN64))
+#if defined(_WIN32)
 #define WINTER_JIT_CALLING_CONV __cdecl
 #else 
 #define WINTER_JIT_CALLING_CONV
@@ -142,9 +142,9 @@ private:
 	void build(const VMConstructionArgs& args);
 	void addExternalFunction(const ExternalFunctionRef& f, llvm::LLVMContext& context, llvm::Module& module);
 	void compileToNativeAssembly(llvm::Module* mod, const std::string& filename);
+	void verifyModule(llvm::Module* mod);
 	bool doInliningPass();
 	bool doDeadCodeEliminationPass();
-	void doDeadFunctionEliminationPass(const VMConstructionArgs& args);
 
 	struct AllocationBlock
 	{

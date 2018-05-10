@@ -54,7 +54,7 @@ namespace RefCounting
 // Returns: void
 llvm::Function* emitIncrRefCountFunc(llvm::Module* module, const llvm::DataLayout* target_data, const string& func_name, const ConstTypeVRef& refcounted_type)
 {
-	const std::vector<llvm::Type*> arg_types(1, refcounted_type->LLVMType(*module));
+	llvm::Type* arg_types[] = { refcounted_type->LLVMType(*module) };
 
 	llvm::FunctionType* functype = llvm::FunctionType::get(
 		llvm::Type::getVoidTy(module->getContext()), // return type

@@ -1,15 +1,21 @@
 /*=====================================================================
 VirtualMachine.cpp
--------------------
-Copyright Glare Technologies Limited 2010 -
+------------------
+Copyright Glare Technologies Limited 2018 -
 Generated at Mon Sep 13 22:23:44 +1200 2010
 =====================================================================*/
 #include "VirtualMachine.h"
 
 
-#include <cassert>
-#include <fstream>
-#include <unordered_map>
+#include "Linker.h"
+#include "Value.h"
+#include "TokenBase.h"
+#include "wnt_Lexer.h"
+#include "wnt_LangParser.h"
+#include "wnt_RefCounting.h"
+#include "wnt_ASTNode.h"
+#include "wnt_LLVMVersion.h"
+#include "LLVMTypeUtils.h"
 #include "utils/FileUtils.h"
 #include "utils/StringUtils.h"
 #include "utils/UTF8Utils.h"
@@ -19,18 +25,6 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "utils/Timer.h"
 #include "utils/ConPrint.h"
 #include "utils/PlatformUtils.h"
-#include "wnt_Lexer.h"
-#include "TokenBase.h"
-#include "wnt_LangParser.h"
-#include "wnt_RefCounting.h"
-#include "wnt_ASTNode.h"
-#include "wnt_LLVMVersion.h"
-#include "VMState.h"
-#include "Linker.h"
-#include "Value.h"
-#include "LanguageTests.h"
-#include "VirtualMachine.h"
-#include "LLVMTypeUtils.h"
 #ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
 #endif
@@ -84,6 +78,9 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #ifdef _MSC_VER
 #pragma warning(pop) // Re-enable warnings
 #endif
+#include <cassert>
+#include <fstream>
+#include <unordered_map>
 
 
 using std::vector;
@@ -92,10 +89,10 @@ using std::string;
 
 namespace Winter
 {
-	
+
 
 static const bool DUMP_MODULE_IR = false; // Dumps to "unoptimised_module_IR.txt", "optimised_module_IR.txt" in current working dir.
-static const bool DUMP_ASSEMBLY = false; // Dumpts to "module_assembly.txt" in current working dir.
+static const bool DUMP_ASSEMBLY = false;  // Dumps to "module_assembly.txt" in current working dir.
 
 
 //=====================================================================================
@@ -368,6 +365,8 @@ static int freeClosure(ClosureRep* closure)
 
 
 //=====================================================================================
+
+
 class ExecArrayMapTask;
 
 static Indigo::TaskManager* winter_global_task_manager = NULL;
@@ -701,12 +700,12 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 
 		// Add allocateString
 		{
-			external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
+			external_functions.push_back(new ExternalFunction(
 				(void*)allocateString,
 				allocateStringInterpreted, // interpreted func
 				FunctionSignature("allocateString", vector<TypeVRef>(1, new OpaqueType())),
 				new String() // return type
-			)));
+			));
 			external_functions.back()->has_side_effects = true;
 			external_functions.back()->is_allocation_function = true;
 		}
@@ -715,76 +714,76 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 		{
 			vector<TypeVRef> arg_types(1, new String());
 			//arg_types.push_back(new VoidPtrType());
-			external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
+			external_functions.push_back(new ExternalFunction(
 				(void*)freeString,
 				NULL, // interpreted func TEMP
 				FunctionSignature("freeString", arg_types),
 				new Int() // return type
-			)));
+			));
 			external_functions.back()->has_side_effects = true;
 		}
 
 		// Add length (stringLength)
-		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
+		external_functions.push_back(new ExternalFunction(
 			(void*)stringLength,
 			stringLengthInterpreted, // interpreted func
 			FunctionSignature("length", vector<TypeVRef>(1, new String())),
 			new Int() // return type
-		)));
+		));
 
 		// Add concatStrings
-		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
+		external_functions.push_back(new ExternalFunction(
 			(void*)concatStrings,
 			concatStringsInterpreted, // interpreted func
 			FunctionSignature("concatStrings", vector<TypeVRef>(2, new String())),
 			new String() // return type
-		)));
+		));
 
 		// Add toString(char)
-		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
+		external_functions.push_back(new ExternalFunction(
 			(void*)charToString,
 			charToStringInterpreted, // interpreted func
 			FunctionSignature("toString", vector<TypeVRef>(1, new CharType())),
 			new String() // return type
-		)));
+		));
 
 		// Add codePoint(char c) int
-		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
+		external_functions.push_back(new ExternalFunction(
 			(void*)codePoint,
 			codePointInterpreted, // interpreted func
 			FunctionSignature("codePoint", vector<TypeVRef>(1, new CharType())),
 			new Int() // return type
-		)));
+		));
 
 		// Add elem(string s, uint64 index) char
-		external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
+		external_functions.push_back(new ExternalFunction(
 			(void*)stringElem,
 			stringElemInterpreted, // interpreted func
 			FunctionSignature("elem", typePair(new String(), new Int(64))),
 			new CharType() // return type
-		)));
+		));
 
 		
 		// Add allocateVArray
 		{
-			external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
+			external_functions.push_back(new ExternalFunction(
 				(void*)allocateVArray,
 				allocateVArrayInterpreted, // interpreted func
 				FunctionSignature("allocateVArray", vector<TypeVRef>(2, new Int(64))),
 				new VArrayType(new Int()) //new OpaqueType() // return type.  Just make this a void*, will cast return value to correct type
-			)));
+			));
 			external_functions.back()->has_side_effects = true;
 			external_functions.back()->is_allocation_function = true;
 		}
 
 		// Add freeVArray
 		{
-			external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
+			external_functions.push_back(new ExternalFunction(
 				(void*)freeVArray,
 				NULL, // interpreted func TEMP
 				FunctionSignature("freeVArray", vector<TypeVRef>(1, new VArrayType(new Int()))), // new OpaqueType())),
 				new Int() // return type
-			)));
+			));
 			external_functions.back()->has_side_effects = true;
 		}
 
@@ -792,24 +791,24 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 
 		// Add allocateClosure
 		{
-			external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
+			external_functions.push_back(new ExternalFunction(
 				(void*)allocateClosure,
 				allocateClosureInterpreted, // interpreted func
 				FunctionSignature("allocateClosure", vector<TypeVRef>(1, new Int(64))),
 				dummy_func_type // return type
-			)));
+			));
 			external_functions.back()->has_side_effects = true;
 			external_functions.back()->is_allocation_function = true;
 		}
 
 		// Add freeClosure
 		{
-			external_functions.push_back(ExternalFunctionRef(new ExternalFunction(
+			external_functions.push_back(new ExternalFunction(
 				(void*)freeClosure,
 				NULL, // interpreted func TEMP
 				FunctionSignature("freeClosure", vector<TypeVRef>(1, dummy_func_type)),
 				new Int() // return type
-			)));
+			));
 			external_functions.back()->has_side_effects = true;
 		}
 
@@ -884,18 +883,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 
 			this->llvm_exec_engine = engine_builder.create(target_machine);
 
-
 			this->llvm_exec_engine->DisableLazyCompilation();
-			//this->llvm_exec_engine->DisableSymbolSearching(); // Symbol searching is required for sin, pow intrinsics etc..
-
-
-		
-			/*ExternalFunctionRef alloc_ref(new ExternalFunction());
-			alloc_ref->interpreted_func = NULL;
-			alloc_ref->return_type = TypeRef(new OpaqueType());
-			alloc_ref->sig = FunctionSignature("allocateRefCountedStructure", std::vector<TypeRef>(1, TypeRef(new Int())));
-			alloc_ref->func = (void*)(allocateRefCountedStructure);
-			this->external_functions.push_back(alloc_ref);*/
 
 		
 			for(unsigned int i=0; i<this->external_functions.size(); ++i)
@@ -908,11 +896,11 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 	}
 	catch(BaseException& e)
 	{
-		// Since we threw an exception in the constructor, the destructor will not be run.
+		// Since we threw an exception in the constructor, VirtualMachine destructor will not be run.
 		// So we need to delete these objects now.
 		delete this->llvm_exec_engine;
 
-		delete llvm_context;
+		delete this->llvm_context;
 
 		throw e; // Re-throw exception
 	}
@@ -926,7 +914,7 @@ VirtualMachine::~VirtualMachine()
 
 	delete this->llvm_exec_engine;
 
-	delete llvm_context;
+	delete this->llvm_context;
 
 	for(size_t i=0; i<jit_mem_blocks.size(); ++i)
 	{
@@ -1078,125 +1066,6 @@ bool VirtualMachine::doDeadCodeEliminationPass()
 }
 
 
-void VirtualMachine::doDeadFunctionEliminationPass(const VMConstructionArgs& args)
-{
-	// do dead-function elimination pass.  This removes all function definitions that are not reachable (through direct or indirect function calls) from the set of entry functions.
-
-	// std::cout << "Doing dead-function elimination pass..." << std::endl;
-
-	std::vector<ASTNode*> stack;
-	TraversalPayload payload(TraversalPayload::DeadFunctionElimination);
-	payload.linker = &linker;
-		
-	// Add entry functions to reachable set and defs_to_process set.
-	for(size_t i=0; i<args.entry_point_sigs.size(); ++i)
-	{
-		FunctionDefinitionRef f = linker.findMatchingFunctionSimple(args.entry_point_sigs[i]);
-		//if(f.isNull())
-		//	throw BaseException("Failed to find entry point function " + args.entry_point_sigs[i].toString());
-		if(f.nonNull())
-		{
-			payload.reachable_nodes.insert(f.getPointer()); // Mark as reachable
-			payload.nodes_to_process.push_back(f.getPointer()); // Add to to-process set.
-		}
-		else
-		{
-			//std::cout << "!!!!!!!!!!!!!!!!!!! Warning: failed to find entry point function " << args.entry_point_sigs[i].toString() << std::endl;
-		}
-	}
-
-	while(!payload.nodes_to_process.empty())
-	{
-		// Pop a node off the stack
-		ASTNode* def_to_process = payload.nodes_to_process.back();
-		payload.nodes_to_process.pop_back();
-
-		if(payload.processed_nodes.find(def_to_process) == payload.processed_nodes.end()) // If not already processed:
-		{
-			payload.processed_nodes.insert(def_to_process); // Mark node as processed
-
-			def_to_process->traverse(payload, stack); // Process it
-			assert(stack.size() == 0);
-		}
-	}
-
-
-	// TEMP HACK: add some special functions to reachable set.
-	{
-		const FunctionSignature allocateStringSig("allocateString", vector<TypeVRef>(1, new OpaqueType()));
-		payload.reachable_nodes.insert(findMatchingFunction(allocateStringSig).getPointer());
-
-		vector<TypeVRef> argtypes(1, new String());
-		const FunctionSignature freeStringSig("freeString", argtypes);
-		payload.reachable_nodes.insert(findMatchingFunction(freeStringSig).getPointer());
-
-		payload.reachable_nodes.insert(findMatchingFunction(FunctionSignature("allocateVArray", vector<TypeVRef>(2, new Int(64)))).getPointer());
-
-		payload.reachable_nodes.insert(findMatchingFunction(FunctionSignature("freeVArray", vector<TypeVRef>(1, new VArrayType(new Int())))).getPointer());
-
-		payload.reachable_nodes.insert(findMatchingFunction(FunctionSignature("allocateClosure", vector<TypeVRef>(1, new Int(64)))).getPointer());
-
-		const TypeVRef dummy_func_type = Function::dummyFunctionType();
-		payload.reachable_nodes.insert(findMatchingFunction(FunctionSignature("freeClosure", vector<TypeVRef>(1, dummy_func_type))).getPointer());
-	}
-
-	// Now remove any non-reachable functions and named constants from linker.top_level_defs
-	std::vector<ASTNodeRef> new_top_level_defs;
-	std::vector<ASTNodeRef> unreachable_defs;
-	for(size_t i=0; i<linker.top_level_defs.size(); ++i)
-		if(payload.reachable_nodes.find(linker.top_level_defs[i].getPointer()) != payload.reachable_nodes.end()) // if in reachable set:
-			new_top_level_defs.push_back(linker.top_level_defs[i]);
-		else
-			unreachable_defs.push_back(linker.top_level_defs[i]);
-
-	linker.top_level_defs = new_top_level_defs;
-
-	// Rebuild linker.sig_to_function_map
-	Linker::SigToFuncMapType new_map;
-	for(auto i = linker.sig_to_function_map.begin(); i != linker.sig_to_function_map.end(); ++i)
-	{
-		FunctionDefinitionRef def = i->second;
-		if(payload.reachable_nodes.find(def.getPointer()) != payload.reachable_nodes.end()) // if in reachable set:
-			new_map.insert(std::make_pair(def->sig, def));
-	}
-	linker.sig_to_function_map = new_map;
-		
-		
-	// Print out reachable function sigs
-	/*std::cout << "Reachable defs:" << std::endl;
-	for(auto i = payload.reachable_nodes.begin(); i != payload.reachable_nodes.end(); ++i)
-	{
-		if((*i)->nodeType() == ASTNode::FunctionDefinitionType)
-		{
-			FunctionDefinition* def = (FunctionDefinition*)*i;
-			std::cout << "\t" << def->sig.toString() << " (" + toHexString((uint64)def) + ")\n";
-		}
-	}
-
-	// Print out unreachable functions:
-	std::cout << "Unreachable defs:" << std::endl;
-	for(auto i = unreachable_defs.begin(); i != unreachable_defs.end(); ++i)
-	{
-		if((*i)->nodeType() == ASTNode::FunctionDefinitionType)
-		{
-			FunctionDefinition* def = (FunctionDefinition*)(*i).getPointer();
-			std::cout << "\t" << def->sig.toString() << " (" + toHexString((uint64)def) + ")\n";
-		}
-	}
-
-	// Print out reachable function sigs
-	std::cout << "new_top_level_defs:" << std::endl;
-	for(auto i = new_top_level_defs.begin(); i != new_top_level_defs.end(); ++i)
-	{
-		if((*i)->nodeType() == ASTNode::FunctionDefinitionType)
-		{
-			FunctionDefinition* def = (FunctionDefinition*)i->getPointer();
-			std::cout << "\t" << def->sig.toString() << " (" + toHexString((uint64)def) + ")\n";
-		}
-	}*/
-}
-
-
 void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vector<SourceBufferRef>& source_buffers, const std::vector<FunctionDefinitionRef>& preconstructed_func_defs)
 {
 	std::map<std::string, TypeVRef> named_types;
@@ -1252,58 +1121,6 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		linker.concrete_funcs.resize(0);
 	}*/
 	
-	// Do Operator overloading conversion.
-	// NOTE: This is done during binding stage now.
-	/*bool op_overloading_changed_tree = false;
-	{
-		std::vector<ASTNode*> stack;
-		TraversalPayload payload(TraversalPayload::OperatorOverloadConversion);
-		
-		// Add linker info, so we can bind new functions such as op_add immediately.
-		//payload.top_lvl_frame = top_lvl_frame;
-		payload.linker = &linker;
-
-		for(size_t i=0; i<linker.func_defs.size(); ++i)
-			if(!linker.func_defs[i]->is_anon_func)
-				linker.func_defs[i]->traverse(payload, stack);
-
-		for(size_t i=0; i<named_constants.size(); ++i)
-			named_constants[i]->traverse(payload, stack);
-
-		//root->traverse(payload, stack);
-		assert(stack.size() == 0);
-
-		op_overloading_changed_tree = payload.tree_changed;
-	}*/
-	
-	// Link functions again if tree has changed due to operator overloading conversion,
-	// because we will now have unbound references to functions like 'op_add'.
-	//if(op_overloading_changed_tree)
-	//{
-	//	std::vector<ASTNode*> stack;
-	//	TraversalPayload payload(TraversalPayload::LinkFunctions, hidden_voidptr_arg, env);
-	//	payload.linker = &linker;
-	//	root->traverse(payload, stack);
-	//	assert(stack.size() == 0);
-	//}
-	// Bind variables
-	/*if(op_overloading_changed_tree)
-	{
-		std::vector<ASTNode*> stack;
-		TraversalPayload payload(TraversalPayload::BindVariables);
-		//payload.top_lvl_frame = top_lvl_frame;
-		payload.linker = &linker;
-		for(size_t i=0; i<linker.func_defs.size(); ++i)
-			if(!linker.func_defs[i]->is_anon_func)
-				linker.func_defs[i]->traverse(payload, stack);
-
-		for(size_t i=0; i<named_constants.size(); ++i)
-			named_constants[i]->traverse(payload, stack);
-
-		//root->traverse(payload, stack);
-		assert(stack.size() == 0);
-	}*/
-
 	while(true)
 	{
 		bool tree_changed = false;
@@ -1455,7 +1272,6 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 	}
 
 
-
 	while(true)
 	{
 		bool inline_change = doInliningPass();
@@ -1466,8 +1282,6 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		if(!changed)
 			break;
 	}
-
-
 
 
 	// do dead-function elimination pass.  This removes all function definitions that are not reachable (through direct or indirect function calls) from the set of entry functions.
@@ -1731,55 +1545,7 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 		this->llvm_module->print(f, NULL);
 	}
 
-	// Verify module
-	{
-#if TARGET_LLVM_VERSION >= 36
-		std::string error_string_stream_str;
-		llvm::raw_string_ostream error_string_stream(error_string_stream_str);
-
-		const bool ver_errors = llvm::verifyModule(
-			*this->llvm_module,
-			&error_string_stream
-		);
-
-		if(ver_errors)
-		{
-			//std::cout << "Module verification errors." << std::endl;
-			//this->llvm_module->dump();
-			//std::cout << "------errors:------" << std::endl;
-			//std::cout << error_string_stream_str << std::endl;
-
-			//TEMP: write to disk
-			/*{
-				std::ofstream f("verification_errors.txt");
-				f << error_string_stream_str;
-			}*/
-
-			throw BaseException("Module verification errors.");
-		}
-#else
-		string error_str;
-		const bool ver_errors = llvm::verifyModule(
-			*this->llvm_module, 
-			llvm::ReturnStatusAction, // Action to take
-			&error_str
-			);
-		if(ver_errors)
-		{
-			conPrint("Module verification errors: " + error_str);
-			{
-				std::ofstream f("verification_errors.txt");
-				f << error_str;
-			}
-			//this->llvm_module->dump();
-			throw BaseException("Module verification errors: " + error_str);
-		}
-#endif
-		assert(!ver_errors);
-	}
-
-	
-
+	verifyModule(this->llvm_module);
 
 	const bool optimise = true;
 	const bool verbose = false;
@@ -1888,38 +1654,9 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 	}
 
 
+	// Verify module again now that we have done optimisations.
+	verifyModule(this->llvm_module);
 
-	// Verify module again.
-	{
-#if TARGET_LLVM_VERSION >= 36
-		const bool ver_errors = llvm::verifyModule(
-			*this->llvm_module
-			// TODO: pass std out
-		);
-		if(ver_errors)
-		{
-			conPrint("Module verification errors.");
-#if !defined(NDEBUG) // llvm::Module::dump() is only implemented in debug mode.
-			this->llvm_module->dump();
-#endif
-			throw BaseException("Module verification errors.");
-		}
-#else
-		string error_str;
-		const bool ver_errors = llvm::verifyModule(
-			*this->llvm_module, 
-			llvm::ReturnStatusAction, // Action to take
-			&error_str
-			);
-		if(ver_errors)
-		{
-			conPrint("Module verification errors: " + error_str);
-			this->llvm_module->dump();
-			throw BaseException("Module verification errors: " + error_str);
-		}
-#endif
-		assert(!ver_errors);
-	}
 
 	// Dump module bitcode to 'module.txt'
 	if(DUMP_MODULE_IR)
@@ -1957,8 +1694,10 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 	params.emit_comments = vm_args.comments_in_opencl_output;
 	params.emit_in_bound_asserts = vm_args.emit_in_bound_asserts;
 
+	// Build set of OpenCL C keywords.  This is needed to detect and rename any variables etc.. in winter programs 
+	// that are OpenCL C keywords.
 	// See Section '6.1.9 Keywords' of OpenCL 2.0 spec
-	const char* opencl_c_keywords_[] = {
+	const char* opencl_c_keywords[] = {
 		// Preprocessor keywords
 		"__OPENCL_VERSION__",
 		"__FILE__",
@@ -2003,21 +1742,7 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 		"_Complex",
 		"_Imaginary",
 				
-
-
 		"half", // not actually described as a keyword in the spec, but seems to be treated as one.
-
-		/*"float2",
-		"float3",
-		"float4",
-		"float8",
-		"float16",
-		"double2",
-		"double3",
-		"double4",
-		"double8",
-		"double16",*/
-		// etc..
 
 		// Table 6.3
 		"image2d_t",
@@ -2061,12 +1786,10 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 		// misc
 		"uniform",
 		"pipe",
-				
-		NULL
 	};
 
-	for(int i=0; opencl_c_keywords_[i]; i++)
-		params.opencl_c_keywords.insert(opencl_c_keywords_[i]);
+	for(size_t i=0; i != staticArrayNumElems(opencl_c_keywords); ++i)
+		params.opencl_c_keywords.insert(opencl_c_keywords[i]);
 
 	const char* vector_base_types[] = {
 		"char",
@@ -2078,10 +1801,9 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 		"long",
 		"ulong",
 		"float",
-		"double",
-		NULL
+		"double"
 	};
-	for(int i=0; vector_base_types[i]; i++)
+	for(int i=0; i != staticArrayNumElems(vector_base_types); ++i)
 	{
 		params.opencl_c_keywords.insert(std::string(vector_base_types[i]) + "2");
 		params.opencl_c_keywords.insert(std::string(vector_base_types[i]) + "3");
@@ -2118,7 +1840,7 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 
 	
 
-	// TODO: Will need to handle dependecies between tuples here as well.
+	// TODO: Will need to handle dependencies between tuples here as well.
 
 	std::set<TupleTypeRef, TypeRefLessThan> emitted_tuples;
 	std::string struct_def_code = this->vm_args.comments_in_opencl_output ? "// OpenCL structure definitions for Winter structs and tuples, from VirtualMachine::buildOpenCLCode()\n" : "";
@@ -2267,6 +1989,41 @@ void* VirtualMachine::getJittedFunction(const FunctionSignature& sig)
 }
 
 
+void VirtualMachine::verifyModule(llvm::Module* the_llvm_module)
+{
+	string error_str;
+
+#if TARGET_LLVM_VERSION >= 36
+	llvm::raw_string_ostream error_string_stream(error_str);
+
+	const bool ver_errors = llvm::verifyModule(
+		*the_llvm_module,
+		&error_string_stream
+	);
+#else
+	const bool ver_errors = llvm::verifyModule(
+		*the_llvm_module, 
+		llvm::ReturnStatusAction, // Action to take
+		&error_str
+	);
+#endif
+
+	if(ver_errors)
+	{
+		conPrint("Module verification errors: " + error_str);
+
+		// Write to disk
+		/*{
+			std::ofstream f("verification_errors.txt");
+			f << error_str;
+		}*/
+
+		//the_llvm_module->dump();
+		throw BaseException("Module verification errors: " + error_str);
+	}
+}
+
+
 // Writes the assembly for the module to disk at filename.  Throws Winter::BaseException on failure.
 void VirtualMachine::compileToNativeAssembly(llvm::Module* mod, const std::string& filename) 
 {
@@ -2322,7 +2079,7 @@ void* VirtualMachine::getJittedFunctionByName(const std::string& name)
 
 	return this->llvm_exec_engine->getPointerToFunction(
 		func->built_llvm_function
-		);
+	);
 }
 
 

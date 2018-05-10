@@ -106,10 +106,10 @@ llvm::FunctionType* llvmFunctionType(const vector<TypeVRef>& arg_types,
 {
 	if(return_type->passByValue())
 	{
-		vector<llvm::Type*> llvm_arg_types;
+		llvm::SmallVector<llvm::Type*, 8> llvm_arg_types((unsigned int)arg_types.size());
 
 		for(unsigned int i=0; i<arg_types.size(); ++i)
-			llvm_arg_types.push_back(arg_types[i]->passByValue() ? arg_types[i]->LLVMType(module) : LLVMTypeUtils::pointerType(*arg_types[i]->LLVMType(module)));
+			llvm_arg_types[i] = arg_types[i]->passByValue() ? arg_types[i]->LLVMType(module) : LLVMTypeUtils::pointerType(*arg_types[i]->LLVMType(module));
 
 		if(captured_var_struct_ptr_arg)
 			llvm_arg_types.push_back(getPtrToBaseCapturedVarStructType(module));
@@ -121,18 +121,18 @@ llvm::FunctionType* llvmFunctionType(const vector<TypeVRef>& arg_types,
 			return_type->LLVMType(module), // return type
 			llvm_arg_types,
 			false // varargs
-			);
+		);
 	}
 	else
 	{
-		// The return value is passed by reference, so that means the zero-th argument will be a pointer to memory where the return value will be placed.
+		// The return value is passed by reference, so that means the zero-th argument will be a pointer to memory where the return value will be placed (SRET).
 
-		vector<llvm::Type*> llvm_arg_types;
-		llvm_arg_types.push_back(LLVMTypeUtils::pointerType(*return_type->LLVMType(module)));
+		llvm::SmallVector<llvm::Type*, 8> llvm_arg_types(1 + arg_types.size());
+		llvm_arg_types[0] = LLVMTypeUtils::pointerType(*return_type->LLVMType(module)); // Arg 0 is SRET arg.
 
-		// Append normal arguments
+		// Set normal arguments
 		for(unsigned int i=0; i<arg_types.size(); ++i)
-			llvm_arg_types.push_back(arg_types[i]->passByValue() ? arg_types[i]->LLVMType(module) : LLVMTypeUtils::pointerType(*arg_types[i]->LLVMType(module)));
+			llvm_arg_types[i + 1] = arg_types[i]->passByValue() ? arg_types[i]->LLVMType(module) : LLVMTypeUtils::pointerType(*arg_types[i]->LLVMType(module));
 
 		if(captured_var_struct_ptr_arg)
 			llvm_arg_types.push_back(getPtrToBaseCapturedVarStructType(module));
@@ -141,11 +141,10 @@ llvm::FunctionType* llvmFunctionType(const vector<TypeVRef>& arg_types,
 		//	llvm_arg_types.push_back(voidPtrType(context));
 
 		return llvm::FunctionType::get(
-			//LLVMTypeUtils::pointerType(*return_type->LLVMType(context)), 
 			llvm::Type::getVoidTy(module.getContext()), // return type - void as return value will be written to mem via zero-th arg.
 			llvm_arg_types,
 			false // varargs
-			);
+		);
 	}
 }
 

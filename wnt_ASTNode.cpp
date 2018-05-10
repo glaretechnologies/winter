@@ -568,7 +568,7 @@ void doDeadCodeElimination(Reference<ASTNode>& e, TraversalPayload& payload, std
 }
 
 
-const std::string mapOpenCLCVarName(const std::set<std::string>& opencl_c_keywords, const std::string& s)
+const std::string mapOpenCLCVarName(const std::unordered_set<std::string>& opencl_c_keywords, const std::string& s)
 {
 	if(opencl_c_keywords.count(s))
 		return s + "_MODIFIED_";
@@ -1591,7 +1591,7 @@ llvm::Value* StringLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 			//true // target_takes_voidptr_arg // params.hidden_voidptr_arg
 		);
 
-		vector<llvm::Value*> args(1, elem_bitcast);
+		llvm::SmallVector<llvm::Value*, 4> args(1, elem_bitcast);
 		
 		// Set hidden voidptr argument
 		/*const bool target_takes_voidptr_arg = true;
