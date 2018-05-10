@@ -127,7 +127,7 @@ llvm::FunctionType* llvmFunctionType(const vector<TypeVRef>& arg_types,
 	{
 		// The return value is passed by reference, so that means the zero-th argument will be a pointer to memory where the return value will be placed (SRET).
 
-		llvm::SmallVector<llvm::Type*, 8> llvm_arg_types(1 + arg_types.size());
+		llvm::SmallVector<llvm::Type*, 8> llvm_arg_types(1 + (unsigned int)arg_types.size());
 		llvm_arg_types[0] = LLVMTypeUtils::pointerType(*return_type->LLVMType(module)); // Arg 0 is SRET arg.
 
 		// Set normal arguments
