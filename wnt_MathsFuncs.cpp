@@ -174,7 +174,7 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 	// which then in turn calls tanf, resulting in an extra call.
 
 	external_functions.push_back(new ExternalFunction(
-		tanf, // func
+		(void*)tanf, // func
 		tanFloatInterpreted, // interpreted func
 		FunctionSignature("tan", vector<TypeVRef>(1, float_type)), // function signature
 		float_type // return type
@@ -188,7 +188,7 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 	));
 
 	external_functions.push_back(new ExternalFunction(
-		asinf,
+		(void*)asinf,
 		asinInterpreted,
 		FunctionSignature("asin", vector<TypeVRef>(1, float_type)),
 		float_type
@@ -202,7 +202,7 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 	));
 
 	external_functions.push_back(new ExternalFunction(
-		acosf,
+		(void*)acosf,
 		acosInterpreted,
 		FunctionSignature("acos", vector<TypeVRef>(1, float_type)),
 		float_type
@@ -216,7 +216,7 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 	));
 
 	external_functions.push_back(new ExternalFunction(
-		atanf,
+		(void*)atanf,
 		atanInterpreted,
 		FunctionSignature("atan", vector<TypeVRef>(1, float_type)),
 		float_type
@@ -230,7 +230,7 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 	));
 
 	external_functions.push_back(new ExternalFunction(
-		atan2f,
+		(void*)atan2f,
 		atan2Interpreted,
 		FunctionSignature("atan2", vector<TypeVRef>(2, float_type)),
 		float_type
