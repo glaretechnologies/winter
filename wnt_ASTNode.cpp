@@ -2897,6 +2897,33 @@ ValueRef DivExpression::exec(VMState& vmstate)
 
 		return new IntValue(a_int_val / b_int_val, checkedCast<IntValue>(aval)->is_signed);
 	}
+	else if(this->type()->getType() == Type::VectorTypeType)
+	{
+		const VectorType* vectype = this->type().downcastToPtr<VectorType>();
+
+		const VectorValue* aval_vec = checkedCast<VectorValue>(aval);
+		
+		if(vectype->elem_type->getType() == Type::FloatType)
+		{
+			const float bval_float = checkedCast<FloatValue>(bval)->value;
+
+			vector<ValueRef> elem_values(aval_vec->e.size());
+			for(unsigned int i=0; i<elem_values.size(); ++i)
+				elem_values[i] = new FloatValue(checkedCast<FloatValue>(aval_vec->e[i])->value / bval_float);
+			return new VectorValue(elem_values);
+		}
+		else if(vectype->elem_type->getType() == Type::DoubleType)
+		{
+			const double bval_double = checkedCast<DoubleValue>(bval)->value;
+
+			vector<ValueRef> elem_values(aval_vec->e.size());
+			for(unsigned int i=0; i<elem_values.size(); ++i)
+				elem_values[i] = new DoubleValue(checkedCast<DoubleValue>(aval_vec->e[i])->value / bval_double);
+			return new VectorValue(elem_values);
+		}
+		else
+			throw BaseException("invalid types for div op.");
+	}
 	else
 	{
 		throw BaseException("invalid types for div op.");
@@ -3050,6 +3077,12 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 		{
 			// Make sure both operands have the same type
 			if(*a->type() != *b->type())
+				throw BaseException("Binary operator '/' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
+		}
+		else if(this_type->getType() == Type::VectorTypeType &&
+			(this_type.downcast<VectorType>()->elem_type->getType() == Type::FloatType || this_type.downcast<VectorType>()->elem_type->getType() == Type::DoubleType))
+		{
+			if(*this_type.downcast<VectorType>()->elem_type != *b->type())
 				throw BaseException("Binary operator '/' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
 		}
 		/*else if(a->type()->getType() == Type::VectorTypeType && b->type()->getType() == Type::VectorTypeType)
@@ -3380,7 +3413,23 @@ std::string DivExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 llvm::Value* DivExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
-	if(this->type()->getType() == Type::FloatType || this->type()->getType() == Type::DoubleType)
+	if(this->type()->getType() == Type::VectorTypeType && (b->type()->getType() == Type::FloatType || b->type()->getType() == Type::DoubleType))
+	{
+		// vector<float> / float
+		assert(a->type()->getType() == Type::VectorTypeType);
+
+		llvm::Value* bval = b->emitLLVMCode(params);
+		llvm::Value* bvec = params.builder->CreateVectorSplat(
+			a->type().downcast<VectorType>()->num,
+			bval
+		);
+
+		return params.builder->CreateFDiv(
+			a->emitLLVMCode(params),
+			bvec
+		);
+	}
+	else if(this->type()->getType() == Type::FloatType || this->type()->getType() == Type::DoubleType)
 	{
 		return params.builder->CreateBinOp(
 			llvm::Instruction::FDiv, 

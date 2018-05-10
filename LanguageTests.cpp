@@ -3667,6 +3667,21 @@ static void testVectors()
 				  let v = [1.0, 2.0, 3.0, 4.0]v in\
 				  e1(mul(v, x))", 10.0f, 2.0f * 10.0f);
 
+
+	// Test vector<float, x> / float division
+	testMainFloatArg("def main(float x) float : \
+				let v = [1.0, 2.0, 3.0, 4.0]v in \
+				e1(v / x)", 10.0, 2.0f / 10.0f);
+
+	// Test vector<double, x> / double division
+	testMainDoubleArg("def main(double x) double : \
+				let v = [1.0, 2.0, 3.0, 4.0]v in \
+				e1(v / x)", 10.0, 2.0f / 10.0f);
+
+
+	testMainFloatArg("def main(float x) float :  ([1.0, 2.0, 3.0, 4.0]v * x)[1]", 10.0, 20.0);
+	testMainDoubleArg("def main(double x) double :  ([1.0, 2.0, 3.0, 4.0]v * x)[1]", 10.0, 20.0);
+
 	// Try dot product
 	testMainFloatArg("	def main(float x) float : \
 					 let v = [x, x, x, x]v in\
