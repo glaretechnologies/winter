@@ -9,6 +9,7 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 
 #include <cassert>
 #include <fstream>
+#include <unordered_map>
 #include "utils/FileUtils.h"
 #include "utils/StringUtils.h"
 #include "utils/UTF8Utils.h"
@@ -561,7 +562,7 @@ public:
 
 	virtual uint64_t getSymbolAddress(const std::string& name)
 	{
-		std::map<std::string, void*>::iterator res = func_map->find(name);
+		std::unordered_map<std::string, void*>::iterator res = func_map->find(name);
 		if(res != func_map->end())
 			return (uint64_t)res->second;
 
@@ -658,7 +659,7 @@ public:
 		return (uint64_t)f;
 	}
 	
-	std::map<std::string, void*>* func_map;
+	std::unordered_map<std::string, void*>* func_map;
 };
 
 

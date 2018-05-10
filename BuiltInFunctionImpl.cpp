@@ -635,7 +635,7 @@ llvm::Value* ArrayMapBuiltInFunc::insertWorkFunction(EmitLLVMCodeParams& params)
 {
 	llvm::Type* int64_type = llvm::IntegerType::get(*params.context, 64);
 
-	std::vector<llvm::Type*> arg_types(2, LLVMTypeUtils::pointerType(this->from_type->LLVMType(*params.module))); // output, input
+	llvm::SmallVector<llvm::Type*, 8> arg_types(2, LLVMTypeUtils::pointerType(this->from_type->LLVMType(*params.module))); // output, input
 	arg_types.push_back(this->func_type->LLVMType(*params.module)); // map_function
 	arg_types.push_back(int64_type); // size_t begin
 	arg_types.push_back(int64_type); // size_t end
@@ -756,7 +756,7 @@ llvm::Value* ArrayMapBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 		llvm::Type* voidptr = LLVMTypeUtils::voidPtrType(*params.context);
 
-		std::vector<llvm::Type*> arg_types(2, LLVMTypeUtils::voidPtrType(*params.context)); // void* output, void* input
+		llvm::SmallVector<llvm::Type*, 8> arg_types(2, LLVMTypeUtils::voidPtrType(*params.context)); // void* output, void* input
 		const TypeVRef int64_type = new Int(64);
 		arg_types.push_back(int64_type->LLVMType(*params.module)); // array_size
 		arg_types.push_back(LLVMTypeUtils::voidPtrType(*params.context)); // map_function
@@ -2787,11 +2787,12 @@ ValueRef PowBuiltInFunc::invoke(VMState& vmstate)
 
 llvm::Value* PowBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
-	vector<llvm::Value*> args(2);
-	args[0] = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
-	args[1] = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
+	llvm::Value* args[] = {
+		LLVMTypeUtils::getNthArg(params.currently_building_func, 0),
+		LLVMTypeUtils::getNthArg(params.currently_building_func, 1),
+	};
 
-	vector<llvm::Type*> types(1, this->type->LLVMType(*params.module));
+	llvm::Type* types[] = { this->type->LLVMType(*params.module) };
 
 	llvm::Function* func = llvm::Intrinsic::getDeclaration(params.module, llvm::Intrinsic::pow, types);
 
