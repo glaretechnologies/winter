@@ -91,8 +91,9 @@ namespace Winter
 {
 
 
-static const bool DUMP_MODULE_IR = false; // Dumps to "unoptimised_module_IR.txt", "optimised_module_IR.txt" in current working dir.
-static const bool DUMP_ASSEMBLY = false;  // Dumps to "module_assembly.txt" in current working dir.
+// Dumps to "unoptimised_module_IR.txt", "optimised_module_IR.txt" in current working dir.
+// Also dumps to "module_assembly.txt" in current working dir.
+static const bool DUMP_MODULE_IR_AND_ASSEMBLY = false; 
 
 
 //=====================================================================================
@@ -205,6 +206,34 @@ static StringRep* concatStrings(StringRep* a, StringRep* b, void* env)
 static ValueRef concatStringsInterpreted(const vector<ValueRef>& args)
 {
 	return new StringValue( getStringArg(args, 0) + getStringArg(args, 1) );
+}
+
+
+static bool compareEqualString(StringRep* a, StringRep* b, void* env)
+{
+	if(a->len != b->len)
+		return false;
+	return std::memcmp((uint8*)a + sizeof(StringRep), (uint8*)b + sizeof(StringRep), a->len) == 0;
+}
+
+
+static ValueRef compareEqualStringInterpreted(const vector<ValueRef>& args)
+{
+	return new BoolValue(getStringArg(args, 0) == getStringArg(args, 1));
+}
+
+
+static bool compareNotEqualString(StringRep* a, StringRep* b, void* env)
+{
+	if(a->len != b->len)
+		return true;
+	return std::memcmp((uint8*)a + sizeof(StringRep), (uint8*)b + sizeof(StringRep), a->len) != 0;
+}
+
+
+static ValueRef compareNotEqualStringInterpreted(const vector<ValueRef>& args)
+{
+	return new BoolValue(getStringArg(args, 0) != getStringArg(args, 1));
 }
 
 
@@ -652,7 +681,7 @@ public:
 
 		void* f = llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(name);
 
-		assert(f);
+		//assert(f);
 		if(!f)
 			throw BaseException("Internal error: failed to find symbol '" + name + "'");
 		return (uint64_t)f;
@@ -763,7 +792,22 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			new CharType() // return type
 		));
 
-		
+		// Add compareEqualString
+		external_functions.push_back(new ExternalFunction(
+			(void*)compareEqualString,
+			compareEqualStringInterpreted, // interpreted func
+			FunctionSignature("compareEqualString", std::vector<TypeVRef>(2, new String())),
+			new Bool() // return type
+		));
+
+		// Add compareNotEqualString
+		external_functions.push_back(new ExternalFunction(
+			(void*)compareNotEqualString,
+			compareNotEqualStringInterpreted, // interpreted func
+			FunctionSignature("compareNotEqualString", std::vector<TypeVRef>(2, new String())),
+			new Bool() // return type
+		));
+
 		// Add allocateVArray
 		{
 			external_functions.push_back(new ExternalFunction(
@@ -1021,6 +1065,7 @@ bool VirtualMachine::doInliningPass()
 	if(tree_changed)
 	{
 		TraversalPayload payload2(TraversalPayload::BindVariables);
+		payload2.linker = &linker;
 		for(size_t i=0; i<linker.top_level_defs.size(); ++i)
 			linker.top_level_defs[i]->traverse(payload2, stack);
 	}
@@ -1364,35 +1409,35 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		
 		
 		// Print out reachable function sigs
-		/*std::cout << "Reachable defs:" << std::endl;
+		/*conPrint("Reachable defs:");
 		for(auto i = payload.reachable_nodes.begin(); i != payload.reachable_nodes.end(); ++i)
 		{
 			if((*i)->nodeType() == ASTNode::FunctionDefinitionType)
 			{
 				FunctionDefinition* def = (FunctionDefinition*)*i;
-				std::cout << "\t" << def->sig.toString() << " (" + toHexString((uint64)def) + ")\n";
+				conPrint("\t" + def->sig.toString() + " (" + toHexString((uint64)def) + ")\n");
 			}
 		}
 
 		// Print out unreachable functions:
-		std::cout << "Unreachable defs:" << std::endl;
+		conPrint("Unreachable defs:");
 		for(auto i = unreachable_defs.begin(); i != unreachable_defs.end(); ++i)
 		{
 			if((*i)->nodeType() == ASTNode::FunctionDefinitionType)
 			{
 				FunctionDefinition* def = (FunctionDefinition*)(*i).getPointer();
-				std::cout << "\t" << def->sig.toString() << " (" + toHexString((uint64)def) + ")\n";
+				conPrint("\t" + def->sig.toString() + " (" + toHexString((uint64)def) + ")\n");
 			}
 		}
 
 		// Print out reachable function sigs
-		std::cout << "new_top_level_defs:" << std::endl;
+		conPrint("new_top_level_defs:");
 		for(auto i = new_top_level_defs.begin(); i != new_top_level_defs.end(); ++i)
 		{
 			if((*i)->nodeType() == ASTNode::FunctionDefinitionType)
 			{
 				FunctionDefinition* def = (FunctionDefinition*)i->getPointer();
-				std::cout << "\t" << def->sig.toString() << " (" + toHexString((uint64)def) + ")\n";
+				conPrint("\t" + def->sig.toString() + " (" + toHexString((uint64)def) + ")\n");
 			}
 		}*/
 	}
@@ -1526,7 +1571,7 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 	
 	
 	// Dump unoptimised module bitcode to 'unoptimised_module.txt'
-	if(DUMP_MODULE_IR)
+	if(DUMP_MODULE_IR_AND_ASSEMBLY)
 	{
 #if TARGET_LLVM_VERSION >= 36
 		std::error_code errorinfo;
@@ -1543,6 +1588,8 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 		);
 #endif
 		this->llvm_module->print(f, NULL);
+
+		conPrint("Dumped unoptimised module IR to 'unoptimised_module_IR.txt'.");
 	}
 
 	verifyModule(this->llvm_module);
@@ -1659,7 +1706,7 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 
 
 	// Dump module bitcode to 'module.txt'
-	if(DUMP_MODULE_IR)
+	if(DUMP_MODULE_IR_AND_ASSEMBLY)
 	{
 #if TARGET_LLVM_VERSION >= 36
 		std::error_code errorinfo;
@@ -1676,9 +1723,11 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 		);
 #endif
 		this->llvm_module->print(f, NULL);
+
+		conPrint("Dumped optimised module IR to 'optimised_module_IR.txt'.");
 	}
 
-	if(DUMP_ASSEMBLY)
+	if(DUMP_MODULE_IR_AND_ASSEMBLY)
 		this->compileToNativeAssembly(this->llvm_module, "module_assembly.txt");
 
 	this->llvm_exec_engine->finalizeObject();
@@ -2070,6 +2119,8 @@ void VirtualMachine::compileToNativeAssembly(llvm::Module* mod, const std::strin
 #endif
 
 	pm.run(*mod);
+
+	conPrint("Dumped module assembly to '" + filename + "'.");
 }
 
 

@@ -17,6 +17,7 @@ class VMState;
 class EmitLLVMCodeParams;
 class EmitOpenCLCodeParams;
 class ASTNode;
+class TraversalPayload;
 
 
 class BuiltInFunctionImpl : public RefCounted
@@ -58,7 +59,8 @@ public:
 		BuiltInType_ToInt64BuiltInFunc,
 		BuiltInType_ToInt32BuiltInFunc,
 		BuiltInType_VoidPtrToInt64BuiltInFunc,
-		BuiltInType_LengthBuiltInFunc
+		BuiltInType_LengthBuiltInFunc,
+		BuiltInType_CompareEqualBuiltInFunc
 	};
 
 	BuiltInFunctionImpl(BuiltInFunctionImplType builtin_type_) : builtin_type(builtin_type_) {}
@@ -66,7 +68,14 @@ public:
 
 	virtual ValueRef invoke(VMState& vmstate) = 0;
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const = 0;
-	virtual bool callIsExpensive() const { return true; } // Should this call be considered expensive, when considering possible duplication during inlining?
+
+	// Should this call be considered expensive, when considering possible duplication during inlining?
+	virtual bool callIsExpensive() const { return true; } 
+
+	 // Built-in functions may call other functions, so we need to be able to traverse them when getting set of alive functions.
+	virtual void deadFunctionEliminationTraverse(TraversalPayload& payload) const {}
+
+	virtual void linkInCalledFunctions(TraversalPayload& payload) const {}
 
 	const BuiltInFunctionImplType builtInType() const { return builtin_type; }
 private:
@@ -636,6 +645,21 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 
 	TypeVRef type;
+};
+
+
+class CompareEqualBuiltInFunc : public BuiltInFunctionImpl
+{
+public:
+	CompareEqualBuiltInFunc(const TypeVRef& arg_type_, bool is_compare_not_equal);
+
+	virtual ValueRef invoke(VMState& vmstate);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+	virtual void deadFunctionEliminationTraverse(TraversalPayload& payload) const;
+	virtual void linkInCalledFunctions(TraversalPayload& payload) const;
+
+	TypeVRef arg_type;
+	bool is_compare_not_equal;
 };
 
 

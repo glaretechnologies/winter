@@ -16,6 +16,7 @@
 #include "utils/PlatformUtils.h"
 #include "utils/StringUtils.h"
 #include "utils/TaskManager.h"
+#include "utils/ConPrint.h"
 #ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
 #endif
@@ -3501,6 +3502,530 @@ llvm::Value* LengthBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	default:
 		throw BaseException("unhandled type.");
 	}
+}
+
+
+//----------------------------------------------------------------------------------------------
+
+
+CompareEqualBuiltInFunc::CompareEqualBuiltInFunc(const TypeVRef& arg_type_, bool is_compare_not_equal_)
+:	BuiltInFunctionImpl(BuiltInType_CompareEqualBuiltInFunc),
+	arg_type(arg_type_),
+	is_compare_not_equal(is_compare_not_equal_)
+{}
+
+
+// Tests if two values are equal.
+// Throws an exception if the values do not belong to 'required_type'.
+// This is a standalone function so it can be called recursively.
+static bool areValuesEqual(const TypeVRef& required_type, const ValueRef& a, const ValueRef& b)
+{
+	switch(required_type->getType())
+	{
+	case Type::FloatType:
+		return checkedCast<const FloatValue>(a)->value == checkedCast<const FloatValue>(b)->value;
+	case Type::DoubleType:
+		return checkedCast<const DoubleValue>(a)->value == checkedCast<const DoubleValue>(b)->value;
+	case Type::IntType:
+		return checkedCast<const IntValue>(a)->value == checkedCast<const IntValue>(b)->value;
+	case Type::StringType:
+		return checkedCast<const StringValue>(a)->value == checkedCast<const StringValue>(b)->value;
+	case Type::CharTypeType:
+		return checkedCast<const CharValue>(a)->value == checkedCast<const CharValue>(b)->value;
+	case Type::BoolType:
+		return checkedCast<const BoolValue>(a)->value == checkedCast<const BoolValue>(b)->value;
+	//case Type::MapType: // TODO: handle
+	//	return checkedCast<const MapValue>(a)->value == checkedCast<const MapValue>(b)->value;
+	case Type::ArrayTypeType:
+	{
+		const ArrayType* array_type = required_type.downcastToPtr<ArrayType>();
+		const ArrayValue* a_array_val = checkedCast<const ArrayValue>(a);
+		const ArrayValue* b_array_val = checkedCast<const ArrayValue>(b);
+
+		if(a_array_val->e.size() != array_type->num_elems)
+			throw BaseException("CompareEqualBuiltInFunc::invoke(): Invalid args.");
+		if(b_array_val->e.size() != array_type->num_elems)
+			throw BaseException("CompareEqualBuiltInFunc::invoke(): Invalid args.");
+
+		for(size_t i=0; i<a_array_val->e.size(); ++i)
+			if(!areValuesEqual(array_type->elem_type, a_array_val->e[i], b_array_val->e[i]))
+				return false;
+		return true;
+	}
+	case Type::VArrayTypeType:
+	{
+		const VArrayType* array_type = required_type.downcastToPtr<VArrayType>();
+		const VArrayValue* a_array_val = checkedCast<const VArrayValue>(a);
+		const VArrayValue* b_array_val = checkedCast<const VArrayValue>(b);
+
+		if(a_array_val->e.size() != b_array_val->e.size())
+			return false;
+
+		for(size_t i=0; i<a_array_val->e.size(); ++i)
+			if(!areValuesEqual(array_type->elem_type, a_array_val->e[i], b_array_val->e[i]))
+				return false;
+		return true;
+	}
+	//case Type::FunctionType:  // TODO: handle
+	case Type::StructureTypeType:
+	{
+		const StructureType* struct_type = required_type.downcastToPtr<StructureType>();
+		const StructureValue* a_struct_val = checkedCast<const StructureValue>(a);
+		const StructureValue* b_struct_val = checkedCast<const StructureValue>(b);
+
+		if(a_struct_val->fields.size() != struct_type->component_types.size())
+			throw BaseException("CompareEqualBuiltInFunc::invoke(): Invalid args.");
+		if(b_struct_val->fields.size() != struct_type->component_types.size())
+			throw BaseException("CompareEqualBuiltInFunc::invoke(): Invalid args.");
+
+		for(size_t i=0; i<a_struct_val->fields.size(); ++i)
+			if(!areValuesEqual(struct_type->component_types[i], a_struct_val->fields[i], b_struct_val->fields[i]))
+				return false;
+		return true;
+	}
+	case Type::TupleTypeType:
+	{
+		const TupleType* tuple_type = required_type.downcastToPtr<TupleType>();
+		const TupleValue* a_tuple_val = checkedCast<const TupleValue>(a);
+		const TupleValue* b_tuple_val = checkedCast<const TupleValue>(b);
+
+		if(a_tuple_val->e.size() != tuple_type->component_types.size())
+			throw BaseException("CompareEqualBuiltInFunc::invoke(): Invalid args.");
+		if(b_tuple_val->e.size() != tuple_type->component_types.size())
+			throw BaseException("CompareEqualBuiltInFunc::invoke(): Invalid args.");
+
+		for(size_t i=0; i<a_tuple_val->e.size(); ++i)
+			if(!areValuesEqual(tuple_type->component_types[i], a_tuple_val->e[i], b_tuple_val->e[i]))
+				return false;
+		return true;
+	}
+	case Type::VectorTypeType:
+	{
+		const VectorType* vector_type = required_type.downcastToPtr<VectorType>();
+		const VectorValue* a_vec_val = checkedCast<const VectorValue>(a);
+		const VectorValue* b_vec_val = checkedCast<const VectorValue>(b);
+
+		if(a_vec_val->e.size() != vector_type->num)
+			throw BaseException("CompareEqualBuiltInFunc::invoke(): Invalid args.");
+		if(b_vec_val->e.size() != vector_type->num)
+			throw BaseException("CompareEqualBuiltInFunc::invoke(): Invalid args.");
+
+		for(unsigned int i=0; i<vector_type->num; ++i)
+			if(!areValuesEqual(vector_type->elem_type, a_vec_val->e[i], b_vec_val->e[i]))
+				return false;
+		return true;
+	}
+	default:
+		assert(0);
+		throw BaseException("CompareEqualBuiltInFunc::invoke(): unhandled type " + required_type->toString());
+	}
+}
+
+
+ValueRef CompareEqualBuiltInFunc::invoke(VMState& vmstate)
+{
+	const bool equal = areValuesEqual(
+		arg_type, // required type
+		vmstate.argument_stack[vmstate.func_args_start.back() + 0],
+		vmstate.argument_stack[vmstate.func_args_start.back() + 1]
+	);
+
+	return new BoolValue(is_compare_not_equal ? !equal : equal);
+}
+
+
+static llvm::Value* emitElemCompareEqualLLVMCode(llvm::IRBuilder<>* builder, llvm::Module* module, const TypeVRef& type, 
+	llvm::Value* a_code, llvm::Value* b_code, bool is_compare_not_equal);
+
+
+/*
+Pseudocode for ==:
+------------------
+res = true
+for each element of arrays:
+	if a_elem != b_elem
+		res = false;
+		break for loop;
+return res
+
+
+Pseudocode for !=:
+------------------
+res = false
+for each element of arrays:
+	if a_elem != b_elem
+		res = true;
+		break for loop;
+return res
+*/
+static llvm::Value* emitArrayCompareEqualLLVMCode(llvm::IRBuilder<>* builder_, llvm::Module* module, const ArrayType& array_type,
+	llvm::Value* a_code, llvm::Value* b_code, bool is_compare_not_equal)
+{
+	llvm::IRBuilder<>& builder = *builder_;
+
+	llvm::Value* begin_index = llvm::ConstantInt::get(module->getContext(), llvm::APInt(64, 0));
+	llvm::Value* end_index   = llvm::ConstantInt::get(module->getContext(), llvm::APInt(64, array_type.num_elems));
+
+	// Make the new basic block for the loop header, inserting after current block.
+	llvm::Function* current_func = builder.GetInsertBlock()->getParent();
+	llvm::BasicBlock* preheader_BB = builder.GetInsertBlock();
+	llvm::BasicBlock* condition_BB = llvm::BasicBlock::Create(module->getContext(), "condition", current_func);
+	llvm::BasicBlock* loop_body_BB = llvm::BasicBlock::Create(module->getContext(), "loop_body", current_func);
+	llvm::BasicBlock* elems_notequal_BB = llvm::BasicBlock::Create(module->getContext(), "elems_notequal_BB", current_func);
+	llvm::BasicBlock* elems_equal_BB = llvm::BasicBlock::Create(module->getContext(), "elems_equal_BB", current_func);
+	llvm::BasicBlock* after_BB = llvm::BasicBlock::Create(module->getContext(), "after_loop", current_func);
+
+	// Allocate space for a boolean which is either 'elems are not equal' or 'elems are all equal' depending on is_compare_not_equal.
+	llvm::Value* res_space = builder.CreateAlloca(llvm::Type::getInt1Ty(module->getContext()), 
+		llvm::ConstantInt::get(module->getContext(), llvm::APInt(64, 1)), "res_space");
+
+	if(is_compare_not_equal)
+		builder.CreateStore(llvm::ConstantInt::get(module->getContext(), llvm::APInt(1, 0)), res_space); // Store 'false' in res_space
+	else
+		builder.CreateStore(llvm::ConstantInt::get(module->getContext(), llvm::APInt(1, 1)), res_space); // Store 'true' in res_space
+
+	builder.SetInsertPoint(preheader_BB);
+	builder.CreateBr(condition_BB); // Insert an explicit fall through from the current block to the condition_BB.
+
+	//============================= condition_BB ================================
+	builder.SetInsertPoint(condition_BB);
+
+	// Create loop index (i) variable phi node
+	llvm::PHINode* loop_index_var = builder.CreatePHI(llvm::Type::getInt64Ty(module->getContext()), 2, "loop_index_var");
+	loop_index_var->addIncoming(begin_index, preheader_BB);
+
+	// Compute the end condition. (i != end)
+	llvm::Value* end_cond = builder.CreateICmpNE(end_index, loop_index_var, "loopcond");
+
+	// Insert the conditional branch
+	builder.CreateCondBr(end_cond, /*true=*/loop_body_BB, /*false=*/after_BB);
+
+	//============================= loop_body_BB ================================
+	builder.SetInsertPoint(loop_body_BB);
+
+	// Load element from input array
+	llvm::Value* indices[] = {
+		llvm::ConstantInt::get(module->getContext(), llvm::APInt(64, 0)), // get the zero-th array
+		loop_index_var // get the indexed element in the array
+	};
+
+	llvm::Value* a_elem_ptr = builder.CreateInBoundsGEP(a_code, indices);
+	llvm::Value* b_elem_ptr = builder.CreateInBoundsGEP(b_code, indices);
+	llvm::Value* compare_elems_res = emitElemCompareEqualLLVMCode(&builder, module, array_type.elem_type, 
+		a_elem_ptr, b_elem_ptr, /*is_compare_not_equal=*/false);
+
+	// Add a branch to to after_BB to take if the elements are not equal
+	builder.CreateCondBr(compare_elems_res, /*true=*/elems_equal_BB, /*false=*/elems_notequal_BB);
+
+	//============================= elems_notequal_BB ================================
+	builder.SetInsertPoint(elems_notequal_BB);
+
+	if(is_compare_not_equal)
+		builder.CreateStore(llvm::ConstantInt::get(module->getContext(), llvm::APInt(1, 1)), res_space); // Store 'true' in res_space
+	else
+		builder.CreateStore(llvm::ConstantInt::get(module->getContext(), llvm::APInt(1, 0)), res_space); // Store 'false' in res_space
+
+	builder.CreateBr(after_BB); // Jump to 'after' basic block
+
+	//============================= elems_equal_BB ================================
+	// Increments the loop index then jumps to condition basic block.
+	builder.SetInsertPoint(elems_equal_BB);
+
+	llvm::Value* one = llvm::ConstantInt::get(module->getContext(), llvm::APInt(64, 1));
+	llvm::Value* next_var = builder.CreateAdd(loop_index_var, one, "next_var");
+
+	// Add a new entry to the PHI node for the backedge.
+	loop_index_var->addIncoming(next_var, elems_equal_BB);
+
+	// Do jump back to condition basic block
+	builder.CreateBr(condition_BB);
+	
+	//============================= after_BB ================================
+	builder.SetInsertPoint(after_BB);
+
+	return builder.CreateLoad(res_space);
+}
+
+
+static llvm::Value* emitCallToBinaryFunction(llvm::IRBuilder<>* builder, llvm::Module* module, const std::string& name, const TypeVRef& arg_type, llvm::Value* a_code, llvm::Value* b_code)
+{
+	const FunctionSignature compare_sig(name, std::vector<TypeVRef>(2, arg_type));
+
+	llvm::FunctionType* llvm_func_type = LLVMTypeUtils::llvmFunctionType(
+		compare_sig.param_types, 
+		false, // use captured var struct ptr arg
+		new Bool(),
+		*module
+	);
+
+	llvm::Constant* llvm_func_constant = module->getOrInsertFunction(
+		compare_sig.typeMangledName(),
+		llvm_func_type // Type
+	);
+
+	llvm::Value* args[] = { a_code, b_code };
+	return builder->CreateCall(llvm_func_constant, args);
+}
+
+
+// a_code and b_code will be pointers to structure or array elements
+static llvm::Value* emitElemCompareEqualLLVMCode(llvm::IRBuilder<>* builder, llvm::Module* module, const TypeVRef& type, 
+	llvm::Value* a_code, llvm::Value* b_code, bool is_compare_not_equal)
+{
+	const std::string compare_func_name = is_compare_not_equal ? "__compare_not_equal" : "__compare_equal";
+
+	switch(type->getType())
+	{
+	case Type::FloatType:
+	case Type::DoubleType:
+		return is_compare_not_equal ? 
+			builder->CreateFCmpONE(builder->CreateLoad(a_code), builder->CreateLoad(b_code)) : 
+			builder->CreateFCmpOEQ(builder->CreateLoad(a_code), builder->CreateLoad(b_code));
+	case Type::IntType:
+	case Type::BoolType:
+		return is_compare_not_equal ? 
+			builder->CreateICmpNE(builder->CreateLoad(a_code), builder->CreateLoad(b_code)) :
+			builder->CreateICmpEQ(builder->CreateLoad(a_code), builder->CreateLoad(b_code));
+	case Type::StructureTypeType:
+	case Type::TupleTypeType:
+	{
+		// a_code and b_code will have pointer-to-struct type already.
+		return emitCallToBinaryFunction(builder, module, compare_func_name, type, a_code, b_code);
+	}
+	case Type::VectorTypeType:
+	{
+		return emitCallToBinaryFunction(builder, module, compare_func_name, type, builder->CreateLoad(a_code), builder->CreateLoad(b_code));
+	}
+	case Type::StringType:
+	{
+		// For string equality we will emit a call to the external func compareNotEqualString() or compareEqualString().
+		return emitCallToBinaryFunction(builder, module, is_compare_not_equal ? "compareNotEqualString" : "compareEqualString", type, builder->CreateLoad(a_code), builder->CreateLoad(b_code));
+	}
+	case Type::ArrayTypeType:
+	{
+		return emitCallToBinaryFunction(builder, module, compare_func_name, type, a_code, b_code);
+	}
+	default:
+		assert(0);
+		throw BaseException("emitCompareEqualLLVMCode(): unhandled type " + type->toString());
+	}
+}
+
+
+llvm::Value* CompareEqualBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	llvm::Value* a_code = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+	llvm::Value* b_code = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
+
+	switch(arg_type->getType())
+	{
+	case Type::ArrayTypeType:
+	{
+		return emitArrayCompareEqualLLVMCode(params.builder, params.module, *arg_type.downcastToPtr<ArrayType>(), a_code, b_code, is_compare_not_equal);
+	}
+	//case Type::VArrayTypeType: // TODO
+	case Type::TupleTypeType:
+	{
+		const TupleType* a_tuple_type = arg_type.downcastToPtr<TupleType>();
+
+		// For each element:
+		llvm::Value* elem_0_equal = emitElemCompareEqualLLVMCode(params.builder, params.module, a_tuple_type->component_types[0],
+			LLVMUtils::createStructGEP(params.builder, a_code, 0),
+			LLVMUtils::createStructGEP(params.builder, b_code, 0),
+			is_compare_not_equal);
+
+		llvm::Value* conjunction = elem_0_equal;
+		for(size_t i=1; i<a_tuple_type->component_types.size(); ++i)
+		{
+			llvm::Value* elem_i_equal = emitElemCompareEqualLLVMCode(params.builder, params.module, a_tuple_type->component_types[i],
+				LLVMUtils::createStructGEP(params.builder, a_code, (unsigned int)i),
+				LLVMUtils::createStructGEP(params.builder, b_code, (unsigned int)i),
+				is_compare_not_equal);
+
+			conjunction = params.builder->CreateBinOp(is_compare_not_equal ? llvm::Instruction::Or : llvm::Instruction::And, conjunction, elem_i_equal);
+		}
+		return conjunction;
+	}
+	case Type::StructureTypeType:
+	{
+		const StructureType* a_struct_type = arg_type.downcastToPtr<StructureType>();
+
+		// For each element:
+		llvm::Value* elem_0_equal = emitElemCompareEqualLLVMCode(params.builder, params.module, a_struct_type->component_types[0],
+			LLVMUtils::createStructGEP(params.builder, a_code, 0),
+			LLVMUtils::createStructGEP(params.builder, b_code, 0),
+			is_compare_not_equal);
+
+		llvm::Value* conjunction = elem_0_equal;
+		for(size_t i=1; i<a_struct_type->component_types.size(); ++i)
+		{
+			llvm::Value* elem_i_equal = emitElemCompareEqualLLVMCode(params.builder, params.module, a_struct_type->component_types[i],
+				LLVMUtils::createStructGEP(params.builder, a_code, (unsigned int)i),
+				LLVMUtils::createStructGEP(params.builder, b_code, (unsigned int)i),
+				is_compare_not_equal);
+
+			conjunction = params.builder->CreateBinOp(is_compare_not_equal ? llvm::Instruction::Or : llvm::Instruction::And, conjunction, elem_i_equal);
+		}
+		return conjunction;
+	}
+	case Type::VectorTypeType:
+	{
+		const VectorType* a_vector_type = arg_type.downcastToPtr<VectorType>();
+
+		llvm::Value* par_eq = params.builder->CreateFCmpOEQ(a_code, b_code); // parallel (element-wise) compare
+
+		llvm::Value* elem_0 = params.builder->CreateExtractElement(par_eq, 
+			llvm::ConstantInt::get(*params.context, llvm::APInt(/*num bits=*/32, /*value=*/0)));
+
+		llvm::Value* conjunction = elem_0;
+		for(unsigned int i=0; i<a_vector_type->num; ++i)
+		{
+			llvm::Value* elem_i = params.builder->CreateExtractElement(par_eq, 
+				llvm::ConstantInt::get(*params.context, llvm::APInt(/*num bits=*/32, /*value=*/i)));
+
+			conjunction = params.builder->CreateBinOp(is_compare_not_equal ? llvm::Instruction::Or : llvm::Instruction::And, conjunction, elem_i);
+		}
+		return conjunction;
+	}
+	case Type::StringType:
+		return emitCallToBinaryFunction(params.builder, params.module, is_compare_not_equal ? "compareNotEqualString" : "compareEqualString", arg_type, a_code, b_code);
+	default:
+		throw BaseException("CompareEqualBuiltInFunc::emitLLVMCode(): unhandled type " + arg_type->toString());
+	}
+}
+
+
+static void addCompareFunctionIfNeeeded(TraversalPayload& payload, const TypeVRef& type)
+{
+	if(type->requiresCompareEqualFunction())
+	{
+		{
+			const FunctionSignature compare_sig("__compare_equal", std::vector<TypeVRef>(2, type));
+			const auto res = payload.linker->sig_to_function_map.find(compare_sig);
+			if(res != payload.linker->sig_to_function_map.end())
+			{
+				FunctionDefinition* compare_def = res->second.getPointer();
+				payload.reachable_nodes.insert(compare_def); // Mark as alive
+				if(payload.processed_nodes.count(compare_def) == 0) // If not processed yet:
+					payload.nodes_to_process.push_back(compare_def); // Add to to-process list
+			}
+		}
+		{
+			const FunctionSignature compare_sig("__compare_not_equal", std::vector<TypeVRef>(2, type));
+			const auto res = payload.linker->sig_to_function_map.find(compare_sig);
+			if(res != payload.linker->sig_to_function_map.end())
+			{
+				FunctionDefinition* compare_def = res->second.getPointer();
+				payload.reachable_nodes.insert(compare_def); // Mark as alive
+				if(payload.processed_nodes.count(compare_def) == 0) // If not processed yet:
+					payload.nodes_to_process.push_back(compare_def); // Add to to-process list
+			}
+		}
+	}
+}
+
+
+void CompareEqualBuiltInFunc::deadFunctionEliminationTraverse(TraversalPayload& payload) const
+{
+	// If this is a comparison function for a composite type, need to add comparison functions we will call to the alive set.
+	switch(arg_type->getType())
+	{
+	case Type::ArrayTypeType:
+	{
+		const ArrayType* a_array_type = arg_type.downcastToPtr<ArrayType>();
+		addCompareFunctionIfNeeeded(payload, a_array_type->elem_type);
+		break;
+	}
+	case Type::VArrayTypeType:
+	{
+		const VArrayType* a_varray_type = arg_type.downcastToPtr<VArrayType>();
+		addCompareFunctionIfNeeeded(payload, a_varray_type->elem_type);
+		break;
+	}
+	case Type::TupleTypeType:
+	{
+		const TupleType* a_tuple_type = arg_type.downcastToPtr<TupleType>();
+
+		for(size_t i=0; i<a_tuple_type->component_types.size(); ++i)
+			addCompareFunctionIfNeeeded(payload, a_tuple_type->component_types[i]);
+		break;
+	}
+	case Type::StructureTypeType:
+	{
+		const StructureType* a_struct_type = arg_type.downcastToPtr<StructureType>();
+
+		for(size_t i=0; i<a_struct_type->component_types.size(); ++i)
+			addCompareFunctionIfNeeeded(payload, a_struct_type->component_types[i]);
+		break;
+	}
+	case Type::VectorTypeType:
+		break; // vectors can only have basic types in them that don't require a compare equal function.
+	case Type::StringType:
+		break;
+	default:
+		throw BaseException("CompareEqualBuiltInFunc::deadFunctionEliminationTraverse(): unhandled type " + arg_type->toString());
+	}
+}
+
+
+static void linkInCompareFunctions(TraversalPayload& payload, const TypeVRef& type)
+{
+	if(type->requiresCompareEqualFunction())
+	{
+		const FunctionSignature compare_sig("__compare_equal", std::vector<TypeVRef>(2, type));
+		payload.linker->findMatchingFunction(compare_sig, Winter::SrcLocation::invalidLocation(),
+			/*effective_callsite_order_num=*/-1);
+
+		const FunctionSignature compare_neq_sig("__compare_not_equal", std::vector<TypeVRef>(2, type));
+		payload.linker->findMatchingFunction(compare_neq_sig, Winter::SrcLocation::invalidLocation(),
+			/*effective_callsite_order_num=*/-1);
+
+
+		// If this is a composite type, need to add comparison functions for child types.
+		switch(type->getType())
+		{
+		case Type::ArrayTypeType:
+		{
+			const ArrayType* a_array_type = type.downcastToPtr<ArrayType>();
+			linkInCompareFunctions(payload, a_array_type->elem_type);
+			break;
+		}
+		case Type::VArrayTypeType:
+		{
+			const VArrayType* a_varray_type = type.downcastToPtr<VArrayType>();
+			linkInCompareFunctions(payload, a_varray_type->elem_type);
+			break;
+		}
+		case Type::TupleTypeType:
+		{
+			const TupleType* a_tuple_type = type.downcastToPtr<TupleType>();
+
+			for(size_t i=0; i<a_tuple_type->component_types.size(); ++i)
+				linkInCompareFunctions(payload, a_tuple_type->component_types[i]);
+			break;
+		}
+		case Type::StructureTypeType:
+		{
+			const StructureType* a_struct_type = type.downcastToPtr<StructureType>();
+
+			for(size_t i=0; i<a_struct_type->component_types.size(); ++i)
+				linkInCompareFunctions(payload, a_struct_type->component_types[i]);
+			break;
+		}
+		case Type::VectorTypeType:
+			break; // vectors can only have basic types in them that don't require a compare equal function.
+		case Type::StringType:
+			break;
+		default:
+			throw BaseException("linkInCompareFunctions(): unhandled type " + type->toString());
+		}
+	}
+}
+
+
+void CompareEqualBuiltInFunc::linkInCalledFunctions(TraversalPayload& payload) const
+{
+	linkInCompareFunctions(payload, this->arg_type);
 }
 
 

@@ -496,6 +496,43 @@ static void testDeadFunctionElimination()
 }
 
 
+static void testArrays()
+{
+	// ===================================================================
+	// Test compare-equal operators
+	// ===================================================================
+
+	// Test == with !noline to test LLVM codgen
+	testMainFloat("def eq(array<float, 2> a, array<float, 2> b) !noinline bool : a == b     \n\
+				  def main() float : eq([1.0, 2.0]a, [1.0, 3.0]a) ? 1.0 : 2.0", 
+				  2.0f);
+
+	testMainFloat("def eq(array<float, 2> a, array<float, 2> b) !noinline bool : a == b     \n\
+				  def main() float : eq([1.0, 2.0]a, [1.0, 2.0]a) ? 1.0 : 2.0", 
+				  1.0f);
+
+	// Test == without !noline to test winter interpreted execution/constant folding.
+	testMainFloat("def main() float : ([1.0, 2.0]a == [1.0, 3.0]a) ? 1.0 : 2.0", 2.0f);
+	testMainFloat("def main() float : ([1.0, 2.0]a == [3.0, 2.0]a) ? 1.0 : 2.0", 2.0f);
+	testMainFloat("def main() float : ([1.0, 2.0]a == [1.0, 2.0]a) ? 1.0 : 2.0", 1.0f);
+
+
+	// Test !=
+	testMainFloat("def neq(array<float, 2> a, array<float, 2> b) !noinline bool : a != b     \n\
+				  def main() float : neq([1.0, 2.0]a, [1.0, 3.0]a) ? 1.0 : 2.0", 
+				  1.0f);
+
+	testMainFloat("def neq(array<float, 2> a, array<float, 2> b) !noinline bool : a != b     \n\
+				  def main() float : neq([1.0, 2.0]a, [1.0, 2.0]a) ? 1.0 : 2.0", 
+				  2.0f);
+
+	// Test != without !noline to test winter interpreted execution/constant folding.
+	testMainFloat("def main() float : ([1.0, 2.0]a != [1.0, 3.0]a) ? 1.0 : 2.0", 1.0f);
+	testMainFloat("def main() float : ([1.0, 2.0]a != [3.0, 2.0]a) ? 1.0 : 2.0", 1.0f);
+	testMainFloat("def main() float : ([1.0, 2.0]a != [1.0, 2.0]a) ? 1.0 : 2.0", 2.0f);
+}
+
+
 static void testVArrays()
 {
 	// ===================================================================
@@ -567,7 +604,7 @@ static void testVArrays()
 	testMainIntegerArgInvalidProgram("def main(int x) int : if x >= 0 && x < 5 then [10, 11, 12, 13]va[x] else 0"); // Test with some incorrect bounding expressions.
 
 
-		// ===================================================================
+	// ===================================================================
 	// Test VArrays
 	// ===================================================================
 	
@@ -919,6 +956,42 @@ static void testStringFunctions()
 
 
 	testMainStringArg("def main(string s) string : concatStrings(toString('a'), toString('b'))", "", "ab");
+
+	// ===================================================================
+	// Test == and !=
+	// ===================================================================
+
+	// Test string ==
+	testMainFloat("def eq(string a, string b) !noinline bool : a == b     \n\
+				  def main() float : eq(\"abc\", \"def\") ? 1.0 : 2.0",
+				  2.0f);
+
+	// Test string ==
+	testMainFloat("def eq(string a, string b) !noinline bool : a == b     \n\
+				  def main() float : eq(\"abc\", \"abc\") ? 1.0 : 2.0",
+				  1.0f);
+
+	// Test string == without !noinline
+	testMainFloat("def main() float : (\"abc\" == \"def\") ? 1.0 : 2.0", 2.0f);
+	testMainFloat("def main() float : (\"abc\" == \"abc\") ? 1.0 : 2.0", 1.0f);
+	testMainFloat("def main() float : (\"\" == \"\") ? 1.0 : 2.0", 1.0f);
+	testMainFloat("def main() float : (\"\" == \"a\") ? 1.0 : 2.0", 2.0f);
+
+	// Test string !=
+	testMainFloat("def eq(string a, string b) !noinline bool : a != b     \n\
+				  def main() float : eq(\"abc\", \"def\") ? 1.0 : 2.0",
+				  1.0f);
+
+	// Test string !=
+	testMainFloat("def eq(string a, string b) !noinline bool : a != b     \n\
+				  def main() float : eq(\"abc\", \"abc\") ? 1.0 : 2.0",
+				  2.0f);
+
+	// Test string != without !noinline
+	testMainFloat("def main() float : (\"abc\" != \"def\") ? 1.0 : 2.0", 1.0f);
+	testMainFloat("def main() float : (\"abc\" != \"abc\") ? 1.0 : 2.0", 2.0f);
+	testMainFloat("def main() float : (\"\" != \"\") ? 1.0 : 2.0", 2.0f);
+	testMainFloat("def main() float : (\"\" != \"a\") ? 1.0 : 2.0", 1.0f);
 }
 
 
@@ -2424,6 +2497,18 @@ static void testOperatorOverloading()
 					 def op_eq(s a, s b) : a.x == b.x		\n\
 					 def main(float x) float : (s(4.0f) == s(x)) ? 1.0 : 0.0", 5.0f, 0.0f);
 
+	// Test that operator overloading overrises the built-in == function - 
+	// Make op_eq return false when the built-in == would return true.
+	testMainFloatArg("struct s { float x }					\n\
+					 def op_eq(s a, s b) : false			\n\
+					 def main(float x) float : (s(4.0f) == s(x)) ? 1.0 : 0.0", 4.0f, 0.0f);
+
+	testMainFloatArg("struct s { float x }					\n\
+					 def op_eq(s a, s b) : false			\n\
+					 def call_op_eq(s a, s b) !noinline : a == b		\n\
+					 def main(float x) float : call_op_eq(s(4.0f), s(x)) ? 1.0 : 0.0", 4.0f, 0.0f);
+
+
 	// op_neq
 	testMainFloatArg("struct s { float x }					\n\
 					 def op_neq(s a, s b) : a.x != b.x		\n\
@@ -2432,6 +2517,20 @@ static void testOperatorOverloading()
 	testMainFloatArg("struct s { float x }					\n\
 					 def op_neq(s a, s b) : a.x != b.x		\n\
 					 def main(float x) float : (s(4.0f) != s(x)) ? 1.0 : 0.0", 5.0f, 1.0f);
+
+
+	// Test that operator overloading overrises the built-in != function - 
+	// Make op_neq return false when the built-in != would return true.
+	// in this test: s(4.0f) != s(5.0) should be true, but we use the overloading op_neq to return false.
+	testMainFloatArg("struct s { float x }					\n\
+					 def op_neq(s a, s b) : false			\n\
+					 def main(float x) float : (s(4.0f) != s(x)) ? 1.0 : 0.0", 5.0f, 0.0f);
+
+	testMainFloatArg("struct s { float x }					\n\
+					 def op_neq(s a, s b) : false			\n\
+					 def call_op_neq(s a, s b) !noinline : a != b		\n\
+					 def main(float x) float : call_op_neq(s(4.0f), s(x)) ? 1.0 : 0.0", 5.0f, 0.0f);
+
 
 	// op_lt
 	testMainFloatArg("struct s { float x }					\n\
@@ -3586,6 +3685,81 @@ static void testStructs()
 				  struct ComplexPair { Complex a, Complex b } \n\
 				  def main() float : ComplexPair(Complex(2.0, 3.0), Complex(4.0, 5.0)).a.im",
 				  3.0f);
+	
+	
+	// ===================================================================
+	// Test equality comparison
+	// ===================================================================
+	
+	// Test ==
+	testMainFloat("struct Complex { float re, float im } \n\
+				  def eq(Complex a, Complex b) !noinline bool : a == b     \n\
+				  def main() float : eq(Complex(1.0, 2.0), Complex(1.0, 3.0)) ? 1.0 : 2.0",
+				  2.0f);
+
+	testMainFloat("struct Complex { float re, float im } \n\
+				  def eq(Complex a, Complex b) !noinline bool : a == b     \n\
+				  def main() float : eq(Complex(1.0, 2.0), Complex(1.0, 2.0)) ? 1.0 : 2.0",
+				  1.0f);
+
+	// Test == without !noline to test winter interpreted execution/constant folding.
+	testMainFloat("struct Complex { float re, float im }  \n\
+				  def main() float : (Complex(1.0, 2.0) == Complex(1.0, 3.0)) ? 1.0 : 2.0", 2.0f);
+
+	testMainFloat("struct Complex { float re, float im }  \n\
+				  def main() float : (Complex(1.0, 2.0) == Complex(1.0, 2.0)) ? 1.0 : 2.0", 1.0f);
+	
+	// Test !=
+	testMainFloat("struct Complex { float re, float im } \n\
+				  def neq(Complex a, Complex b) !noinline bool : a != b     \n\
+				  def main() float : neq(Complex(1.0, 2.0), Complex(1.0, 3.0)) ? 1.0 : 2.0",
+				  1.0f);
+				  
+	testMainFloat("struct Complex { float re, float im } \n\
+				  def neq(Complex a, Complex b) !noinline bool : a != b     \n\
+				  def main() float : neq(Complex(1.0, 2.0), Complex(1.0, 2.0)) ? 1.0 : 2.0",
+				  2.0f);
+
+	// Test != without !noline to test winter interpreted execution/constant folding.
+	testMainFloat("struct Complex { float re, float im }  \n\
+				  def main() float : (Complex(1.0, 2.0) != Complex(1.0, 3.0)) ? 1.0 : 2.0", 1.0f);
+
+	testMainFloat("struct Complex { float re, float im }  \n\
+				  def main() float : (Complex(1.0, 2.0) != Complex(1.0, 2.0)) ? 1.0 : 2.0", 2.0f);
+
+	
+	// Test with a struct in a struct
+	testMainFloat("struct A { int x }             \n\
+				   struct B { int x }             \n\
+				   struct S { A a, B b }          \n\
+				  def eq(S a, S b) !noinline bool : a == b     \n\
+				  def main() float : eq(S(A(1), B(2)), S(A(1), B(3))) ? 1.0 : 2.0",
+				  2.0f);
+	
+	// Test != with a struct in a struct
+	testMainFloat("struct A { int x }             \n\
+				   struct B { int x }             \n\
+				   struct S { A a, B b }          \n\
+				  def neq(S a, S b) !noinline bool : a != b     \n\
+				  def main() float : neq(S(A(1), B(2)), S(A(1), B(3))) ? 1.0 : 2.0",
+				  1.0f);
+
+	// Test with an array in a struct
+	testMainFloat("struct S { array<float, 2> a }          \n\
+				  def eq(S a, S b) !noinline bool : a == b     \n\
+				  def main() float : eq(S([1.0, 2.0]a), S([1.0, 3.0]a)) ? 1.0 : 2.0",
+				  2.0f);
+
+	// Test with a string in a struct
+	testMainFloat("struct S { string str } \n\
+				  def eq(S a, S b) !noinline bool : a == b     \n\
+				  def main() float : eq(S(\"abc\"), S(\"def\")) ? 1.0 : 2.0",
+				  2.0f);
+
+	testMainFloat("struct S { string str } \n\
+				  def eq(S a, S b) !noinline bool : a == b     \n\
+				  def main() float : eq(S(\"abc\"), S(\"abc\")) ? 1.0 : 2.0",
+				  1.0f);
 }
 
 
@@ -4015,6 +4189,8 @@ void LanguageTests::run()
 
 	testDeadFunctionElimination();
 	
+	testArrays();
+
 	testVArrays();
 
 	testToIntFunctions();

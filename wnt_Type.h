@@ -78,6 +78,7 @@ public:
 	virtual void getContainedTypesWithDestructors(std::set<VRef<const Type>, ConstTypeVRefLessThan>& types) const {}
 	virtual bool containsType(const Type& other_type) const { return false; }
 	virtual bool isHeapAllocated() const { return false; } // same as 'is refcounted'.
+	virtual bool requiresCompareEqualFunction() const { return false; } // Do we need to make a __compare_equal function for this type, or can we use some code built into llvm.
 
 	inline TypeType getType() const { return type; }
 
@@ -208,6 +209,7 @@ public:
 
 	virtual bool hasDestructor() const { return true; }
 	virtual bool isHeapAllocated() const { return true; }
+	virtual bool requiresCompareEqualFunction() const { return true; }
 };
 
 
@@ -265,6 +267,7 @@ public:
 	virtual void emitDestructorCall(EmitLLVMCodeParams& params, llvm::Value* value, const std::string& comment) const;
 	virtual void getContainedTypesWithDestructors(std::set<ConstTypeVRef, ConstTypeVRefLessThan>& types) const;
 	virtual bool containsType(const Type& other_type) const;
+	virtual bool requiresCompareEqualFunction() const { return true; }
 
 	virtual bool lessThan(const Type& b) const
 	{
@@ -338,6 +341,7 @@ public:
 	virtual llvm::Type* LLVMType(llvm::Module& module) const;
 	virtual const std::string OpenCLCType() const;
 	virtual bool passByValue() const { return false; }
+	virtual bool requiresCompareEqualFunction() const { return true; }
 
 	TypeVRef from_type;
 	TypeVRef to_type;
@@ -374,6 +378,7 @@ public:
 	virtual const std::string OpenCLCType() const;
 	virtual bool passByValue() const { return false; }
 	virtual bool containsType(const Type& other_type) const;
+	virtual bool requiresCompareEqualFunction() const { return true; }
 
 
 	VRef<Type> elem_type;
@@ -414,6 +419,7 @@ public:
 	virtual void getContainedTypesWithDestructors(std::set<ConstTypeVRef, ConstTypeVRefLessThan>& types) const;
 	virtual bool containsType(const Type& other_type) const;
 	virtual bool isHeapAllocated() const { return true; }
+	virtual bool requiresCompareEqualFunction() const { return true; }
 
 	TypeVRef elem_type;
 };
@@ -453,6 +459,7 @@ public:
 	virtual bool hasDestructor() const;
 	virtual void getContainedTypesWithDestructors(std::set<ConstTypeVRef, ConstTypeVRefLessThan>& types) const;
 	virtual bool containsType(const Type& other_type) const;
+	virtual bool requiresCompareEqualFunction() const { return true; }
 
 	const std::string definitionString() const; // Winter definition string, e.g "struct a { float b }"
 	const std::string getOpenCLCDefinition(EmitOpenCLCodeParams& params, bool emit_comments) const; // Get full definition string, e.g. "struct a { float b; };"
@@ -519,6 +526,7 @@ public:
 	virtual bool hasDestructor() const { return true; }
 	virtual void getContainedTypesWithDestructors(std::set<ConstTypeVRef, ConstTypeVRefLessThan>& types) const;
 	virtual bool containsType(const Type& other_type) const;
+	virtual bool requiresCompareEqualFunction() const { return true; }
 
 
 	std::vector<TypeVRef> component_types;
@@ -556,6 +564,7 @@ public:
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 	virtual llvm::Type* LLVMType(llvm::Module& module) const;
 	virtual const std::string OpenCLCType() const;
+	virtual bool requiresCompareEqualFunction() const { return true; }
 
 	TypeVRef elem_type;
 	unsigned int num;

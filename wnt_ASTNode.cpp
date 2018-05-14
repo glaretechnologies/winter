@@ -668,9 +668,36 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::v
 	{
 		ComparisonExpression* expr = static_cast<ComparisonExpression*>(e.getPointer());
 		if(expr->a->type().nonNull() && expr->b->type().nonNull())
+		{
 			if(	expr->a->type()->getType() == Type::StructureTypeType ||
 				expr->b->type()->getType() == Type::StructureTypeType)
 			{
+				// == and != are not overloadable, but are instead built-in
+				if(expr->token->getType() == DOUBLE_EQUALS_TOKEN)
+				{
+					// If op_eq for this structure has been defined, use it instead of the built-in __compare_equal.
+					if(payload.linker->findMatchingFunctionSimple(
+						FunctionSignature(expr->getOverloadedFuncName(), typePair(TypeVRef(expr->a->type()), TypeVRef(expr->b->type())))).isNull())
+					{
+						// Replace with built-in func call expression here
+						e = new FunctionExpression(expr->srcLocation(), "__compare_equal", expr->a, expr->b);
+						payload.tree_changed = true;
+						break;
+					}
+				}
+				else if(expr->token->getType() == NOT_EQUALS_TOKEN)
+				{
+					// If op_eq for this structure has been defined, use it instead of the built-in __compare_equal.
+					if(payload.linker->findMatchingFunctionSimple(
+						FunctionSignature(expr->getOverloadedFuncName(), typePair(TypeVRef(expr->a->type()), TypeVRef(expr->b->type())))).isNull())
+					{
+						// Replace with built-in func call expression here
+						e = new FunctionExpression(expr->srcLocation(), "__compare_not_equal", expr->a, expr->b);
+						payload.tree_changed = true;
+						break;
+					}
+				}
+
 				// Replace expr with a function call.
 				e = new FunctionExpression(expr->srcLocation(), expr->getOverloadedFuncName(), expr->a, expr->b);
 				payload.tree_changed = true;
@@ -681,8 +708,29 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::v
 				new_payload.linker = payload.linker;
 				new_payload.func_def_stack = payload.func_def_stack;
 				e->traverse(new_payload, stack);
+				break;
 			}
-			break;
+
+			if(expr->a->type()->getType() == Type::ArrayTypeType || expr->a->type()->getType() == Type::StringType)
+			{
+				// == and != are not overloadable, but are instead built-in
+				if(expr->token->getType() == DOUBLE_EQUALS_TOKEN)
+				{
+					// Replace with built-in func call expression here
+					e = new FunctionExpression(expr->srcLocation(), "__compare_equal", expr->a, expr->b);
+					payload.tree_changed = true;
+					break;
+				}
+				else if(expr->token->getType() == NOT_EQUALS_TOKEN)
+				{
+					// Replace with built-in func call expression here
+					e = new FunctionExpression(expr->srcLocation(), "__compare_not_equal", expr->a, expr->b);
+					payload.tree_changed = true;
+					break;
+				}
+			}
+		}
+		break;
 	}
 	case ASTNode::UnaryMinusExpressionType:
 	{
@@ -4385,10 +4433,16 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 		if(a_type.isNull() || b_type.isNull())
 			throw BaseException("Unknown type");
 
-		if(a_type->getType() == Type::GenericTypeType || a_type->getType() == Type::IntType || a_type->getType() == Type::FloatType || a_type->getType() == Type::DoubleType || a_type->getType() == Type::BoolType)
+		if(*a_type != *b_type)
+			throw BaseException("Comparison operand types must be the same.  Left operand type: " + a_type->toString() + ", right operand type: " + b_type->toString() + "." + errorContext(*this, payload));
+
+		if(a_type->getType() == Type::GenericTypeType || a_type->getType() == Type::IntType ||
+			a_type->getType() == Type::FloatType || a_type->getType() == Type::DoubleType ||
+			a_type->getType() == Type::BoolType ||
+			a_type->getType() == Type::ArrayTypeType ||
+			a_type->getType() == Type::VectorTypeType ||
+			a_type->getType() == Type::StructureTypeType)
 		{
-			if(*a_type != *b_type)
-				throw BaseException("Comparison operand types must be the same.  Left operand type: " + a_type->toString() + ", right operand type: " + b_type->toString() + "." + errorContext(*this, payload));
 		}
 		else
 		{
@@ -4459,6 +4513,34 @@ llvm::Value* ComparisonExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm
 			}
 		}
 		break;
+	
+	// NOTE: shouldn't get structure type here because the comparison expression should have been replaced with a call to __compare_equal().
+	// Likewise for array type.
+
+	case Type::VectorTypeType:
+		{
+			const VectorType* a_vector_type = a->type().downcastToPtr<VectorType>();
+
+			llvm::Value* par_eq = params.builder->CreateFCmpOEQ(a_code, b_code);
+
+			llvm::Value* elem_0 = params.builder->CreateExtractElement(par_eq, 
+				llvm::ConstantInt::get(*params.context, llvm::APInt(/*num bits=*/32, /*value=*/0)));
+
+			llvm::Value* conjunction = elem_0;
+			for(unsigned int i=0; i<a_vector_type->num; ++i)
+			{
+				llvm::Value* elem_i = params.builder->CreateExtractElement(par_eq, 
+					llvm::ConstantInt::get(*params.context, llvm::APInt(/*num bits=*/32, /*value=*/i)));
+
+				conjunction = params.builder->CreateBinOp(
+					llvm::Instruction::And,
+					conjunction,
+					elem_i
+				);
+			}
+
+			return conjunction;
+		}
 	default:
 		assert(!"ComparisonExpression type invalid!");
 		throw BaseException("ComparisonExpression type invalid");

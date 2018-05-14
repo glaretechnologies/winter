@@ -449,6 +449,9 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 			//payload.func_def_stack.pop_back();
 		}
 
+		if(this->built_in_func_impl.nonNull())
+			this->built_in_func_impl->linkInCalledFunctions(payload);
+
 
 		// NOTE: wtf is this code doing?
 		//this->captured_vars = payload.captured_vars;
@@ -522,6 +525,9 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 		{
 			payload.reachable_nodes.insert(this);
 		}
+
+		if(this->built_in_func_impl.nonNull())
+			this->built_in_func_impl->deadFunctionEliminationTraverse(payload);
 	}
 	else if(payload.operation == TraversalPayload::DeadCodeElimination_ComputeAlive)
 	{
@@ -1067,6 +1073,9 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 	
 	llvm::AttrBuilder function_attr_builder;
 	function_attr_builder.addAttribute(llvm::Attribute::NoUnwind); // Does not throw exceptions
+
+	if(this->noinline)
+		function_attr_builder.addAttribute(llvm::Attribute::NoInline);
 	
 	// We can only mark a function as readonly (or readnone) if the return type is pass by value, otherwise this function will need to write through the SRET argument.
 	/*if(this->returnType()->passByValue())

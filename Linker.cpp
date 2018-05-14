@@ -428,6 +428,59 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 	}
 	else if(sig.param_types.size() == 2)
 	{
+		if(sig.name == "__compare_equal")
+		{
+			if(sig.param_types[0]->requiresCompareEqualFunction())
+			{
+				//if(type->getType() == Type::FunctionType)
+				//	continue; // TODO: implement function comparison
+
+				vector<FunctionDefinition::FunctionArg> compare_args;
+				compare_args.push_back(FunctionDefinition::FunctionArg(sig.param_types[0], "a"));
+				compare_args.push_back(FunctionDefinition::FunctionArg(sig.param_types[0], "b"));
+
+				FunctionDefinitionRef compare_eq_func = new FunctionDefinition(
+					SrcLocation::invalidLocation(),
+					-1, // order number
+					"__compare_equal", // name
+					compare_args, // arguments
+					ASTNodeRef(), // body expr
+					new Bool(), // declard return type
+					new CompareEqualBuiltInFunc(sig.param_types[0], /*is_compare_not_equal=*/false) // built in func impl.
+				);
+
+				this->sig_to_function_map.insert(std::make_pair(sig, compare_eq_func));
+				this->top_level_defs.push_back(compare_eq_func); // Add to top_level_defs so binding is done on this function as well.
+				return compare_eq_func;
+			}
+		}
+		else if(sig.name == "__compare_not_equal")
+		{
+			if(sig.param_types[0]->requiresCompareEqualFunction())
+			{
+				//if(type->getType() == Type::FunctionType)
+				//	continue; // TODO: implement function comparison
+
+				vector<FunctionDefinition::FunctionArg> compare_args;
+				compare_args.push_back(FunctionDefinition::FunctionArg(sig.param_types[0], "a"));
+				compare_args.push_back(FunctionDefinition::FunctionArg(sig.param_types[0], "b"));
+
+				FunctionDefinitionRef compare_neq_func = new FunctionDefinition(
+					SrcLocation::invalidLocation(),
+					-1, // order number
+					"__compare_not_equal", // name
+					compare_args, // arguments
+					ASTNodeRef(), // body expr
+					new Bool(), // declard return type
+					new CompareEqualBuiltInFunc(sig.param_types[0], /*is_compare_not_equal=*/true) // built in func impl.
+				);
+
+				this->sig_to_function_map.insert(std::make_pair(sig, compare_neq_func));
+				this->top_level_defs.push_back(compare_neq_func); // Add to top_level_defs so binding is done on this function as well.
+				return compare_neq_func;
+			}
+		}
+
 		if(sig.param_types[0]->getType() == Type::FunctionType && sig.param_types[1]->getType() == Type::ArrayTypeType)
 		{
 			if(sig.name == "map")
