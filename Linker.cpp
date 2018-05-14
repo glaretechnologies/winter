@@ -825,6 +825,74 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 					this->sig_to_function_map.insert(std::make_pair(sig, def));
 					return def;
 				}
+				else if(sig.name == "dot1")
+				{
+					const vector<FunctionDefinition::FunctionArg> args = makeFunctionArgPair("x", sig.param_types[0], "y", sig.param_types[1]);
+
+					FunctionDefinitionRef def = new FunctionDefinition(
+						SrcLocation::invalidLocation(),
+						-1, // order number
+						"dot1", // name
+						args, // args
+						NULL, // body expr
+						static_cast<const VectorType*>(sig.param_types[0].getPointer())->elem_type, // return type
+						new DotProductBuiltInFunc(sig.param_types[0].downcast<VectorType>(), /*num_components=*/1) // built in impl.
+					);
+
+					this->sig_to_function_map.insert(std::make_pair(sig, def));
+					return def;
+				}
+				else if(sig.name == "dot2")
+				{
+					const vector<FunctionDefinition::FunctionArg> args = makeFunctionArgPair("x", sig.param_types[0], "y", sig.param_types[1]);
+
+					FunctionDefinitionRef def = new FunctionDefinition(
+						SrcLocation::invalidLocation(),
+						-1, // order number
+						"dot2", // name
+						args, // args
+						NULL, // body expr
+						static_cast<const VectorType*>(sig.param_types[0].getPointer())->elem_type, // return type
+						new DotProductBuiltInFunc(sig.param_types[0].downcast<VectorType>(), /*num_components=*/2) // built in impl.
+					);
+
+					this->sig_to_function_map.insert(std::make_pair(sig, def));
+					return def;
+				}
+				else if(sig.name == "dot3")
+				{
+					const vector<FunctionDefinition::FunctionArg> args = makeFunctionArgPair("x", sig.param_types[0], "y", sig.param_types[1]);
+
+					FunctionDefinitionRef def = new FunctionDefinition(
+						SrcLocation::invalidLocation(),
+						-1, // order number
+						"dot3", // name
+						args, // args
+						NULL, // body expr
+						static_cast<const VectorType*>(sig.param_types[0].getPointer())->elem_type, // return type
+						new DotProductBuiltInFunc(sig.param_types[0].downcast<VectorType>(), /*num_components=*/3) // built in impl.
+					);
+
+					this->sig_to_function_map.insert(std::make_pair(sig, def));
+					return def;
+				}
+				else if(sig.name == "dot4")
+				{
+					const vector<FunctionDefinition::FunctionArg> args = makeFunctionArgPair("x", sig.param_types[0], "y", sig.param_types[1]);
+
+					FunctionDefinitionRef def = new FunctionDefinition(
+						SrcLocation::invalidLocation(),
+						-1, // order number
+						"dot4", // name
+						args, // args
+						NULL, // body expr
+						static_cast<const VectorType*>(sig.param_types[0].getPointer())->elem_type, // return type
+						new DotProductBuiltInFunc(sig.param_types[0].downcast<VectorType>(), /*num_components=*/4) // built in impl.
+					);
+
+					this->sig_to_function_map.insert(std::make_pair(sig, def));
+					return def;
+				}
 			} // End if (vector of floats, vector of floats)
 		} // End if (vector, vector) params
 

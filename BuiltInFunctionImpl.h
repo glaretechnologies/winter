@@ -376,12 +376,16 @@ private:
 class DotProductBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
-	DotProductBuiltInFunc(const VRef<VectorType>& vector_type_) : BuiltInFunctionImpl(BuiltInType_DotProductBuiltInFunc), vector_type(vector_type_) {}
+	DotProductBuiltInFunc(const VRef<VectorType>& vector_type_, int num_components_ = -1) :
+		BuiltInFunctionImpl(BuiltInType_DotProductBuiltInFunc), vector_type(vector_type_), 
+		num_components(num_components_)
+	{}
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 private:
 	VRef<VectorType> vector_type;
+	int num_components; // -1 if default
 };
 
 

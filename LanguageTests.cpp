@@ -3865,7 +3865,24 @@ static void testVectors()
 	testMainFloatArg("	def main(float x) float : \
 					 let v = [x, x, x, x, x, x, x, x]v in\
 					 dot(v, v)", 4.0f, 128.0f, INVALID_OPENCL);
-					 
+
+	// Test dot product variants that use a variable number of components
+	testMainFloatArg("def main(float x) float : dot1([1.0, 2.0, 3.0, 4.0]v, [x, x, x, x]v)", 2.0f, 2.0f);
+	testMainFloatArg("def main(float x) float : dot2([1.0, 2.0, 3.0, 4.0]v, [x, x, x, x]v)", 2.0f, 6.0f);
+	testMainFloatArg("def main(float x) float : dot3([1.0, 2.0, 3.0, 4.0]v, [x, x, x, x]v)", 2.0f, 12.0f);
+	testMainFloatArg("def main(float x) float : dot4([1.0, 2.0, 3.0, 4.0]v, [x, x, x, x]v)", 2.0f, 20.0f);
+
+
+	// Test dot product variants that use a variable number of components
+	testMainDoubleArg("def main(double x) double : dot1([1.0, 2.0, 3.0, 4.0]v, [x, x, x, x]v)", 2.0, 2.0);
+	testMainDoubleArg("def main(double x) double : dot2([1.0, 2.0, 3.0, 4.0]v, [x, x, x, x]v)", 2.0, 6.0);
+	testMainDoubleArg("def main(double x) double : dot3([1.0, 2.0, 3.0, 4.0]v, [x, x, x, x]v)", 2.0, 12.0);
+	testMainDoubleArg("def main(double x) double : dot4([1.0, 2.0, 3.0, 4.0]v, [x, x, x, x]v)", 2.0, 20.0);
+
+	// Test dppd instruction emission
+	testMainDoubleArg("def main(double x) double : dot1([1.0, 2.0]v, [x, x]v)", 2.0, 2.0);
+	testMainDoubleArg("def main(double x) double : dot2([1.0, 2.0]v, [x, x]v)", 2.0, 6.0);
+
 
 	// Test vector min
 	testMainFloat("	def main() float : \

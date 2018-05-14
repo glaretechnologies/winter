@@ -2361,17 +2361,19 @@ ValueRef DotProductBuiltInFunc::invoke(VMState& vmstate)
 	const VectorValue* a = checkedCast<const VectorValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 0].getPointer());
 	const VectorValue* b = checkedCast<const VectorValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
 
+	const int use_num_comp = (this->num_components != -1) ? myMin((int)vector_type->num, this->num_components) : (int)vector_type->num;
+
 	if(vector_type->elem_type->getType() == Type::FloatType)
 	{
 		FloatValueRef res = new FloatValue(0.0f);
-		for(unsigned int i=0; i<vector_type->num; ++i)
+		for(int i=0; i<use_num_comp; ++i)
 			res->value += checkedCast<const FloatValue>(a->e[i].getPointer())->value * checkedCast<const FloatValue>(b->e[i].getPointer())->value;
 		return res;
 	}
 	else
 	{
 		DoubleValueRef res = new DoubleValue(0.0f);
-		for(unsigned int i=0; i<vector_type->num; ++i)
+		for(int i=0; i<use_num_comp; ++i)
 			res->value += checkedCast<const DoubleValue>(a->e[i].getPointer())->value * checkedCast<const DoubleValue>(b->e[i].getPointer())->value;
 		return res;
 	}
@@ -2390,10 +2392,21 @@ llvm::Value* DotProductBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) con
 		llvm::SmallVector<llvm::Value*, 3> args;
 		args.push_back(a);
 		args.push_back(b);
+
+		const int use_num_components = (this->num_components != -1) ? myMin((int)vector_type->num, this->num_components) : 4;
+		/*
+		use_num_components = 1  =>    upper_mask = 0001
+		use_num_components = 2  =>    upper_mask = 0011
+		use_num_components = 3  =>    upper_mask = 0111
+		use_num_components = 4  =>    upper_mask = 1111
+		*/
+		const int upper_mask = (1 << use_num_components) - 1;
+		const int mask = (upper_mask << 4) | 15;
+
 #if TARGET_LLVM_VERSION <= 34
-		args.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(/*num bits=*/32, 255))); // SSE DPPS control bits
+		args.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(/*num bits=*/32, mask))); // SSE DPPS control bits
 #else
-		args.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(/*num bits=*/8, 255))); // SSE DPPS control bits
+		args.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(/*num bits=*/8, mask))); // SSE DPPS control bits
 #endif
 
 		llvm::Function* dot_func = llvm::Intrinsic::getDeclaration(params.module, llvm::Intrinsic::x86_sse41_dpps);
@@ -2413,10 +2426,19 @@ llvm::Value* DotProductBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) con
 		llvm::SmallVector<llvm::Value*, 3> args;
 		args.push_back(a);
 		args.push_back(b);
+
+		const int use_num_components = (this->num_components != -1) ? myMin((int)vector_type->num, this->num_components) : 2;
+		/*
+		use_num_components = 1  =>    upper_mask = 0001
+		use_num_components = 2  =>    upper_mask = 0011
+		*/
+		const int upper_mask = (1 << use_num_components) - 1;
+		const int mask = (upper_mask << 4) | 15;
+
 #if TARGET_LLVM_VERSION <= 34
-		args.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(/*num bits=*/32, 255))); // SSE DPPD control bits
+		args.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(/*num bits=*/32, mask))); // SSE DPPD control bits
 #else
-		args.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(/*num bits=*/8, 255))); // SSE DPPD control bits
+		args.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(/*num bits=*/8, mask))); // SSE DPPD control bits
 #endif
 
 		llvm::Function* dot_func = llvm::Intrinsic::getDeclaration(params.module, llvm::Intrinsic::x86_sse41_dppd);
@@ -2431,6 +2453,9 @@ llvm::Value* DotProductBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) con
 	}
 	else
 	{
+		const int use_num_components = (this->num_components != -1) ? myMin((int)vector_type->num, this->num_components) : vector_type->num;
+		assert(use_num_components >= 1);
+
 		// x = a[0] * b[0]
 		llvm::Value* x = params.builder->CreateBinOp(
 			llvm::Instruction::FMul, 
@@ -2438,7 +2463,7 @@ llvm::Value* DotProductBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) con
 			params.builder->CreateExtractElement(b, llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0)))
 		);
 			
-		for(unsigned int i=1; i<this->vector_type->num; ++i)
+		for(int i=1; i<use_num_components; ++i)
 		{
 			// y = a[i] * b[i]
 			llvm::Value* y = params.builder->CreateBinOp(
