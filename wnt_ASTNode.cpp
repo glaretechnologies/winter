@@ -3648,12 +3648,12 @@ void BinaryBitwiseExpression::traverse(TraversalPayload& payload, std::vector<AS
 		if(this_type->getType() == Type::GenericTypeType)
 		{
 			if(*a_type != *b_type)
-				throw BaseException("AdditionExpression: Binary operator '" + opToken() + "' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
+				throw BaseException("Binary operator '" + opToken() + "' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
 		}
 		else if(this_type->getType() == Type::IntType)
 		{
 			if(*a_type != *b_type)
-				throw BaseException("AdditionExpression: Binary operator '" + opToken() + "' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
+				throw BaseException("Binary operator '" + opToken() + "' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
 
 			//const Int* a_int_type = a_type.downcastToPtr<Int>();
 			//const Int* b_int_type = b_type.downcastToPtr<Int>();
@@ -3672,7 +3672,7 @@ void BinaryBitwiseExpression::traverse(TraversalPayload& payload, std::vector<AS
 		//}
 		else
 		{
-			throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'." + errorContext(*this, payload));
+			throw BaseException(" Binary operator '" + opToken() + "' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'." + errorContext(*this, payload));
 		}
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
