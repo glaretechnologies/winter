@@ -108,21 +108,7 @@ set(WINTER_INCLUDE_DIRS "")
 # Add OpenCL paths
 if(WINTER_USE_OPENCL)
 	message("Building with OpenCL support.")
-	
-	if(WIN32)
-		if(DEFINED ENV{AMDAPPSDKROOT})
-			message("OpenCL include path: Using AMDAPPSDKROOT")
-			SET(WINTER_INCLUDE_DIRS "${WINTER_INCLUDE_DIRS} $ENV{AMDAPPSDKROOT}include")
-		else()
-			message("OpenCL include path: Using CUDA_INC_PATH")
-			SET(WINTER_INCLUDE_DIRS "${WINTER_INCLUDE_DIRS} $ENV{CUDA_INC_PATH}")
-		endif()
-	elseif(APPLE)
-	else() # linux
-		# Just use the OpenCL headers from the CUDA SDK for now.
-		addIncludeDirectory("/usr/local/cuda/include")
-	endif()
-	
+
 	add_definitions("-DUSE_OPENCL=1")
 endif()
 
