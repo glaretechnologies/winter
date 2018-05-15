@@ -299,6 +299,7 @@ endif()
 
 SOURCE_GROUP(winter FILES ${WINTER_FILES})
 SOURCE_GROUP(utils FILES ${util_files})
+SOURCE_GROUP(maths FILES ${maths_files})
 SOURCE_GROUP(double_conversion FILES ${double_conversion_files})
 SOURCE_GROUP(opencl FILES ${glare_opencl_files})
 SOURCE_GROUP(xxhash FILES ${xxhash_files})
