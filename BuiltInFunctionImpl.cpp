@@ -3806,6 +3806,122 @@ static llvm::Value* emitArrayCompareEqualLLVMCode(llvm::IRBuilder<>* builder_, l
 }
 
 
+/*
+// In-memory string representation for a Winter VArray
+class VArrayRep
+{
+public:
+	uint64 refcount;
+	uint64 len;
+	uint64 flags;
+	// Data follows..
+};
+*/
+static llvm::Value* emitVArrayCompareEqualLLVMCode(llvm::IRBuilder<>* builder_, llvm::Module* module, const VArrayType& varray_type,
+	llvm::Value* a_code, llvm::Value* b_code, bool is_compare_not_equal)
+{
+	llvm::IRBuilder<>& builder = *builder_;
+
+	// Load length fields from varray objects:
+	llvm::Value* a_len = builder.CreateLoad(LLVMUtils::createStructGEP(builder_, a_code, 1, "a_len"));
+	llvm::Value* b_len = builder.CreateLoad(LLVMUtils::createStructGEP(builder_, b_code, 1, "b_len"));
+
+	// Get data pointers for the varray objects:
+	llvm::Value* a_data_ptr = LLVMUtils::createStructGEP(builder_, a_code, 3, "a_data_ptr"); // [0 x T]*
+	llvm::Value* b_data_ptr = LLVMUtils::createStructGEP(builder_, b_code, 3, "b_data_ptr"); // [0 x T]*
+
+	llvm::Value* begin_index = llvm::ConstantInt::get(module->getContext(), llvm::APInt(64, 0));
+	llvm::Value* end_index   = a_len;
+
+	// Make the new basic block for the loop header, inserting after current block.
+	llvm::Function* current_func = builder.GetInsertBlock()->getParent();
+	llvm::BasicBlock* preheader_BB = builder.GetInsertBlock();
+	llvm::BasicBlock* condition_BB = llvm::BasicBlock::Create(module->getContext(), "condition", current_func);
+	llvm::BasicBlock* loop_body_BB = llvm::BasicBlock::Create(module->getContext(), "loop_body", current_func);
+	llvm::BasicBlock* elems_notequal_BB = llvm::BasicBlock::Create(module->getContext(), "elems_notequal_BB", current_func);
+	llvm::BasicBlock* elems_equal_BB = llvm::BasicBlock::Create(module->getContext(), "elems_equal_BB", current_func);
+	llvm::BasicBlock* after_BB = llvm::BasicBlock::Create(module->getContext(), "after_loop", current_func);
+
+	// Allocate space for a boolean which is either 'elems are not equal' or 'elems are all equal' depending on is_compare_not_equal.
+	llvm::Value* res_space = builder.CreateAlloca(llvm::Type::getInt1Ty(module->getContext()), 
+		llvm::ConstantInt::get(module->getContext(), llvm::APInt(64, 1)), "res_space");
+
+	if(is_compare_not_equal)
+		builder.CreateStore(llvm::ConstantInt::get(module->getContext(), llvm::APInt(1, 0)), res_space); // Store 'false' in res_space
+	else
+		builder.CreateStore(llvm::ConstantInt::get(module->getContext(), llvm::APInt(1, 1)), res_space); // Store 'true' in res_space
+
+	//============================= preheader_BB ================================
+	builder.SetInsertPoint(preheader_BB);
+
+	// Compare a_len and b_len
+	llvm::Value* compare_len_res =  builder.CreateICmpEQ(a_len, b_len, "compare_len_res");
+
+	// Add a branch to elems_notequal_BB to take if the lengths are not equal
+	builder.CreateCondBr(compare_len_res, /*true=*/condition_BB, /*false=*/elems_notequal_BB);
+
+	//============================= condition_BB ================================
+	builder.SetInsertPoint(condition_BB);
+
+	// Create loop index (i) variable phi node
+	llvm::PHINode* loop_index_var = builder.CreatePHI(llvm::Type::getInt64Ty(module->getContext()), 2, "loop_index_var");
+	loop_index_var->addIncoming(begin_index, preheader_BB);
+
+	// Compute the end condition. (i != end)
+	llvm::Value* end_cond = builder.CreateICmpNE(end_index, loop_index_var, "loopcond");
+
+	// Insert the conditional branch
+	builder.CreateCondBr(end_cond, /*true=*/loop_body_BB, /*false=*/after_BB);
+
+	//============================= loop_body_BB ================================
+	builder.SetInsertPoint(loop_body_BB);
+
+	// Load element from input array
+	llvm::Value* indices[] = {
+		llvm::ConstantInt::get(module->getContext(), llvm::APInt(64, 0)), // get the zero-th array
+		loop_index_var // get the indexed element in the array
+	};
+
+
+	llvm::Value* a_elem_ptr = builder.CreateInBoundsGEP(a_data_ptr, indices);
+	llvm::Value* b_elem_ptr = builder.CreateInBoundsGEP(b_data_ptr, indices);
+
+	llvm::Value* compare_elems_res = emitElemCompareEqualLLVMCode(&builder, module, varray_type.elem_type, 
+		a_elem_ptr, b_elem_ptr, /*is_compare_not_equal=*/false);
+
+	// Add a branch to to elems_notequal_BB to take if the elements are not equal
+	builder.CreateCondBr(compare_elems_res, /*true=*/elems_equal_BB, /*false=*/elems_notequal_BB);
+
+	//============================= elems_notequal_BB ================================
+	builder.SetInsertPoint(elems_notequal_BB);
+
+	if(is_compare_not_equal)
+		builder.CreateStore(llvm::ConstantInt::get(module->getContext(), llvm::APInt(1, 1)), res_space); // Store 'true' in res_space
+	else
+		builder.CreateStore(llvm::ConstantInt::get(module->getContext(), llvm::APInt(1, 0)), res_space); // Store 'false' in res_space
+
+	builder.CreateBr(after_BB); // Jump to 'after' basic block
+
+	//============================= elems_equal_BB ================================
+	// Increments the loop index then jumps to condition basic block.
+	builder.SetInsertPoint(elems_equal_BB);
+
+	llvm::Value* one = llvm::ConstantInt::get(module->getContext(), llvm::APInt(64, 1));
+	llvm::Value* next_var = builder.CreateAdd(loop_index_var, one, "next_var");
+
+	// Add a new entry to the PHI node for the backedge.
+	loop_index_var->addIncoming(next_var, elems_equal_BB);
+
+	// Do jump back to condition basic block
+	builder.CreateBr(condition_BB);
+	
+	//============================= after_BB ================================
+	builder.SetInsertPoint(after_BB);
+
+	return builder.CreateLoad(res_space);
+}
+
+
 static llvm::Value* emitCallToBinaryFunction(llvm::IRBuilder<>* builder, llvm::Module* module, const std::string& name, const TypeVRef& arg_type, llvm::Value* a_code, llvm::Value* b_code)
 {
 	const FunctionSignature compare_sig(name, std::vector<TypeVRef>(2, arg_type));
@@ -3864,6 +3980,10 @@ static llvm::Value* emitElemCompareEqualLLVMCode(llvm::IRBuilder<>* builder, llv
 	{
 		return emitCallToBinaryFunction(builder, module, compare_func_name, type, a_code, b_code);
 	}
+	case Type::VArrayTypeType:
+	{
+		return emitCallToBinaryFunction(builder, module, compare_func_name, type, a_code, b_code);
+	}
 	default:
 		assert(0);
 		throw BaseException("emitCompareEqualLLVMCode(): unhandled type " + type->toString());
@@ -3882,7 +4002,10 @@ llvm::Value* CompareEqualBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) c
 	{
 		return emitArrayCompareEqualLLVMCode(params.builder, params.module, *arg_type.downcastToPtr<ArrayType>(), a_code, b_code, is_compare_not_equal);
 	}
-	//case Type::VArrayTypeType: // TODO
+	case Type::VArrayTypeType:
+	{
+		return emitVArrayCompareEqualLLVMCode(params.builder, params.module, *arg_type.downcastToPtr<VArrayType>(), a_code, b_code, is_compare_not_equal);
+	}
 	case Type::TupleTypeType:
 	{
 		const TupleType* a_tuple_type = arg_type.downcastToPtr<TupleType>();

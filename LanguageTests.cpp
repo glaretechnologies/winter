@@ -765,6 +765,58 @@ static void testVArrays()
 
 	testMainFloatArgAllowUnsafe("def f(varray<float> v) : v     TEST = f([3.0]va)     def main(float x) float : TEST[0]", 10.f, 3.0f, INVALID_OPENCL);
 	testMainFloatArgAllowUnsafe("def f(varray<float> v) : v     TEST = f([3.0]va)     def main(float x) float : TEST[0] + TEST[0]", 10.f, 6.0f, INVALID_OPENCL);
+
+	// ===================================================================
+	// Test compare-equal operators
+	// ===================================================================
+
+	// Test == with !noline to test LLVM codgen
+	testMainFloat("def eq(varray<float> a, varray<float> b) !noinline bool : a == b     \n\
+				  def main() float : eq([1.0, 2.0]va, [1.0, 3.0]va) ? 1.0 : 0.0", 
+				  0.0f);
+
+	testMainFloat("def eq(varray<float> a, varray<float> b) !noinline bool : a == b     \n\
+				  def main() float : eq([1.0, 2.0]va, [1.0, 2.0, 3.0]va) ? 1.0 : 0.0", 
+				  0.0f);
+
+	testMainFloat("def eq(varray<float> a, varray<float> b) !noinline bool : a == b     \n\
+				  def main() float : eq([1.0, 2.0]va, [1.0, 2.0]va) ? 1.0 : 0.0", 
+				  1.0f);
+
+	// Test with a heap-allocated type as the varray elem type
+	testMainFloat("def eq(varray<string> a, varray<string> b) !noinline bool : a == b     \n\
+				  def main() float : eq([\"a\", \"b\"]va, [\"a\", \"b\"]va) ? 1.0 : 0.0", 
+				  1.0f);
+
+	testMainFloat("def eq(varray<string> a, varray<string> b) !noinline bool : a == b     \n\
+				  def main() float : eq([\"a\", \"b\"]va, [\"a\", \"c\"]va) ? 1.0 : 0.0", 
+				  0.0f);
+
+
+	// Test == without !noline to test winter interpreted execution/constant folding.
+	testMainFloat("def main() float : ([1.0, 2.0]va == [1.0, 3.0]va) ? 1.0 : 0.0", 0.0f);
+	testMainFloat("def main() float : ([1.0, 2.0]va == [3.0, 2.0]va) ? 1.0 : 0.0", 0.0f);
+	testMainFloat("def main() float : ([1.0, 2.0]va == [1.0, 2.0]va) ? 1.0 : 0.0", 1.0f);
+
+
+	// Test !=
+	testMainFloat("def neq(varray<float> a, varray<float> b) !noinline bool : a != b     \n\
+				  def main() float : neq([1.0, 2.0]va, [1.0, 3.0]va) ? 1.0 : 0.0", 
+				  1.0f);
+
+	testMainFloat("def neq(varray<float> a, varray<float> b) !noinline bool : a != b     \n\
+				  def main() float : neq([1.0, 2.0]va, [1.0, 2.0, 3.0]va) ? 1.0 : 0.0", 
+				  1.0f);
+
+	testMainFloat("def neq(varray<float> a, varray<float> b) !noinline bool : a != b     \n\
+				  def main() float : neq([1.0, 2.0]va, [1.0, 2.0]va) ? 1.0 : 0.0", 
+				  0.0f);
+
+	// Test != without !noline to test winter interpreted execution/constant folding.
+	testMainFloat("def main() float : ([1.0, 2.0]va != [1.0, 3.0]va) ? 1.0 : 0.0", 1.0f);
+	testMainFloat("def main() float : ([1.0, 2.0]va != [3.0, 2.0]va) ? 1.0 : 0.0", 1.0f);
+	testMainFloat("def main() float : ([1.0, 2.0]va != [1.0, 2.0]va) ? 1.0 : 0.0", 0.0f);
+	testMainFloat("def main() float : ([1.0, 2.0]va != [1.0]va) ? 1.0 : 0.0", 1.0f);
 }
 
 
