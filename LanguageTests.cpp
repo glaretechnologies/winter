@@ -4321,13 +4321,26 @@ void LanguageTests::run()
 	// ===================================================================
 	// Test sign()
 	// ===================================================================
-	testMainFloatArg("def main(float x) float :	sign(x)", 4.f, 1.f);
-	testMainFloatArg("def main(float x) float :	sign(x)", -4.f, -1.f);
+	testMainFloatArg("def main(float x) float : sign(x)", 4.f, 1.f);
+	testMainFloatArg("def main(float x) float : sign(x)", -4.f, -1.f);
+	testMainFloat("def main() float : sign( 4.0)", 1.f);
+	testMainFloat("def main() float : sign(-4.0)", -1.f);
 
-	//NOTE: a bit of a problem with sign(0).  sign(0) is plus/minus zero in OpenCL, but copysign(1.0, 0.f) is one.
-	//testMainFloatArg("def main(float x) float :	sign(x)", 0.f, 1.f);
+	// Test sign(+0) and sign(-0)
+	testMainFloatArg("def main(float x) float :	sign(x)", 0.f, 0.f);
+	testMainFloatArg("def main(float x) float :	sign(x)", -0.f, -0.f); // NOTE: This is not actually checking the sign bit
+	testMainFloat("def main() float : sign( 0.0)",  0.f);
+	testMainFloat("def main() float : sign(-0.0)", -0.f); // NOTE: This is not actually checking the sign bit
 
 	// sign() on vectors:
+	testMainFloatArg("def f(vector<float, 4> v) !noinline : sign(v)     \n\
+		def main(float x) float :	f([x, x, x, x]v)[0]", -4.f, -1.f);
+	testMainFloatArg("def f(vector<float, 4> v) !noinline : sign(v)     \n\
+		def main(float x) float :	f([x, x, x, x]v)[0]", 4.f, 1.f);
+
+	testMainDoubleArg("def f(vector<double, 4> v) !noinline : sign(v)     \n\
+		def main(double x) double :	f([x, x, x, x]v)[0]", -4.f, -1.f);
+
 	testMainFloatArg("def main(float x) float :	sign([x, x, x, x]v)[0]", -4.f, -1.f);
 	testMainFloatArg("def main(float x) float :	sign([x, x, x, x]v)[3]", -4.f, -1.f);
 	testMainFloatArg("def main(float x) float :	sign([4.0, 4.0, 4.0, 4.0]v)[3]", -4.f, 1.f);

@@ -3165,12 +3165,12 @@ ValueRef SignBuiltInFunc::invoke(VMState& vmstate)
 	if(type->getType() == Type::FloatType)
 	{
 		const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
-		return new FloatValue(a->value >= 0 ? 1.0f : -1.0f);
+		return new FloatValue(Maths::sign(a->value));
 	}
 	else if(type->getType() == Type::DoubleType)
 	{
 		const DoubleValue* a = checkedCast<const DoubleValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
-		return new DoubleValue(a->value >= 0 ? 1.0 : -1.0);
+		return new DoubleValue(Maths::sign(a->value));
 	}
 	else
 	{
@@ -3181,10 +3181,23 @@ ValueRef SignBuiltInFunc::invoke(VMState& vmstate)
 		const VectorValue* a = checkedCast<const VectorValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
 
 		vector<ValueRef> res_values(vector_type->num);
-		for(unsigned int i=0; i<vector_type->num; ++i)
+		if(vector_type->elem_type->getType() == Type::FloatType)
 		{
-			const float x = checkedCast<const FloatValue>(a->e[i].getPointer())->value;
-			res_values[i] = new FloatValue(x >= 0 ? 1.0f : -1.0f);
+			for(unsigned int i=0; i<vector_type->num; ++i)
+			{
+				const float x = checkedCast<const FloatValue>(a->e[i].getPointer())->value;
+				res_values[i] = new FloatValue(Maths::sign(x));
+			}
+		}
+		else
+		{
+			assert(vector_type->elem_type->getType() == Type::DoubleType);
+
+			for(unsigned int i=0; i<vector_type->num; ++i)
+			{
+				const double x = checkedCast<const DoubleValue>(a->e[i].getPointer())->value;
+				res_values[i] = new DoubleValue(Maths::sign(x));
+			}
 		}
 
 		return new VectorValue(res_values);
@@ -3201,21 +3214,42 @@ llvm::Value* SignBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	assert(func);
 	assert(func->isIntrinsic());
 
-	llvm::Value* scalar_one = llvm::ConstantFP::get(*params.context, llvm::APFloat(1.f));
-
-	llvm::Value* one;
-	if(type->getType() == Type::VectorTypeType)
+	llvm::Value* scalar_zero;
+	llvm::Value* scalar_one;
+	if(type->getType() == Type::FloatType || (type->getType() == Type::VectorTypeType && type.downcastToPtr<VectorType>()->elem_type->getType() == Type::FloatType))
 	{
-		one = params.builder->CreateVectorSplat(
-			this->type.downcastToPtr<VectorType>()->num, // num elements
-			scalar_one // value
-		);
+		scalar_zero = llvm::ConstantFP::get(*params.context, llvm::APFloat(0.f));
+		scalar_one  = llvm::ConstantFP::get(*params.context, llvm::APFloat(1.f));
 	}
 	else
-		one = scalar_one;
+	{
+		scalar_zero = llvm::ConstantFP::get(*params.context, llvm::APFloat(0.0));
+		scalar_one  = llvm::ConstantFP::get(*params.context, llvm::APFloat(1.0));
+	}
+
+	llvm::Value* one;
+	llvm::Value* zero;
+	if(type->getType() == Type::VectorTypeType)
+	{
+		zero = params.builder->CreateVectorSplat(/*num elements=*/this->type.downcastToPtr<VectorType>()->num, scalar_zero);
+		one  = params.builder->CreateVectorSplat(/*num elements=*/this->type.downcastToPtr<VectorType>()->num, scalar_one);
+	}
+	else
+	{
+		zero = scalar_zero;
+		one  = scalar_one;
+	}
+
+	llvm::Value* arg0 = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+
+	llvm::Value* magnitude = params.builder->CreateSelect(
+		params.builder->CreateFCmpOEQ(arg0, zero), // condition: arg0 == zero
+		zero, // true
+		one // false
+	);
 
 	// "The ‘llvm.copysign.*‘ intrinsics return a value with the magnitude of the first operand and the sign of the second operand."
-	llvm::Value* args[] = { one, LLVMTypeUtils::getNthArg(params.currently_building_func, 0) };
+	llvm::Value* args[] = { magnitude, arg0 };
 	return params.builder->CreateCall(func, args);
 }
 
