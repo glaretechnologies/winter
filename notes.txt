@@ -1,3 +1,210 @@
+pre_result = p_pre_affine
+res0 = xf1_var0_eval(pre_result, internal_real_data, unit_rnd, gauss_rnd)
+res1 = xf1_var1_eval(pre_result, internal_real_data, unit_rnd, gauss_rnd)
+res2 = xf1_var2_eval(pre_result, internal_real_data, unit_rnd, gauss_rnd)
+sum_result = res0 + res1 + res2
+		
+		else if(this->static_target_function && this->static_target_function->sig.name == "dot" && 
+			this->static_target_function->sig.param_types.size() == 3 &&
+			static_target_function->built_in_func_impl.nonNull() && 
+			static_target_function->built_in_func_impl->builtInType() == BuiltInFunctionImpl::BuiltInType_DotProductBuiltInFunc)
+		{
+			assert(this->argument_expressions.size() == 3);
+			if(!this->argument_expressions[2]->isConstant())
+				throw BaseException("Third arg to dot(a, b, num_comp) must be constant");
+
+			int64 num_components;
+			try
+			{
+				VMState vmstate;
+				vmstate.func_args_start.push_back(0);
+
+				ValueRef res = this->argument_expressions[2]->exec(vmstate);
+
+				const IntValue* res_i = checkedCast<IntValue>(res.getPointer());
+
+				num_components = res_i->value;
+			}
+			catch(BaseException& e)
+			{
+				throw BaseException("Failed to eval third arg of dot(a, b, num_comp): " + e.what());
+			}	
+
+			DotProductBuiltInFunc* dot_func = static_cast<DotProductBuiltInFunc*>(this->static_target_function->built_in_func_impl.getPointer());
+				
+			// bounds check index.
+			assert(this->static_target_function->sig.param_types[0]->getType() == Type::VectorTypeType);
+
+			if(num_components <= 0 || num_components > (int64)dot_func->vector_type->num)
+				throw BaseException("Third argument to dot(a, b, num_comp) function is out of range." + errorContext(*this));
+
+			dot_func->setNumComponents((int)num_components);
+		}
+		
+		
+				if(
+			sig.param_types[0]->getType() == Type::VectorTypeType && // vector 
+			sig.param_types[1]->getType() == Type::VectorTypeType) // and vector
+		{
+			if((static_cast<const VectorType*>(sig.param_types[0].getPointer())->elem_type->getType() == Type::FloatType || // vector of floats
+				static_cast<const VectorType*>(sig.param_types[0].getPointer())->elem_type->getType() == Type::DoubleType) && // or vector of doubles
+				(*sig.param_types[0] == *sig.param_types[1]) &&  // and argument types are the same
+				sig.param_types[2]->getType() == Type::IntType)
+			{
+				if(sig.name == "dot")
+				{
+					vector<FunctionDefinition::FunctionArg> args = makeFunctionArgPair("x", sig.param_types[0], "y", sig.param_types[1]);
+					args.push_back(FunctionDefinition::FunctionArg(sig.param_types[2], "num_components"));
+
+					FunctionDefinitionRef def = new FunctionDefinition(
+						SrcLocation::invalidLocation(),
+						-1, // order number
+						"dot", // name
+						args, // args
+						NULL, // body expr
+						static_cast<const VectorType*>(sig.param_types[0].getPointer())->elem_type, // return type
+						new DotProductBuiltInFunc(sig.param_types[0].downcast<VectorType>(),
+							/*has_third_num_comp_arg=*/true) // built in impl.
+					);
+
+					//this->sig_to_function_map.insert(std::make_pair(sig, def));
+					// NOTE: because dot with 3 args is unusual in that it has the mask 'baked into it', we need a unique DotProductBuiltInFunc impl each time.
+					// So don't add to function map, so that it isn't reused.
+					// However, we need to add it to unique_functions to prevent it from being deleted, as calling function expr doesn't hold a ref to it.
+					unique_functions.push_back(def);
+					return def;
+				}
+			}
+		}
+		
+			//testMainFloatArg("def main(float x) float : dot([1.0, 2.0, 3.0, 4.0]v, [x, x, x, x]v, 1)", 2.0f, 2.0f);
+	//testMainFloatArg("def main(float x) float : dot([1.0, 2.0, 3.0, 4.0]v, [x, x, x, x]v, 2)", 2.0f, 6.0f);
+	
+		// Build auto-generated functions (compare equal etc..) for types seen)
+#if 0
+	vector<ASTNodeRef> auto_gen_func_defs;
+	for(auto it=parsed_types.begin(); it != parsed_types.end(); ++it)
+	{
+		const TypeVRef& type = *it;
+
+		conPrint(type->toString());
+
+		// Make compare equal function for type
+		if(type->requiresCompareEqualFunction())
+		{
+			if(type->getType() == Type::FunctionType)
+				continue; // TODO: implement function comparison
+
+			vector<FunctionDefinition::FunctionArg> compare_eq_args;
+			compare_eq_args.push_back(FunctionDefinition::FunctionArg(type, "a"));
+			compare_eq_args.push_back(FunctionDefinition::FunctionArg(type, "b"));
+
+			FunctionDefinitionRef compare_eq_func = new FunctionDefinition(
+				SrcLocation::invalidLocation(),
+				-1, // order number
+				"__compare_equal", // name
+				compare_eq_args, // arguments
+				ASTNodeRef(), // body expr
+				new Bool(), // declard return type
+				new CompareEqualBuiltInFunc(type, /*is_compare_not_equal=*/false) // built in func impl.
+			);
+			auto_gen_func_defs.push_back(compare_eq_func);
+
+			// Make compare not-equal func
+			FunctionDefinitionRef compare_neq_func = new FunctionDefinition(
+				SrcLocation::invalidLocation(),
+				-1, // order number
+				"__compare_not_equal", // name
+				compare_eq_args, // arguments
+				ASTNodeRef(), // body expr
+				new Bool(), // declard return type
+				new CompareEqualBuiltInFunc(type, /*is_compare_not_equal=*/true) // built in func impl.
+			);
+			auto_gen_func_defs.push_back(compare_neq_func);
+		}
+	}
+	linker.addTopLevelDefs(auto_gen_func_defs);
+#endif
+
+
+
+// conPrint("a_code: ");
+	// a_code->dump();
+	// conPrint("a_code->getType(): ");
+	// a_code->getType()->dump();
+	// conPrint("");
+	// 
+	// conPrint("b_code: ");
+	// b_code->dump();
+	// conPrint("b_code->getType(): ");
+	// b_code->getType()->dump();
+	// conPrint("");
+
+
+"N:\chaotica\trunk\user params\lyc_nicer_linears.flame" DE speed
+non-winter
+------------------
+103.8
+103.9
+
+winter
+---------------
+93.6
+93.4
+
+non-winter
+------------
+min elapsed: 35.239476710557945 ns
+min elapsed: 34.80492159724236 ns
+min elapsed: 34.88389775156975 ns
+
+pdj::aply: 22ns
+
+
+winter
+---------
+min elapsed: 41.24441184103489 ns
+min elapsed: 41.20492376387119 ns
+min elapsed: 40.69134593009949 ns
+
+
+1 trig call, med size values: std::cos(): 8.075055666267872 ns
+4 trig calls, med size values, std::cos(): 23.731342516839504 ns
+
+
+
+winter gnarl 1 thread
+81
+
+non-winter
+88.4
+88.4
+
+
+
+
+Speed of running winter tests vs LLVM version
+----------------------------------------------
+
+6.0.0:
+====================
+4.8417684212327 s 
+4.894991885405034 s
+4.8816621182486415 s
+
+
+3.4
+=======================
+2.332595095038414 s
+2.3739817291498184 s
+2.3964389953762293 s
+
+
+
+
+Winter:
+testASMFuncDirect():   7.194066420197487 ns
+testASMFuncIndirect(): 7.277028635144234 ns
 
 
 Dependent types
@@ -42,6 +249,33 @@ decrements a and b ref count.
 //engine_builder.setCodeModel(llvm::CodeModel::Large);
 		
 		Copyright 2009- Nicholas Chapman
+
+
+
+
+Notes on adding built-in functions
+==================================
+Built-in functions are functions like constructors, field acess functions, compare_equal functions etc..
+
+There are a couple of approachs to adding them to the set of functions in the program:
+
+Eager Addition
+--------------
+As soon as we see e.g. a struct type, add constructors, field access functions etc.. for that structure.
+Such functions may be unused, and so will have to wait until the dead function elim pass to be removed.
+
+Problems with this approach include how to get the set of used types in a program.
+Easy enough for structures since they must be explictly defined.
+However consider the literal [1, 2]a, which has type array<int, 2>.  The type of this won't be known during parsing.
+
+Lazy addition
+-------------
+This approach is to add the function only when requested, e.g. add __compare_equal(array<float, 2>, array<float, 2>) when
+trying to bind the function from the expression [1, 2]a == [3, 4]a.
+
+This is possibly more efficient, since we don't have to add and then remove a bunch of functions.
+However this requires a bunch of support code to make sure these functions are included in the reachable set etc..
+
 
 
 

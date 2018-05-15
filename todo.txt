@@ -1,8 +1,21 @@
+TODO: Finish defining == and != operators for all types, including varry types.
+
+TODO: move constructor, get elem creation etc.. from LangParser to VirtualMachine, like compare_equal creation.
+
+	// Test equality comparison
+	testMainFloat("def eq(Complex a, Complex b) !noinline bool : a == b     \n\
+				  struct Complex { float re, float im } \n\
+				  def main() float : (Complex(1.0, 2.0) == Complex(1.0, 3.0)) ? 1.0 : 2.0",
+				  2.0f);
+
+				  hits assert (note that struct Complex is defined after usage)
+
+
 TODO: Does engine_builder.setOptLevel(llvm::CodeGenOpt::Aggressive); do anything?
 
 TODO: test exp2 usage with old VS builds.
 
-TODO: define == and != operators for ?all? types, including vector types.
+
 
 TODO integer divison in Winter should use //
 
