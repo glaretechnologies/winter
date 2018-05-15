@@ -105,11 +105,9 @@ endif()
 
 set(WINTER_INCLUDE_DIRS "")
 
-# Add OpenCL paths
+
 if(WINTER_USE_OPENCL)
 	message("Building with OpenCL support.")
-
-	add_definitions("-DUSE_OPENCL=1")
 endif()
 
 

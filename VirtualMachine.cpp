@@ -1944,7 +1944,16 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 		"int toInt32_int64_(long x) { return (int)x; }		\n"
 		"long toInt64_int_(int x) { return (long)x; }		\n"
 		"bool isFinite_float_(float x) { return isfinite(x); }		\n"
-		"bool isNAN_float_(float x) { return isnan(x); }		\n";
+		"bool isNAN_float_(float x) { return isnan(x); }		\n"
+		"float mod_float__float_(float x, float y) { if(x < 0) { const float z = y - fmod(-x, y); return z == y ? 0.f : z; } else return fmod(x, y); }     \n"
+		"int mod_int__int_(int x, int y) { return (unsigned int)x % y; }        \n"
+		"float dot1_vector_float__2___vector_float__2__(float2 a, float2 b) { return a.x * b.x; } \n"
+		"float dot2_vector_float__2___vector_float__2__(float2 a, float2 b) { return a.x * b.x + a.y * b.y; } \n"
+		"float dot1_vector_float__4___vector_float__4__(float4 a, float4 b) { return a.x * b.x; } \n"
+		"float dot2_vector_float__4___vector_float__4__(float4 a, float4 b) { return a.x * b.x + a.y * b.y; } \n"
+		"float dot3_vector_float__4___vector_float__4__(float4 a, float4 b) { return a.x * b.x + a.y * b.y + a.z * b.z; } \n"
+		"float dot4_vector_float__4___vector_float__4__(float4 a, float4 b) { return dot(a, b); } \n";
+
 	if(vm_args.emit_opencl_printf_calls)
 	{
 		built_in_func_code += 
@@ -1967,7 +1976,16 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 		built_in_func_code +=
 			"double toDouble_int_(int x) { return (double)x; } \n"
 			"int truncateToInt_double_(double x) { return (int)x; } \n"
-			"int8 truncateToInt_vector_double__8__(float8 v) { return convert_int8(v); }  \n";
+			"int8 truncateToInt_vector_double__8__(float8 v) { return convert_int8(v); }  \n"
+			"double mod_double__double_(double x, double y) { if(x < 0) { const double z = y - fmod(-x, y); return z == y ? 0.0 : z; } else return fmod(x, y); }     \n"
+			"bool isFinite_double_(double x) { return isfinite(x); }		\n"
+			"bool isNAN_double_(double x) { return isnan(x); }		\n"
+			"double dot1_vector_double__2___vector_double__2__(double2 a, double2 b) { return a.x * b.x; } \n"
+			"double dot2_vector_double__2___vector_double__2__(double2 a, double2 b) { return a.x * b.x + a.y * b.y; } \n"
+			"double dot1_vector_double__4___vector_double__4__(double4 a, double4 b) { return a.x * b.x; } \n"
+			"double dot2_vector_double__4___vector_double__4__(double4 a, double4 b) { return a.x * b.x + a.y * b.y; } \n"
+			"double dot3_vector_double__4___vector_double__4__(double4 a, double4 b) { return a.x * b.x + a.y * b.y + a.z * b.z; } \n"
+			"double dot4_vector_double__4___vector_double__4__(double4 a, double4 b) { return dot(a, b); } \n";
 
 		if(vm_args.emit_opencl_printf_calls)
 			built_in_func_code += "double print_double_(double x) { printf((__constant char *)\"%f\\n\", x); return x; }    \n";
@@ -2002,6 +2020,14 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 				"{}\n";
 		}
 	}
+
+	if(vm_args.real_is_double)
+	{
+		if(vm_args.opencl_double_support)
+			built_in_func_code += "double toReal_int_(int x) { return (double)x; } \n";
+	}
+	else
+		built_in_func_code += "float toReal_int_(int x) { return (float)x; } \n";
 
 	built_in_func_code += "// End Winter built-in functions\n";
 

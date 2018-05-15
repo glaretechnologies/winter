@@ -4,18 +4,6 @@
 #if BUILD_TESTS
 
 
-//#include <maths/sse.h>
-extern "C"
-{
-#include <xmmintrin.h> //SSE header file
-};
-
-
-#include <cassert>
-#include <fstream>
-#include "utils/FileUtils.h"
-#include "utils/StringUtils.h"
-#include "utils/Timer.h"
 #include "wnt_Lexer.h"
 #include "TokenBase.h"
 #include "wnt_LangParser.h"
@@ -31,10 +19,15 @@ extern "C"
 #include <Vector.h>
 #include <ConPrint.h>
 #include <Platform.h>
+#include <FileUtils.h>
+#include <StringUtils.h>
+#include <Timer.h>
+#include <cassert>
+#include <fstream>
 //#include "utils/Obfuscator.h"
 
 
-//#define WINTER_OPENCL_TESTS 1
+#define WINTER_OPENCL_TESTS 1
 static const bool DUMP_OPENCL_C_SOURCE = false;
 
 
@@ -378,77 +371,81 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 		if(!(test_flags & INVALID_OPENCL))
 		{
 #if WINTER_OPENCL_TESTS
-			Winter::VirtualMachine::BuildOpenCLCodeArgs opencl_args;
-			std::string opencl_code = vm.buildOpenCLCodeCombined(opencl_args);
-
-			const std::string extended_source = opencl_code + "\n" + "__kernel void main_kernel(float x, __global float * const restrict output_buffer) { \n" + 
-				"	output_buffer[0] = main_float_(x);		\n" + 
-				" }";
-
-			if(DUMP_OPENCL_C_SOURCE)
+			if(::getGlobalOpenCL() && !::getGlobalOpenCL()->getOpenCLDevices().empty())
 			{
-				std::ofstream file("opencl_source.c");
-				file << extended_source;
-			}
+				Winter::VirtualMachine::BuildOpenCLCodeArgs opencl_args;
+				std::string opencl_code = vm.buildOpenCLCodeCombined(opencl_args);
 
-			const OpenCLDeviceRef device = ::getGlobalOpenCL()->getOpenCLDevices()[0];
-			std::vector<OpenCLDeviceRef> devices(1, device);
-			OpenCLContextRef context = new OpenCLContext(device->opencl_platform_id);
-			OpenCLCommandQueueRef command_queue = new OpenCLCommandQueue(context, device->opencl_device_id, /*profiling=*/false);
-			std::string build_log;
-			OpenCLProgramRef program;
-			try
-			{
-				program = ::getGlobalOpenCL()->buildProgram(
-					extended_source,
-					context->getContext(),
-					devices,
-					"", // options
-					build_log
+				const std::string extended_source = opencl_code + "\n" + "__kernel void main_kernel(float x, __global float * const restrict output_buffer) { \n" +
+					"	output_buffer[0] = main_float_(x);		\n" +
+					" }";
+
+				if(DUMP_OPENCL_C_SOURCE)
+				{
+					std::ofstream file("opencl_source.c");
+					file << extended_source;
+				}
+
+				const OpenCLDeviceRef device = ::getGlobalOpenCL()->getOpenCLDevices()[0];
+				std::vector<OpenCLDeviceRef> devices(1, device);
+				OpenCLContextRef context = new OpenCLContext(device->opencl_platform_id);
+				OpenCLCommandQueueRef command_queue = new OpenCLCommandQueue(context, device->opencl_device_id, /*profiling=*/false);
+				std::string build_log;
+				OpenCLProgramRef program;
+				try
+				{
+					program = ::getGlobalOpenCL()->buildProgram(
+						extended_source,
+						context->getContext(),
+						devices,
+						"", // options
+						build_log
+					);
+				}
+				catch(Indigo::Exception& e)
+				{
+					conPrint("Build failed: " + e.what() + "\nbuild_log:\n" + build_log);
+					assert(0);
+					exit(1);
+				}
+				//conPrint("build_log: \n" + build_log);
+
+				OpenCLKernelRef kernel = new OpenCLKernel(program->getProgram(), "main_kernel", device->opencl_device_id, /*profile=*/false);
+
+				OpenCLBuffer output_buffer(context->getContext(), sizeof(float), CL_MEM_READ_WRITE);
+
+				kernel->setKernelArgFloat(0, argument);
+				kernel->setKernelArgBuffer(1, output_buffer.getDevicePtr());
+
+				// Launch the kernel
+				const size_t global_work_size = 1;
+				kernel->launchKernel(command_queue->getCommandQueue(), global_work_size);
+
+				SSE_ALIGN float host_output_buffer[1];
+
+				// Read back result
+				cl_int result = ::getGlobalOpenCL()->clEnqueueReadBuffer(
+					command_queue->getCommandQueue(),
+					output_buffer.getDevicePtr(), // buffer
+					CL_TRUE, // blocking read
+					0, // offset
+					sizeof(float), // size in bytes
+					host_output_buffer, // host buffer pointer
+					0, // num events in wait list
+					NULL, // wait list
+					NULL // event
 				);
-			}
-			catch(Indigo::Exception& e)
-			{
-				conPrint("Build failed: " + e.what() + "\nbuild_log:\n" + build_log);
-				exit(1);
-			}
-			//conPrint("build_log: \n" + build_log);
+				if(result != CL_SUCCESS)
+					throw Indigo::Exception("clEnqueueReadBuffer failed: " + OpenCL::errorString(result));
 
-			OpenCLKernelRef kernel = new OpenCLKernel(program->getProgram(), "main_kernel", device->opencl_device_id, /*profile=*/false);
+				const float opencl_result = host_output_buffer[0];
 
-			OpenCLBuffer output_buffer(context->getContext(), sizeof(float), CL_MEM_READ_WRITE);
-
-			kernel->setKernelArgFloat(0, argument);
-			kernel->setKernelArgBuffer(1, output_buffer.getDevicePtr());
-
-			// Launch the kernel
-			const size_t global_work_size = 1;
-			kernel->launchKernel(command_queue->getCommandQueue(), global_work_size);
-
-			SSE_ALIGN float host_output_buffer[1];
-
-			// Read back result
-			cl_int result = ::getGlobalOpenCL()->clEnqueueReadBuffer(
-				command_queue->getCommandQueue(),
-				output_buffer.getDevicePtr(), // buffer
-				CL_TRUE, // blocking read
-				0, // offset
-				sizeof(float), // size in bytes
-				host_output_buffer, // host buffer pointer
-				0, // num events in wait list
-				NULL, // wait list
-				NULL // event
-			);
-			if(result != CL_SUCCESS)
-				throw Indigo::Exception("clEnqueueReadBuffer failed: " + OpenCL::errorString(result));
-
-			const float opencl_result = host_output_buffer[0];
-
-			if(!epsEqual(opencl_result, target_return_val))
-			{
-				stdErrPrint("Test failed: OpenCL returned " + toString(opencl_result) + ", target was " + toString(target_return_val));
-				assert(0);
-				exit(1);
+				if(!epsEqual(opencl_result, target_return_val))
+				{
+					stdErrPrint("Test failed: OpenCL returned " + toString(opencl_result) + ", target was " + toString(target_return_val));
+					assert(0);
+					exit(1);
+				}
 			}
 #endif // #if WINTER_OPENCL_TESTS
 		}
@@ -566,80 +563,83 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 		if(!(test_flags & INVALID_OPENCL))
 		{
 #if WINTER_OPENCL_TESTS
-		
-			Winter::VirtualMachine::BuildOpenCLCodeArgs opencl_args;
-			std::string opencl_code = vm.buildOpenCLCodeCombined(opencl_args);
-
-			const std::string extended_source = opencl_code + "\n" + "__kernel void main_kernel(double x, __global double * const restrict output_buffer) { \n" + 
-				"	output_buffer[0] = main_double_(x);		\n" + 
-				" }";
-
-			if(DUMP_OPENCL_C_SOURCE)
+			if(::getGlobalOpenCL() && !::getGlobalOpenCL()->getOpenCLDevices().empty())
 			{
-				std::ofstream file("opencl_source.c");
-				file << extended_source;
-			}
+				Winter::VirtualMachine::BuildOpenCLCodeArgs opencl_args;
+				std::string opencl_code = vm.buildOpenCLCodeCombined(opencl_args);
 
-			const OpenCLDeviceRef& device = ::getGlobalOpenCL()->getOpenCLDevices()[0];
-			std::vector<OpenCLDeviceRef> devices(1, device);
-			OpenCLContextRef context = new OpenCLContext(device->opencl_platform_id);
-			OpenCLCommandQueueRef command_queue = new OpenCLCommandQueue(context, device->opencl_device_id, /*profile=*/false);
-			std::string build_log;
-			OpenCLProgramRef program;
-			try
-			{
-				program = ::getGlobalOpenCL()->buildProgram(
-					extended_source,
-					context->getContext(),
-					devices,
-					"", // options
-					build_log
+				const std::string extended_source = opencl_code + "\n" + "__kernel void main_kernel(double x, __global double * const restrict output_buffer) { \n" +
+					"	output_buffer[0] = main_double_(x);		\n" +
+					" }";
+
+				if(DUMP_OPENCL_C_SOURCE)
+				{
+					std::ofstream file("opencl_source.c");
+					file << extended_source;
+				}
+
+				const OpenCLDeviceRef& device = ::getGlobalOpenCL()->getOpenCLDevices()[0];
+				std::vector<OpenCLDeviceRef> devices(1, device);
+				OpenCLContextRef context = new OpenCLContext(device->opencl_platform_id);
+				OpenCLCommandQueueRef command_queue = new OpenCLCommandQueue(context, device->opencl_device_id, /*profile=*/false);
+				std::string build_log;
+				OpenCLProgramRef program;
+				try
+				{
+					program = ::getGlobalOpenCL()->buildProgram(
+						extended_source,
+						context->getContext(),
+						devices,
+						"", // options
+						build_log
+					);
+				}
+				catch(Indigo::Exception& e)
+				{
+					conPrint("Build failed: " + e.what() + "\nbuild_log:\n" + build_log);
+					assert(0);
+					exit(1);
+				}
+				//conPrint("build_log: \n" + build_log);
+
+				OpenCLKernelRef kernel = new OpenCLKernel(program->getProgram(), "main_kernel", device->opencl_device_id, /*profile=*/false);
+
+
+				OpenCLBuffer output_buffer(context->getContext(), sizeof(double), CL_MEM_READ_WRITE);
+
+				kernel->setKernelArgDouble(0, argument);
+				kernel->setKernelArgBuffer(1, output_buffer.getDevicePtr());
+
+				const size_t global_work_size = 1;
+				kernel->launchKernel(command_queue->getCommandQueue(), global_work_size);
+
+
+
+				SSE_ALIGN double host_output_buffer[1];
+
+				// Read back result
+				cl_int result = ::getGlobalOpenCL()->clEnqueueReadBuffer(
+					command_queue->getCommandQueue(),
+					output_buffer.getDevicePtr(), // buffer
+					CL_TRUE, // blocking read
+					0, // offset
+					sizeof(double), // size in bytes
+					host_output_buffer, // host buffer pointer
+					0, // num events in wait list
+					NULL, // wait list
+					NULL // event
 				);
-			}
-			catch(Indigo::Exception& e)
-			{
-				conPrint("Build failed: " + e.what() + "\nbuild_log:\n" + build_log);
-				exit(1);
-			}
-			//conPrint("build_log: \n" + build_log);
+				if(result != CL_SUCCESS)
+					throw Indigo::Exception("clEnqueueReadBuffer failed: " + OpenCL::errorString(result));
 
-			OpenCLKernelRef kernel = new OpenCLKernel(program->getProgram(), "main_kernel", device->opencl_device_id, /*profile=*/false);
+				const double opencl_result = host_output_buffer[0];
 
-
-			OpenCLBuffer output_buffer(context->getContext(), sizeof(double), CL_MEM_READ_WRITE);
-
-			kernel->setKernelArgDouble(0, argument);
-			kernel->setKernelArgBuffer(1, output_buffer.getDevicePtr());
-
-			const size_t global_work_size = 1;
-			kernel->launchKernel(command_queue->getCommandQueue(), global_work_size);
-
-
-
-			SSE_ALIGN double host_output_buffer[1];
-
-			// Read back result
-			cl_int result = ::getGlobalOpenCL()->clEnqueueReadBuffer(
-				command_queue->getCommandQueue(),
-				output_buffer.getDevicePtr(), // buffer
-				CL_TRUE, // blocking read
-				0, // offset
-				sizeof(double), // size in bytes
-				host_output_buffer, // host buffer pointer
-				0, // num events in wait list
-				NULL, // wait list
-				NULL // event
-			);
-			if(result != CL_SUCCESS)
-				throw Indigo::Exception("clEnqueueReadBuffer failed: " + OpenCL::errorString(result));
-
-			const double opencl_result = host_output_buffer[0];
-
-			if(!epsEqual(opencl_result, target_return_val))
-			{
-				stdErrPrint("Test failed: OpenCL returned " + toString(opencl_result) + ", target was " + toString(target_return_val));
-				assert(0);
-				exit(1);
+				if(!epsEqual(opencl_result, target_return_val))
+				{
+					stdErrPrint("Test failed: OpenCL returned " + toString(opencl_result) + ", target was " + toString(target_return_val));
+					assert(0);
+					exit(1);
+				}
 			}
 #endif // #if WINTER_OPENCL_TESTS
 		}
@@ -946,79 +946,82 @@ TestResults testMainIntegerArg(const std::string& src, int x, int target_return_
 		if(!(test_flags & INVALID_OPENCL))
 		{
 #if WINTER_OPENCL_TESTS
-			
-			Winter::VirtualMachine::BuildOpenCLCodeArgs opencl_args;
-			std::string opencl_code = vm.buildOpenCLCodeCombined(opencl_args);
-
-			const std::string extended_source = opencl_code + "\n" + "__kernel void main_kernel(int x, __global int * const restrict output_buffer) { \n" + 
-				"	output_buffer[0] = main_int_(x);		\n" + 
-				" }";
-
-			if(DUMP_OPENCL_C_SOURCE)
+			if(::getGlobalOpenCL() && !::getGlobalOpenCL()->getOpenCLDevices().empty())
 			{
-				std::ofstream file("opencl_source.c");
-				file << extended_source;
-			}
+				Winter::VirtualMachine::BuildOpenCLCodeArgs opencl_args;
+				std::string opencl_code = vm.buildOpenCLCodeCombined(opencl_args);
 
-			const OpenCLDeviceRef& device = ::getGlobalOpenCL()->getOpenCLDevices()[0];
-			std::vector<OpenCLDeviceRef> devices(1, device);
-			OpenCLContextRef context = new OpenCLContext(device->opencl_platform_id);
-			OpenCLCommandQueueRef command_queue = new OpenCLCommandQueue(context, device->opencl_device_id, false);
-			std::string build_log;
-			OpenCLProgramRef program;
-			try
-			{
-				program = ::getGlobalOpenCL()->buildProgram(
-					extended_source,
-					context->getContext(),
-					devices,
-					"", // options
-					build_log
+				const std::string extended_source = opencl_code + "\n" + "__kernel void main_kernel(int x, __global int * const restrict output_buffer) { \n" +
+					"	output_buffer[0] = main_int_(x);		\n" +
+					" }";
+
+				if(DUMP_OPENCL_C_SOURCE)
+				{
+					std::ofstream file("opencl_source.c");
+					file << extended_source;
+				}
+
+				const OpenCLDeviceRef& device = ::getGlobalOpenCL()->getOpenCLDevices()[0];
+				std::vector<OpenCLDeviceRef> devices(1, device);
+				OpenCLContextRef context = new OpenCLContext(device->opencl_platform_id);
+				OpenCLCommandQueueRef command_queue = new OpenCLCommandQueue(context, device->opencl_device_id, false);
+				std::string build_log;
+				OpenCLProgramRef program;
+				try
+				{
+					program = ::getGlobalOpenCL()->buildProgram(
+						extended_source,
+						context->getContext(),
+						devices,
+						"", // options
+						build_log
+					);
+				}
+				catch(Indigo::Exception& e)
+				{
+					conPrint("Build failed: " + e.what() + "\nbuild_log:\n" + build_log);
+					assert(0);
+					exit(1);
+				}
+				//conPrint("build_log: \n" + build_log);
+
+				OpenCLBuffer output_buffer(context->getContext(), sizeof(int), CL_MEM_READ_WRITE);
+
+
+				OpenCLKernelRef kernel = new OpenCLKernel(program->getProgram(), "main_kernel", device->opencl_device_id, /*profile=*/false);
+
+				kernel->setKernelArgInt(0, x);
+				kernel->setKernelArgBuffer(1, output_buffer.getDevicePtr());
+
+				// Launch the kernel
+				const size_t global_work_size = 1;
+				kernel->launchKernel(command_queue->getCommandQueue(), global_work_size);
+
+				SSE_ALIGN int host_output_buffer[1];
+
+				// Read back result
+				cl_int result = ::getGlobalOpenCL()->clEnqueueReadBuffer(
+					command_queue->getCommandQueue(),
+					output_buffer.getDevicePtr(), // buffer
+					CL_TRUE, // blocking read
+					0, // offset
+					sizeof(int), // size in bytes
+					host_output_buffer, // host buffer pointer
+					0, // num events in wait list
+					NULL, // wait list
+					NULL // event
 				);
-			}
-			catch(Indigo::Exception& e)
-			{
-				conPrint("Build failed: " + e.what() + "\nbuild_log:\n" + build_log);
-				exit(1);
-			}
-			//conPrint("build_log: \n" + build_log);
+				if(result != CL_SUCCESS)
+					throw Indigo::Exception("clEnqueueReadBuffer failed: " + OpenCL::errorString(result));
 
-			OpenCLBuffer output_buffer(context->getContext(), sizeof(int), CL_MEM_READ_WRITE);
+				const int opencl_result = host_output_buffer[0];
 
-
-			OpenCLKernelRef kernel = new OpenCLKernel(program->getProgram(), "main_kernel", device->opencl_device_id, /*profile=*/false);
-
-			kernel->setKernelArgInt(0, x);
-			kernel->setKernelArgBuffer(1, output_buffer.getDevicePtr());
-
-			// Launch the kernel
-			const size_t global_work_size = 1;
-			kernel->launchKernel(command_queue->getCommandQueue(), global_work_size);
-
-			SSE_ALIGN int host_output_buffer[1];
-
-			// Read back result
-			cl_int result = ::getGlobalOpenCL()->clEnqueueReadBuffer(
-				command_queue->getCommandQueue(),
-				output_buffer.getDevicePtr(), // buffer
-				CL_TRUE, // blocking read
-				0, // offset
-				sizeof(int), // size in bytes
-				host_output_buffer, // host buffer pointer
-				0, // num events in wait list
-				NULL, // wait list
-				NULL // event
-			);
-			if(result != CL_SUCCESS)
-				throw Indigo::Exception("clEnqueueReadBuffer failed: " + OpenCL::errorString(result));
-
-			const int opencl_result = host_output_buffer[0];
-
-			if(opencl_result != target_return_val)
-			{
-				stdErrPrint("Test failed: OpenCL returned " + toString(opencl_result) + ", target was " + toString(target_return_val));
-				assert(0);
-				exit(1);
+				if(opencl_result != target_return_val)
+				{
+					stdErrPrint("Test failed: OpenCL returned " + toString(opencl_result) + ", target was " + toString(target_return_val));
+					assert(0);
+					exit(1);
+				}
 			}
 #endif // #if WINTER_OPENCL_TESTS
 		}

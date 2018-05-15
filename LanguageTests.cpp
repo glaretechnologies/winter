@@ -2877,7 +2877,8 @@ static void testLetBlocks()
 
 
 	// Test two let clauses where one refers to the other (reverse order)
-	/*testMainFloat("def f() float : \
+	#if 0
+	testMainFloat("def f() float : \
 				  let	\
 					z = y \
 					y = 2.0 \
@@ -2891,7 +2892,8 @@ static void testLetBlocks()
 					y = 2.0 \
 				  in \
 					y \
-				  def main() float : f()", 2.0);*/
+				  def main() float : f()", 2.0);
+	#endif
 
 	// Test nested let blocks
 	testMainFloat("def f() float :				\n\
@@ -3039,7 +3041,8 @@ static void testLetBlocks()
 		def main(float y) float	:			\n\
 			f([y,y,y,y]a)",
 		1.0f,
-		1.0f
+		1.0f,
+		INVALID_OPENCL // array literals
 	);
 
 	// Test also that the second let clause with var name 'a' does not get interpreted as a suffix for an array literal on '[0]',
@@ -3053,7 +3056,8 @@ static void testLetBlocks()
 		def main(float y) float	:						\n\
 			f([y,y,y,y]a)",
 		1.0f,
-		1.0f
+		1.0f,
+		INVALID_OPENCL // array literals
 	);
 }
 
@@ -4319,8 +4323,8 @@ void LanguageTests::run()
 	// ===================================================================
 	testMainFloatArg("def main(float x) float :	sign(x)", 4.f, 1.f);
 	testMainFloatArg("def main(float x) float :	sign(x)", -4.f, -1.f);
-	//NOTE: a bit of a problem wtih sign(0).  sign(0) is plus/minus zero in OpenCL.
-	// but copysign(1.0, 0.f) is one.
+
+	//NOTE: a bit of a problem with sign(0).  sign(0) is plus/minus zero in OpenCL, but copysign(1.0, 0.f) is one.
 	//testMainFloatArg("def main(float x) float :	sign(x)", 0.f, 1.f);
 
 	// sign() on vectors:
