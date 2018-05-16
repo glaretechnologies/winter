@@ -817,6 +817,28 @@ static void testVArrays()
 	testMainFloat("def main() float : ([1.0, 2.0]va != [3.0, 2.0]va) ? 1.0 : 0.0", 1.0f);
 	testMainFloat("def main() float : ([1.0, 2.0]va != [1.0, 2.0]va) ? 1.0 : 0.0", 0.0f);
 	testMainFloat("def main() float : ([1.0, 2.0]va != [1.0]va) ? 1.0 : 0.0", 1.0f);
+
+	// ===================================================================
+	// Test allocation of large varray that is not captured or returned.
+	// ===================================================================
+	// Because this varray is not returned or captured from f(), it might have been allocated on the stack.
+	// We want to make sure it isn't because it is too large.
+	testMainInt64Arg("def f(int64 index) !noinline int64 : ([123i64]va1000000)[index]    \n\
+		def main(int64 x) int64 : f(x)", 1, 123, ALLOW_UNSAFE);
+
+	// Test with smaller int suffix, should not emit a call to makeVArray()
+	testMainInt64Arg("def f(int64 index) !noinline int64 : ([123i64]va5)[index]    \n\
+		def main(int64 x) int64 : f(x)", 1, 123, ALLOW_UNSAFE);
+
+	// Test the same as above, but with a structure in the varray
+	testMainInt64Arg("struct S { int64 x }    \n\
+		def f(int64 index) !noinline int64 : ([S(123i64)]va1000000)[index].x    \n\
+		def main(int64 x) int64 : f(x)", 1, 123, ALLOW_UNSAFE);
+
+	// Test with smaller int suffix, should not emit a call to makeVArray()
+	testMainInt64Arg("struct S { int64 x }    \n\
+		def f(int64 index) !noinline int64 : ([S(123i64)]va5)[index].x    \n\
+		def main(int64 x) int64 : f(x)", 1, 123, ALLOW_UNSAFE);
 }
 
 

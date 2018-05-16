@@ -51,7 +51,8 @@ VArrayLiteral::VArrayLiteral(const std::vector<ASTNodeRef>& elems, const SrcLoca
 :	ASTNode(VArrayLiteralType, loc),
 	elements(elems),
 	has_int_suffix(has_int_suffix_),
-	int_suffix(int_suffix_)
+	int_suffix(int_suffix_),
+	make_varray_func_def(NULL)
 {
 	if(has_int_suffix && int_suffix <= 0)
 		throw BaseException("VArray literal int suffix must be > 0." + errorContext(*this));
@@ -128,12 +129,27 @@ std::string VArrayLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 }
 
 
+static const int MAX_INT_SUFFIX_NO_MAKE_VARRAY = 16;
+
+
 void VArrayLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
 	if(payload.operation == TraversalPayload::BindVariables)
 	{
 		for(size_t i=0; i<elements.size(); ++i)
 			convertOverloadedOperators(elements[i], payload, stack);
+
+		TypeRef elem_0_type = elements[0]->type();
+		if(elem_0_type.nonNull())
+		{
+			if(has_int_suffix && (int_suffix > MAX_INT_SUFFIX_NO_MAKE_VARRAY)) // If we want to call makeVArray() to construct this varray:
+			{
+				const FunctionSignature makeVArray_sig("makeVArray", typePair(TypeVRef(elements[0]->type()), new Int(64)));
+				FunctionDefinitionRef def = payload.linker->findMatchingFunction(makeVArray_sig, Winter::SrcLocation::invalidLocation(),
+					/*effective_callsite_order_num=*/-1);
+				make_varray_func_def = def.getPointer();
+			}
+		}
 	}
 
 
@@ -179,8 +195,9 @@ void VArrayLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	}
 	else if(payload.operation == TraversalPayload::DeadFunctionElimination)
 	{
-		//FunctionDefinitionRef def = payload.linker->findMatchingFunctionSimple(FunctionSignature("allocateVArray", vector<TypeRef>(2, new Int(64))));
-		//payload.reachable_defs.insert(def.getPointer());
+		// Mark makeVArray() as reachable.
+		if(make_varray_func_def)
+			payload.reachable_nodes.insert(make_varray_func_def);
 	}
 	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
 	{
@@ -201,13 +218,39 @@ bool VArrayLiteral::areAllElementsConstant() const
 
 llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
-	const bool alloc_on_heap = mayEscapeCurrentlyBuildingFunction(params, this->type());
+	const size_t max_num_stack_elems = 1 << 16;
+	const size_t max_on_stack_size = 1 << 16;
+
+	const uint64_t num_elems = has_int_suffix ? int_suffix : elements.size();
+	const TypeRef elem_type = elements[0]->type();
+	const uint64_t elem_size_B = params.target_data->getTypeAllocSize(elem_type->LLVMType(*params.module)); // Get size of element
+	const uint64_t all_elems_size_B = elem_size_B * num_elems;
+
+	// We need to allocate on heap if size of varray is too large for stack
+	const bool alloc_on_heap = mayEscapeCurrentlyBuildingFunction(params, this->type()) ||
+		(num_elems > max_num_stack_elems) ||
+		(all_elems_size_B > max_on_stack_size);
 
 	llvm::Value* varray_ptr;
 	uint64 initial_flags;
 
 	if(alloc_on_heap)
 	{
+		llvm::Value* num_elems_llvm_val = llvm::ConstantInt::get(*params.context, 
+			llvm::APInt(/*num bits=*/64, num_elems, /*signed=*/true));
+
+		// If we have an int suffix with a large value, then we don't want to emit assignment instructions for every element,
+		// rather emit a call to makeVArray() which uses a loop.
+		if(has_int_suffix && (num_elems > MAX_INT_SUFFIX_NO_MAKE_VARRAY))
+		{
+			llvm::Function* make_varray_llvm_func = make_varray_func_def->getOrInsertFunction(params.module);
+
+			llvm::Value* element_0_value = this->elements[0]->emitLLVMCode(params);
+
+			llvm::Value* args[] = { element_0_value, num_elems_llvm_val };
+			return params.builder->CreateCall(make_varray_llvm_func, args);
+		}
+
 		params.stats->num_heap_allocation_calls++;
 
 		// Emit a call to allocateVArray:
@@ -217,20 +260,11 @@ llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 			false // use_cap_var_struct_ptr
 		);
 
-		const TypeRef elem_type = elements[0]->type();
+		llvm::Value* size_B_constant = llvm::ConstantInt::get(*params.context, llvm::APInt(64, elem_size_B, /*signed=*/false));
 
-		const uint64_t size_B = params.target_data->getTypeAllocSize(elem_type->LLVMType(*params.module)); // Get size of element
-		llvm::Value* size_B_constant = llvm::ConstantInt::get(*params.context, llvm::APInt(64, size_B, /*signed=*/false));
+		
 
-		llvm::Value* num_elems = llvm::ConstantInt::get(
-			*params.context,
-			llvm::APInt(64, //TEMP
-				this->elements.size(),
-				true // signed
-			)
-		);
-
-		llvm::Value* args[2] = { size_B_constant, num_elems };
+		llvm::Value* args[] = { size_B_constant, num_elems_llvm_val };
 		llvm::CallInst* call_inst = params.builder->CreateCall(allocateVArrayLLVMFunc, args, "varray_literal");
 
 		// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
@@ -253,10 +287,7 @@ llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 		// We will emit the alloca at the start of the block, so that it doesn't go after any terminator instructions already created which have to be at the end of the block.
 		llvm::IRBuilder<> entry_block_builder(&params.currently_building_func->getEntryBlock(), params.currently_building_func->getEntryBlock().getFirstInsertionPt());
 
-
-		const TypeRef elem_type = elements[0]->type();
-		const uint64 elem_size_B = params.target_data->getTypeAllocSize(elem_type->LLVMType(*params.module)); // Get size of element
-		const uint64 total_varray_size_B = sizeof(uint64)*3 + elem_size_B * elements.size();
+		const uint64 total_varray_size_B = sizeof(uint64)*3 + elem_size_B * num_elems;
 
 		llvm::Value* alloca_ptr = entry_block_builder.CreateAlloca(
 			llvm::Type::getInt8Ty(*params.context), // byte
@@ -290,12 +321,12 @@ llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 	llvm::Value* length_ptr = LLVMUtils::createStructGEP(params.builder, varray_ptr, 1, "varray_literal_length_ptr");
 	llvm::Value* length_constant_int = llvm::ConstantInt::get(
 		*params.context,
-		llvm::APInt(64, this->elements.size(), 
+		llvm::APInt(64, num_elems, 
 			true // signed
 		)
 	);
 	llvm::StoreInst* store_length_inst = params.builder->CreateStore(length_constant_int, length_ptr);
-	addMetaDataCommentToInstruction(params, store_length_inst, "VArray literal set initial length count to " + ::toString(this->elements.size()));
+	addMetaDataCommentToInstruction(params, store_length_inst, "VArray literal set initial length count to " + ::toString(num_elems));
 
 	// Set the flags
 	llvm::Value* flags_ptr = LLVMUtils::createStructGEP(params.builder, varray_ptr, 2, "varray_literal_flags_ptr");
@@ -313,25 +344,25 @@ llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 	// For each element in the literal
 	if(has_int_suffix)
 	{
-		// NOTE: could optimise this more (share value etc..)
-		for(int i=0; i<int_suffix; ++i)
+		assert(int_suffix <= 16);
+
+		if(this->elements[0]->type()->passByValue())
 		{
-			llvm::Value* element_ptr = LLVMUtils::createStructGEP(params.builder, data_ptr, i);
-
-			if(this->elements[0]->type()->passByValue())
+			llvm::Value* elem_0_value = this->elements[0]->emitLLVMCode(params);
+			for(int i=0; i<int_suffix; ++i)
 			{
-				llvm::Value* element_value = this->elements[0]->emitLLVMCode(params);
-
 				// Store the element in the array
-				params.builder->CreateStore(
-					element_value, // value
-					element_ptr // ptr
-				);
+				llvm::Value* element_ptr = LLVMUtils::createStructGEP(params.builder, data_ptr, i);
+				params.builder->CreateStore(/*value=*/elem_0_value, /*ptr=*/element_ptr);
 			}
-			else
+		}
+		else
+		{
+			// Element is pass-by-pointer, for example a structure.
+			// So just emit code that will store it directly in the array.
+			for(int i=0; i<int_suffix; ++i)
 			{
-				// Element is pass-by-pointer, for example a structure.
-				// So just emit code that will store it directly in the array.
+				llvm::Value* element_ptr = LLVMUtils::createStructGEP(params.builder, data_ptr, i);
 				this->elements[0]->emitLLVMCode(params, element_ptr);
 			}
 		}
@@ -340,8 +371,6 @@ llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 	{
 		for(unsigned int i=0; i<this->elements.size(); ++i)
 		{
-			//llvm::Value* element_ptr = params.builder->CreateStructGEP(data_ptr, i);
-			//llvm::Value* element_ptr = params.builder->CreateConstInBoundsGEP1_64(data_ptr, i);
 			llvm::Value* element_ptr = params.builder->CreateConstInBoundsGEP2_64(data_ptr, 0, i, "varray_literal_element_ptr");
 
 			if(this->elements[i]->type()->passByValue())

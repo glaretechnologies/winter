@@ -350,7 +350,7 @@ static int freeVArray(VArrayRep* varray)
 //=====================================================================================
 
 
-// In-memory string representation for a Winter VArray
+// In-memory string representation for a Winter Closure
 class ClosureRep
 {
 public:

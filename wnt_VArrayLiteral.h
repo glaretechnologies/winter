@@ -46,6 +46,7 @@ private:
 	int int_suffix; // e.g. number of elements
 
 	//mutable llvm::Value* ptr_alloca;
+	FunctionDefinition* make_varray_func_def;
 };
 
 

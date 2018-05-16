@@ -1678,7 +1678,7 @@ ValueRef MakeVArrayBuiltInFunc::invoke(VMState& vmstate)
 class MakeVArrayBuiltInFunc_CreateLoopBodyCallBack : public CreateLoopBodyCallBack
 {
 public:
-	virtual llvm::Value* emitLoopBody(llvm::IRBuilder<>& builder, llvm::Module* module, /*llvm::Value* loop_value_var, */llvm::Value* i)
+	virtual llvm::Value* emitLoopBody(llvm::IRBuilder<>& builder, llvm::Module* module, llvm::Value* i)
 	{
 		llvm::Value* indices[2] = {llvm::ConstantInt::get(module->getContext(), llvm::APInt(32, 0)), i };
 		llvm::Value* element_ptr = builder.CreateInBoundsGEP(data_ptr, indices);
@@ -1693,18 +1693,22 @@ public:
 		}
 		else
 		{
-			// Element is pass-by-pointer, for example a structure.
-			// So just emit code that will store it directly in the array.
-			//this->element_value->emitLLVMCode(params, element_ptr);
+			LLVMUtils::createCollectionCopy(
+				array_type->elem_type, 
+				element_ptr, // dest ptr
+				element_value, // src ptr
+				*params
+			);
 
-			//TEMP:
-			assert(0);
-			throw BaseException("not implemented");
+			// If the element has a ref-counted type, we need to increment its reference count, since the newly constructed array now holds a reference to it. 
+			// (and to compensate for the decrement of the argument in the function application code)
+			array_type->elem_type->emitIncrRefCount(*params, element_value, "makeVArray() for type " + this->array_type->toString());
 		}
 
 		return NULL;
 	}
 
+	EmitLLVMCodeParams* params;
 	llvm::Value* element_value;
 	llvm::Value* data_ptr;
 	Reference<VArrayType> array_type;
@@ -1772,6 +1776,7 @@ llvm::Value* MakeVArrayBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) con
 	// Emit for loop to write count copies of the element to the varray.
 
 	MakeVArrayBuiltInFunc_CreateLoopBodyCallBack callback;
+	callback.params = &params;
 	callback.array_type = this->array_type;
 	callback.data_ptr = data_ptr;
 	callback.element_value = elem_val;
