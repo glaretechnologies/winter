@@ -874,7 +874,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		if(this->captured_vars[i].vartype == CapturedVar::Arg)
 		{
 			// Load arg
-			val = LLVMTypeUtils::getNthArg(
+			val = LLVMUtils::getNthArg(
 				params.currently_building_func,
 				params.currently_building_func_def->getLLVMArgIndex(this->captured_vars[i].arg_index)
 			);
@@ -917,7 +917,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			// This captured var is bound to a captured var itself.
 			// The target captured var is in the captured var struct for the function, which is passed as the last arg to the function body.
 			//FunctionDefinition* def = this->captured_vars[i].bound_function;
-			llvm::Value* base_current_func_captured_var_struct = LLVMTypeUtils::getLastArg(params.currently_building_func);
+			llvm::Value* base_current_func_captured_var_struct = LLVMUtils::getLastArg(params.currently_building_func);
 			
 			// Now we need to downcast it to the correct type.
 			llvm::Type* actual_cap_var_struct_type = params.currently_building_func_def->getCapturedVariablesStructType()->LLVMType(*params.module);
@@ -965,7 +965,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		llvm::IRBuilder<> builder(block);
 
 		// Get zeroth arg to func
-		llvm::Value* base_captured_var_struct = LLVMTypeUtils::getNthArg(destructor, 0);
+		llvm::Value* base_captured_var_struct = LLVMUtils::getNthArg(destructor, 0);
 
 		// Downcast to known actual captured var struct type.
 		// Bitcast the closure pointer down to the 'base' closure type.
@@ -1286,7 +1286,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 		// Increment ref counts on all (ref counted) arguments:
 //		const size_t num_sret_args = this->returnType()->passByValue() ? 0 : 1;
 //		for(size_t i=0; i<this->sig.param_types.size(); ++i)
-//			sig.param_types[i]->emitIncrRefCount(params, LLVMTypeUtils::getNthArg(llvm_func, i + num_sret_args));
+//			sig.param_types[i]->emitIncrRefCount(params, LLVMUtils::getNthArg(llvm_func, i + num_sret_args));
 
 
 		if(this->returnType()->passByValue())
@@ -1305,7 +1305,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 
 			// Decrement ref counts on all (ref counted) arguments:
 //			for(size_t i=0; i<this->sig.param_types.size(); ++i)
-//				sig.param_types[i]->emitDecrRefCount(params, LLVMTypeUtils::getNthArg(llvm_func, i));
+//				sig.param_types[i]->emitDecrRefCount(params, LLVMUtils::getNthArg(llvm_func, i));
 
 			builder.CreateRet(body_code);
 		}
@@ -1315,7 +1315,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 
 			// body code will return a pointer to the result of the body expression, allocated on the stack.
 			// So load from the stack, and save to the return pointer which will have been passed in as arg zero.
-			llvm::Value* return_val_ptr = LLVMTypeUtils::getNthArg(llvm_func, 0);
+			llvm::Value* return_val_ptr = LLVMUtils::getNthArg(llvm_func, 0);
 
 			// Emit body code, storing the result directly to the return value ptr.
 			llvm::Value* body_code = this->body->emitLLVMCode(params, return_val_ptr);
@@ -1338,7 +1338,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 							throw BaseException("Internal error: body type was null.");
 
 						// Load value
-						LLVMTypeUtils::createCollectionCopy(
+						LLVMUtils::createCollectionCopy(
 							TypeVRef(body_type), 
 							return_val_ptr, // dest ptr
 							body_code, // src ptr
@@ -1392,7 +1392,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 
 			// Decrement ref counts on all (ref counted) arguments:
 //			for(size_t i=0; i<this->sig.param_types.size(); ++i)
-//				sig.param_types[i]->emitDecrRefCount(params, LLVMTypeUtils::getNthArg(llvm_func, i));
+//				sig.param_types[i]->emitDecrRefCount(params, LLVMUtils::getNthArg(llvm_func, i));
 
 			builder.CreateRetVoid();
 

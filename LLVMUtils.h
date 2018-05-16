@@ -32,13 +32,26 @@ LLVMUtils
 =====================================================================*/
 namespace LLVMUtils
 {
+
+
+llvm::Value* getNthArg(llvm::Function *func, int n);
+llvm::Value* getLastArg(llvm::Function *func);
+
+
 #if TARGET_LLVM_VERSION >= 60
-	llvm::Value* createStructGEP(llvm::IRBuilder</*true, */llvm::ConstantFolder, llvm::IRBuilderDefaultInserter/*<true>*/ >* builder,
-		llvm::Value* struct_ptr, unsigned int field_index, const llvm::Twine& name = "");
+llvm::Value* createStructGEP(llvm::IRBuilder</*true, */llvm::ConstantFolder, llvm::IRBuilderDefaultInserter/*<true>*/ >* builder,
+	llvm::Value* struct_ptr, unsigned int field_index, const llvm::Twine& name = "");
 #else
-	llvm::Value* createStructGEP(llvm::IRBuilder<true, llvm::ConstantFolder, llvm::IRBuilderDefaultInserter<true> >* builder,
-		llvm::Value* struct_ptr, unsigned int field_index, const llvm::Twine& name = "");
+llvm::Value* createStructGEP(llvm::IRBuilder<true, llvm::ConstantFolder, llvm::IRBuilderDefaultInserter<true> >* builder,
+	llvm::Value* struct_ptr, unsigned int field_index, const llvm::Twine& name = "");
 #endif
+
+
+//llvm::Value* createFieldLoad(llvm::Value* structure_ptr, int field_index, llvm::IRBuilder<>* builder, const llvm::Twine& name);
+
+
+void createCollectionCopy(const TypeVRef& collection_type, llvm::Value* dest_ptr, llvm::Value* src_ptr, EmitLLVMCodeParams& params);
+
 
 }; // end namespace LLVMUtils
 

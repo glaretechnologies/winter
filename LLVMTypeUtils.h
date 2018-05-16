@@ -1,7 +1,7 @@
 /*=====================================================================
 LLVMTypeUtils.h
 -------------------
-Copyright Glare Technologies Limited 2010 -
+Copyright Glare Technologies Limited 2018 -
 Generated at Wed Oct 20 15:22:37 +1300 2010
 =====================================================================*/
 #pragma once
@@ -33,10 +33,6 @@ LLVMTypeUtils
 namespace LLVMTypeUtils
 {
 
-
-llvm::Value* getNthArg(llvm::Function *func, int n);
-llvm::Value* getLastArg(llvm::Function *func);
-
 llvm::Type* pointerType(llvm::Type& type);
 llvm::Type* pointerType(llvm::Type* type);
 
@@ -51,11 +47,6 @@ llvm::FunctionType* llvmFunctionType(const std::vector<TypeVRef>& arg_types,
 									 llvm::Module& module
 									 //bool hidden_voidptr_arg
 									 );
-
-//llvm::Value* createFieldLoad(llvm::Value* structure_ptr, int field_index, llvm::IRBuilder<>* builder, const llvm::Twine& name);
-
-void createCollectionCopy(const TypeVRef& collection_type, llvm::Value* dest_ptr, llvm::Value* src_ptr, EmitLLVMCodeParams& params);
-
 
 }; // end namespace LLVMTypeUtils
 

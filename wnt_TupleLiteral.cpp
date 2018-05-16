@@ -279,7 +279,7 @@ llvm::Value* TupleLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 		}
 		else
 		{
-			LLVMTypeUtils::createCollectionCopy(
+			LLVMUtils::createCollectionCopy(
 				tuple_type->component_types[i], 
 				field_ptr, // dest ptr
 				arg_value_or_ptr, // src ptr

@@ -72,7 +72,7 @@ llvm::Function* emitIncrRefCountFunc(llvm::Module* module, const llvm::DataLayou
 	llvm::BasicBlock* block = llvm::BasicBlock::Create(module->getContext(), "entry", llvm_func);
 	llvm::IRBuilder<> builder(block);
 		
-	llvm::Value* refcounted_val = LLVMTypeUtils::getNthArg(llvm_func, 0); // Get arg 0.
+	llvm::Value* refcounted_val = LLVMUtils::getNthArg(llvm_func, 0); // Get arg 0.
 	llvm::Value* ref_ptr = LLVMUtils::createStructGEP(&builder, refcounted_val, 0, "ref_ptr"); // Get pointer to ref count
 	llvm::Value* ref_count = builder.CreateLoad(ref_ptr, "ref_count"); // Load the ref count
 	llvm::Value* one = llvm::ConstantInt::get(module->getContext(), llvm::APInt(64, 1, /*signed=*/true));
@@ -184,7 +184,7 @@ void emitDecrementorForType(llvm::Module* module, const llvm::DataLayout* target
 	llvm::IRBuilder<> builder(entry_block);
 
 	// Get arg 0 - (a pointer to) the ref counted value
-	llvm::Value* refcounted_val = LLVMTypeUtils::getNthArg(llvm_func, 0);
+	llvm::Value* refcounted_val = LLVMUtils::getNthArg(llvm_func, 0);
 
 	// Load ref count
 	llvm::Value* ref_ptr = LLVMUtils::createStructGEP(&builder, refcounted_val, 0, "ref_ptr");
@@ -281,7 +281,7 @@ void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_
 		const StructureType* struct_type = type.downcastToPtr<StructureType>();
 
 		// Get arg 0 - (a pointer to) the ref counted value
-		llvm::Value* struct_ptr = LLVMTypeUtils::getNthArg(llvm_func, 0);
+		llvm::Value* struct_ptr = LLVMUtils::getNthArg(llvm_func, 0);
 
 		for(size_t i=0; i<struct_type->component_types.size(); ++i)
 		{
@@ -319,7 +319,7 @@ void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_
 		const TupleType* tuple_type = type.downcastToPtr<TupleType>();
 
 		// Get arg 0 - (a pointer to) the ref counted value
-		llvm::Value* struct_ptr = LLVMTypeUtils::getNthArg(llvm_func, 0);
+		llvm::Value* struct_ptr = LLVMUtils::getNthArg(llvm_func, 0);
 
 		for(size_t i=0; i<tuple_type->component_types.size(); ++i)
 		{
@@ -354,7 +354,7 @@ void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_
 		//const Function* function_type = type.downcastToPtr<Function>();
 
 		// Get arg 0 - (a pointer to) the ref counted value (closure)
-		llvm::Value* closure = LLVMTypeUtils::getNthArg(llvm_func, 0);
+		llvm::Value* closure = LLVMUtils::getNthArg(llvm_func, 0);
 
 		// Load the destructor ptr
 		llvm::Value* destructor_ptr_ptr = LLVMUtils::createStructGEP(&builder, closure, Function::destructorPtrIndex(), "destructor_ptr_ptr");
@@ -372,7 +372,7 @@ void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_
 	
 
 	// Get arg 0 - (a pointer to) the value
-	llvm::Value* val = LLVMTypeUtils::getNthArg(llvm_func, 0);
+	llvm::Value* val = LLVMUtils::getNthArg(llvm_func, 0);
 
 	llvm::BasicBlock* MergeBB = llvm::BasicBlock::Create(module->getContext(), "merge");
 

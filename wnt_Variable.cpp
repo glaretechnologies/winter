@@ -547,7 +547,7 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 		// Get pointer to captured variables. structure.
 		// This pointer will be passed after the normal arguments to the function.
 
-		llvm::Value* base_cap_var_structure = LLVMTypeUtils::getNthArg(
+		llvm::Value* base_cap_var_structure = LLVMUtils::getNthArg(
 			params.currently_building_func,
 			params.currently_building_func_def->getCapturedVarStructLLVMArgIndex()
 		);
@@ -622,7 +622,7 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 		if(!params.argument_values.empty())
 			return params.argument_values[this->arg_index];
 
-		llvm::Value* arg = LLVMTypeUtils::getNthArg(
+		llvm::Value* arg = LLVMUtils::getNthArg(
 			params.currently_building_func,
 			params.currently_building_func_def->getLLVMArgIndex(this->arg_index)
 		);

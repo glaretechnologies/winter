@@ -347,13 +347,13 @@ llvm::Value* IfExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 			phi_result
 		);
 
-		llvm::Value* return_val_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+		llvm::Value* return_val_ptr = LLVMUtils::getNthArg(params.currently_building_func, 0);
 
 		return params.builder->CreateStore(
 			arg_val, // value
 			return_val_ptr // ptr
 		);*/
-		//llvm::Value* return_val_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+		//llvm::Value* return_val_ptr = LLVMUtils::getNthArg(params.currently_building_func, 0);
 		//return return_val_ptr;
 	}
 

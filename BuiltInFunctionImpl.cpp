@@ -236,7 +236,7 @@ llvm::Value* Constructor::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 		for(unsigned int i=0; i<this->struct_type->component_types.size(); ++i)
 		{
-			llvm::Value* arg_value = LLVMTypeUtils::getNthArg(params.currently_building_func, i);
+			llvm::Value* arg_value = LLVMUtils::getNthArg(params.currently_building_func, i);
 
 			s = params.builder->CreateInsertValue(
 				s,
@@ -250,7 +250,7 @@ llvm::Value* Constructor::emitLLVMCode(EmitLLVMCodeParams& params) const
 	else
 	{
 		// Pointer to structure memory will be in 0th argument.
-		llvm::Value* struct_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+		llvm::Value* struct_ptr = LLVMUtils::getNthArg(params.currently_building_func, 0);
 
 		// For each field in the structure
 		for(unsigned int i=0; i<this->struct_type->component_types.size(); ++i)
@@ -258,7 +258,7 @@ llvm::Value* Constructor::emitLLVMCode(EmitLLVMCodeParams& params) const
 			// Get the pointer to the structure field.
 			llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, struct_ptr, i);
 
-			llvm::Value* arg_value_or_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, i + 1);
+			llvm::Value* arg_value_or_ptr = LLVMUtils::getNthArg(params.currently_building_func, i + 1);
 
 			if(this->struct_type->component_types[i]->passByValue())
 			{
@@ -266,7 +266,7 @@ llvm::Value* Constructor::emitLLVMCode(EmitLLVMCodeParams& params) const
 			}
 			else
 			{
-				LLVMTypeUtils::createCollectionCopy(
+				LLVMUtils::createCollectionCopy(
 					this->struct_type->component_types[i], 
 					field_ptr, // dest ptr
 					arg_value_or_ptr, // src ptr
@@ -302,7 +302,7 @@ llvm::Value* GetField::emitLLVMCode(EmitLLVMCodeParams& params) const
 	if(this->struct_type->passByValue())
 	{
 		return params.builder->CreateExtractValue(
-			LLVMTypeUtils::getNthArg(params.currently_building_func, 0),
+			LLVMUtils::getNthArg(params.currently_building_func, 0),
 			this->index,
 			this->struct_type->component_names[this->index] // name
 		);
@@ -315,7 +315,7 @@ llvm::Value* GetField::emitLLVMCode(EmitLLVMCodeParams& params) const
 		if(field_type->passByValue())
 		{
 			// Pointer to structure will be in 0th argument.
-			llvm::Value* struct_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+			llvm::Value* struct_ptr = LLVMUtils::getNthArg(params.currently_building_func, 0);
 
 			llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, struct_ptr, this->index, field_name + " ptr");
 
@@ -333,14 +333,14 @@ llvm::Value* GetField::emitLLVMCode(EmitLLVMCodeParams& params) const
 		else
 		{
 			// Pointer to memory for return value will be 0th argument.
-			llvm::Value* return_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+			llvm::Value* return_ptr = LLVMUtils::getNthArg(params.currently_building_func, 0);
 
 			// Pointer to structure will be in 1st argument.
-			llvm::Value* struct_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
+			llvm::Value* struct_ptr = LLVMUtils::getNthArg(params.currently_building_func, 1);
 
 			llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, struct_ptr, this->index, field_name + " ptr");
 
-			LLVMTypeUtils::createCollectionCopy(
+			LLVMUtils::createCollectionCopy(
 				field_type, 
 				return_ptr, // dest ptr
 				field_ptr, // src ptr
@@ -400,16 +400,16 @@ llvm::Value* UpdateElementBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) 
 	if(collection_type->getType() == Type::ArrayTypeType)
 	{
 		// Pointer to memory for return value will be 0th argument.
-		llvm::Value* return_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+		llvm::Value* return_ptr = LLVMUtils::getNthArg(params.currently_building_func, 0);
 
 		// Pointer to structure will be in 1st argument.
-		llvm::Value* struct_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
+		llvm::Value* struct_ptr = LLVMUtils::getNthArg(params.currently_building_func, 1);
 
 		// Index will be in 2nd argument.
-		llvm::Value* index = LLVMTypeUtils::getNthArg(params.currently_building_func, 2);
+		llvm::Value* index = LLVMUtils::getNthArg(params.currently_building_func, 2);
 
 		// New val will be in 3rd argument.  TEMP: assuming pass by value.
-		llvm::Value* newval = LLVMTypeUtils::getNthArg(params.currently_building_func, 3);
+		llvm::Value* newval = LLVMUtils::getNthArg(params.currently_building_func, 3);
 
 
 		// Copy old collection to new collection
@@ -456,7 +456,7 @@ llvm::Value* GetTupleElementBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 	{
 		assert(0);
 		//return params.builder->CreateExtractValue(
-		//	LLVMTypeUtils::getNthArg(params.currently_building_func, 0),
+		//	LLVMUtils::getNthArg(params.currently_building_func, 0),
 		//	this->index,
 		//	this->tuple_type->component_names[this->index] // name
 		//);
@@ -470,7 +470,7 @@ llvm::Value* GetTupleElementBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 		if(field_type->passByValue())
 		{
 			// Pointer to structure will be in 0th argument.
-			llvm::Value* struct_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+			llvm::Value* struct_ptr = LLVMUtils::getNthArg(params.currently_building_func, 0);
 
 			llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, struct_ptr, this->index, field_name + " ptr");
 
@@ -488,14 +488,14 @@ llvm::Value* GetTupleElementBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 		else
 		{
 			// Pointer to memory for return value will be 0th argument.
-			llvm::Value* return_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+			llvm::Value* return_ptr = LLVMUtils::getNthArg(params.currently_building_func, 0);
 
 			// Pointer to structure will be in 1st argument.
-			llvm::Value* struct_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
+			llvm::Value* struct_ptr = LLVMUtils::getNthArg(params.currently_building_func, 1);
 
 			llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, struct_ptr, this->index, field_name + " ptr");
 
-			LLVMTypeUtils::createCollectionCopy(
+			LLVMUtils::createCollectionCopy(
 				field_type, 
 				return_ptr, // dest ptr
 				field_ptr, // src ptr
@@ -529,7 +529,7 @@ llvm::Value* GetVectorElement::emitLLVMCode(EmitLLVMCodeParams& params) const
 	llvm::Value* vec_value = NULL;
 	if(true) // TEMP shouldPassByValue(*this->type()))
 	{
-		vec_value = LLVMTypeUtils::getNthArg(
+		vec_value = LLVMUtils::getNthArg(
 			params.currently_building_func, 
 			0
 		);
@@ -537,7 +537,7 @@ llvm::Value* GetVectorElement::emitLLVMCode(EmitLLVMCodeParams& params) const
 	else
 	{
 		vec_value = params.builder->CreateLoad(
-			LLVMTypeUtils::getNthArg(params.currently_building_func, 0),
+			LLVMUtils::getNthArg(params.currently_building_func, 0),
 			false, // true,// TEMP: volatile = true to pick up returned vector);
 			"argument" // name
 		);
@@ -661,15 +661,15 @@ llvm::Value* ArrayMapBuiltInFunc::insertWorkFunction(EmitLLVMCodeParams& params)
 		
 
 	ArrayMapBuiltInFunc_CreateLoopBodyCallBack callback;
-	callback.return_ptr = LLVMTypeUtils::getNthArg(llvm_func, 0);
+	callback.return_ptr = LLVMUtils::getNthArg(llvm_func, 0);
 
 	// If we have a specialised function to use, insert a call to it directly, else used the function pointer passed in as an argument.
 	if(this->specialised_f)
 		callback.function = this->specialised_f->getOrInsertFunction(params.module, false);
 	else
-		callback.function = LLVMTypeUtils::getNthArg(llvm_func, 2);
+		callback.function = LLVMUtils::getNthArg(llvm_func, 2);
 
-	callback.input_array = LLVMTypeUtils::getNthArg(llvm_func, 1);
+	callback.input_array = LLVMUtils::getNthArg(llvm_func, 1);
 
 	//llvm_func->addAttribute(1, llvm::Attribute::getWithAlignment(*params.context, 3));
 	// Set some attributes
@@ -695,8 +695,8 @@ llvm::Value* ArrayMapBuiltInFunc::insertWorkFunction(EmitLLVMCodeParams& params)
 	makeForLoop(
 		builder,
 		params.module,
-		llvm::ConstantInt::get(*params.context, llvm::APInt(64, 0)), // TEMP BEGIN=0    LLVMTypeUtils::getNthArg(llvm_func, 3), // begin index
-		LLVMTypeUtils::getNthArg(llvm_func, 4), // end index
+		llvm::ConstantInt::get(*params.context, llvm::APInt(64, 0)), // TEMP BEGIN=0    LLVMUtils::getNthArg(llvm_func, 3), // begin index
+		LLVMUtils::getNthArg(llvm_func, 4), // end index
 		//from_type->elem_type->LLVMType(*params.module), // Loop value type
 		&callback
 	);
@@ -711,10 +711,10 @@ llvm::Value* ArrayMapBuiltInFunc::insertWorkFunction(EmitLLVMCodeParams& params)
 llvm::Value* ArrayMapBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
 	// Pointer to result array
-	llvm::Value* return_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+	llvm::Value* return_ptr = LLVMUtils::getNthArg(params.currently_building_func, 0);
 
 	// Closure ptr
-	/*llvm::Value* closure_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
+	/*llvm::Value* closure_ptr = LLVMUtils::getNthArg(params.currently_building_func, 1);
 
 	// Get function ptr from closure ptr
 	vector<llvm::Value*> indices(2);
@@ -728,7 +728,7 @@ llvm::Value* ArrayMapBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 	llvm::Value* function = params.builder->CreateLoad(function_ptr);*/
 
-	llvm::Value* closure_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
+	llvm::Value* closure_ptr = LLVMUtils::getNthArg(params.currently_building_func, 1);
 	llvm::Value* function_ptr = LLVMUtils::createStructGEP(params.builder, closure_ptr, Function::functionPtrIndex());
 	llvm::Value* function = params.builder->CreateLoad(function_ptr);
 	llvm::Value* captured_var_struct_ptr = LLVMUtils::createStructGEP(params.builder, closure_ptr, Function::capturedVarStructIndex());
@@ -740,7 +740,7 @@ llvm::Value* ArrayMapBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	//);
 
 	// Input array
-	llvm::Value* input_array = LLVMTypeUtils::getNthArg(params.currently_building_func, 2);
+	llvm::Value* input_array = LLVMUtils::getNthArg(params.currently_building_func, 2);
 
 
 
@@ -868,16 +868,16 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 
 	if(state_type->passByValue())
 	{
-		closure_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0); // Pointer to function
-		array_arg = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
-		initial_state_ptr_or_value = LLVMTypeUtils::getNthArg(params.currently_building_func, 2); // Pointer to, or value of initial state
+		closure_ptr = LLVMUtils::getNthArg(params.currently_building_func, 0); // Pointer to function
+		array_arg = LLVMUtils::getNthArg(params.currently_building_func, 1);
+		initial_state_ptr_or_value = LLVMUtils::getNthArg(params.currently_building_func, 2); // Pointer to, or value of initial state
 	}
 	else
 	{
-		return_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0); // Pointer to result structure
-		closure_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 1); // Pointer to function
-		array_arg = LLVMTypeUtils::getNthArg(params.currently_building_func, 2);
-		initial_state_ptr_or_value = LLVMTypeUtils::getNthArg(params.currently_building_func, 3); // Pointer to, or value of initial state
+		return_ptr = LLVMUtils::getNthArg(params.currently_building_func, 0); // Pointer to result structure
+		closure_ptr = LLVMUtils::getNthArg(params.currently_building_func, 1); // Pointer to function
+		array_arg = LLVMUtils::getNthArg(params.currently_building_func, 2);
+		initial_state_ptr_or_value = LLVMUtils::getNthArg(params.currently_building_func, 3); // Pointer to, or value of initial state
 	}
 
 	llvm::Value* function_ptr = LLVMUtils::createStructGEP(params.builder, closure_ptr, Function::functionPtrIndex());
@@ -1260,8 +1260,8 @@ ValueRef ArraySubscriptBuiltInFunc::invoke(VMState& vmstate)
 
 static llvm::Value* loadElement(EmitLLVMCodeParams& params, int arg_offset)
 {
-	llvm::Value* array_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, arg_offset + 0);
-	llvm::Value* index     = LLVMTypeUtils::getNthArg(params.currently_building_func, arg_offset + 1);
+	llvm::Value* array_ptr = LLVMUtils::getNthArg(params.currently_building_func, arg_offset + 0);
+	llvm::Value* index     = LLVMUtils::getNthArg(params.currently_building_func, arg_offset + 1);
 
 	llvm::Value* indices[] = {
 		llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0)), // get the array
@@ -1283,8 +1283,8 @@ static llvm::Value* loadElement(EmitLLVMCodeParams& params, int arg_offset)
 // Returns a vector value
 static llvm::Value* loadGatherElements(EmitLLVMCodeParams& params, int arg_offset, const TypeVRef& array_elem_type, int index_vec_num_elems)
 {
-	llvm::Value* array_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, arg_offset + 0);
-	llvm::Value* index_vec = LLVMTypeUtils::getNthArg(params.currently_building_func, arg_offset + 1);
+	llvm::Value* array_ptr = LLVMUtils::getNthArg(params.currently_building_func, arg_offset + 0);
+	llvm::Value* index_vec = LLVMUtils::getNthArg(params.currently_building_func, arg_offset + 1);
 
 	// We have a single ptr, we need to shuffle it to an array of ptrs.
 
@@ -1379,7 +1379,7 @@ llvm::Value* ArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 
 	// Bounds check the index
 	const int arg_offset = field_type->passByValue() ? 0 : 1;
-	llvm::Value* index     = LLVMTypeUtils::getNthArg(params.currently_building_func, arg_offset + 1);
+	llvm::Value* index     = LLVMUtils::getNthArg(params.currently_building_func, arg_offset + 1);
 
 	const bool do_bounds_check = false;//TEMP
 
@@ -1458,7 +1458,7 @@ llvm::Value* ArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 		else // Else if element type is pass-by-pointer
 		{
 			// Pointer to memory for return value will be 0th argument.
-			llvm::Value* return_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+			llvm::Value* return_ptr = LLVMUtils::getNthArg(params.currently_building_func, 0);
 
 			// Store the element
 			params.builder->CreateStore(
@@ -1484,7 +1484,7 @@ llvm::Value* ArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 			else // Else if element type is pass-by-pointer
 			{
 				// Pointer to memory for return value will be 0th argument.
-				llvm::Value* return_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+				llvm::Value* return_ptr = LLVMUtils::getNthArg(params.currently_building_func, 0);
 
 				llvm::Value* elem_val = loadElement(
 					params, 
@@ -1506,7 +1506,7 @@ llvm::Value* ArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 			// Since we are returning a vector, and we are assuming vectors are not pass by pointer, we know the return type is not pass by pointer.
 			
 			// Pointer to memory for return value will be 0th argument.
-			//llvm::Value* return_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+			//llvm::Value* return_ptr = LLVMUtils::getNthArg(params.currently_building_func, 0);
 
 			llvm::Value* result_vector = loadGatherElements(
 				params, 
@@ -1591,7 +1591,7 @@ llvm::Value* VArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 	TypeVRef field_type = this->array_type->elem_type;
 
 	const int arg_offset = field_type->passByValue() ? 0 : 1;
-	llvm::Value* index     = LLVMTypeUtils::getNthArg(params.currently_building_func, arg_offset + 1);
+	llvm::Value* index     = LLVMUtils::getNthArg(params.currently_building_func, arg_offset + 1);
 
 	
 	if(index_type->getType() == Type::IntType)
@@ -1600,7 +1600,7 @@ llvm::Value* VArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 
 		if(field_type->passByValue())
 		{
-			llvm::Value* varray_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, arg_offset + 0);
+			llvm::Value* varray_ptr = LLVMUtils::getNthArg(params.currently_building_func, arg_offset + 0);
 			
 			//varray_ptr->dump();
 			//varray_ptr->getType()->dump();
@@ -1618,9 +1618,9 @@ llvm::Value* VArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 		else // Else if element type is pass-by-pointer
 		{
 			// Pointer to memory for return value will be 0th argument.
-			llvm::Value* return_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+			llvm::Value* return_ptr = LLVMUtils::getNthArg(params.currently_building_func, 0);
 
-			llvm::Value* varray_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, arg_offset + 0);
+			llvm::Value* varray_ptr = LLVMUtils::getNthArg(params.currently_building_func, arg_offset + 0);
 			llvm::Value* data_ptr = LLVMUtils::createStructGEP(params.builder, varray_ptr, 3, "data_ptr"); // [0 x T]*
 
 			llvm::Value* indices[] = { llvm::ConstantInt::get(*params.context, llvm::APInt(64, 0)), index };
@@ -1713,8 +1713,8 @@ public:
 
 llvm::Value* MakeVArrayBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
-	llvm::Value* elem_val  = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
-	llvm::Value* count_val = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
+	llvm::Value* elem_val  = LLVMUtils::getNthArg(params.currently_building_func, 0);
+	llvm::Value* count_val = LLVMUtils::getNthArg(params.currently_building_func, 1);
 
 	// Make call to allocateVArray
 
@@ -1825,8 +1825,8 @@ llvm::Value* VectorSubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 	// Vector elements are also pass-by-value.
 
 	// Bounds check the index
-	llvm::Value* vec       = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
-	llvm::Value* index     = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
+	llvm::Value* vec       = LLVMUtils::getNthArg(params.currently_building_func, 0);
+	llvm::Value* index     = LLVMUtils::getNthArg(params.currently_building_func, 1);
 
 	const bool do_bounds_check = false;//TEMP
 
@@ -1898,7 +1898,7 @@ llvm::Value* VectorSubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 		else // Else if element type is pass-by-pointer
 		{
 			// Pointer to memory for return value will be 0th argument.
-			llvm::Value* return_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+			llvm::Value* return_ptr = LLVMUtils::getNthArg(params.currently_building_func, 0);
 
 			// Store the element
 			params.builder->CreateStore(
@@ -1948,7 +1948,7 @@ llvm::Value* ArrayInBoundsBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) 
 
 	// Bounds check the index
 	const int arg_offset = field_type->passByValue() ? 0 : 1;
-	llvm::Value* index     = LLVMTypeUtils::getNthArg(params.currently_building_func, arg_offset + 1);
+	llvm::Value* index     = LLVMUtils::getNthArg(params.currently_building_func, arg_offset + 1);
 
 	// Create bounds check condition code
 	return params.builder->CreateAnd(
@@ -1986,7 +1986,7 @@ llvm::Value* VectorInBoundsBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 
 	// Bounds check the index
 	const int arg_offset = field_type->passByValue() ? 0 : 1;
-	llvm::Value* index     = LLVMTypeUtils::getNthArg(params.currently_building_func, arg_offset + 1);
+	llvm::Value* index     = LLVMUtils::getNthArg(params.currently_building_func, arg_offset + 1);
 
 	// Create bounds check condition code
 	return params.builder->CreateAnd(
@@ -2099,18 +2099,18 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 	if(state_type->passByValue())
 	{
-		closure_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0); // Pointer to function
-		initial_state_ptr_or_value = LLVMTypeUtils::getNthArg(params.currently_building_func, 1); // Pointer to, or value of initial state
+		closure_ptr = LLVMUtils::getNthArg(params.currently_building_func, 0); // Pointer to function
+		initial_state_ptr_or_value = LLVMUtils::getNthArg(params.currently_building_func, 1); // Pointer to, or value of initial state
 		for(size_t i=0; i<invariant_data_types.size(); ++i)
-			invariant_data_ptr_or_value[i] = LLVMTypeUtils::getNthArg(params.currently_building_func, 2 + (int)i); // Pointer to, or value of invariant_data
+			invariant_data_ptr_or_value[i] = LLVMUtils::getNthArg(params.currently_building_func, 2 + (int)i); // Pointer to, or value of invariant_data
 	}
 	else
 	{
-		return_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0); // Pointer to result structure
-		closure_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 1); // Pointer to function
-		initial_state_ptr_or_value = LLVMTypeUtils::getNthArg(params.currently_building_func, 2); // Pointer to, or value of initial state
+		return_ptr = LLVMUtils::getNthArg(params.currently_building_func, 0); // Pointer to result structure
+		closure_ptr = LLVMUtils::getNthArg(params.currently_building_func, 1); // Pointer to function
+		initial_state_ptr_or_value = LLVMUtils::getNthArg(params.currently_building_func, 2); // Pointer to, or value of initial state
 		for(size_t i=0; i<invariant_data_types.size(); ++i)
-			invariant_data_ptr_or_value[i] = LLVMTypeUtils::getNthArg(params.currently_building_func, 3 + (int)i); // Pointer to, or value of invariant_data
+			invariant_data_ptr_or_value[i] = LLVMUtils::getNthArg(params.currently_building_func, 3 + (int)i); // Pointer to, or value of invariant_data
 	}
 
 
@@ -2382,8 +2382,8 @@ ValueRef DotProductBuiltInFunc::invoke(VMState& vmstate)
 
 llvm::Value* DotProductBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
-	llvm::Value* a = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
-	llvm::Value* b = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
+	llvm::Value* a = LLVMUtils::getNthArg(params.currently_building_func, 0);
+	llvm::Value* b = LLVMUtils::getNthArg(params.currently_building_func, 1);
 
 	// If have SSE4.1 and this is a 4-vector of floats, using DPPS instruction
 	if(vector_type->elem_type->getType() == Type::FloatType && this->vector_type->num == 4 && params.cpu_info->sse4_1)
@@ -2574,8 +2574,8 @@ ValueRef VectorMinBuiltInFunc::invoke(VMState& vmstate)
 
 llvm::Value* VectorMinBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
-	llvm::Value* a = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
-	llvm::Value* b = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
+	llvm::Value* a = LLVMUtils::getNthArg(params.currently_building_func, 0);
+	llvm::Value* b = LLVMUtils::getNthArg(params.currently_building_func, 1);
 
 	llvm::Value* condition;
 	
@@ -2687,8 +2687,8 @@ ValueRef VectorMaxBuiltInFunc::invoke(VMState& vmstate)
 
 llvm::Value* VectorMaxBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
-	llvm::Value* a = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
-	llvm::Value* b = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
+	llvm::Value* a = LLVMUtils::getNthArg(params.currently_building_func, 0);
+	llvm::Value* b = LLVMUtils::getNthArg(params.currently_building_func, 1);
 
 	llvm::Value* condition;
 	if(this->vector_type->elem_type->getType() == Type::FloatType || this->vector_type->elem_type->getType() == Type::DoubleType)
@@ -2736,8 +2736,8 @@ ValueRef ShuffleBuiltInFunc::invoke(VMState& vmstate)
 
 llvm::Value* ShuffleBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
-	llvm::Value* a = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
-	//llvm::Value* index_vec = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
+	llvm::Value* a = LLVMUtils::getNthArg(params.currently_building_func, 0);
+	//llvm::Value* index_vec = LLVMUtils::getNthArg(params.currently_building_func, 1);
 
 
 	llvm::Constant* mask;
@@ -2819,8 +2819,8 @@ ValueRef PowBuiltInFunc::invoke(VMState& vmstate)
 llvm::Value* PowBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
 	llvm::Value* args[] = {
-		LLVMTypeUtils::getNthArg(params.currently_building_func, 0),
-		LLVMTypeUtils::getNthArg(params.currently_building_func, 1),
+		LLVMUtils::getNthArg(params.currently_building_func, 0),
+		LLVMUtils::getNthArg(params.currently_building_func, 1),
 	};
 
 	llvm::Type* types[] = { this->type->LLVMType(*params.module) };
@@ -2844,7 +2844,7 @@ static llvm::Value* emitUnaryIntrinsic(EmitLLVMCodeParams& params, const TypeVRe
 {
 	assert(type->getType() == Type::FloatType || type->getType() == Type::DoubleType || (type->getType() == Type::VectorTypeType));
 
-	llvm::Value* args[] = { LLVMTypeUtils::getNthArg(params.currently_building_func, 0) };
+	llvm::Value* args[] = { LLVMUtils::getNthArg(params.currently_building_func, 0) };
 
 	llvm::Type* types[] = { type->LLVMType(*params.module) };
 
@@ -3240,7 +3240,7 @@ llvm::Value* SignBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 		one  = scalar_one;
 	}
 
-	llvm::Value* arg0 = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+	llvm::Value* arg0 = LLVMUtils::getNthArg(params.currently_building_func, 0);
 
 	llvm::Value* magnitude = params.builder->CreateSelect(
 		params.builder->CreateFCmpOEQ(arg0, zero), // condition: arg0 == zero
@@ -3305,7 +3305,7 @@ llvm::Value* TruncateToIntBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) 
 	llvm::Type* dest_llvm_type = dest_type->LLVMType(*params.module);
 
 	return params.builder->CreateFPToSI(
-		LLVMTypeUtils::getNthArg(params.currently_building_func, 0), 
+		LLVMUtils::getNthArg(params.currently_building_func, 0), 
 		dest_llvm_type
 	);
 }
@@ -3353,12 +3353,12 @@ llvm::Value* ToFloatBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	{
 		if(type.downcastToPtr<Int>()->is_signed)
 			return params.builder->CreateSIToFP(
-				LLVMTypeUtils::getNthArg(params.currently_building_func, 0),
+				LLVMUtils::getNthArg(params.currently_building_func, 0),
 				dest_llvm_type // dest type
 			);
 		else
 			return params.builder->CreateUIToFP(
-				LLVMTypeUtils::getNthArg(params.currently_building_func, 0),
+				LLVMUtils::getNthArg(params.currently_building_func, 0),
 				dest_llvm_type // dest type
 			);
 	}
@@ -3368,12 +3368,12 @@ llvm::Value* ToFloatBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 		if(type.downcastToPtr<VectorType>()->elem_type.downcastToPtr<Int>()->is_signed)
 			return params.builder->CreateSIToFP(
-				LLVMTypeUtils::getNthArg(params.currently_building_func, 0),
+				LLVMUtils::getNthArg(params.currently_building_func, 0),
 				dest_llvm_type // dest type
 			);
 		else
 			return params.builder->CreateUIToFP(
-				LLVMTypeUtils::getNthArg(params.currently_building_func, 0),
+				LLVMUtils::getNthArg(params.currently_building_func, 0),
 				dest_llvm_type // dest type
 			);
 	}
@@ -3421,7 +3421,7 @@ llvm::Value* ToDoubleBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	llvm::Type* dest_llvm_type = dest_type->LLVMType(*params.module);
 
 	return params.builder->CreateSIToFP(
-		LLVMTypeUtils::getNthArg(params.currently_building_func, 0), 
+		LLVMUtils::getNthArg(params.currently_building_func, 0), 
 		dest_llvm_type // dest type
 	);
 }
@@ -3450,7 +3450,7 @@ llvm::Value* ToInt64BuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	llvm::Type* dest_llvm_type = dest_type->LLVMType(*params.module);
 
 	return params.builder->CreateSExt(
-		LLVMTypeUtils::getNthArg(params.currently_building_func, 0), 
+		LLVMUtils::getNthArg(params.currently_building_func, 0), 
 		dest_llvm_type // dest type
 	);
 }
@@ -3483,7 +3483,7 @@ llvm::Value* ToInt32BuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	llvm::Type* dest_llvm_type = dest_type->LLVMType(*params.module);
 
 	return params.builder->CreateTrunc(
-		LLVMTypeUtils::getNthArg(params.currently_building_func, 0), 
+		LLVMUtils::getNthArg(params.currently_building_func, 0), 
 		dest_llvm_type // dest type
 	);
 }
@@ -3509,7 +3509,7 @@ llvm::Value* VoidPtrToInt64BuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 {
 	TypeVRef int_type = new Int(64, true);
 	return params.builder->CreatePtrToInt(
-		LLVMTypeUtils::getNthArg(params.currently_building_func, 0), 
+		LLVMUtils::getNthArg(params.currently_building_func, 0), 
 		int_type->LLVMType(*params.module) // dest type
 	);
 }
@@ -3550,7 +3550,7 @@ llvm::Value* LengthBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 		return llvm::ConstantInt::get(*params.context, llvm::APInt(64, type.downcastToPtr<ArrayType>()->num_elems));
 	case Type::VArrayTypeType:
 		{
-			llvm::Value* varray_ptr = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
+			llvm::Value* varray_ptr = LLVMUtils::getNthArg(params.currently_building_func, 0);
 			llvm::Value* len_field_ptr = LLVMUtils::createStructGEP(params.builder, varray_ptr, 1, "len_field_ptr");
 			return params.builder->CreateLoad(len_field_ptr, false, "len_value");
 		}
@@ -3993,8 +3993,8 @@ static llvm::Value* emitElemCompareEqualLLVMCode(llvm::IRBuilder<>* builder, llv
 
 llvm::Value* CompareEqualBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
-	llvm::Value* a_code = LLVMTypeUtils::getNthArg(params.currently_building_func, 0);
-	llvm::Value* b_code = LLVMTypeUtils::getNthArg(params.currently_building_func, 1);
+	llvm::Value* a_code = LLVMUtils::getNthArg(params.currently_building_func, 0);
+	llvm::Value* b_code = LLVMUtils::getNthArg(params.currently_building_func, 1);
 
 	switch(arg_type->getType())
 	{
