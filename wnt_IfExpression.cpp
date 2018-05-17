@@ -387,4 +387,11 @@ bool IfExpression::isConstant() const
 }
 
 
+size_t IfExpression::getTimeBound(GetTimeBoundParams& params) const
+{
+	// Assuming we don't know the value of condition here.
+	return this->condition->getTimeBound(params) + myMax(this->then_expr->getTimeBound(params), this->else_expr->getTimeBound(params)) + 1;
+}
+
+
 } // end namespace Winter

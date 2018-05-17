@@ -446,4 +446,18 @@ bool ArrayLiteral::isConstant() const
 }
 
 
+size_t ArrayLiteral::getTimeBound(GetTimeBoundParams& params) const
+{
+	if(has_int_suffix)
+		return elements[0]->getTimeBound(params) + int_suffix; // Time to compute elem 0 and then copy time.
+	else
+	{
+		size_t sum = 0;
+		for(size_t i=0; i<elements.size(); ++i)
+			sum += elements[i]->getTimeBound(params);
+		return sum;
+	}
+}
+
+
 } // end namespace Winter

@@ -15,8 +15,8 @@ class ProofUtils
 {
 public:
 
-	static IntervalSetInt64 getInt64Range(TraversalPayload& payload, std::vector<ASTNode*>& stack, const ASTNodeRef& integer_value);
-	static IntervalSetFloat getFloatRange(TraversalPayload& payload, std::vector<ASTNode*>& stack, const ASTNodeRef& integer_value);
+	static IntervalSetInt64 getInt64Range(std::vector<ASTNode*>& stack, const ASTNodeRef& integer_value);
+	static IntervalSetFloat getFloatRange(std::vector<ASTNode*>& stack, const ASTNodeRef& integer_value);
 };
 
 

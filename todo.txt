@@ -1,3 +1,5 @@
+TODO: add min and max functions for scalar types.
+
 TODO: Finish defining == and != operators for all types, including varry types.
 
 TODO: move constructor, get elem creation etc.. from LangParser to VirtualMachine, like compare_equal creation.

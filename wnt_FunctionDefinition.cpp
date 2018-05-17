@@ -1532,6 +1532,23 @@ bool FunctionDefinition::isConstant() const
 }
 
 
+size_t FunctionDefinition::getTimeBound(GetTimeBoundParams& params) const
+{
+	
+	if(built_in_func_impl.nonNull())
+	{
+		return built_in_func_impl->getTimeBound(params);
+	}
+	else if(external_function.nonNull())
+		return external_function->time_bound;
+	else
+	{
+		return this->body->getTimeBound(params);
+	}
+	
+}
+
+
 //llvm::Type* FunctionDefinition::getClosureStructLLVMType(llvm::LLVMContext& context) const
 //{
 //	vector<const llvm::Type*> field_types;

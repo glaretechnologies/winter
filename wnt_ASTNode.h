@@ -267,6 +267,11 @@ public:
 };
 
 
+struct GetTimeBoundParams
+{
+};
+
+
 class SrcLocation
 {
 public:
@@ -365,6 +370,8 @@ public:
 	// For example, elem(a, i) may not be proven defined yet.
 	virtual bool provenDefined() const { return true; }
 
+	virtual size_t getTimeBound(GetTimeBoundParams& params) const = 0;
+
 
 	const SrcLocation& srcLocation() const { return location; }
 
@@ -413,6 +420,7 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
+	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 
 };
 
@@ -430,6 +438,7 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const { return true; }
+	virtual size_t getTimeBound(GetTimeBoundParams& params) const { return 1; }
 
 	float value;
 };
@@ -448,6 +457,7 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const { return true; }
+	virtual size_t getTimeBound(GetTimeBoundParams& params) const { return 1; }
 
 	double value;
 };
@@ -469,6 +479,7 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const { return true; }
+	virtual size_t getTimeBound(GetTimeBoundParams& params) const { return 1; }
 };
 
 
@@ -487,6 +498,7 @@ public:
 	//virtual void emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* val) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const { return true; }
+	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 
 	std::string value;
 };
@@ -507,6 +519,7 @@ public:
 	//virtual void emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* val) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const { return true; }
+	virtual size_t getTimeBound(GetTimeBoundParams& params) const { return 1; }
 
 	std::string value; // utf-8 encoded char.
 };
@@ -526,6 +539,7 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const { return true; }
+	virtual size_t getTimeBound(GetTimeBoundParams& params) const { return 1; }
 };
 
 
@@ -543,6 +557,7 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
+	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 
 
 
@@ -565,6 +580,7 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
+	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 
 	bool typeCheck(TraversalPayload& payload) const;
 
@@ -589,6 +605,7 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
+	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 
 	bool typeCheck(TraversalPayload& payload) const;
 
@@ -613,6 +630,7 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
+	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 
 	bool typeCheck(TraversalPayload& payload) const;
 
@@ -638,6 +656,7 @@ public:
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual bool provenDefined() const;
+	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 
 	bool typeCheck(TraversalPayload& payload) const;
 
@@ -675,6 +694,7 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
+	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 
 private:
 	const std::string opToken() const;
@@ -704,6 +724,7 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
+	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 
 	Type t;
 	ASTNodeRef a;
@@ -725,6 +746,7 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
+	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 
 	ASTNodeRef expr;
 };
@@ -745,6 +767,7 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
+	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 
 	ASTNodeRef expr;
 };
@@ -765,6 +788,7 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
+	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 
 	const std::string getOverloadedFuncName() const; // returns e.g. op_lt, op_gt   etc..
 
@@ -792,6 +816,7 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
+	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 	
 	ASTNodeRef subscript_expr;
 };
@@ -814,6 +839,7 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
+	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 
 	TypeRef declared_type; // May be NULL if no type was declared.
 	std::string name;

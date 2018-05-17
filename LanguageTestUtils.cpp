@@ -326,6 +326,20 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 		float(WINTER_JIT_CALLING_CONV*f)(float, void*) = (float(WINTER_JIT_CALLING_CONV*)(float, void*))vm.getJittedFunction(mainsig);
 
 
+		conPrint("==================== original src: =====================");
+		conPrint(src);
+		conPrint("========================================================");
+		try
+		{
+			GetTimeBoundParams params;
+			conPrint("Time bound: " + toString(maindef->getTimeBound(params)) + " virtual cycles");
+		}
+		catch(BaseException& e)
+		{
+			conPrint("Exception: " + e.what());
+		}
+		conPrint("");
+
 
 		// Call the JIT'd function
 		const float jitted_result = f(argument, &test_env);
@@ -1063,6 +1077,16 @@ void testMainInt64Arg(const std::string& src, int64 x, int64 target_return_val, 
 
 		// Get main function
 		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
+
+		/*try
+		{
+			GetTimeBoundParams params;
+			printVar(maindef->getTimeBound(params));
+		}
+		catch(BaseException& e)
+		{
+			conPrint("Exception: " + e.what());
+		}*/
 
 		int64 (WINTER_JIT_CALLING_CONV *f)(int64, void*) = (int64 (WINTER_JIT_CALLING_CONV *)(int64, void*)) vm.getJittedFunction(mainsig);
 

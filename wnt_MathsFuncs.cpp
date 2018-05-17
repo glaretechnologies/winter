@@ -177,119 +177,136 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		(void*)tanf, // func
 		tanFloatInterpreted, // interpreted func
 		FunctionSignature("tan", vector<TypeVRef>(1, float_type)), // function signature
-		float_type // return type
+		float_type, // return type
+		30 // time_bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)(double(*)(double))tan, // func - Use cast to pick the correct overload.
 		tanDoubleInterpreted, // interpreted func
 		FunctionSignature("tan", vector<TypeVRef>(1, double_type)), // function signature
-		double_type // return type
+		double_type, // return type
+		30 // time_bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)asinf,
 		asinInterpreted,
 		FunctionSignature("asin", vector<TypeVRef>(1, float_type)),
-		float_type
+		float_type,
+		30 // time_bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)(double(*)(double))asin,
 		asinDoubleInterpreted,
 		FunctionSignature("asin", vector<TypeVRef>(1, double_type)),
-		double_type
+		double_type,
+		30 // time_bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)acosf,
 		acosInterpreted,
 		FunctionSignature("acos", vector<TypeVRef>(1, float_type)),
-		float_type
+		float_type,
+		30 // time_bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)(double(*)(double))acos,
 		acosDoubleInterpreted,
 		FunctionSignature("acos", vector<TypeVRef>(1, double_type)),
-		double_type
+		double_type,
+		30 // time_bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)atanf,
 		atanInterpreted,
 		FunctionSignature("atan", vector<TypeVRef>(1, float_type)),
-		float_type
+		float_type,
+		30 // time_bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)(double(*)(double))atan,
 		atanDoubleInterpreted,
 		FunctionSignature("atan", vector<TypeVRef>(1, double_type)),
-		double_type
+		double_type,
+		30 // time_bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)atan2f,
 		atan2Interpreted,
 		FunctionSignature("atan2", vector<TypeVRef>(2, float_type)),
-		float_type
+		float_type,
+		60 // time_bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)(double(*)(double, double))atan2,
 		atan2DoubleInterpreted,
 		FunctionSignature("atan2", vector<TypeVRef>(2, double_type)),
-		double_type
+		double_type,
+		60 // time_bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)Maths::floatMod,
 		floatModInterpreted,
 		FunctionSignature("mod", vector<TypeVRef>(2, float_type)),
-		float_type
+		float_type,
+		10 // time_bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)Maths::doubleMod,
 		doubleModInterpreted,
 		FunctionSignature("mod", vector<TypeVRef>(2, double_type)),
-		double_type
+		double_type,
+		10 // time_bound
 	));
 	
 	external_functions.push_back(new ExternalFunction(
 		(void*)Maths::intMod,
 		intModInterpreted,
 		FunctionSignature("mod", vector<TypeVRef>(2, int_type)),
-		int_type
+		int_type,
+		10 // time_bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)(bool(*)(float))::isFinite,
 		isFiniteInterpreted,
 		FunctionSignature("isFinite", vector<TypeVRef>(1, float_type)),
-		bool_type // return type
+		bool_type, // return type
+		10 // time_bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)(bool(*)(double))::isFinite,
 		isFiniteDoubleInterpreted,
 		FunctionSignature("isFinite", vector<TypeVRef>(1, double_type)),
-		bool_type // return type
+		bool_type, // return type
+		10 // time_bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)(bool(*)(float))::isNAN,
 		isNANInterpreted,
 		FunctionSignature("isNAN", vector<TypeVRef>(1, float_type)),
-		bool_type // return type
+		bool_type, // return type
+		10 // time_bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)(bool(*)(double))::isNAN,
 		isNANDoubleInterpreted,
 		FunctionSignature("isNAN", vector<TypeVRef>(1, double_type)),
-		bool_type // return type
+		bool_type, // return type
+		10 // time_bound
 	));
 }
 

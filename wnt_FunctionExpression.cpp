@@ -915,7 +915,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 				//int i_upper = std::numeric_limits<int32>::max();
 				//Vec2<int> i_bounds(std::numeric_limits<int32>::min(), std::numeric_limits<int32>::max());
 
-				const IntervalSetInt64 i_bounds = ProofUtils::getInt64Range(payload, stack, 
+				const IntervalSetInt64 i_bounds = ProofUtils::getInt64Range(stack, 
 					this->argument_expressions[1] // integer value
 				);
 
@@ -1062,7 +1062,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 			{
 				// Else index is not known at compile time.
 
-				const IntervalSetInt64 i_bounds = ProofUtils::getInt64Range(payload, stack, 
+				const IntervalSetInt64 i_bounds = ProofUtils::getInt64Range(stack, 
 					this->argument_expressions[1] // integer value
 				);
 
@@ -1204,7 +1204,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 				{
 					// Else index is not known at compile time.
 				
-					const IntervalSetInt64 i_bounds = ProofUtils::getInt64Range(payload, stack, 
+					const IntervalSetInt64 i_bounds = ProofUtils::getInt64Range(stack, 
 						this->argument_expressions[1] // integer value
 					);
 
@@ -1277,7 +1277,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 			{
 				// Else index is not known at compile time.
 				
-				const IntervalSetInt64 i_bounds = ProofUtils::getInt64Range(payload, stack, 
+				const IntervalSetInt64 i_bounds = ProofUtils::getInt64Range(stack, 
 					this->argument_expressions[1] // integer value
 				);
 
@@ -1313,7 +1313,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 		{
 			// Else index is not known at compile time.
 			
-			const IntervalSetInt64 i_bounds = ProofUtils::getInt64Range(payload, stack, 
+			const IntervalSetInt64 i_bounds = ProofUtils::getInt64Range(stack, 
 				this->argument_expressions[0] // integer value
 			);
 
@@ -2003,12 +2003,64 @@ bool FunctionExpression::isConstant() const
 	if(!static_target_function)
 		return false;
 
-	for(unsigned int i=0; i<argument_expressions.size(); ++i)
+	for(size_t i=0; i<argument_expressions.size(); ++i)
 		if(!argument_expressions[i]->isConstant())
 			return false;
 
 	return true;
 }
 
+
+size_t FunctionExpression::getTimeBound(GetTimeBoundParams& params) const
+{
+	size_t arg_eval_bound = 0;
+	for(size_t i=0; i<argument_expressions.size(); ++i)
+		arg_eval_bound += argument_expressions[i]->getTimeBound(params);
+
+	if(static_target_function)
+	{
+		if(static_target_function->built_in_func_impl.nonNull() &&
+			static_target_function->built_in_func_impl->builtInType() == BuiltInFunctionImpl::BuiltInType_MakeVArrayBuiltInFunc)
+		{
+			if(this->argument_expressions[1]->isConstant())
+			{
+				// Evaluate the index expression
+				VMState vmstate;
+				vmstate.func_args_start.push_back(0);
+
+				ValueRef retval = this->argument_expressions[1]->exec(vmstate);
+
+				const int64 arg_1_val = checkedCast<IntValue>(retval)->value;
+
+				return arg_1_val;
+			}
+			else
+			{
+				// Else arg 1 (count) is not known at compile time.
+
+				//const IntervalSetInt64 i_bounds = ProofUtils::getInt64Range((std::vector<ASTNode*>&)params.stack,
+				//	this->argument_expressions[1] // integer value
+				//);
+				//
+				//return i_bounds.upper();
+			}
+		}
+
+		try
+		{
+			return arg_eval_bound + static_target_function->getTimeBound(params);
+		}
+		catch(BaseException& e)
+		{
+			throw BaseException(e.what() + errorContext(this->srcLocation()));
+		}
+	}
+	else
+	{
+		// TODO: Compute a maximum over all functions that this expression may be calling.
+		//TEMP:
+		throw BaseException("Unable to bound time of function expression." + errorContext(this->srcLocation()));
+	}
+}
 
 } // end namespace Winter

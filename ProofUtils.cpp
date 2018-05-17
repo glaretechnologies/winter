@@ -11,7 +11,7 @@ namespace Winter
 {
 
 
-static const IntervalSetInt64 updateIndexBounds(TraversalPayload& payload, const ComparisonExpression& comp_expr, const ASTNodeRef& index, const IntervalSetInt64& bounds)
+static const IntervalSetInt64 updateIndexBounds(const ComparisonExpression& comp_expr, const ASTNodeRef& index, const IntervalSetInt64& bounds)
 {
 	// We know comp_expr is of type 'i T x' where T is some comparison token
 
@@ -88,7 +88,7 @@ static float myNextFloat(float x)
 
 
 
-static const IntervalSetFloat updateBounds(TraversalPayload& payload, const ComparisonExpression& comp_expr, const ASTNodeRef& index, const IntervalSetFloat& bounds)
+static const IntervalSetFloat updateBounds(const ComparisonExpression& comp_expr, const ASTNodeRef& index, const IntervalSetFloat& bounds)
 {
 	// We know comp_expr is of type 'i T x' where T is some comparison token
 
@@ -131,7 +131,7 @@ static const IntervalSetFloat updateBounds(TraversalPayload& payload, const Comp
 }
 
 
-IntervalSetInt64 ProofUtils::getInt64Range(TraversalPayload& payload, std::vector<ASTNode*>& stack, const ASTNodeRef& integer_value)
+IntervalSetInt64 ProofUtils::getInt64Range(std::vector<ASTNode*>& stack, const ASTNodeRef& integer_value)
 {
 	// Lower and upper inclusive bounds
 	IntervalSetInt64 bounds;
@@ -220,21 +220,21 @@ IntervalSetInt64 ProofUtils::getInt64Range(TraversalPayload& payload, std::vecto
 						if(bin->a->nodeType() == ASTNode::ComparisonExpressionType)
 						{
 							ComparisonExpression* a = static_cast<ComparisonExpression*>(bin->a.getPointer());
-							bounds = updateIndexBounds(payload, *a, integer_value, bounds);
+							bounds = updateIndexBounds(*a, integer_value, bounds);
 						}
 
 						// Process B
 						if(bin->b->nodeType() == ASTNode::ComparisonExpressionType)
 						{
 							ComparisonExpression* b = static_cast<ComparisonExpression*>(bin->b.getPointer());
-							bounds = updateIndexBounds(payload, *b, integer_value, bounds);
+							bounds = updateIndexBounds(*b, integer_value, bounds);
 						}
 					}
 				}
 				else if(if_node->condition->nodeType() == ASTNode::ComparisonExpressionType)
 				{
 					ComparisonExpression* comp = static_cast<ComparisonExpression*>(if_node->condition.getPointer());
-					bounds = updateIndexBounds(payload, *comp, integer_value, bounds);
+					bounds = updateIndexBounds(*comp, integer_value, bounds);
 				}
 			}
 		}
@@ -244,7 +244,7 @@ IntervalSetInt64 ProofUtils::getInt64Range(TraversalPayload& payload, std::vecto
 }
 
 
-IntervalSetFloat ProofUtils::getFloatRange(TraversalPayload& payload, std::vector<ASTNode*>& stack, const ASTNodeRef& float_value)
+IntervalSetFloat ProofUtils::getFloatRange(std::vector<ASTNode*>& stack, const ASTNodeRef& float_value)
 {
 	// Lower and upper inclusive bounds
 	IntervalSetFloat bounds(-std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity());
@@ -284,21 +284,21 @@ IntervalSetFloat ProofUtils::getFloatRange(TraversalPayload& payload, std::vecto
 						if(bin->a->nodeType() == ASTNode::ComparisonExpressionType)
 						{
 							ComparisonExpression* a = static_cast<ComparisonExpression*>(bin->a.getPointer());
-							bounds = updateBounds(payload, *a, float_value, bounds);
+							bounds = updateBounds(*a, float_value, bounds);
 						}
 
 						// Process B
 						if(bin->b->nodeType() == ASTNode::ComparisonExpressionType)
 						{
 							ComparisonExpression* b = static_cast<ComparisonExpression*>(bin->b.getPointer());
-							bounds = updateBounds(payload, *b, float_value, bounds);
+							bounds = updateBounds(*b, float_value, bounds);
 						}
 					}
 				}
 				else if(if_node->condition->nodeType() == ASTNode::ComparisonExpressionType)
 				{
 					ComparisonExpression* comp = static_cast<ComparisonExpression*>(if_node->condition.getPointer());
-					bounds = updateBounds(payload, *comp, float_value, bounds);
+					bounds = updateBounds(*comp, float_value, bounds);
 				}
 			}
 		}

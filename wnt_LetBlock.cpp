@@ -463,6 +463,16 @@ bool LetBlock::isConstant() const
 }
 
 
+size_t LetBlock::getTimeBound(GetTimeBoundParams& params) const
+{
+	size_t sum = 0;
+	for(size_t i=0; i<lets.size(); ++i)
+		sum += lets[i]->getTimeBound(params);
+
+	return sum + expr->getTimeBound(params);
+}
+
+
 //llvm::Value* LetBlock::getLetExpressionLLVMValue(EmitLLVMCodeParams& params, unsigned int let_index, llvm::Value* ret_space_ptr)
 //{
 	/*if(let_exprs_llvm_value[let_index] == NULL)

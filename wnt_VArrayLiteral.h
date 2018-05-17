@@ -35,6 +35,7 @@ public:
 	virtual void emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* val) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
+	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 
 
 	size_t numElementsInValue() const;

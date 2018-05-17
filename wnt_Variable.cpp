@@ -689,4 +689,11 @@ bool Variable::isConstant() const
 }
 
 
+size_t Variable::getTimeBound(GetTimeBoundParams& params) const
+{
+	// A variable just refers to some existing value, so doesn't really take any time to compute.
+	return 1;
+}
+
+
 } // end namespace Winter

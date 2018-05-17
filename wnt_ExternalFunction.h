@@ -28,13 +28,15 @@ class ExternalFunction : public RefCounted
 public:
 	typedef ValueRef (* INTERPRETED_FUNC)(const std::vector<ValueRef>& arg_values);
 
-	ExternalFunction(void* func_, INTERPRETED_FUNC interpreted_func_, const FunctionSignature& sig_, const TypeVRef& return_type_)
+	ExternalFunction(void* func_, INTERPRETED_FUNC interpreted_func_, const FunctionSignature& sig_, const TypeVRef& return_type_,
+		size_t time_bound_ = 1000)
 	:	func(func_),
 		interpreted_func(interpreted_func_),
 		sig(sig_),
 		return_type(return_type_),
 		has_side_effects(false),
-		is_allocation_function(false)
+		is_allocation_function(false),
+		time_bound(time_bound_)
 	{}
 
 	~ExternalFunction();
@@ -47,6 +49,8 @@ public:
 
 	bool has_side_effects; // Such as the function freeString()
 	bool is_allocation_function;
+
+	size_t time_bound;
 private:
 
 };

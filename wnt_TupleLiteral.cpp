@@ -321,4 +321,13 @@ bool TupleLiteral::isConstant() const
 }
 
 
+size_t TupleLiteral::getTimeBound(GetTimeBoundParams& params) const
+{
+	size_t sum = 0;
+	for(size_t i=0; i<elements.size(); ++i)
+		sum += elements[i]->getTimeBound(params);
+	return sum;
+}
+
+
 } // end namespace Winter

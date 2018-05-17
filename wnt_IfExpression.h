@@ -57,6 +57,7 @@ public:
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual bool provenDefined() const;
+	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 
 
 private:

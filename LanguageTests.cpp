@@ -538,6 +538,13 @@ static void testVArrays()
 	// ===================================================================
 	// Test makeVArray(elem, count) varray<T>
 	// ===================================================================
+
+	// Test makeVArray with constant count arg
+	testMainInt64Arg("def main(int64 x) int64 : length(makeVArray(1, 10i64))", 10, 10);
+
+	// Test makeVArray with runtime-variable, but bounded count arg
+	testMainInt64Arg("def main(int64 x) int64 : length(makeVArray(1, x > 10i64 ? 10i64 : x))", 10, 10);
+
 	testMainInt64Arg("def main(int64 x) int64 : length(makeVArray(1, x))", 1, 1);
 	testMainInt64Arg("def main(int64 x) int64 : length(makeVArray(1, x))", 4, 4);
 	testMainInt64Arg("def main(int64 x) int64 : length(makeVArray(1, x))", 0, 0);
@@ -839,6 +846,8 @@ static void testVArrays()
 	testMainInt64Arg("struct S { int64 x }    \n\
 		def f(int64 index) !noinline int64 : ([S(123i64)]va5)[index].x    \n\
 		def main(int64 x) int64 : f(x)", 1, 123, ALLOW_UNSAFE);
+
+	// TODO: test with refcounted heap-allocated types like string.
 }
 
 

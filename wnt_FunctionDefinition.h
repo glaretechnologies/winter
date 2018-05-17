@@ -100,6 +100,7 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
+	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 
 	bool isGenericFunction() const; // true if it is parameterised by type.
 	bool isExternalFunction() const { return external_function.nonNull(); }

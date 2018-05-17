@@ -284,6 +284,15 @@ llvm::Value* Constructor::emitLLVMCode(EmitLLVMCodeParams& params) const
 }
 
 
+size_t Constructor::getTimeBound(GetTimeBoundParams& params) const
+{
+	return struct_type->component_types.size(); // Copy time
+}
+
+
+//------------------------------------------------------------------------------------
+
+
 ValueRef GetField::invoke(VMState& vmstate)
 {
 	const size_t func_args_start = vmstate.func_args_start.back();
@@ -353,6 +362,12 @@ llvm::Value* GetField::emitLLVMCode(EmitLLVMCodeParams& params) const
 }
 
 
+size_t GetField::getTimeBound(GetTimeBoundParams& params) const
+{
+	return 1;
+}
+
+
 //------------------------------------------------------------------------------------
 
 
@@ -389,7 +404,7 @@ ValueRef UpdateElementBuiltInFunc::invoke(VMState& vmstate)
 	else
 	{
 		// TODO: handle other types.
-		throw BaseException("invalid type");
+		throw BaseException("UpdateElementBuiltInFunc::invoke: invalid type");
 	}
 }
 
@@ -430,6 +445,12 @@ llvm::Value* UpdateElementBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) 
 	}
 
 	return NULL;
+}
+
+
+size_t UpdateElementBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	throw BaseException("UpdateElementBuiltInFunc::getTimeBound: unimplemented");
 }
 
 
@@ -508,6 +529,12 @@ llvm::Value* GetTupleElementBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 }
 
 
+size_t GetTupleElementBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	return 1;
+}
+
+
 //------------------------------------------------------------------------------------
 
 
@@ -547,6 +574,12 @@ llvm::Value* GetVectorElement::emitLLVMCode(EmitLLVMCodeParams& params) const
 		vec_value, // vec
 		llvm::ConstantInt::get(*params.context, llvm::APInt(32, this->index))
 	);
+}
+
+
+size_t GetVectorElement::getTimeBound(GetTimeBoundParams& params) const
+{
+	return 1;
 }
 
 
@@ -808,6 +841,15 @@ llvm::Value* ArrayMapBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 		return return_ptr;
 	}
+}
+
+
+size_t ArrayMapBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	if(specialised_f)
+		return specialised_f->getTimeBound(params) * from_type->num_elems;
+	else
+		throw BaseException("Unable to bound time of array map function.");
 }
 
 
@@ -1213,6 +1255,15 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 }
 
 
+size_t ArrayFoldBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	if(specialised_f)
+		return specialised_f->getTimeBound(params) * array_type->num_elems;
+	else
+		throw BaseException("Unable to bound time of array fold function.");
+}
+
+
 //------------------------------------------------------------------------------------
 
 
@@ -1536,6 +1587,12 @@ llvm::Value* ArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 }
 
 
+size_t ArraySubscriptBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	return 1;
+}
+
+
 //------------------------------------------------------------------------------------
 
 
@@ -1649,6 +1706,12 @@ llvm::Value* VArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 		//return NULL;
 		throw BaseException("internal error 1559");
 	}
+}
+
+
+size_t VArraySubscriptBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	return 1;
 }
 
 
@@ -1794,10 +1857,11 @@ llvm::Value* MakeVArrayBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) con
 }
 
 
-
-
-
-
+size_t MakeVArrayBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	// TODO: this is a tricky one.  The runtime of this should be bounded by the size argument, which is only known at runtime.
+	throw BaseException("Unable to bound time of makeVArray function.");
+}
 
 
 //------------------------------------------------------------------------------------
@@ -1925,6 +1989,12 @@ llvm::Value* VectorSubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 }
 
 
+size_t VectorSubscriptBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	return 1;
+}
+
+
 //------------------------------------------------------------------------------------
 
 
@@ -1963,6 +2033,12 @@ llvm::Value* ArrayInBoundsBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) 
 }
 
 
+size_t ArrayInBoundsBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	return 1;
+}
+
+
 //------------------------------------------------------------------------------------
 
 
@@ -1998,6 +2074,12 @@ llvm::Value* VectorInBoundsBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 		params.builder->CreateICmpSGE(index, llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0, true))), // index >= 0
 		params.builder->CreateICmpSLT(index, llvm::ConstantInt::get(*params.context, llvm::APInt(32, this->vector_type->num, true))) // index < vector num elems
 	);
+}
+
+
+size_t VectorInBoundsBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	return 1;
 }
 
 
@@ -2358,6 +2440,12 @@ const std::string IterateBuiltInFunc::emitOpenCLForFunctionArg(EmitOpenCLCodePar
 }
 
 
+size_t IterateBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	throw BaseException("Unable to bound time of iterate function.");
+}
+
+
 //----------------------------------------------------------------------------------------------
 
 
@@ -2490,8 +2578,10 @@ llvm::Value* DotProductBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) con
 }
 
 
-
-
+size_t DotProductBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	return vector_type->num;
+}
 
 
 //----------------------------------------------------------------------------------------------
@@ -2643,6 +2733,12 @@ llvm::Value* VectorMinBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 }
 
 
+size_t VectorMinBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	return vector_type->num;
+}
+
+
 //----------------------------------------------------------------------------------------------
 
 
@@ -2711,6 +2807,12 @@ llvm::Value* VectorMaxBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 	}
 
 	return params.builder->CreateSelect(condition, a, b);
+}
+
+
+size_t VectorMaxBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	return vector_type->num;
 }
 
 
@@ -2795,6 +2897,12 @@ void ShuffleBuiltInFunc::setShuffleMask(const std::vector<int>& shuffle_mask_)
 }
 
 
+size_t ShuffleBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	return vector_type->num;
+}
+
+
 //----------------------------------------------------------------------------------------------
 
 
@@ -2839,6 +2947,12 @@ llvm::Value* PowBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 		func,
 		args
 	);
+}
+
+
+size_t PowBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	return 200;
 }
 
 
@@ -2907,6 +3021,13 @@ llvm::Value* SqrtBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 }
 
 
+size_t SqrtBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	const size_t scalar_cost = 15;
+	return (type->getType() == Type::VectorTypeType) ? (type.downcastToPtr<VectorType>()->num * scalar_cost) : scalar_cost;
+}
+
+
 //----------------------------------------------------------------------------------------------
 
 
@@ -2934,6 +3055,13 @@ ValueRef ExpBuiltInFunc::invoke(VMState& vmstate)
 llvm::Value* ExpBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
 	return emitUnaryIntrinsic(params, this->type, llvm::Intrinsic::exp);
+}
+
+
+size_t ExpBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	const size_t scalar_cost = 40;
+	return (type->getType() == Type::VectorTypeType) ? (type.downcastToPtr<VectorType>()->num * scalar_cost) : scalar_cost;
 }
 
 
@@ -2967,6 +3095,13 @@ llvm::Value* LogBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 }
 
 
+size_t LogBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	const size_t scalar_cost = 40;
+	return (type->getType() == Type::VectorTypeType) ? (type.downcastToPtr<VectorType>()->num * scalar_cost) : scalar_cost;
+}
+
+
 //----------------------------------------------------------------------------------------------
 
 
@@ -2997,6 +3132,13 @@ llvm::Value* SinBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 }
 
 
+size_t SinBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	const size_t scalar_cost = 30;
+	return (type->getType() == Type::VectorTypeType) ? (type.downcastToPtr<VectorType>()->num * scalar_cost) : scalar_cost;
+}
+
+
 //----------------------------------------------------------------------------------------------
 
 
@@ -3024,6 +3166,13 @@ ValueRef CosBuiltInFunc::invoke(VMState& vmstate)
 llvm::Value* CosBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
 	return emitUnaryIntrinsic(params, this->type, llvm::Intrinsic::cos);
+}
+
+
+size_t CosBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	const size_t scalar_cost = 30;
+	return (type->getType() == Type::VectorTypeType) ? (type.downcastToPtr<VectorType>()->num * scalar_cost) : scalar_cost;
 }
 
 
@@ -3059,6 +3208,13 @@ ValueRef AbsBuiltInFunc::invoke(VMState& vmstate)
 llvm::Value* AbsBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
 	return emitUnaryIntrinsic(params, this->type, llvm::Intrinsic::fabs);
+}
+
+
+size_t AbsBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	const size_t scalar_cost = 1;
+	return (type->getType() == Type::VectorTypeType) ? (type.downcastToPtr<VectorType>()->num * scalar_cost) : scalar_cost;
 }
 
 
@@ -3109,6 +3265,13 @@ llvm::Value* FloorBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 }
 
 
+size_t FloorBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	const size_t scalar_cost = 1;
+	return (type->getType() == Type::VectorTypeType) ? (type.downcastToPtr<VectorType>()->num * scalar_cost) : scalar_cost;
+}
+
+
 //----------------------------------------------------------------------------------------------
 
 
@@ -3153,6 +3316,13 @@ ValueRef CeilBuiltInFunc::invoke(VMState& vmstate)
 llvm::Value* CeilBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 {
 	return emitUnaryIntrinsic(params, this->type, llvm::Intrinsic::ceil);
+}
+
+
+size_t CeilBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	const size_t scalar_cost = 1;
+	return (type->getType() == Type::VectorTypeType) ? (type.downcastToPtr<VectorType>()->num * scalar_cost) : scalar_cost;
 }
 
 
@@ -3259,6 +3429,13 @@ llvm::Value* SignBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 }
 
 
+size_t SignBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	const size_t scalar_cost = 5;
+	return (type->getType() == Type::VectorTypeType) ? (type.downcastToPtr<VectorType>()->num * scalar_cost) : scalar_cost;
+}
+
+
 //----------------------------------------------------------------------------------------------
 
 
@@ -3313,6 +3490,13 @@ llvm::Value* TruncateToIntBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) 
 		LLVMUtils::getNthArg(params.currently_building_func, 0), 
 		dest_llvm_type
 	);
+}
+
+
+size_t TruncateToIntBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	const size_t scalar_cost = 1;
+	return (type->getType() == Type::VectorTypeType) ? (type.downcastToPtr<VectorType>()->num * scalar_cost) : scalar_cost;
 }
 
 
@@ -3387,6 +3571,13 @@ llvm::Value* ToFloatBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 }
 
 
+size_t ToFloatBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	const size_t scalar_cost = 1;
+	return (type->getType() == Type::VectorTypeType) ? (type.downcastToPtr<VectorType>()->num * scalar_cost) : scalar_cost;
+}
+
+
 //----------------------------------------------------------------------------------------------
 
 
@@ -3432,6 +3623,13 @@ llvm::Value* ToDoubleBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 }
 
 
+size_t ToDoubleBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	const size_t scalar_cost = 1;
+	return (type->getType() == Type::VectorTypeType) ? (type.downcastToPtr<VectorType>()->num * scalar_cost) : scalar_cost;
+}
+
+
 //----------------------------------------------------------------------------------------------
 
 
@@ -3458,6 +3656,13 @@ llvm::Value* ToInt64BuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 		LLVMUtils::getNthArg(params.currently_building_func, 0), 
 		dest_llvm_type // dest type
 	);
+}
+
+
+size_t ToInt64BuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	const size_t scalar_cost = 1;
+	return (type->getType() == Type::VectorTypeType) ? (type.downcastToPtr<VectorType>()->num * scalar_cost) : scalar_cost;
 }
 
 
@@ -3494,6 +3699,13 @@ llvm::Value* ToInt32BuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 }
 
 
+size_t ToInt32BuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	const size_t scalar_cost = 1;
+	return (type->getType() == Type::VectorTypeType) ? (type.downcastToPtr<VectorType>()->num * scalar_cost) : scalar_cost;
+}
+
+
 //----------------------------------------------------------------------------------------------
 
 
@@ -3517,6 +3729,12 @@ llvm::Value* VoidPtrToInt64BuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 		LLVMUtils::getNthArg(params.currently_building_func, 0), 
 		int_type->LLVMType(*params.module) // dest type
 	);
+}
+
+
+size_t VoidPtrToInt64BuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	return 1;
 }
 
 
@@ -3566,6 +3784,12 @@ llvm::Value* LengthBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	default:
 		throw BaseException("unhandled type.");
 	}
+}
+
+
+size_t LengthBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	return 1;
 }
 
 
@@ -4213,6 +4437,64 @@ static void linkInCompareFunctions(TraversalPayload& payload, const TypeVRef& ty
 void CompareEqualBuiltInFunc::linkInCalledFunctions(TraversalPayload& payload) const
 {
 	linkInCompareFunctions(payload, this->arg_type);
+}
+
+
+static size_t getCompareEqualTimeBound(const TypeVRef& type)
+{
+	switch(type->getType())
+	{
+	case Type::FloatType:
+	case Type::DoubleType:
+	case Type::IntType:
+	case Type::BoolType:
+	case Type::CharTypeType:
+		return 1;
+	case Type::StructureTypeType:
+	{
+		size_t sum = 0;
+		const StructureType* a_struct_type = type.downcastToPtr<StructureType>();
+		for(size_t i=0; i<a_struct_type->component_types.size(); ++i)
+			sum += getCompareEqualTimeBound(a_struct_type->component_types[i]);
+		return sum;
+	}
+	case Type::TupleTypeType:
+	{
+		size_t sum = 0;
+		const TupleType* a_struct_type = type.downcastToPtr<TupleType>();
+		for(size_t i=0; i<a_struct_type->component_types.size(); ++i)
+			sum += getCompareEqualTimeBound(a_struct_type->component_types[i]);
+		return sum;
+	}
+	case Type::VectorTypeType:
+	{
+		const VectorType* vector_type = type.downcastToPtr<VectorType>();
+		return getCompareEqualTimeBound(vector_type->elem_type) * vector_type->num;
+	}
+	case Type::StringType:
+	{
+		// TODO: depends on string length (runtime value)
+		throw BaseException("Unable to bound time of compare function for string type.");
+	}
+	case Type::ArrayTypeType:
+	{
+		const ArrayType* array_type = type.downcastToPtr<ArrayType>();
+		return getCompareEqualTimeBound(array_type->elem_type) * array_type->num_elems;
+	}
+	case Type::VArrayTypeType:
+	{
+		// TODO: depends on string length (runtime value)
+		throw BaseException("Unable to bound time of compare function for varray type.");
+	}
+	default:
+		assert(0);
+		throw BaseException("getCompareEqualTimeBound(): unhandled type " + type->toString());
+	}
+}
+
+size_t CompareEqualBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	return getCompareEqualTimeBound(this->arg_type);
 }
 
 

@@ -229,4 +229,10 @@ bool LetASTNode::isConstant() const
 }
 
 
+size_t LetASTNode::getTimeBound(GetTimeBoundParams& params) const
+{
+	return expr->getTimeBound(params);
+}
+
+
 } // end namespace Winter

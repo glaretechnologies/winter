@@ -38,7 +38,7 @@ e.g.   f(a, 1)
 
 There are two main types of function application:
 
-Application of a globally defined, statically determined function., such as
+Application of a globally defined, statically determined function, such as
 square(x)
 where square is defined with "def square" etc..
 
@@ -69,6 +69,7 @@ public:
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual bool provenDefined() const;
+	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 
 	///////
 

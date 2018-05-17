@@ -1170,6 +1170,13 @@ bool BufferRoot::isConstant() const
 }
 
 
+size_t BufferRoot::getTimeBound(GetTimeBoundParams& params) const
+{
+	assert(0);
+	return 0;
+}
+
+
 //----------------------------------------------------------------------------------
 
 
@@ -1555,6 +1562,15 @@ bool MapLiteral::isConstant() const
 }
 
 
+size_t MapLiteral::getTimeBound(GetTimeBoundParams& params) const
+{
+	size_t sum = 0;
+	for(size_t i=0; i<items.size(); ++i)
+		sum += items[i].first->getTimeBound(params) + items[i].second->getTimeBound(params);
+	return sum;
+}
+
+
 //----------------------------------------------------------------------------------------------
 
 
@@ -1736,6 +1752,12 @@ Reference<ASTNode> StringLiteral::clone(CloneMapType& clone_map)
 	StringLiteral* res = new StringLiteral(value, srcLocation());
 	clone_map.insert(std::make_pair(this, res));
 	return res;
+}
+
+
+size_t StringLiteral::getTimeBound(GetTimeBoundParams& params) const
+{
+	return value.size();
 }
 
 
@@ -2292,6 +2314,15 @@ bool AdditionExpression::isConstant() const
 }
 
 
+size_t AdditionExpression::getTimeBound(GetTimeBoundParams& params) const
+{
+	const size_t scalar_cost = 1;
+	const size_t op_cost = (type()->getType() == Type::VectorTypeType) ? (type().downcastToPtr<VectorType>()->num * scalar_cost) : scalar_cost;
+
+	return a->getTimeBound(params) + b->getTimeBound(params) + op_cost;
+}
+
+
 //-------------------------------------------------------------------------------------------------
 
 
@@ -2524,6 +2555,15 @@ Reference<ASTNode> SubtractionExpression::clone(CloneMapType& clone_map)
 bool SubtractionExpression::isConstant() const
 {
 	return a->isConstant() && b->isConstant();
+}
+
+
+size_t SubtractionExpression::getTimeBound(GetTimeBoundParams& params) const
+{
+	const size_t scalar_cost = 1;
+	const size_t op_cost = (type()->getType() == Type::VectorTypeType) ? (type().downcastToPtr<VectorType>()->num * scalar_cost) : scalar_cost;
+
+	return a->getTimeBound(params) + b->getTimeBound(params) + op_cost;
 }
 
 
@@ -2906,6 +2946,15 @@ bool MulExpression::isConstant() const
 }
 
 
+size_t MulExpression::getTimeBound(GetTimeBoundParams& params) const
+{
+	const size_t scalar_cost = 1;
+	const size_t op_cost = (type()->getType() == Type::VectorTypeType) ? (type().downcastToPtr<VectorType>()->num * scalar_cost) : scalar_cost;
+
+	return a->getTimeBound(params) + b->getTimeBound(params) + op_cost;
+}
+
+
 //-------------------------------------------------------------------------------------------------------
 
 
@@ -3259,7 +3308,7 @@ void DivExpression::checkNoOverflow(TraversalPayload& payload, std::vector<ASTNo
 		}
 
 		// See if we can bound the numerator or denominator ranges
-		const IntervalSetInt64 a_bounds = ProofUtils::getInt64Range(payload, stack, 
+		const IntervalSetInt64 a_bounds = ProofUtils::getInt64Range(stack, 
 			a // integer value
 		);
 
@@ -3269,7 +3318,7 @@ void DivExpression::checkNoOverflow(TraversalPayload& payload, std::vector<ASTNo
 			return;
 		}
 
-		const IntervalSetInt64 b_bounds = ProofUtils::getInt64Range(payload, stack, 
+		const IntervalSetInt64 b_bounds = ProofUtils::getInt64Range(stack, 
 			b // integer value
 		);
 
@@ -3371,7 +3420,7 @@ void DivExpression::checkNoZeroDivide(TraversalPayload& payload, std::vector<AST
 		{
 			// b is not constant.
 
-			const IntervalSetInt64 b_bounds = ProofUtils::getInt64Range(payload, stack, 
+			const IntervalSetInt64 b_bounds = ProofUtils::getInt64Range(stack, 
 				b // integer value
 			);
 
@@ -3513,6 +3562,15 @@ Reference<ASTNode> DivExpression::clone(CloneMapType& clone_map)
 bool DivExpression::isConstant() const
 {
 	return /*this->proven_defined && */a->isConstant() && b->isConstant();
+}
+
+
+size_t DivExpression::getTimeBound(GetTimeBoundParams& params) const
+{
+	const size_t scalar_cost = 10;
+	const size_t op_cost = (type()->getType() == Type::VectorTypeType) ? (type().downcastToPtr<VectorType>()->num * scalar_cost) : scalar_cost;
+
+	return a->getTimeBound(params) + b->getTimeBound(params) + op_cost;
 }
 
 
@@ -3735,7 +3793,10 @@ bool BinaryBitwiseExpression::isConstant() const
 }
 
 
-//-------------------------------------------------------------------------------------------------
+size_t BinaryBitwiseExpression::getTimeBound(GetTimeBoundParams& params) const
+{
+	return a->getTimeBound(params) + b->getTimeBound(params) + 1;
+}
 
 
 //-------------------------------------------------------------------------------------------------------
@@ -3902,6 +3963,12 @@ Reference<ASTNode> BinaryBooleanExpr::clone(CloneMapType& clone_map)
 bool BinaryBooleanExpr::isConstant() const
 {
 	return a->isConstant() && b->isConstant();
+}
+
+
+size_t BinaryBooleanExpr::getTimeBound(GetTimeBoundParams& params) const
+{
+	return a->getTimeBound(params) + b->getTimeBound(params) + 1;
 }
 
 
@@ -4118,6 +4185,12 @@ bool UnaryMinusExpression::isConstant() const
 }
 
 
+size_t UnaryMinusExpression::getTimeBound(GetTimeBoundParams& params) const
+{
+	return expr->getTimeBound(params) + 1;
+}
+
+
 //----------------------------------------------------------------------------------------
 
 
@@ -4222,9 +4295,11 @@ bool LogicalNegationExpr::isConstant() const
 }
 
 
-//----------------------------------------------------------------------------------------
 
-
+size_t LogicalNegationExpr::getTimeBound(GetTimeBoundParams& params) const
+{
+	return expr->getTimeBound(params) + 1;
+}
 
 
 //---------------------------------------------------------------------------------
@@ -4578,7 +4653,11 @@ const std::string ComparisonExpression::getOverloadedFuncName() const // returns
 }
 
 
-//----------------------------------------------------------------------------------------
+
+size_t ComparisonExpression::getTimeBound(GetTimeBoundParams& params) const
+{
+	return a->getTimeBound(params) + b->getTimeBound(params) + 1;
+}
 
 
 //---------------------------------------------------------------------------------
@@ -4680,6 +4759,12 @@ Reference<ASTNode> ArraySubscript::clone(CloneMapType& clone_map)
 bool ArraySubscript::isConstant() const
 {
 	return subscript_expr->isConstant();
+}
+
+
+size_t ArraySubscript::getTimeBound(GetTimeBoundParams& params) const
+{
+	return subscript_expr->getTimeBound(params) + 1;
 }
 
 
@@ -4881,6 +4966,12 @@ Reference<ASTNode> NamedConstant::clone(CloneMapType& clone_map)
 bool NamedConstant::isConstant() const
 {
 	return value_expr->isConstant();
+}
+
+
+size_t NamedConstant::getTimeBound(GetTimeBoundParams& params) const
+{
+	return value_expr->getTimeBound(params);
 }
 
 

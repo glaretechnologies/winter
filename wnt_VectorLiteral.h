@@ -33,6 +33,7 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
+	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 
 	const std::vector<ASTNodeRef>& getElements() const { return elements; }
 private:
