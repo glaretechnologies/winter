@@ -9,7 +9,6 @@
 #include "wnt_FunctionDefinition.h"
 #include "wnt_FunctionExpression.h"
 #include "wnt_RefCounting.h"
-#include "wnt_LLVMVersion.h"
 #include <vector>
 #include "LLVMUtils.h"
 #include "LLVMTypeUtils.h"

@@ -7,7 +7,6 @@ Generated at 2011-04-25 19:15:40 +0100
 #include "wnt_FunctionDefinition.h"
 
 
-#include "wnt_LLVMVersion.h"
 #include "wnt_ASTNode.h"
 #include "wnt_SourceBuffer.h"
 #include "wnt_RefCounting.h"

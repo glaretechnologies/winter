@@ -11,7 +11,6 @@ File created by ClassTemplate on Wed Jun 11 03:55:25 2008
 #include "wnt_SourceBuffer.h"
 #include "wnt_Diagnostics.h"
 #include "wnt_RefCounting.h"
-#include "wnt_LLVMVersion.h"
 #include "wnt_ArrayLiteral.h"
 #include "wnt_VectorLiteral.h"
 #include "wnt_TupleLiteral.h"

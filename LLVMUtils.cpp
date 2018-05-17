@@ -8,7 +8,6 @@ Generated at Wed Oct 20 15:22:37 +1300 2010
 
 
 #include "wnt_ASTNode.h"
-#include "wnt_LLVMVersion.h"
 #ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
 #endif

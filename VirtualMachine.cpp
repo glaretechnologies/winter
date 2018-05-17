@@ -14,7 +14,6 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "wnt_LangParser.h"
 #include "wnt_RefCounting.h"
 #include "wnt_ASTNode.h"
-#include "wnt_LLVMVersion.h"
 #include "LLVMTypeUtils.h"
 #include "utils/FileUtils.h"
 #include "utils/StringUtils.h"
@@ -85,6 +84,11 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 
 using std::vector;
 using std::string;
+
+
+#if !defined(TARGET_LLVM_VERSION)
+#error Target LLVM Version must be defined via TARGET_LLVM_VERSION
+#endif
 
 
 namespace Winter

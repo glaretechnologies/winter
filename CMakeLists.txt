@@ -53,12 +53,15 @@ endfunction()
 
 checkAndGetEnvVar(INDIGO_TRUNK_DIR INDIGO_TRUNK_DIR)
 #set(INDIGO_TRUNK_DIR $ENV{INDIGO_TRUNK_DIR})
-MESSAGE("INDIGO_TRUNK_DIR: ${INDIGO_TRUNK_DIR}")
+MESSAGE("Indigo trunk dir: ${INDIGO_TRUNK_DIR}")
 
 
 
 # Supported versions: 3.4, 3.6, 6.0.0.
-set(LLVM_VERSION "3.4")
+set(LLVM_VERSION "6.0.0")
+
+MESSAGE("Target LLVM version: ${LLVM_VERSION}")
+
 # The llvm dirs use the version seperator "_" instead of "."
 string(REPLACE "." "_" LLVM_VERSION_PATH ${LLVM_VERSION})
 
@@ -165,7 +168,6 @@ set(WINTER_FILES
 "${winterdir}/ProofUtils.h"
 "${winterdir}/wnt_IfExpression.cpp"
 "${winterdir}/wnt_IfExpression.h"
-"${winterdir}/wnt_LLVMVersion.h"
 "${winterdir}/wnt_ArrayLiteral.h"
 "${winterdir}/wnt_TupleLiteral.h"
 "${winterdir}/wnt_VectorLiteral.h"
@@ -406,7 +408,16 @@ else() # Linux
 endif()
 
 
-
+# Set DTARGET_LLVM_VERSION
+if(LLVM_VERSION STREQUAL "6.0.0")
+	add_definitions("-DTARGET_LLVM_VERSION=60")
+elseif(LLVM_VERSION STREQUAL "3.6")
+	add_definitions("-DTARGET_LLVM_VERSION=36")
+elseif(LLVM_VERSION STREQUAL "3.4")
+	add_definitions("-DTARGET_LLVM_VERSION=34")
+else()
+	MESSAGE("Unsupported LLVM version ${LLVM_VERSION}")
+endif()
 
 
 # LLVM include path and compiler settings.
@@ -439,7 +450,7 @@ if(WIN32)
 	SET(CMAKE_MODULE_LINKER_FLAGS_DEBUG				"${CMAKE_MODULE_LINKER_FLAGS_DEBUG} ${LLVM_LINK_FLAGS_DEBUG}")
 	SET(CMAKE_MODULE_LINKER_FLAGS_SDKDEBUG			"${CMAKE_MODULE_LINKER_FLAGS_SDKDEBUG} ${LLVM_LINK_FLAGS_SDKDEBUG}")
 	
-	if(LLVM_VERSION EQUAL "6.0")
+	if(LLVM_VERSION STREQUAL "6.0.0")
 		SET(LLVM_LIBS
 			LLVMAArch64AsmParser.lib
 			LLVMAArch64AsmPrinter.lib
@@ -575,12 +586,12 @@ if(WIN32)
 			LLVMXCoreInfo.lib
 			LLVMXRay.lib
 		)
-	elseif(LLVM_VERSION EQUAL "3.6")
+	elseif(LLVM_VERSION STREQUAL "3.6")
 		SET(LLVM_LIBS
 			LLVMAnalysis.lib LLVMAsmParser.lib LLVMAsmPrinter.lib LLVMBitReader.lib LLVMBitWriter.lib LLVMCodeGen.lib LLVMCore.lib LLVMExecutionEngine.lib LLVMInstCombine.lib LLVMInstrumentation.lib LLVMInterpreter.lib LLVMipa.lib LLVMipo.lib 			
 			LLVMLinker.lib LLVMMC.lib LLVMMCDisassembler.lib LLVMMCJIT.lib LLVMMCParser.lib LLVMObject.lib LLVMRuntimeDyld.lib LLVMScalarOpts.lib LLVMSelectionDAG.lib LLVMSupport.lib LLVMTarget.lib LLVMTransformUtils.lib LLVMVectorize.lib LLVMX86AsmParser.lib LLVMX86AsmPrinter.lib LLVMX86CodeGen.lib LLVMX86Desc.lib LLVMX86Disassembler.lib LLVMX86Info.lib LLVMX86Utils.lib
 		)
-	elseif(LLVM_VERSION EQUAL "3.4")
+	elseif(LLVM_VERSION STREQUAL "3.4")
 		SET(LLVM_LIBS
 			LLVMAnalysis.lib LLVMAsmParser.lib LLVMAsmPrinter.lib LLVMBitReader.lib LLVMBitWriter.lib LLVMCodeGen.lib LLVMCore.lib LLVMExecutionEngine.lib LLVMInstCombine.lib LLVMInstrumentation.lib LLVMInterpreter.lib LLVMipa.lib LLVMipo.lib 
 			LLVMJIT.lib 

@@ -7,7 +7,6 @@ File created by ClassTemplate on Wed Jun 11 03:55:25 2008
 #pragma once
 
 
-#include "wnt_LLVMVersion.h"
 #include "wnt_Type.h"
 #include "wnt_FunctionSignature.h"
 #include "wnt_ExternalFunction.h"

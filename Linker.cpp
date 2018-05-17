@@ -10,7 +10,6 @@ Copyright Glare Technologies Limited 2016 -
 #include "utils/StringUtils.h"
 #include "utils/PlatformUtils.h"
 #include "wnt_ExternalFunction.h"
-#include "wnt_LLVMVersion.h"
 #include "wnt_RefCounting.h"
 #include <limits>
 
