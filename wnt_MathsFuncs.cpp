@@ -104,6 +104,102 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 	));
 
 	external_functions.push_back(new ExternalFunction(
+		(void*)sinhf,
+		NULL,
+		FunctionSignature("sinh", vector<TypeVRef>(1, float_type)),
+		float_type,
+		30 // time_bound
+	));
+
+	external_functions.push_back(new ExternalFunction(
+		(void*)(double(*)(double))sinh,
+		NULL,
+		FunctionSignature("sinh", vector<TypeVRef>(1, double_type)),
+		double_type,
+		30 // time_bound
+	));
+
+	external_functions.push_back(new ExternalFunction(
+		(void*)asinhf,
+		NULL,
+		FunctionSignature("asinh", vector<TypeVRef>(1, float_type)),
+		float_type,
+		30 // time_bound
+	));
+
+	external_functions.push_back(new ExternalFunction(
+		(void*)(double(*)(double))asinh,
+		NULL,
+		FunctionSignature("asinh", vector<TypeVRef>(1, double_type)),
+		double_type,
+		30 // time_bound
+	));
+
+	external_functions.push_back(new ExternalFunction(
+		(void*)coshf,
+		NULL,
+		FunctionSignature("cosh", vector<TypeVRef>(1, float_type)),
+		float_type,
+		30 // time_bound
+	));
+
+	external_functions.push_back(new ExternalFunction(
+		(void*)(double(*)(double))cosh,
+		NULL,
+		FunctionSignature("cosh", vector<TypeVRef>(1, double_type)),
+		double_type,
+		30 // time_bound
+	));
+
+	external_functions.push_back(new ExternalFunction(
+		(void*)acoshf,
+		NULL,
+		FunctionSignature("acosh", vector<TypeVRef>(1, float_type)),
+		float_type,
+		30 // time_bound
+	));
+
+	external_functions.push_back(new ExternalFunction(
+		(void*)(double(*)(double))acosh,
+		NULL,
+		FunctionSignature("acosh", vector<TypeVRef>(1, double_type)),
+		double_type,
+		30 // time_bound
+	));
+
+	external_functions.push_back(new ExternalFunction(
+		(void*)tanhf,
+		NULL,
+		FunctionSignature("tanh", vector<TypeVRef>(1, float_type)),
+		float_type,
+		30 // time_bound
+	));
+
+	external_functions.push_back(new ExternalFunction(
+		(void*)(double(*)(double))tanh,
+		NULL,
+		FunctionSignature("tanh", vector<TypeVRef>(1, double_type)),
+		double_type,
+		30 // time_bound
+	));
+
+	external_functions.push_back(new ExternalFunction(
+		(void*)atanhf,
+		NULL,
+		FunctionSignature("atanh", vector<TypeVRef>(1, float_type)),
+		float_type,
+		30 // time_bound
+	));
+
+	external_functions.push_back(new ExternalFunction(
+		(void*)(double(*)(double))atanh,
+		NULL,
+		FunctionSignature("atanh", vector<TypeVRef>(1, double_type)),
+		double_type,
+		30 // time_bound
+	));
+
+	external_functions.push_back(new ExternalFunction(
 		(void*)(double(*)(double))atan,
 		NULL,
 		FunctionSignature("atan", vector<TypeVRef>(1, double_type)),
