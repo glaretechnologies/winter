@@ -408,7 +408,7 @@ else() # Linux
 endif()
 
 
-# Set DTARGET_LLVM_VERSION
+# Set TARGET_LLVM_VERSION
 if(LLVM_VERSION STREQUAL "6.0.0")
 	add_definitions("-DTARGET_LLVM_VERSION=60")
 elseif(LLVM_VERSION STREQUAL "3.6")
