@@ -18,33 +18,9 @@ namespace Winter
 {
 
 
-static float getFloatArg(const vector<ValueRef>& arg_values, int i)
-{
-	return checkedCast<const FloatValue>(arg_values[i])->value;
-}
-
-
-static double getDoubleArg(const vector<ValueRef>& arg_values, int i)
-{
-	return checkedCast<const DoubleValue>(arg_values[i])->value;
-}
-
-
 static int getIntArg(const vector<ValueRef>& arg_values, int i)
 {
 	return (int)checkedCast<const IntValue>(arg_values[i])->value;
-}
-
-
-static ValueRef makeFloat(float x)
-{
-	return new FloatValue(x);
-}
-
-
-static ValueRef makeDouble(double x)
-{
-	return new DoubleValue(x);
 }
 
 
@@ -54,111 +30,9 @@ static ValueRef makeInt(int x)
 }
 
 
-static ValueRef makeBool(bool x)
-{
-	return new BoolValue(x);
-}
-
-
-static ValueRef tanFloatInterpreted(const vector<ValueRef>& args)
-{
-	return makeFloat(std::tan(getFloatArg(args, 0)));
-}
-
-
-static ValueRef tanDoubleInterpreted(const vector<ValueRef>& args)
-{
-	return makeDouble(std::tan(getDoubleArg(args, 0)));
-}
-
-
-static ValueRef asinInterpreted(const vector<ValueRef>& args)
-{
-	return makeFloat(std::asin(getFloatArg(args, 0)));
-}
-
-
-static ValueRef asinDoubleInterpreted(const vector<ValueRef>& args)
-{
-	return makeDouble(std::asin(getDoubleArg(args, 0)));
-}
-
-
-static ValueRef acosInterpreted(const vector<ValueRef>& args)
-{
-	return makeFloat(std::acos(getFloatArg(args, 0)));
-}
-
-
-static ValueRef acosDoubleInterpreted(const vector<ValueRef>& args)
-{
-	return makeDouble(std::acos(getDoubleArg(args, 0)));
-}
-
-
-static ValueRef atanInterpreted(const vector<ValueRef>& args)
-{
-	return makeFloat(std::atan(getFloatArg(args, 0)));
-}
-
-
-static ValueRef atanDoubleInterpreted(const vector<ValueRef>& args)
-{
-	return makeDouble(std::atan(getDoubleArg(args, 0)));
-}
-
-
-static ValueRef atan2Interpreted(const vector<ValueRef>& args)
-{
-	return makeFloat(std::atan2(getFloatArg(args, 0), getFloatArg(args, 1)));
-}
-
-
-static ValueRef atan2DoubleInterpreted(const vector<ValueRef>& args)
-{
-	return makeDouble(std::atan2(getDoubleArg(args, 0), getDoubleArg(args, 1)));
-}
-
-
-static ValueRef floatModInterpreted(const vector<ValueRef>& args)
-{
-	return makeFloat(Maths::floatMod(getFloatArg(args, 0), getFloatArg(args, 1)));
-}
-
-
-static ValueRef doubleModInterpreted(const vector<ValueRef>& args)
-{
-	return makeDouble(Maths::doubleMod(getDoubleArg(args, 0), getDoubleArg(args, 1)));
-}
-
-
 static ValueRef intModInterpreted(const vector<ValueRef>& args)
 {
 	return makeInt(Maths::intMod(getIntArg(args, 0), getIntArg(args, 1)));
-}
-
-
-static ValueRef isFiniteInterpreted(const vector<ValueRef>& args)
-{
-	return makeBool(::isFinite(getFloatArg(args, 0)));
-}
-
-
-static ValueRef isFiniteDoubleInterpreted(const vector<ValueRef>& args)
-{
-	return makeBool(::isFinite(getDoubleArg(args, 0)));
-}
-
-
-static ValueRef isNANInterpreted(const vector<ValueRef>& args)
-{
-	return makeBool(::isNAN(getFloatArg(args, 0)));
-}
-
-
-static ValueRef isNANDoubleInterpreted(const vector<ValueRef>& args)
-{
-	return makeBool(::isNAN(getDoubleArg(args, 0)));
 }
 
 
@@ -175,7 +49,7 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)tanf, // func
-		tanFloatInterpreted, // interpreted func
+		NULL, // interpreted func.  Can be null here since this is a float -> float function which can be called directly from the interpreter.
 		FunctionSignature("tan", vector<TypeVRef>(1, float_type)), // function signature
 		float_type, // return type
 		30 // time_bound
@@ -183,7 +57,7 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)(double(*)(double))tan, // func - Use cast to pick the correct overload.
-		tanDoubleInterpreted, // interpreted func
+		NULL, // interpreted func
 		FunctionSignature("tan", vector<TypeVRef>(1, double_type)), // function signature
 		double_type, // return type
 		30 // time_bound
@@ -191,7 +65,7 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)asinf,
-		asinInterpreted,
+		NULL,
 		FunctionSignature("asin", vector<TypeVRef>(1, float_type)),
 		float_type,
 		30 // time_bound
@@ -199,7 +73,7 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)(double(*)(double))asin,
-		asinDoubleInterpreted,
+		NULL,
 		FunctionSignature("asin", vector<TypeVRef>(1, double_type)),
 		double_type,
 		30 // time_bound
@@ -207,7 +81,7 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)acosf,
-		acosInterpreted,
+		NULL,
 		FunctionSignature("acos", vector<TypeVRef>(1, float_type)),
 		float_type,
 		30 // time_bound
@@ -215,7 +89,7 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)(double(*)(double))acos,
-		acosDoubleInterpreted,
+		NULL,
 		FunctionSignature("acos", vector<TypeVRef>(1, double_type)),
 		double_type,
 		30 // time_bound
@@ -223,7 +97,7 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)atanf,
-		atanInterpreted,
+		NULL,
 		FunctionSignature("atan", vector<TypeVRef>(1, float_type)),
 		float_type,
 		30 // time_bound
@@ -231,7 +105,7 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)(double(*)(double))atan,
-		atanDoubleInterpreted,
+		NULL,
 		FunctionSignature("atan", vector<TypeVRef>(1, double_type)),
 		double_type,
 		30 // time_bound
@@ -239,7 +113,7 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)atan2f,
-		atan2Interpreted,
+		NULL,
 		FunctionSignature("atan2", vector<TypeVRef>(2, float_type)),
 		float_type,
 		60 // time_bound
@@ -247,7 +121,7 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)(double(*)(double, double))atan2,
-		atan2DoubleInterpreted,
+		NULL,
 		FunctionSignature("atan2", vector<TypeVRef>(2, double_type)),
 		double_type,
 		60 // time_bound
@@ -255,7 +129,7 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)Maths::floatMod,
-		floatModInterpreted,
+		NULL,
 		FunctionSignature("mod", vector<TypeVRef>(2, float_type)),
 		float_type,
 		10 // time_bound
@@ -263,7 +137,7 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)Maths::doubleMod,
-		doubleModInterpreted,
+		NULL,
 		FunctionSignature("mod", vector<TypeVRef>(2, double_type)),
 		double_type,
 		10 // time_bound
@@ -279,7 +153,7 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)(bool(*)(float))::isFinite,
-		isFiniteInterpreted,
+		NULL,
 		FunctionSignature("isFinite", vector<TypeVRef>(1, float_type)),
 		bool_type, // return type
 		10 // time_bound
@@ -287,7 +161,7 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)(bool(*)(double))::isFinite,
-		isFiniteDoubleInterpreted,
+		NULL,
 		FunctionSignature("isFinite", vector<TypeVRef>(1, double_type)),
 		bool_type, // return type
 		10 // time_bound
@@ -295,7 +169,7 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)(bool(*)(float))::isNAN,
-		isNANInterpreted,
+		NULL,
 		FunctionSignature("isNAN", vector<TypeVRef>(1, float_type)),
 		bool_type, // return type
 		10 // time_bound
@@ -303,7 +177,7 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)(bool(*)(double))::isNAN,
-		isNANDoubleInterpreted,
+		NULL,
 		FunctionSignature("isNAN", vector<TypeVRef>(1, double_type)),
 		bool_type, // return type
 		10 // time_bound

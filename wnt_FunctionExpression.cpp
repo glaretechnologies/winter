@@ -89,6 +89,14 @@ FunctionExpression::FunctionExpression(const SrcLocation& src_loc, const std::st
 }
 
 
+typedef float (* FLOAT1_TO_FLOAT_TYPE)(float);
+typedef float (* FLOAT2_TO_FLOAT_TYPE)(float, float);
+typedef double (* DOUBLE1_TO_DOUBLE_TYPE)(double);
+typedef double (* DOUBLE2_TO_DOUBLE_TYPE)(double, double);
+typedef bool (* FLOAT1_TO_BOOL_TYPE)(float);
+typedef bool (* DOUBLE1_TO_BOOL_TYPE)(double);
+
+
 ValueRef FunctionExpression::exec(VMState& vmstate)
 {
 	if(VERBOSE_EXEC) conPrint(vmstate.indent() + "FunctionExpression, target_name=" + this->functionName() + "\n");
@@ -99,6 +107,69 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 
 	if(this->static_target_function != NULL && this->static_target_function->external_function.nonNull())
 	{
+		// For external functions with certain type signatures, we can call the native function directly:
+		if(static_target_function->returnType()->getType() == Type::FloatType)
+		{
+			if(static_target_function->args.size() == 1 && (static_target_function->args[0].type->getType() == Type::FloatType))
+			{
+				if(this->argument_expressions.size() != 1) throw BaseException("Invalid num args.");
+				ValueRef arg0 = this->argument_expressions[0]->exec(vmstate);
+				FLOAT1_TO_FLOAT_TYPE f = (FLOAT1_TO_FLOAT_TYPE)this->static_target_function->external_function->func;
+				return new FloatValue(f(checkedCast<FloatValue>(arg0)->value));
+			}
+			else if(static_target_function->args.size() == 2 && 
+				(static_target_function->args[0].type->getType() == Type::FloatType) &&
+				(static_target_function->args[1].type->getType() == Type::FloatType))
+			{
+				if(this->argument_expressions.size() != 2) throw BaseException("Invalid num args.");
+				ValueRef arg0 = this->argument_expressions[0]->exec(vmstate);
+				ValueRef arg1 = this->argument_expressions[1]->exec(vmstate);
+				FLOAT2_TO_FLOAT_TYPE f = (FLOAT2_TO_FLOAT_TYPE)this->static_target_function->external_function->func;
+				return new FloatValue(f(checkedCast<FloatValue>(arg0)->value, checkedCast<FloatValue>(arg1)->value));
+			}
+		}
+
+		if(static_target_function->returnType()->getType() == Type::DoubleType)
+		{
+			if(static_target_function->args.size() == 1 && (static_target_function->args[0].type->getType() == Type::DoubleType))
+			{
+				if(this->argument_expressions.size() != 1) throw BaseException("Invalid num args.");
+				ValueRef arg0 = this->argument_expressions[0]->exec(vmstate);
+				DOUBLE1_TO_DOUBLE_TYPE f = (DOUBLE1_TO_DOUBLE_TYPE)this->static_target_function->external_function->func;
+				return new DoubleValue(f(checkedCast<DoubleValue>(arg0)->value));
+			}
+			else if(static_target_function->args.size() == 2 && 
+				(static_target_function->args[0].type->getType() == Type::DoubleType) &&
+				(static_target_function->args[1].type->getType() == Type::DoubleType))
+			{
+				if(this->argument_expressions.size() != 2) throw BaseException("Invalid num args.");
+				ValueRef arg0 = this->argument_expressions[0]->exec(vmstate);
+				ValueRef arg1 = this->argument_expressions[1]->exec(vmstate);
+				DOUBLE2_TO_DOUBLE_TYPE f = (DOUBLE2_TO_DOUBLE_TYPE)this->static_target_function->external_function->func;
+				return new DoubleValue(f(checkedCast<DoubleValue>(arg0)->value, checkedCast<DoubleValue>(arg1)->value));
+			}
+		}
+
+		if(static_target_function->returnType()->getType() == Type::BoolType)
+		{
+			if(static_target_function->args.size() == 1 && (static_target_function->args[0].type->getType() == Type::FloatType))
+			{
+				if(this->argument_expressions.size() != 1)
+					throw BaseException("Invalid num args.");
+				ValueRef arg0 = this->argument_expressions[0]->exec(vmstate);
+				FLOAT1_TO_BOOL_TYPE f = (FLOAT1_TO_BOOL_TYPE)this->static_target_function->external_function->func;
+				return new BoolValue(f(checkedCast<FloatValue>(arg0)->value));
+			}
+			if(static_target_function->args.size() == 1 && (static_target_function->args[0].type->getType() == Type::DoubleType))
+			{
+				if(this->argument_expressions.size() != 1)
+					throw BaseException("Invalid num args.");
+				ValueRef arg0 = this->argument_expressions[0]->exec(vmstate);
+				DOUBLE1_TO_BOOL_TYPE f = (DOUBLE1_TO_BOOL_TYPE)this->static_target_function->external_function->func;
+				return new BoolValue(f(checkedCast<DoubleValue>(arg0)->value));
+			}
+		}
+
 		vector<ValueRef> args;
 		for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
 			args.push_back(this->argument_expressions[i]->exec(vmstate));

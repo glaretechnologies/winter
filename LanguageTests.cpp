@@ -2493,6 +2493,8 @@ static void testExternalMathsFunctions()
 	testMainFloatArg("def main(float x) float : tan(x)", 0.3f, std::tan(0.3f), INCLUDE_EXTERNAL_MATHS_FUNCS);
 	testMainDoubleArg("def main(double x) double : tan(x)", 0.3, std::tan(0.3), INCLUDE_EXTERNAL_MATHS_FUNCS);
 
+	testMainFloatArg("def main(float x) float : tan(0.5f)", 0.3f, std::tan(0.5f), INCLUDE_EXTERNAL_MATHS_FUNCS);
+
 	// asin
 	testMainFloatArg("def main(float x) float : asin(x)", 0.3f, std::asin(0.3f), INCLUDE_EXTERNAL_MATHS_FUNCS);
 	testMainDoubleArg("def main(double x) double : asin(x)", 0.3, std::asin(0.3), INCLUDE_EXTERNAL_MATHS_FUNCS);

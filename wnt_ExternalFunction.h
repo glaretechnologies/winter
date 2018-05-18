@@ -28,6 +28,16 @@ class ExternalFunction : public RefCounted
 public:
 	typedef ValueRef (* INTERPRETED_FUNC)(const std::vector<ValueRef>& arg_values);
 
+	// Interpreted function must be set, unless the function type is one of
+	//
+	// (float) -> float
+	// (float, float) -> float
+	// (double) -> double
+	// (double, double) -> double
+	// (float) -> bool
+	// (double) -> bool
+	//
+	// in which case NULL can be passed instead.
 	ExternalFunction(void* func_, INTERPRETED_FUNC interpreted_func_, const FunctionSignature& sig_, const TypeVRef& return_type_,
 		size_t time_bound_ = 1000)
 	:	func(func_),
