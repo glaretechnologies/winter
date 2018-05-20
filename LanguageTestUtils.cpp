@@ -126,7 +126,7 @@ TestResults testMainFloat(const std::string& src, float target_return_val)
 		test_env.val = 10;
 
 		VMConstructionArgs vm_args;
-		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
+		vm_args.source_buffers.push_back(new SourceBuffer("buffer", src));
 		vm_args.env = &test_env;
 		vm_args.floating_point_literals_default_to_double = false;
 		vm_args.real_is_double = false;
@@ -153,13 +153,13 @@ TestResults testMainFloat(const std::string& src, float target_return_val)
 
 		vm_args.entry_point_sigs.push_back(mainsig);
 
-		VirtualMachine vm(vm_args);
+		VirtualMachineRef vm = new VirtualMachine(vm_args);
 
 		// Get main function
 		
-		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
+		Reference<FunctionDefinition> maindef = vm->findMatchingFunction(mainsig);
 
-		void* f = vm.getJittedFunction(mainsig);
+		void* f = vm->getJittedFunction(mainsig);
 
 		//// cast to correct type
 		float_void_func mainf = (float_void_func)f;
@@ -203,7 +203,7 @@ TestResults testMainFloat(const std::string& src, float target_return_val)
 		}
 
 		TestResults res;
-		res.stats = vm.getProgramStats();
+		res.stats = vm->getProgramStats();
 		res.maindef = maindef;
 		return res;
 	}

@@ -12,6 +12,7 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "wnt_ASTNode.h"
 #include "Linker.h"
 #include <utils/Reference.h>
+#include <utils/ThreadSafeRefCounted.h>
 #include <unordered_map>
 namespace llvm
 {
@@ -105,7 +106,7 @@ struct ProgramStats
 };
 
 
-class VirtualMachine
+class VirtualMachine : public ThreadSafeRefCounted
 {
 public:
 	VirtualMachine(const VMConstructionArgs& args); // throws BaseException
@@ -174,6 +175,9 @@ private:
 
 	std::vector<AllocationBlock> jit_mem_blocks;
 };
+
+
+typedef Reference<VirtualMachine> VirtualMachineRef;
 
 
 // In-memory string representation for a Winter string
