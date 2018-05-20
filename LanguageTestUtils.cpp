@@ -326,7 +326,7 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 		float(WINTER_JIT_CALLING_CONV*f)(float, void*) = (float(WINTER_JIT_CALLING_CONV*)(float, void*))vm.getJittedFunction(mainsig);
 
 
-		conPrint("==================== original src: =====================");
+		/*conPrint("==================== original src: =====================");
 		conPrint(src);
 		conPrint("========================================================");
 		try
@@ -338,7 +338,7 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 		{
 			conPrint("Exception: " + e.what());
 		}
-		conPrint("");
+		conPrint("");*/
 
 
 		// Call the JIT'd function
@@ -476,6 +476,102 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 		exit(1);
 	}
 	catch(Indigo::Exception& e)
+	{
+		stdErrPrint(e.what());
+		assert(0);
+		exit(1);
+	}
+}
+
+
+size_t getTimeBoundForMainFloatArg(const std::string& src, uint32 test_flags)
+{
+	testPrint("===================== Winter getTimeBoundForMainFloatArg() =====================");
+	try
+	{
+		VMConstructionArgs vm_args;
+		vm_args.source_buffers.push_back(new SourceBuffer("buffer", src));
+		vm_args.allow_unsafe_operations = (test_flags & ALLOW_UNSAFE) != 0;
+		vm_args.floating_point_literals_default_to_double = false;
+		vm_args.try_coerce_int_to_double_first = false;
+		vm_args.real_is_double = false;
+
+		if(test_flags & INCLUDE_EXTERNAL_MATHS_FUNCS)
+			MathsFuncs::appendExternalMathsFuncs(vm_args.external_functions);
+
+		const FunctionSignature mainsig("main", std::vector<TypeVRef>(1, new Float()));
+		vm_args.entry_point_sigs.push_back(mainsig);
+
+		Timer timer;
+		VirtualMachine vm(vm_args);
+
+		conPrint("Virtual machine build time: " + timer.elapsedString());
+
+		// Get main function
+		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
+		if(maindef.isNull()) throw BaseException("Failed to find function " + mainsig.toString());
+		if(maindef->returnType()->getType() != Type::FloatType) throw BaseException("main did not return float.");
+
+		timer.reset();
+		GetTimeBoundParams params;
+		const size_t bound = maindef->getTimeBound(params);
+		conPrint("Computing time bound took " + timer.elapsedString());
+		return bound;
+	}
+	catch(Winter::BaseException& e)
+	{
+		stdErrPrint(e.what());
+		assert(0);
+		exit(1);
+	}
+}
+
+
+void testTimeBoundInvalidForMainFloatArg(const std::string& src, uint32 test_flags)
+{
+	testPrint("===================== Winter testTimeBoundInvalidForMainFloatArg() =====================");
+	try
+	{
+		VMConstructionArgs vm_args;
+		vm_args.source_buffers.push_back(new SourceBuffer("buffer", src));
+		vm_args.allow_unsafe_operations = (test_flags & ALLOW_UNSAFE) != 0;
+		vm_args.floating_point_literals_default_to_double = false;
+		vm_args.try_coerce_int_to_double_first = false;
+		vm_args.real_is_double = false;
+
+		if(test_flags & INCLUDE_EXTERNAL_MATHS_FUNCS)
+			MathsFuncs::appendExternalMathsFuncs(vm_args.external_functions);
+
+		const FunctionSignature mainsig("main", std::vector<TypeVRef>(1, new Float()));
+		vm_args.entry_point_sigs.push_back(mainsig);
+
+		Timer timer;
+		VirtualMachine vm(vm_args);
+
+		conPrint("Virtual machine build time: " + timer.elapsedString());
+
+		// Get main function
+		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
+		if(maindef.isNull()) throw BaseException("Failed to find function " + mainsig.toString());
+		if(maindef->returnType()->getType() != Type::FloatType) throw BaseException("main did not return float.");
+
+		timer.reset();
+		try
+		{
+			GetTimeBoundParams params;
+			const size_t bound = maindef->getTimeBound(params);
+
+			stdErrPrint("Error: expected getTimeBound() to throw an exception.");
+			assert(0);
+			exit(1);
+		}
+		catch(Winter::BaseException& e)
+		{
+			conPrint("Caught expected exception from getTimeBound(): " + e.what());
+			conPrint("Computing time bound took " + timer.elapsedString());
+		}
+	}
+	catch(Winter::BaseException& e)
 	{
 		stdErrPrint(e.what());
 		assert(0);

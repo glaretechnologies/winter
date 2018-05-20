@@ -2084,6 +2084,10 @@ bool FunctionExpression::isConstant() const
 
 size_t FunctionExpression::getTimeBound(GetTimeBoundParams& params) const
 {
+	params.steps++;
+	if(params.steps > (1 << 22))
+		throw BaseException("Too many steps when computing time bound.");
+
 	size_t arg_eval_bound = 0;
 	for(size_t i=0; i<argument_expressions.size(); ++i)
 		arg_eval_bound += argument_expressions[i]->getTimeBound(params);

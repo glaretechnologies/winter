@@ -134,6 +134,8 @@ struct TestStructIn
 };
 
 
+size_t getTimeBoundForMainFloatArg(const std::string& src, uint32 test_flags = 0);
+void testTimeBoundInvalidForMainFloatArg(const std::string& src, uint32 test_flags = 0);
 TestResults testMainFloat(const std::string& src, float target_return_val);
 void testMainFloatArgInvalidProgram(const std::string& src);
 TestResults testMainFloatArg(const std::string& src, float argument, float target_return_val, uint32 test_flags = 0);

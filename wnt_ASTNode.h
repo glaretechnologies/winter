@@ -268,6 +268,9 @@ public:
 
 struct GetTimeBoundParams
 {
+	GetTimeBoundParams() : steps(0) {}
+
+	size_t steps;
 };
 
 

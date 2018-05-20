@@ -4137,6 +4137,104 @@ static void testUseOfLaterDefinition()
 }
 
 
+static void testTimeBounds()
+{
+	const size_t sin_time = 30; // See SinBuiltInFunc::getTimeBound().
+
+	const size_t single_sin_time = getTimeBoundForMainFloatArg("def main(float x) float : sin(x)");
+	testAssert(single_sin_time >= sin_time);
+
+	{
+		const size_t recursive_sin_time = getTimeBoundForMainFloatArg(
+			"def f(float x) float : sin(x)								\n\
+			def f4(float x) float : f(f(f(f(x))))						\n\
+			def f16(float x)float :  f4(f4(f4(f4(x))))					\n\
+			def f64(float x)float :  f16(f16(f16(f16(x))))				\n\
+			def f256(float x) float : f64(f64(f64(f64(x))))				\n\
+			def f1024(float x)float :  f256(f256(f256(f256(x))))		\n\
+			def f4096(float x)float :  f1024(f1024(f1024(f1024(x))))	\n\
+			def main(float x) float : f4096(x)");
+		testAssert(recursive_sin_time >= sin_time * 4096);
+	}
+	{
+		const size_t recursive_sin_time = getTimeBoundForMainFloatArg(
+			"def f(float x) float : sin(x)														\n\
+			def f4(float x) float : f(x) + f(x + 0.01)	+ f(x + 0.02) + f(x + 0.03)				\n\
+			def f16(float x) float : f4(x) + f4(x + 0.01)	+ f4(x + 0.02) + f4(x + 0.03)		\n\
+			def f64(float x) float : f16(x) + f16(x + 0.01)	+ f16(x + 0.02) + f16(x + 0.03)		\n\
+			def main(float x) float : f64(x)");
+		testAssert(recursive_sin_time >= sin_time * 64);
+	}
+
+
+	// For the following code: fn ultimately calls sin(x) 4^n times.
+	{
+		// So f10 calls sin(x) 4^10 = 1048576 times.
+		const size_t recursive_sin_time = getTimeBoundForMainFloatArg(
+			"def f0(float x) float : sin(x)						\n\
+			def f1 (float x) float : f0(f0(f0(f0(x))))			\n\
+			def f2 (float x) float : f1(f1(f1(f1(x))))			\n\
+			def f3 (float x) float : f2(f2(f2(f2(x))))			\n\
+			def f4 (float x) float : f3(f3(f3(f3(x))))			\n\
+			def f5 (float x) float : f4(f4(f4(f4(x))))			\n\
+			def f6 (float x) float : f5(f5(f5(f5(x))))			\n\
+			def f7 (float x) float : f6(f6(f6(f6(x))))			\n\
+			def f8 (float x) float : f7(f7(f7(f7(x))))			\n\
+			def f9 (float x) float : f8(f8(f8(f8(x))))			\n\
+			def f10(float x) float : f9(f9(f9(f9(x))))			\n\
+			def main(float x) float : f10(x)");
+		testAssert(recursive_sin_time >= sin_time * 1048576);
+	}
+
+	// Test something that will fail getTimeBound() due to too many recursive calls.
+	{
+		// f12 calls sin(x) 4^12 = 16,777,216 times.
+		testTimeBoundInvalidForMainFloatArg(
+			"def f0(float x) float : sin(x)							\n\
+			def f1 (float x) float : f0(f0(f0(f0(x))))				\n\
+			def f2 (float x) float : f1(f1(f1(f1(x))))				\n\
+			def f3 (float x) float : f2(f2(f2(f2(x))))				\n\
+			def f4 (float x) float : f3(f3(f3(f3(x))))				\n\
+			def f5 (float x) float : f4(f4(f4(f4(x))))				\n\
+			def f6 (float x) float : f5(f5(f5(f5(x))))				\n\
+			def f7 (float x) float : f6(f6(f6(f6(x))))				\n\
+			def f8 (float x) float : f7(f7(f7(f7(x))))				\n\
+			def f9 (float x) float : f8(f8(f8(f8(x))))				\n\
+			def f10(float x) float : f9(f9(f9(f9(x))))				\n\
+			def f11(float x) float : f10(f10(f10(f10(x))))			\n\
+			def f12(float x) float : f11(f11(f11(f11(x))))			\n\
+			def main(float x) float : f12(x)");
+	}
+
+	{
+		// f20 calls sin(x) 4^20 = 1,099,511,627,776 times.
+		testTimeBoundInvalidForMainFloatArg(
+			"def f0(float x) float : sin(x)							\n\
+			def f1 (float x) float : f0(f0(f0(f0(x))))				\n\
+			def f2 (float x) float : f1(f1(f1(f1(x))))				\n\
+			def f3 (float x) float : f2(f2(f2(f2(x))))				\n\
+			def f4 (float x) float : f3(f3(f3(f3(x))))				\n\
+			def f5 (float x) float : f4(f4(f4(f4(x))))				\n\
+			def f6 (float x) float : f5(f5(f5(f5(x))))				\n\
+			def f7 (float x) float : f6(f6(f6(f6(x))))				\n\
+			def f8 (float x) float : f7(f7(f7(f7(x))))				\n\
+			def f9 (float x) float : f8(f8(f8(f8(x))))				\n\
+			def f10(float x) float : f9(f9(f9(f9(x))))				\n\
+			def f11(float x) float : f10(f10(f10(f10(x))))			\n\
+			def f12(float x) float : f11(f11(f11(f11(x))))			\n\
+			def f13(float x) float : f12(f12(f12(f12(x))))			\n\
+			def f14(float x) float : f13(f13(f13(f13(x))))			\n\
+			def f15(float x) float : f14(f14(f14(f14(x))))			\n\
+			def f16(float x) float : f15(f15(f15(f15(x))))			\n\
+			def f17(float x) float : f16(f16(f16(f16(x))))			\n\
+			def f18(float x) float : f17(f17(f17(f17(x))))			\n\
+			def f19(float x) float : f18(f18(f18(f18(x))))			\n\
+			def f20(float x) float : f19(f19(f19(f19(x))))			\n\
+			def main(float x) float : f20(x)");
+	}
+}
+
+
 void LanguageTests::run()
 {
 	Timer timer;
@@ -4348,6 +4446,8 @@ void LanguageTests::run()
 	testFunctionRedefinition();
 
 	testUseOfLaterDefinition();
+
+	testTimeBounds();
 
 
 	// TODO: why is this vector being parsed as doubles?
