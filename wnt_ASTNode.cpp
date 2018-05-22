@@ -710,8 +710,7 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::v
 				break;
 			}
 
-			if(expr->a->type()->getType() == Type::ArrayTypeType || expr->a->type()->getType() == Type::StringType ||
-				expr->a->type()->getType() == Type::VArrayTypeType || expr->a->type()->getType() == Type::VectorTypeType)
+			if(expr->a->type()->requiresCompareEqualFunction())
 			{
 				// == and != are not overloadable, but are instead built-in
 				if(expr->token->getType() == DOUBLE_EQUALS_TOKEN)

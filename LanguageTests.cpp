@@ -1782,6 +1782,55 @@ static void testTuples()
 	// Test varying index (invalid)
 	testMainFloatArgInvalidProgram("def f(float x) tuple<float, float> : (x, x)   \n\
 		def main(float x) float :  elem(f(x), truncateToInt(x))");
+
+	// ===================================================================
+	// Test comparison operators == and !=
+	// ===================================================================
+	
+	// Test ==
+	testMainFloat("def eq(tuple<float, float> a, tuple<float, float> b) !noinline bool : a == b     \n\
+				  def main() float : eq([1.0, 2.0]t, [1.0, 2.0]t) ? 1.0 : 0.0",
+				  1.0f);
+
+	testMainFloat("def eq(tuple<float, float> a, tuple<float, float> b) !noinline bool : a == b     \n\
+				  def main() float : eq([1.0, 2.0]t, [1.0, 3.0]t) ? 1.0 : 0.0",
+				  0.0f);
+
+	// Test == without !noline to test winter interpreted execution/constant folding.
+	testMainFloat("def main() float : [1.0, 2.0]t == [1.0, 2.0]t ? 1.0 : 0.0", 1.0f);
+	testMainFloat("def main() float : [1.0, 2.0]t == [1.0, 3.0]t ? 1.0 : 0.0", 0.0f);
+	
+	// Test !=
+	testMainFloat("def neq(tuple<float, float> a, tuple<float, float> b) !noinline bool : a != b     \n\
+				  def main() float : neq([1.0, 2.0]t, [1.0, 3.0]t) ? 1.0 : 0.0",
+				  1.0f);
+				  
+	testMainFloat("def neq(tuple<float, float> a, tuple<float, float> b) !noinline bool : a != b     \n\
+				  def main() float : neq([1.0, 2.0]t, [1.0, 2.0]t) ? 1.0 : 0.0",
+				  0.0f);
+
+	// Test != without !noline to test winter interpreted execution/constant folding.
+	testMainFloat("def main() float : [1.0, 2.0]t != [1.0, 3.0]t ? 1.0 : 0.0", 1.0f);
+	testMainFloat("def main() float : [1.0, 2.0]t != [1.0, 2.0]t ? 1.0 : 0.0", 0.0f);
+
+	
+	// Test with a tuple in a tuple
+	testMainFloat("def eq(tuple<tuple<int>, tuple<int> > a, tuple<tuple<int>, tuple<int> > b) !noinline bool : a == b     \n\
+				  def main() float : eq([[1]t, [2]t]t, [[1]t, [2]t]t) ? 1.0 : 0.0",
+				  1.0f);
+
+	testMainFloat("def eq(tuple<tuple<int>, tuple<int> > a, tuple<tuple<int>, tuple<int> > b) !noinline bool : a == b     \n\
+				  def main() float : eq([[1]t, [2]t]t, [[1]t, [3]t]t) ? 1.0 : 0.0",
+				  0.0f);
+
+	// Test with a string in a tuple
+	testMainFloat("def eq(tuple<string> a, tuple<string> b) !noinline bool : a == b     \n\
+				  def main() float : eq([\"a\"]t, [\"a\"]t) ? 1.0 : 0.0",
+				  1.0f);
+
+	testMainFloat("def eq(tuple<string> a, tuple<string> b) !noinline bool : a == b     \n\
+				  def main() float : eq([\"a\"]t, [\"b\"]t) ? 1.0 : 0.0",
+				  0.0f);
 }
 
 
@@ -2162,10 +2211,6 @@ static void testIfThenElse()
 
 static void stringTests()
 {
-	// ===================================================================
-	// String tests
-	// ===================================================================
-
 	// String test - string literal in let statement, with assignment.
 	testMainIntegerArg(
 		"def main(int x) int : length(concatStrings(\"hello\", \"world\"))",
@@ -2250,6 +2295,54 @@ static void stringTests()
 			in								\n\
 				10",
 		2, 10);
+
+
+	// ===================================================================
+	// Test comparisons
+	// ===================================================================
+
+	// Test ==
+	testMainIntegerArg("def f(string a, string b) !noinline bool : a == b     \n\
+		def main(int x) int : f(\"hello\", \"world\") ? 1 : 0",
+		0, /*target=*/0, INVALID_OPENCL);
+
+	testMainIntegerArg("def f(string a, string b) !noinline bool : a == b     \n\
+		def main(int x) int : f(\"hello\", \"hello\") ? 1 : 0",
+		0, /*target=*/1, INVALID_OPENCL);
+
+	// Test == with empty string
+	testMainIntegerArg("def f(string a, string b) !noinline bool : a == b     \n\
+		def main(int x) int : f(\"\", \"\") ? 1 : 0",
+		0, /*target=*/1, INVALID_OPENCL);
+
+	// Test !=
+	testMainIntegerArg("def f(string a, string b) !noinline bool : a != b     \n\
+		def main(int x) int : f(\"hello\", \"hello\") ? 1 : 0",
+		0, /*target=*/0, INVALID_OPENCL);
+
+	testMainIntegerArg("def f(string a, string b) !noinline bool : a != b     \n\
+		def main(int x) int : f(\"hello\", \"world\") ? 1 : 0",
+		0, /*target=*/1, INVALID_OPENCL);
+
+	// Test != with empty string
+	testMainIntegerArg("def f(string a, string b) !noinline bool : a != b     \n\
+		def main(int x) int : f(\"\", \"\") ? 1 : 0",
+		0, /*target=*/0, INVALID_OPENCL);
+
+
+	// Test == without noinline function, to test interpretation
+	testMainIntegerArg("def main(int x) int : \"hello\" == \"world\" ? 1 : 0",
+		0, /*target=*/0, INVALID_OPENCL);
+
+	testMainIntegerArg("def main(int x) int : \"hello\" == \"hello\" ? 1 : 0",
+		0, /*target=*/1, INVALID_OPENCL);
+
+	// Test != without noinline function, to test interpretation
+	testMainIntegerArg("def main(int x) int : \"hello\" != \"world\" ? 1 : 0",
+		0, /*target=*/1, INVALID_OPENCL);
+
+	testMainIntegerArg("def main(int x) int : \"hello\" != \"hello\" ? 1 : 0",
+		0, /*target=*/0, INVALID_OPENCL);
 }
 
 
