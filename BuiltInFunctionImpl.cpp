@@ -4282,7 +4282,12 @@ llvm::Value* CompareEqualBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) c
 	{
 		const VectorType* a_vector_type = arg_type.downcastToPtr<VectorType>();
 
-		llvm::Value* par_eq = params.builder->CreateFCmpOEQ(a_code, b_code); // parallel (element-wise) compare
+		// parallel (element-wise) compare
+		llvm::Value* par_eq = is_compare_not_equal ? 
+			params.builder->CreateFCmpONE(a_code, b_code) :
+			params.builder->CreateFCmpOEQ(a_code, b_code);
+
+		// TODO: for later LLVMs, use experimental horizontal reduce here to do the reduction.
 
 		llvm::Value* elem_0 = params.builder->CreateExtractElement(par_eq, 
 			llvm::ConstantInt::get(*params.context, llvm::APInt(/*num bits=*/32, /*value=*/0)));

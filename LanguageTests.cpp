@@ -4071,8 +4071,117 @@ static void testVectors()
 		"def main(int x) int: elem(   [1, 2, 3, 4]v * x, 1)",
 		2, 4);
 
-	
+	//================== Test '==' ============================
 
+	// Test for vector<float, 2>
+	testMainFloatArg(
+		"def f(vector<float, 2> a, vector<float, 2> b) !noinline bool : a == b   \n\
+		def main(float x) float : f([x, 2.0]v, [1.0, 2.0]v) ? 1.0 : 0.0",
+		1.0f, 1.0f);
+
+	testMainFloatArg(
+		"def f(vector<float, 2> a, vector<float, 2> b) !noinline bool : a == b   \n\
+		def main(float x) float : f([x, 2.0]v, [1.0, 2.0]v) ? 1.0 : 0.0",
+		1.5f, 0.0f);
+
+	testMainFloatArg(
+		"def f(vector<float, 2> a, vector<float, 2> b) !noinline bool : a == b   \n\
+		def main(float x) float : f([1.0, x]v, [1.0, 2.0]v) ? 1.0 : 0.0",
+		2.0f, 1.0f);
+
+	testMainFloatArg(
+		"def f(vector<float, 2> a, vector<float, 2> b) !noinline bool : a == b   \n\
+		def main(float x) float : f([1.0, x]v, [1.0, 2.0]v) ? 1.0 : 0.0",
+		1.5f, 0.0f);
+
+	// Test for vector<float, 4>
+	testMainFloatArg(
+		"def f(vector<float, 4> a, vector<float, 4> b) !noinline bool : a == b   \n\
+		def main(float x) float : f([x, 2.0, 3.0, 4.0]v, [1.0, 2.0, 3.0, 4.0]v) ? 1.0 : 0.0",
+		1.0f, 1.0f);
+
+	testMainFloatArg(
+		"def f(vector<float, 4> a, vector<float, 4> b) !noinline bool : a == b   \n\
+		def main(float x) float : f([x, 2.0, 3.0, 4.0]v, [1.0, 2.0, 3.0, 4.0]v) ? 1.0 : 0.0",
+		1.5f, 0.0f);
+
+	// Test for vector<double, 2>
+	testMainDoubleArg(
+		"def f(vector<double, 2> a, vector<double, 2> b) !noinline bool : a == b   \n\
+		def main(double x) double : f([x, 2.0]v, [1.0, 2.0]v) ? 1.0 : 0.0",
+		1.0f, 1.0f);
+
+	testMainDoubleArg(
+		"def f(vector<double, 2> a, vector<double, 2> b) !noinline bool : a == b   \n\
+		def main(double x) double : f([x, 2.0]v, [1.0, 2.0]v) ? 1.0 : 0.0",
+		1.5f, 0.0f);
+
+	// Test for vector<double, 4>
+	testMainDoubleArg(
+		"def f(vector<double, 4> a, vector<double, 4> b) !noinline bool : a == b   \n\
+		def main(double x) double : f([x, 2.0, 3.0, 4.0]v, [1.0, 2.0, 3.0, 4.0]v) ? 1.0 : 0.0",
+		1.0f, 1.0f);
+
+	testMainDoubleArg(
+		"def f(vector<double, 4> a, vector<double, 4> b) !noinline bool : a == b   \n\
+		def main(double x) double : f([x, 2.0, 3.0, 4.0]v, [1.0, 2.0, 3.0, 4.0]v) ? 1.0 : 0.0",
+		1.5f, 0.0f);
+
+	//================== Test '!=' ============================
+
+	// Test for vector<float, 2>
+	testMainFloatArg(
+		"def f(vector<float, 2> a, vector<float, 2> b) !noinline bool : a != b   \n\
+		def main(float x) float : f([x, 2.0]v, [1.0, 2.0]v) ? 1.0 : 0.0",
+		1.0f, 0.0f);
+
+	testMainFloatArg(
+		"def f(vector<float, 2> a, vector<float, 2> b) !noinline bool : a != b   \n\
+		def main(float x) float : f([x, 2.0]v, [1.0, 2.0]v) ? 1.0 : 0.0",
+		1.5f, 1.0f);
+
+	testMainFloatArg(
+		"def f(vector<float, 2> a, vector<float, 2> b) !noinline bool : a != b   \n\
+		def main(float x) float : f([1.0, x]v, [1.0, 2.0]v) ? 1.0 : 0.0",
+		2.0f, 0.0f);
+
+	testMainFloatArg(
+		"def f(vector<float, 2> a, vector<float, 2> b) !noinline bool : a != b   \n\
+		def main(float x) float : f([1.0, x]v, [1.0, 2.0]v) ? 1.0 : 0.0",
+		1.5f, 1.0f);
+
+	// Test for vector<float, 4>
+	testMainFloatArg(
+		"def f(vector<float, 4> a, vector<float, 4> b) !noinline bool : a != b   \n\
+		def main(float x) float : f([x, 2.0, 3.0, 4.0]v, [1.0, 2.0, 3.0, 4.0]v) ? 1.0 : 0.0",
+		1.0f, 0.0f);
+
+	testMainFloatArg(
+		"def f(vector<float, 4> a, vector<float, 4> b) !noinline bool : a != b   \n\
+		def main(float x) float : f([x, 2.0, 3.0, 4.0]v, [1.0, 2.0, 3.0, 4.0]v) ? 1.0 : 0.0",
+		1.5f, 1.0f);
+
+	// Test for vector<double, 2>
+	testMainDoubleArg(
+		"def f(vector<double, 2> a, vector<double, 2> b) !noinline bool : a != b   \n\
+		def main(double x) double : f([x, 2.0]v, [1.0, 2.0]v) ? 1.0 : 0.0",
+		1.0f, 0.0f);
+
+	testMainDoubleArg(
+		"def f(vector<double, 2> a, vector<double, 2> b) !noinline bool : a != b   \n\
+		def main(double x) double : f([x, 2.0]v, [1.0, 2.0]v) ? 1.0 : 0.0",
+		1.5f, 1.0f);
+
+	// Test for vector<double, 4>
+	testMainDoubleArg(
+		"def f(vector<double, 4> a, vector<double, 4> b) !noinline bool : a != b   \n\
+		def main(double x) double : f([x, 2.0, 3.0, 4.0]v, [1.0, 2.0, 3.0, 4.0]v) ? 1.0 : 0.0",
+		1.0f, 0.0f);
+
+	testMainDoubleArg(
+		"def f(vector<double, 4> a, vector<double, 4> b) !noinline bool : a != b   \n\
+		def main(double x) double : f([x, 2.0, 3.0, 4.0]v, [1.0, 2.0, 3.0, 4.0]v) ? 1.0 : 0.0",
+		1.5f, 1.0f);
 
 	// Test integer in-bounds runtime index access to vector
 	/*testMainIntegerArg(

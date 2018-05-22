@@ -1956,7 +1956,14 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 		"float dot1_vector_float__4___vector_float__4__(float4 a, float4 b) { return a.x * b.x; } \n"
 		"float dot2_vector_float__4___vector_float__4__(float4 a, float4 b) { return a.x * b.x + a.y * b.y; } \n"
 		"float dot3_vector_float__4___vector_float__4__(float4 a, float4 b) { return a.x * b.x + a.y * b.y + a.z * b.z; } \n"
-		"float dot4_vector_float__4___vector_float__4__(float4 a, float4 b) { return dot(a, b); } \n";
+		"float dot4_vector_float__4___vector_float__4__(float4 a, float4 b) { return dot(a, b); } \n"
+		"bool __compare_equal_vector_float__2___vector_float__2__(float2 a, float2 b) { return all(a == b); } \n"
+		"bool __compare_equal_vector_float__4___vector_float__4__(float4 a, float4 b) { return all(a == b); } \n"
+		"bool __compare_equal_vector_float__8___vector_float__8__(float8 a, float8 b) { return all(a == b); } \n"
+		"bool __compare_not_equal_vector_float__2___vector_float__2__(float2 a, float2 b) { return any(a != b); } \n"
+		"bool __compare_not_equal_vector_float__4___vector_float__4__(float4 a, float4 b) { return any(a != b); } \n"
+		"bool __compare_not_equal_vector_float__8___vector_float__8__(float8 a, float8 b) { return any(a != b); } \n"
+		;
 
 	if(vm_args.emit_opencl_printf_calls)
 	{
@@ -1989,7 +1996,14 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 			"double dot1_vector_double__4___vector_double__4__(double4 a, double4 b) { return a.x * b.x; } \n"
 			"double dot2_vector_double__4___vector_double__4__(double4 a, double4 b) { return a.x * b.x + a.y * b.y; } \n"
 			"double dot3_vector_double__4___vector_double__4__(double4 a, double4 b) { return a.x * b.x + a.y * b.y + a.z * b.z; } \n"
-			"double dot4_vector_double__4___vector_double__4__(double4 a, double4 b) { return dot(a, b); } \n";
+			"double dot4_vector_double__4___vector_double__4__(double4 a, double4 b) { return dot(a, b); } \n"
+			"bool __compare_equal_vector_double__2___vector_double__2__(double2 a, double2 b) { return all(a == b); } \n"
+			"bool __compare_equal_vector_double__4___vector_double__4__(double4 a, double4 b) { return all(a == b); } \n"
+			"bool __compare_equal_vector_double__8___vector_double__8__(double8 a, double8 b) { return all(a == b); } \n"
+			"bool __compare_not_equal_vector_double__2___vector_double__2__(double2 a, double2 b) { return any(a != b); } \n"
+			"bool __compare_not_equal_vector_double__4___vector_double__4__(double4 a, double4 b) { return any(a != b); } \n"
+			"bool __compare_not_equal_vector_double__8___vector_double__8__(double8 a, double8 b) { return any(a != b); } \n"
+			;
 
 		if(vm_args.emit_opencl_printf_calls)
 			built_in_func_code += "double print_double_(double x) { printf((__constant char *)\"%f\\n\", x); return x; }    \n";
