@@ -1961,7 +1961,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			return_val_addr = entry_block_builder.CreateAlloca(
 				target_ret_type->LLVMType(*params.module), // type
 				llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1, true)), // num elems
-				this->static_target_function->sig.name + "() ret"
+				"res"
 			);
 		}
 
