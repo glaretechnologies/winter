@@ -559,7 +559,7 @@ void testTimeBoundInvalidForMainFloatArg(const std::string& src, uint32 test_fla
 		try
 		{
 			GetTimeBoundParams params;
-			const size_t bound = maindef->getTimeBound(params);
+			maindef->getTimeBound(params);
 
 			stdErrPrint("Error: expected getTimeBound() to throw an exception.");
 			assert(0);
