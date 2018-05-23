@@ -2614,9 +2614,9 @@ static void testExternalMathsFunctions()
 	testMainDoubleArg("def main(double x) double : cosh(x)", 0.3, std::cosh(0.3), INCLUDE_EXTERNAL_MATHS_FUNCS);
 	testMainFloatArg("def main(float x) float : cosh(0.5f)", 0.3f, std::cosh(0.5f), INCLUDE_EXTERNAL_MATHS_FUNCS);
 	// acosh
-	testMainFloatArg("def main(float x) float : acosh(x)", 0.3f, std::acosh(0.3f), INCLUDE_EXTERNAL_MATHS_FUNCS);
-	testMainDoubleArg("def main(double x) double : acosh(x)", 0.3, std::acosh(0.3), INCLUDE_EXTERNAL_MATHS_FUNCS);
-	testMainFloatArg("def main(float x) float : acosh(0.5f)", 0.3f, std::acosh(0.5f), INCLUDE_EXTERNAL_MATHS_FUNCS);
+	testMainFloatArg("def main(float x) float : acosh(x)", 2.0f, std::acosh(2.0f), INCLUDE_EXTERNAL_MATHS_FUNCS);
+	testMainDoubleArg("def main(double x) double : acosh(x)", 2.0, std::acosh(2.0), INCLUDE_EXTERNAL_MATHS_FUNCS);
+	testMainFloatArg("def main(float x) float : acosh(2.0f)", 2.2f, std::acosh(2.0f), INCLUDE_EXTERNAL_MATHS_FUNCS);
 
 	// tanh
 	testMainFloatArg("def main(float x) float : tanh(x)", 0.3f, std::tanh(0.3f), INCLUDE_EXTERNAL_MATHS_FUNCS);
