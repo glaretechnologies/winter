@@ -1388,6 +1388,70 @@ void testMainUInt32Arg(const std::string& src, uint32 x, uint32 target_return_va
 }
 
 
+void testMainBoolArg(const std::string& src, bool x, bool target_return_val, uint32 test_flags)
+{
+	testPrint("===================== Winter testMainBoolArg() =====================");
+	try
+	{
+		VMConstructionArgs vm_args;
+		vm_args.allow_unsafe_operations = (test_flags & ALLOW_UNSAFE) != 0;
+		vm_args.source_buffers.push_back(new SourceBuffer("buffer", src));
+		const FunctionSignature mainsig("main", std::vector<TypeVRef>(1, new Bool()));
+		vm_args.entry_point_sigs.push_back(mainsig);
+		VirtualMachine vm(vm_args);
+		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig); // Get main function
+
+		bool (WINTER_JIT_CALLING_CONV *f)(bool, void*) = (bool (WINTER_JIT_CALLING_CONV *)(bool, void*)) vm.getJittedFunction(mainsig);
+
+		const bool jitted_result = f(x, NULL); // Call the JIT'd function
+
+		printVar(jitted_result);
+
+		// Check JIT'd result.
+		if(jitted_result != target_return_val)
+		{
+			stdErrPrint("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
+			assert(0);
+			exit(1);
+		}
+
+		VMState vmstate;
+		vmstate.func_args_start.push_back(0);
+		vmstate.argument_stack.push_back(new BoolValue(x));
+
+		ValueRef retval = maindef->invoke(vmstate);
+		vmstate.func_args_start.pop_back();
+		
+		if(retval->valueType() != Value::ValueType_Bool)
+		{
+			stdErrPrint("main() Return value was of unexpected type.");
+			assert(0);
+			exit(1);
+		}
+		BoolValue* val = static_cast<BoolValue*>(retval.getPointer());
+
+		if(val->value != target_return_val)
+		{
+			stdErrPrint("Test failed: main returned " + toString(val->value) + ", target was " + toString(target_return_val));
+			assert(0);
+			exit(1);
+		}
+	}
+	catch(Winter::BaseException& e)
+	{
+		stdErrPrint(e.what());
+		assert(0);
+		exit(1);
+	}
+	catch(Indigo::Exception& e)
+	{
+		stdErrPrint(e.what());
+		assert(0);
+		exit(1);
+	}
+}
+
+
 void testMainIntegerArgInvalidProgram(const std::string& src)
 {
 	testPrint("===================== Winter testMainIntegerArgInvalidProgram() =====================");

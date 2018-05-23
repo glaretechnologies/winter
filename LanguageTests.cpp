@@ -4366,6 +4366,23 @@ static void testUseOfLaterDefinition()
 }
 
 
+// Test interfacing with C++ with functions that take and return bools.
+static void testBoolFunctions()
+{
+	testMainBoolArg("def main(bool x) bool : x", true, true);
+	testMainBoolArg("def main(bool x) bool : x", false, false);
+	testMainBoolArg("def main(bool x) bool : true", false, true);
+	testMainBoolArg("def main(bool x) bool : false", true, false);
+
+	// For vector equality, LLVM is generating code that is returning 255 in RAX, not 1.
+	testMainBoolArg("def f(vector<float, 2> a, vector<float, 2> b) !noinline bool : a == b       \n\
+		def main(bool x) bool : [1.0f, 2.0f]v == [1.0f, 2.0f]v", false, true);
+
+	testMainBoolArg("def f(vector<float, 2> a, vector<float, 2> b) !noinline bool : a == b       \n\
+		def main(bool x) bool : [1.0f, 2.0f]v == [1.0f, 3.0f]v", false, false);
+}
+
+
 static void testTimeBounds()
 {
 	const size_t sin_time = 30; // See SinBuiltInFunc::getTimeBound().
@@ -4669,6 +4686,8 @@ void LanguageTests::run()
 	testLambdaExpressionsAndClosures();
 	
 	testStructs();
+
+	testBoolFunctions();
 
 	testVectors();
 

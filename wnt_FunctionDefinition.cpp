@@ -1148,6 +1148,10 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 	//	llvm_func->addAttribute(llvm::AttributeSet::ReturnIndex, llvm::Attribute::NonNull);
 	}
 
+	// Boolean type needs to have zero-extend attribute to be ABI-compatible with C++.
+	if(this->returnType()->getType() == Type::BoolType)
+		llvm_func->addAttribute(UseAttributeList::ReturnIndex, llvm::Attribute::ZExt);
+
 	// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
 	llvm_func->setCallingConv(llvm::CallingConv::C);
 
@@ -1195,6 +1199,14 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 				llvm::AttrBuilder builder;
 				builder.addAttribute(llvm::Attribute::ReadOnly);
 				builder.addAttribute(llvm::Attribute::NoAlias);
+				setArgumentAttributes(&module->getContext(), AI, /*index=*/i + 1, builder);
+			}
+
+			// Boolean type needs to have zero-extend attribute to be ABI-compatible with C++.
+			if(this->args[winter_arg_index].type->getType() == Type::BoolType)
+			{
+				llvm::AttrBuilder builder;
+				builder.addAttribute(llvm::Attribute::ZExt);
 				setArgumentAttributes(&module->getContext(), AI, /*index=*/i + 1, builder);
 			}
 

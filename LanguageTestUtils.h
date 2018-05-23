@@ -148,6 +148,7 @@ TestResults testMainIntegerArg(const std::string& src, int x, int target_return_
 void testMainInt64Arg(const std::string& src, int64 x, int64 target_return_val, uint32 test_flags = 0);
 void testMainInt16Arg(const std::string& src, int16 x, int16 target_return_val, uint32 test_flags = 0);
 void testMainUInt32Arg(const std::string& src, uint32 x, uint32 target_return_val, uint32 test_flags = 0);
+void testMainBoolArg(const std::string& src, bool x, bool target_return_val, uint32 test_flags = 0);
 void testMainIntegerArgInvalidProgram(const std::string& src);
 void testFloat4StructPairRetFloat(const std::string& src, const Float4StructPair& a, const Float4StructPair& b, float target_return_val);
 void testVectorInStruct(const std::string& src, const StructWithVec& struct_in, const StructWithVec& target_return_val);
