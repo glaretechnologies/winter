@@ -2604,28 +2604,37 @@ static void testExternalMathsFunctions()
 	testMainFloatArg("def main(float x) float : sinh(x)", 0.3f, std::sinh(0.3f), INCLUDE_EXTERNAL_MATHS_FUNCS);
 	testMainDoubleArg("def main(double x) double : sinh(x)", 0.3, std::sinh(0.3), INCLUDE_EXTERNAL_MATHS_FUNCS);
 	testMainFloatArg("def main(float x) float : sinh(0.5f)", 0.3f, std::sinh(0.5f), INCLUDE_EXTERNAL_MATHS_FUNCS);
+
+#if !defined(_MSC_VER) || _MSC_VER >= 1800 // asinh etc.. are only available in Visual Studio 2013+
 	// asinh
 	testMainFloatArg("def main(float x) float : asinh(x)", 0.3f, std::asinh(0.3f), INCLUDE_EXTERNAL_MATHS_FUNCS);
 	testMainDoubleArg("def main(double x) double : asinh(x)", 0.3, std::asinh(0.3), INCLUDE_EXTERNAL_MATHS_FUNCS);
 	testMainFloatArg("def main(float x) float : asinh(0.5f)", 0.3f, std::asinh(0.5f), INCLUDE_EXTERNAL_MATHS_FUNCS);
+#endif
 
 	// cosh
 	testMainFloatArg("def main(float x) float : cosh(x)", 0.3f, std::cosh(0.3f), INCLUDE_EXTERNAL_MATHS_FUNCS);
 	testMainDoubleArg("def main(double x) double : cosh(x)", 0.3, std::cosh(0.3), INCLUDE_EXTERNAL_MATHS_FUNCS);
 	testMainFloatArg("def main(float x) float : cosh(0.5f)", 0.3f, std::cosh(0.5f), INCLUDE_EXTERNAL_MATHS_FUNCS);
+
+#if !defined(_MSC_VER) || _MSC_VER >= 1800
 	// acosh
 	testMainFloatArg("def main(float x) float : acosh(x)", 2.0f, std::acosh(2.0f), INCLUDE_EXTERNAL_MATHS_FUNCS);
 	testMainDoubleArg("def main(double x) double : acosh(x)", 2.0, std::acosh(2.0), INCLUDE_EXTERNAL_MATHS_FUNCS);
 	testMainFloatArg("def main(float x) float : acosh(2.0f)", 2.2f, std::acosh(2.0f), INCLUDE_EXTERNAL_MATHS_FUNCS);
+#endif
 
 	// tanh
 	testMainFloatArg("def main(float x) float : tanh(x)", 0.3f, std::tanh(0.3f), INCLUDE_EXTERNAL_MATHS_FUNCS);
 	testMainDoubleArg("def main(double x) double : tanh(x)", 0.3, std::tanh(0.3), INCLUDE_EXTERNAL_MATHS_FUNCS);
 	testMainFloatArg("def main(float x) float : tanh(0.5f)", 0.3f, std::tanh(0.5f), INCLUDE_EXTERNAL_MATHS_FUNCS);
+
+#if !defined(_MSC_VER) || _MSC_VER >= 1800
 	// atanh
 	testMainFloatArg("def main(float x) float : atanh(x)", 0.3f, std::atanh(0.3f), INCLUDE_EXTERNAL_MATHS_FUNCS);
 	testMainDoubleArg("def main(double x) double : atanh(x)", 0.3, std::atanh(0.3), INCLUDE_EXTERNAL_MATHS_FUNCS);
 	testMainFloatArg("def main(float x) float : atanh(0.5f)", 0.3f, std::atanh(0.5f), INCLUDE_EXTERNAL_MATHS_FUNCS);
+#endif
 
 	// atan2
 	testMainFloatArg("def main(float x) float : atan2(x, 0.4f)", 0.3f, std::atan2(0.3f, 0.4f), INCLUDE_EXTERNAL_MATHS_FUNCS);

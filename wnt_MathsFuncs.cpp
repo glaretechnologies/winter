@@ -119,6 +119,8 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		30 // time_bound
 	));
 
+	// asinh etc.. are only available in Visual Studio 2013+
+#if !defined(_MSC_VER) || _MSC_VER >= 1800
 	external_functions.push_back(new ExternalFunction(
 		(void*)asinhf,
 		NULL,
@@ -134,6 +136,7 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		double_type,
 		30 // time_bound
 	));
+#endif
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)coshf,
@@ -151,6 +154,7 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		30 // time_bound
 	));
 
+#if !defined(_MSC_VER) || _MSC_VER >= 1800
 	external_functions.push_back(new ExternalFunction(
 		(void*)acoshf,
 		NULL,
@@ -166,6 +170,7 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		double_type,
 		30 // time_bound
 	));
+#endif
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)tanhf,
@@ -183,6 +188,7 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		30 // time_bound
 	));
 
+#if !defined(_MSC_VER) || _MSC_VER >= 1800
 	external_functions.push_back(new ExternalFunction(
 		(void*)atanhf,
 		NULL,
@@ -198,6 +204,7 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		double_type,
 		30 // time_bound
 	));
+#endif
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)(double(*)(double))atan,
