@@ -4280,14 +4280,24 @@ llvm::Value* CompareEqualBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) c
 	}
 	case Type::VectorTypeType:
 	{
-		const VectorType* a_vector_type = arg_type.downcastToPtr<VectorType>();
-
 		// parallel (element-wise) compare
 		llvm::Value* par_eq = is_compare_not_equal ? 
 			params.builder->CreateFCmpONE(a_code, b_code) :
 			params.builder->CreateFCmpOEQ(a_code, b_code);
 
-		// TODO: for later LLVMs, use experimental horizontal reduce here to do the reduction.
+		// For later LLVMs, use experimental horizontal reduce here to do the reduction.
+#if TARGET_LLVM_VERSION >= 60
+
+		llvm::Type* types[] = { llvm::Type::getIntNTy(*params.context, 1), // elem type
+			par_eq->getType() }; // vector type
+
+		llvm::Function* vec_reduce_and = llvm::Intrinsic::getDeclaration(params.module, 
+			is_compare_not_equal ? llvm::Intrinsic::experimental_vector_reduce_or : llvm::Intrinsic::experimental_vector_reduce_and, 
+			types);
+
+		return params.builder->CreateCall(vec_reduce_and, par_eq);
+#else
+		const VectorType* a_vector_type = arg_type.downcastToPtr<VectorType>();
 
 		llvm::Value* elem_0 = params.builder->CreateExtractElement(par_eq, 
 			llvm::ConstantInt::get(*params.context, llvm::APInt(/*num bits=*/32, /*value=*/0)));
@@ -4301,6 +4311,7 @@ llvm::Value* CompareEqualBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) c
 			conjunction = params.builder->CreateBinOp(is_compare_not_equal ? llvm::Instruction::Or : llvm::Instruction::And, conjunction, elem_i);
 		}
 		return conjunction;
+#endif
 	}
 	case Type::StringType:
 		return emitCallToBinaryFunction(params.builder, params.module, is_compare_not_equal ? "compareNotEqualString" : "compareEqualString", arg_type, a_code, b_code);
