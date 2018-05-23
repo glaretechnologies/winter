@@ -97,7 +97,7 @@ namespace Winter
 
 // Dumps to "unoptimised_module_IR.txt", "optimised_module_IR.txt" in current working dir.
 // Also dumps to "module_assembly.txt" in current working dir.
-static const bool DUMP_MODULE_IR_AND_ASSEMBLY = false; 
+static const bool DUMP_MODULE_IR_AND_ASSEMBLY = false;
 
 
 //=====================================================================================
