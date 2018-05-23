@@ -4293,7 +4293,7 @@ llvm::Value* CompareEqualBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) c
 			llvm::ConstantInt::get(*params.context, llvm::APInt(/*num bits=*/32, /*value=*/0)));
 
 		llvm::Value* conjunction = elem_0;
-		for(unsigned int i=0; i<a_vector_type->num; ++i)
+		for(unsigned int i=1; i<a_vector_type->num; ++i)
 		{
 			llvm::Value* elem_i = params.builder->CreateExtractElement(par_eq, 
 				llvm::ConstantInt::get(*params.context, llvm::APInt(/*num bits=*/32, /*value=*/i)));
