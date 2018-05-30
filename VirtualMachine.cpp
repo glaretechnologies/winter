@@ -829,11 +829,16 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 
 			// There is an issue with LLVM, that if it encounters a newer CPU model than it knows about, then it just returns 
 			// "x86-64", which has less feature support than we actually have.  So in this case just use "corei7" which should give us the features we need.
+			// This issue seems to have been fixed in LLVM 6, which tries to autodetect a suitable cpu if it doesn't have an exact match.
 			std::string cpu_name;
+#if TARGET_LLVM_VERSION >= 60
+			cpu_name = llvm::sys::getHostCPUName();
+#else
 			if(cpu_info.family == 6 && cpu_info.model > 70)
 				cpu_name = "corei7";
 			else
 				cpu_name = llvm::sys::getHostCPUName();
+#endif
 
 			// Select the host computer architecture as the target.
 			this->target_machine = engine_builder.selectTarget(
