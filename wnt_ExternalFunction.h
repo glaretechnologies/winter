@@ -12,6 +12,7 @@ Generated at Wed Oct 27 16:44:39 +1300 2010
 #include <utils/Reference.h>
 #include <utils/RefCounted.h>
 #include "Value.h"
+#include <limits>
 
 
 namespace Winter
