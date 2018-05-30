@@ -332,10 +332,6 @@ size_t TupleLiteral::getTimeBound(GetTimeBoundParams& params) const
 
 GetSpaceBoundResults TupleLiteral::getSpaceBound(GetSpaceBoundParams& params) const
 {
-	TypeRef this_type = this->type();
-	assert(this_type->getType() == Type::TupleTypeType);
-	TupleType* tuple_type = static_cast<TupleType*>(this_type.getPointer());
-
 	// Compute space to compute the element values:
 	GetSpaceBoundResults sum(0, 0);
 	for(size_t i=0; i<elements.size(); ++i)

@@ -1569,8 +1569,9 @@ GetSpaceBoundResults FunctionDefinition::getSpaceBound(GetSpaceBoundParams& para
 {
 	// TODO: handle space for lambdas as well
 
-	//llvm::MachineFrameInfo &MFI = built_llvm_function->,machinefiunc getFrameInfo();
-
+	// We require LLVM 6.0 in order to use the diagnostic callback interface, which allows us to get the stack 
+	// size used by functions.  If we can't use this information, just use a large upper bound which should suffice.
+#if TARGET_LLVM_VERSION >= 60
 	// If llvm_used_stack_size == -1, then this information wasn't set by LLVM.  This probably means that this 
 	// function wasn't compiled, due it being inlined and then dead-code removed.
 	// It could also mean that it literally used zero stack size, for instance if it just gets compiled down to 
@@ -1579,6 +1580,9 @@ GetSpaceBoundResults FunctionDefinition::getSpaceBound(GetSpaceBoundParams& para
 
 	use_stack_size += sizeof(void*);// The call instruction pushes the return address onto the stack.
 	// Consider this space part of the stack used by functions.
+#else
+	const size_t use_stack_size = 512;
+#endif
 
 	if(built_in_func_impl.nonNull())
 	{

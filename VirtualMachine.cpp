@@ -75,9 +75,11 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Analysis/Lint.h"
+#if TARGET_LLVM_VERSION >= 60
 #include "llvm/IR/DiagnosticHandler.h"
 #include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/IR/DiagnosticInfo.h"
+#endif
 #ifdef _MSC_VER
 #pragma warning(pop) // Re-enable warnings
 #endif
@@ -898,11 +900,13 @@ void VirtualMachine::init()
 	llvm::InitializeNativeTarget();
 	llvm::InitializeNativeTargetAsmPrinter();
 
+#if TARGET_LLVM_VERSION >= 60
 	// Enable -warn-stack-size= option.
 	// We use this to get the stack size for compiled functions.
 	// The option boolean is a global static, so set it once here.
 	const char* argv[] = { "dummyprogname", "-warn-stack-size=0" };
 	llvm::cl::ParseCommandLineOptions(2, argv);
+#endif
 }
 
 
@@ -1404,6 +1408,8 @@ static const llvm::DataLayout* getDataLayout(llvm::ExecutionEngine* llvm_exec_en
 }
 
 
+// DiagnosticHandler does not seem to be present in earlier LLVMS (e.g. 3.4).
+#if TARGET_LLVM_VERSION >= 60
 struct WinterDiagHandler : public llvm::DiagnosticHandler
 {
 	virtual bool handleDiagnostics(const llvm::DiagnosticInfo& info)
@@ -1434,14 +1440,16 @@ struct WinterDiagHandler : public llvm::DiagnosticHandler
 
 	std::unordered_map<const llvm::Function*, uint64>* stack_sizes;
 };
+#endif
 
 
 void VirtualMachine::build(const VMConstructionArgs& args)
 {
+#if TARGET_LLVM_VERSION >= 60
 	WinterDiagHandler* handler = new WinterDiagHandler();
 	handler->stack_sizes = &this->stack_sizes;
 	this->llvm_context->setDiagnosticHandler(std::unique_ptr<WinterDiagHandler>(handler));
-
+#endif
 
 	this->llvm_module->setDataLayout(getDataLayout(llvm_exec_engine)->getStringRepresentation());
 
