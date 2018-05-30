@@ -404,4 +404,22 @@ size_t VectorLiteral::getTimeBound(GetTimeBoundParams& params) const
 }
 
 
+GetSpaceBoundResults VectorLiteral::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	// Compute space to compute the element values:
+	GetSpaceBoundResults sum(0, 0);
+	if(has_int_suffix)
+	{
+		sum += elements[0]->getSpaceBound(params);
+	}
+	else
+	{
+		for(size_t i=0; i<elements.size(); ++i)
+			sum += elements[i]->getSpaceBound(params);
+	}
+
+	return sum;
+}
+
+
 } // end namespace Winter

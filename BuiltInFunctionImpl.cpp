@@ -289,6 +289,13 @@ size_t Constructor::getTimeBound(GetTimeBoundParams& params) const
 }
 
 
+GetSpaceBoundResults Constructor::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	// TEMP HACK work out properly
+	return GetSpaceBoundResults(0, this->struct_type->memSize());
+}
+
+
 //------------------------------------------------------------------------------------
 
 
@@ -364,6 +371,14 @@ llvm::Value* GetField::emitLLVMCode(EmitLLVMCodeParams& params) const
 size_t GetField::getTimeBound(GetTimeBoundParams& params) const
 {
 	return 1;
+}
+
+
+GetSpaceBoundResults GetField::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	const TypeVRef field_type = this->struct_type->component_types[this->index];
+	// TEMP HACK TODO: work out properly
+	return GetSpaceBoundResults(0, field_type->memSize());
 }
 
 
@@ -453,6 +468,12 @@ size_t UpdateElementBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 }
 
 
+GetSpaceBoundResults UpdateElementBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	throw BaseException("UpdateElementBuiltInFunc::getTimeBound: unimplemented");
+}
+
+
 //------------------------------------------------------------------------------------
 
 
@@ -534,6 +555,14 @@ size_t GetTupleElementBuiltInFunc::getTimeBound(GetTimeBoundParams& params) cons
 }
 
 
+GetSpaceBoundResults GetTupleElementBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	const TypeVRef field_type = this->tuple_type->component_types[this->index];
+	// TEMP HACK TODO: work out properly
+	return GetSpaceBoundResults(0, field_type->memSize());
+}
+
+
 //------------------------------------------------------------------------------------
 
 
@@ -579,6 +608,12 @@ llvm::Value* GetVectorElement::emitLLVMCode(EmitLLVMCodeParams& params) const
 size_t GetVectorElement::getTimeBound(GetTimeBoundParams& params) const
 {
 	return 1;
+}
+
+
+GetSpaceBoundResults GetVectorElement::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return GetSpaceBoundResults(0, 0);
 }
 
 
@@ -849,6 +884,13 @@ size_t ArrayMapBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 		return specialised_f->getTimeBound(params) * from_type->num_elems;
 	else
 		throw BaseException("Unable to bound time of array map function.");
+}
+
+
+GetSpaceBoundResults ArrayMapBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	// TODO
+	throw BaseException("TODO: Unable to bound space of array map function.");
 }
 
 
@@ -1263,6 +1305,13 @@ size_t ArrayFoldBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 }
 
 
+GetSpaceBoundResults ArrayFoldBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	// TODO
+	throw BaseException("TODO: Unable to bound space of array fold function.");
+}
+
+
 //------------------------------------------------------------------------------------
 
 
@@ -1592,7 +1641,11 @@ size_t ArraySubscriptBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 }
 
 
-//------------------------------------------------------------------------------------
+GetSpaceBoundResults ArraySubscriptBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	const size_t elem_size = this->array_type->elem_type->memSize();
+	return GetSpaceBoundResults(0, elem_size);
+}
 
 
 //------------------------------------------------------------------------------------
@@ -1711,6 +1764,13 @@ llvm::Value* VArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 size_t VArraySubscriptBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 {
 	return 1;
+}
+
+
+GetSpaceBoundResults VArraySubscriptBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	const size_t elem_size = this->array_type->elem_type->memSize();
+	return GetSpaceBoundResults(0, elem_size);
 }
 
 
@@ -1863,6 +1923,12 @@ size_t MakeVArrayBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 }
 
 
+GetSpaceBoundResults MakeVArrayBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	throw BaseException("Unable to bound space of makeVArray function.");
+}
+
+
 //------------------------------------------------------------------------------------
 
 
@@ -1994,6 +2060,13 @@ size_t VectorSubscriptBuiltInFunc::getTimeBound(GetTimeBoundParams& params) cons
 }
 
 
+GetSpaceBoundResults VectorSubscriptBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	const size_t elem_size = this->vec_type->elem_type->memSize();
+	return GetSpaceBoundResults(0, elem_size);
+}
+
+
 //------------------------------------------------------------------------------------
 
 
@@ -2038,6 +2111,12 @@ size_t ArrayInBoundsBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 }
 
 
+GetSpaceBoundResults ArrayInBoundsBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return GetSpaceBoundResults(0, 0);
+}
+
+
 //------------------------------------------------------------------------------------
 
 
@@ -2079,6 +2158,12 @@ llvm::Value* VectorInBoundsBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 size_t VectorInBoundsBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 {
 	return 1;
+}
+
+
+GetSpaceBoundResults VectorInBoundsBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return GetSpaceBoundResults(0, 0);
 }
 
 
@@ -2445,6 +2530,12 @@ size_t IterateBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 }
 
 
+GetSpaceBoundResults IterateBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	throw BaseException("Unable to bound space of iterate function.");
+}
+
+
 //----------------------------------------------------------------------------------------------
 
 
@@ -2580,6 +2671,12 @@ llvm::Value* DotProductBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) con
 size_t DotProductBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 {
 	return vector_type->num;
+}
+
+
+GetSpaceBoundResults DotProductBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return GetSpaceBoundResults(0, 0);
 }
 
 
@@ -2738,6 +2835,12 @@ size_t VectorMinBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 }
 
 
+GetSpaceBoundResults VectorMinBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return GetSpaceBoundResults(0, 0);
+}
+
+
 //----------------------------------------------------------------------------------------------
 
 
@@ -2812,6 +2915,12 @@ llvm::Value* VectorMaxBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 size_t VectorMaxBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 {
 	return vector_type->num;
+}
+
+
+GetSpaceBoundResults VectorMaxBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return GetSpaceBoundResults(0, 0);
 }
 
 
@@ -2902,6 +3011,12 @@ size_t ShuffleBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 }
 
 
+GetSpaceBoundResults ShuffleBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return GetSpaceBoundResults(0, 0);
+}
+
+
 //----------------------------------------------------------------------------------------------
 
 
@@ -2952,6 +3067,12 @@ llvm::Value* PowBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 size_t PowBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 {
 	return 200;
+}
+
+
+GetSpaceBoundResults PowBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return GetSpaceBoundResults(256, 0); // The CMath function called by the intrinsic may use some stack space.
 }
 
 
@@ -3027,6 +3148,12 @@ size_t SqrtBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 }
 
 
+GetSpaceBoundResults SqrtBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return GetSpaceBoundResults(0, 0);
+}
+
+
 //----------------------------------------------------------------------------------------------
 
 
@@ -3061,6 +3188,12 @@ size_t ExpBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 {
 	const size_t scalar_cost = 40;
 	return (type->getType() == Type::VectorTypeType) ? (type.downcastToPtr<VectorType>()->num * scalar_cost) : scalar_cost;
+}
+
+
+GetSpaceBoundResults ExpBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return GetSpaceBoundResults(256, 0); // The CMath function called by the intrinsic may use some stack space.
 }
 
 
@@ -3101,6 +3234,12 @@ size_t LogBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 }
 
 
+GetSpaceBoundResults LogBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return GetSpaceBoundResults(256, 0); // The CMath function called by the intrinsic may use some stack space.
+}
+
+
 //----------------------------------------------------------------------------------------------
 
 
@@ -3138,6 +3277,12 @@ size_t SinBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 }
 
 
+GetSpaceBoundResults SinBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return GetSpaceBoundResults(256, 0); // The CMath function called by the intrinsic may use some stack space.
+}
+
+
 //----------------------------------------------------------------------------------------------
 
 
@@ -3172,6 +3317,12 @@ size_t CosBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 {
 	const size_t scalar_cost = 30;
 	return (type->getType() == Type::VectorTypeType) ? (type.downcastToPtr<VectorType>()->num * scalar_cost) : scalar_cost;
+}
+
+
+GetSpaceBoundResults CosBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return GetSpaceBoundResults(256, 0); // The CMath function called by the intrinsic may use some stack space.
 }
 
 
@@ -3214,6 +3365,12 @@ size_t AbsBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 {
 	const size_t scalar_cost = 1;
 	return (type->getType() == Type::VectorTypeType) ? (type.downcastToPtr<VectorType>()->num * scalar_cost) : scalar_cost;
+}
+
+
+GetSpaceBoundResults AbsBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return GetSpaceBoundResults(0, 0);
 }
 
 
@@ -3271,6 +3428,12 @@ size_t FloorBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 }
 
 
+GetSpaceBoundResults FloorBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return GetSpaceBoundResults(0, 0);
+}
+
+
 //----------------------------------------------------------------------------------------------
 
 
@@ -3322,6 +3485,12 @@ size_t CeilBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 {
 	const size_t scalar_cost = 1;
 	return (type->getType() == Type::VectorTypeType) ? (type.downcastToPtr<VectorType>()->num * scalar_cost) : scalar_cost;
+}
+
+
+GetSpaceBoundResults CeilBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return GetSpaceBoundResults(0, 0);
 }
 
 
@@ -3435,6 +3604,12 @@ size_t SignBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 }
 
 
+GetSpaceBoundResults SignBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return GetSpaceBoundResults(0, 0);
+}
+
+
 //----------------------------------------------------------------------------------------------
 
 
@@ -3496,6 +3671,12 @@ size_t TruncateToIntBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 {
 	const size_t scalar_cost = 1;
 	return (type->getType() == Type::VectorTypeType) ? (type.downcastToPtr<VectorType>()->num * scalar_cost) : scalar_cost;
+}
+
+
+GetSpaceBoundResults TruncateToIntBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return GetSpaceBoundResults(0, 0);
 }
 
 
@@ -3577,6 +3758,12 @@ size_t ToFloatBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 }
 
 
+GetSpaceBoundResults ToFloatBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return GetSpaceBoundResults(0, 0);
+}
+
+
 //----------------------------------------------------------------------------------------------
 
 
@@ -3629,6 +3816,12 @@ size_t ToDoubleBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 }
 
 
+GetSpaceBoundResults ToDoubleBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return GetSpaceBoundResults(0, 0);
+}
+
+
 //----------------------------------------------------------------------------------------------
 
 
@@ -3662,6 +3855,12 @@ size_t ToInt64BuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 {
 	const size_t scalar_cost = 1;
 	return (type->getType() == Type::VectorTypeType) ? (type.downcastToPtr<VectorType>()->num * scalar_cost) : scalar_cost;
+}
+
+
+GetSpaceBoundResults ToInt64BuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return GetSpaceBoundResults(0, 0);
 }
 
 
@@ -3705,6 +3904,12 @@ size_t ToInt32BuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 }
 
 
+GetSpaceBoundResults ToInt32BuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return GetSpaceBoundResults(0, 0);
+}
+
+
 //----------------------------------------------------------------------------------------------
 
 
@@ -3734,6 +3939,12 @@ llvm::Value* VoidPtrToInt64BuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 size_t VoidPtrToInt64BuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 {
 	return 1;
+}
+
+
+GetSpaceBoundResults VoidPtrToInt64BuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return GetSpaceBoundResults(0, 0);
 }
 
 
@@ -3789,6 +4000,12 @@ llvm::Value* LengthBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 size_t LengthBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 {
 	return 1;
+}
+
+
+GetSpaceBoundResults LengthBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return GetSpaceBoundResults(0, 0);
 }
 
 
@@ -4510,6 +4727,12 @@ static size_t getCompareEqualTimeBound(const TypeVRef& type)
 size_t CompareEqualBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 {
 	return getCompareEqualTimeBound(this->arg_type);
+}
+
+
+GetSpaceBoundResults CompareEqualBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return GetSpaceBoundResults(0, 0);
 }
 
 

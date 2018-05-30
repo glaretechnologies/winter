@@ -52,6 +52,7 @@ public:
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 
 	ASTNodeRef expr;
 	std::vector<LetNodeVar> vars; // One or more variable names (And possible associated declared types).  Will be more than one in the case of destructuring assignment.

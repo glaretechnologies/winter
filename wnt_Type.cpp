@@ -6,6 +6,7 @@
 #include "LLVMTypeUtils.h"
 #include "wnt_FunctionDefinition.h"
 #include "wnt_RefCounting.h"
+#include "maths/mathstypes.h"
 #include "utils/StringUtils.h"
 #ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
@@ -240,6 +241,12 @@ llvm::Value* Int::getInvalidLLVMValue(llvm::Module& module) const // For array o
 Reference<Value> Int::getInvalidValue() const // For array out-of-bounds
 {
 	return new IntValue(0, true);
+}
+
+
+size_t Int::memSize() const
+{
+	return Maths::roundedUpDivide(num_bits, 8);
 }
 
 
@@ -1154,6 +1161,15 @@ bool StructureType::containsType(const Type& other_type) const
 }
 
 
+size_t StructureType::memSize() const
+{
+	size_t sum = 0;
+	for(size_t i=0; i<component_types.size(); ++i)
+		sum += component_types[i]->memSize();
+	return sum;
+}
+
+
 //==========================================================================
 
 
@@ -1401,6 +1417,15 @@ bool TupleType::containsType(const Type& other_type) const
 }
 
 
+size_t TupleType::memSize() const
+{
+	size_t sum = 0;
+	for(size_t i=0; i<component_types.size(); ++i)
+		sum += component_types[i]->memSize();
+	return sum;
+}
+
+
 //==========================================================================
 
 
@@ -1489,6 +1514,13 @@ const std::string SumType::OpenCLCType() const
 }
 
 
+size_t SumType::memSize() const
+{
+	assert(0);
+	return 0;
+}
+
+
 bool SumType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
 {
 	if(this->getType() != b.getType())
@@ -1535,6 +1567,13 @@ const std::string ErrorType::OpenCLCType() const
 {
 	assert(0);
 	return "";
+}
+
+
+size_t ErrorType::memSize() const
+{
+	assert(0);
+	return 0;
 }
 
 

@@ -12,6 +12,8 @@
 #include "VMState.h"
 #include "Linker.h"
 #include "Value.h"
+#include "CompiledValue.h"
+#include "indigo/TestUtils.h"
 #include <StandardPrintOutput.h>
 #include <Mutex.h>
 #include <Lock.h>
@@ -24,11 +26,15 @@
 #include <Timer.h>
 #include <cassert>
 #include <fstream>
+#ifdef _WIN32
+#include <intrin.h>
+#endif
 //#include "utils/Obfuscator.h"
 
 
-#define WINTER_OPENCL_TESTS 1
+//#define WINTER_OPENCL_TESTS 1
 static const bool DUMP_OPENCL_C_SOURCE = false;
+static const bool PRINT_MEM_BOUNDS_AND_USAGE = false;
 
 
 // OpenCL:
@@ -44,6 +50,67 @@ static const bool DUMP_OPENCL_C_SOURCE = false;
 
 namespace Winter
 {
+
+
+/*
+Example of stack marked zone:
+	
+		stack info for current func
+sp		---------------
+		0x12
+		0x45
+		0x3a
+		0x42
+sp - 4	--------------------	
+		0xab
+		0xa6
+sp - 6
+		0xEE
+		0xEE
+sp - 8-------------------
+		0xEE
+		0xEE
+		0xEE
+		0xEE	
+	
+In this case, sp - 6 contains the lowest byte that is not 0xEE.
+	
+	*/
+
+static const int MARKED_ZONE_SIZE = 1000;
+
+// Put some special byte patterns on the stack
+// Store 0xEE for MARKED_ZONE_SIZE bytes below the current stack
+#define MARK_STACK										\
+uint8* _sp = (uint8*)getStackPointer();					\
+for(uint8* p = _sp - MARKED_ZONE_SIZE; p < _sp; ++p)	\
+	*p = 0xEE;
+
+
+// Try and detect how much stack we actually used.
+// We will do this by finding the lowest byte in the marked area that is not 0xEE.
+#define GET_TOUCHED_STACK_SIZE(touched_stack_size_out)	\
+touched_stack_size_out = 0;								\
+for(uint8* p = _sp - MARKED_ZONE_SIZE; p < _sp; ++p)	\
+{														\
+	if(*p != 0xEE)										\
+	{													\
+		touched_stack_size_out = _sp - p;				\
+		break;											\
+	}													\
+}
+
+
+// Returns the stack pointer (value in RSP register) of the calling function.
+static GLARE_NO_INLINE void* getStackPointer()
+{
+	// The return address of this function is stored immediately below where RSP for the calling function points to.
+#ifdef _WIN32
+	return (void*)((char*)_AddressOfReturnAddress() + sizeof(void*));
+#else
+	return (void*)((char*)__builtin_frame_address() + sizeof(void*));
+#endif
+}
 
 
 static bool epsEqual(float x, float y)
@@ -298,7 +365,10 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 				(void*)testExternalFunc,
 				testExternalFuncInterpreted,
 				FunctionSignature("testExternalFunc", std::vector<TypeVRef>(1, new Float())),
-				new Float() // ret type
+				new Float(), // ret type
+				256, // time bound
+				256, // stack size bound
+				0 // heap size bound
 			);
 			vm_args.external_functions.push_back(f);
 		}
@@ -340,9 +410,17 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 		}
 		conPrint("");*/
 
+		resetMemUsageStats();
 
-		// Call the JIT'd function
+		// Put some special byte patterns on the stack
+		MARK_STACK;
+
+		//================= Call the JIT'd function ====================
 		const float jitted_result = f(argument, &test_env);
+
+		// Try and detect how much stack we actually used.
+		size_t touched_stack_size;
+		GET_TOUCHED_STACK_SIZE(touched_stack_size);
 
 		// Check JIT'd result.
 		if(!epsEqual(jitted_result, target_return_val))
@@ -351,6 +429,36 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 			assert(0);
 			exit(1);
 		}
+
+		testAssert(getCurrentHeapMemUsage() == 0);
+
+		try
+		{
+			GetSpaceBoundParams params;
+			GetSpaceBoundResults space_bounds = maindef->getSpaceBound(params);
+
+			// Compute space bounds for arg
+			const size_t arg_heap_size = 0;
+			const size_t total_allowed_heap = space_bounds.heap_space + arg_heap_size;
+
+			if(PRINT_MEM_BOUNDS_AND_USAGE)
+			{
+				conPrint("stack space bound: " + toString(space_bounds.stack_space));
+				conPrint("stack used:        " + toString(touched_stack_size));
+				conPrint("heap space bound:  " + toString(total_allowed_heap));
+				conPrint("heap used:         " + toString(getMaxHeapMemUsage()));
+				conPrint("");
+			}
+			
+			testAssert(getMaxHeapMemUsage() <= total_allowed_heap);
+			testAssert(touched_stack_size <= space_bounds.stack_space);
+		}
+		catch(BaseException& e)
+		{
+			conPrint("Failed to get space bound: " + e.what());
+		}
+
+
 
 		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
@@ -901,53 +1009,65 @@ void testMainStringArg(const std::string& src, const std::string& arg, const std
 		TestEnv test_env;
 		test_env.val = 10;
 
+		testAssert(getCurrentHeapMemUsage() == 0);
+		resetMemUsageStats();
+		size_t touched_stack_size = 0;
 
-		StringRep* arg_string_rep = (StringRep*)malloc(sizeof(StringRep) + arg.size());
-		arg_string_rep->refcount = 1;
-		arg_string_rep->len = arg.size();
-		arg_string_rep->flags = 1; // heap allocated
-		if(!arg.empty())
-			std::memcpy((uint8*)arg_string_rep + sizeof(StringRep), &arg[0], arg.size()); // Copy data
+		{ // Scope for CompiledValRefs
+			CompiledValRef<StringRep> arg_string_ref = allocateString(arg.c_str());
 
-		debugIncrStringCount();
+			// Call the JIT'd function
+			
+			MARK_STACK; // Put some special byte patterns on the stack
 
-		// Call the JIT'd function
-		StringRep* jitted_result = f(arg_string_rep, &test_env);
+			CompiledValRef<StringRep> jitted_result = f(arg_string_ref.getPointer(), &test_env);
+
+			// Try and detect how much stack we actually used.
+			GET_TOUCHED_STACK_SIZE(touched_stack_size);
+
+			jitted_result->refcount--; // The jitted func will return a result with refcount 1
+
+			// Check JIT'd result.
+			if(jitted_result->toStdString() != target_return_val)
+			{
+				stdErrPrint("Test failed: JIT'd main returned " + jitted_result->toStdString() + ", target was " + target_return_val);
+				assert(0);
+				exit(1);
+			}
+
+			testAssert(arg_string_ref->getRefCount() == 1);
+			testAssert(jitted_result->getRefCount() == 1);
+		}
 
 		
 
-		if(jitted_result->len != target_return_val.size())
+		testAssert(getCurrentHeapMemUsage() == 0);
+
+		try
 		{
-			stdErrPrint("Test failed: JIT'd main returned string with length " + toString(jitted_result->len) + ", target was " + toString(target_return_val.size()));
-			assert(0);
-			exit(1);
+			GetSpaceBoundParams params;
+			GetSpaceBoundResults space_bounds = maindef->getSpaceBound(params);
+
+			// Compute space bounds for arg
+			const size_t arg_heap_size = sizeof(StringRep) + arg.size();
+
+			const size_t total_allowed_heap = space_bounds.heap_space + arg_heap_size;
+
+			if(PRINT_MEM_BOUNDS_AND_USAGE)
+			{
+				conPrint("stack space bound: " + toString(space_bounds.stack_space));
+				conPrint("stack used:        " + toString(touched_stack_size));
+				conPrint("heap space bound:  " + toString(total_allowed_heap));
+				conPrint("heap used:         " + toString(getMaxHeapMemUsage()));
+				conPrint("");
+			}
+			
+			testAssert(getMaxHeapMemUsage() <= total_allowed_heap);
+			testAssert(touched_stack_size <= space_bounds.stack_space);
 		}
-
-		std::string result_str;
-		result_str.resize(jitted_result->len);
-		std::memcpy(&result_str[0], (uint8*)jitted_result + sizeof(StringRep), jitted_result->len);
-
-
-		// Check JIT'd result.
-		if(result_str != target_return_val)
+		catch(BaseException& e)
 		{
-			stdErrPrint("Test failed: JIT'd main returned " + result_str + ", target was " + target_return_val);
-			assert(0);
-			exit(1);
-		}
-
-		arg_string_rep->refcount--;
-		if(arg_string_rep->refcount == 0)
-		{
-			debugDecrStringCount();
-			free(arg_string_rep);
-		}
-
-		jitted_result->refcount--;
-		if(jitted_result->refcount == 0)
-		{
-			debugDecrStringCount();
-			free(jitted_result);
+			conPrint("Failed to get space bound: " + e.what());
 		}
 
 		VMState vmstate;
@@ -1189,9 +1309,16 @@ void testMainInt64Arg(const std::string& src, int64 x, int64 target_return_val, 
 		TestEnv test_env;
 		test_env.val = 10;
 
+		resetMemUsageStats();
+
+		MARK_STACK; // Put some special byte patterns on the stack
+
 		// Call the JIT'd function
 		const int64 jitted_result = f(x, &test_env);
 
+		// Try and detect how much stack we actually used.
+		size_t touched_stack_size;
+		GET_TOUCHED_STACK_SIZE(touched_stack_size); // Sets touched_stack_size var.
 
 		// Check JIT'd result.
 		if(jitted_result != target_return_val)
@@ -1200,6 +1327,36 @@ void testMainInt64Arg(const std::string& src, int64 x, int64 target_return_val, 
 			assert(0);
 			exit(1);
 		}
+
+
+		testAssert(getCurrentHeapMemUsage() == 0);
+
+		try
+		{
+			GetSpaceBoundParams params;
+			GetSpaceBoundResults space_bounds = maindef->getSpaceBound(params);
+
+			// Compute space bounds for arg
+			const size_t arg_heap_size = 0;
+			const size_t total_allowed_heap = space_bounds.heap_space + arg_heap_size;
+
+			if(PRINT_MEM_BOUNDS_AND_USAGE)
+			{
+				conPrint("stack space bound: " + toString(space_bounds.stack_space));
+				conPrint("stack used:        " + toString(touched_stack_size));
+				conPrint("heap space bound:  " + toString(total_allowed_heap));
+				conPrint("heap used:         " + toString(getMaxHeapMemUsage()));
+				conPrint("");
+			}
+			
+			testAssert(getMaxHeapMemUsage() <= total_allowed_heap);
+			testAssert(touched_stack_size <= space_bounds.stack_space);
+		}
+		catch(BaseException& e)
+		{
+			conPrint("Failed to get space bound: " + e.what());
+		}
+
 
 		VMState vmstate;
 		vmstate.func_args_start.push_back(0);

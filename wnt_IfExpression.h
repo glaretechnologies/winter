@@ -58,6 +58,7 @@ public:
 	virtual bool isConstant() const;
 	virtual bool provenDefined() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 
 
 private:

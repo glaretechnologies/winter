@@ -36,6 +36,7 @@ public:
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 
 
 	size_t numElementsInValue() const;
@@ -48,6 +49,8 @@ private:
 
 	//mutable llvm::Value* ptr_alloca;
 	FunctionDefinition* make_varray_func_def;
+
+	mutable bool llvm_heap_allocated;
 };
 
 

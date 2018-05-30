@@ -394,4 +394,11 @@ size_t IfExpression::getTimeBound(GetTimeBoundParams& params) const
 }
 
 
+GetSpaceBoundResults IfExpression::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	// Assuming we don't know the value of condition here.
+	return this->condition->getSpaceBound(params) + this->then_expr->getSpaceBound(params) +  this->else_expr->getSpaceBound(params);
+}
+
+
 } // end namespace Winter

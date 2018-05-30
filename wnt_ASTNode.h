@@ -269,9 +269,31 @@ public:
 struct GetTimeBoundParams
 {
 	GetTimeBoundParams() : steps(0) {}
-
 	size_t steps;
 };
+
+
+struct GetSpaceBoundParams
+{
+	GetSpaceBoundParams() : steps(0) {}
+	size_t steps;
+};
+
+
+struct GetSpaceBoundResults
+{
+	GetSpaceBoundResults(size_t stack_space_, size_t heap_space_) : stack_space(stack_space_), heap_space(heap_space_) {}
+	size_t stack_space;
+	size_t heap_space;
+
+	void operator += (const GetSpaceBoundResults& b) { stack_space += b.stack_space; heap_space += b.heap_space; }
+};
+
+
+inline GetSpaceBoundResults operator + (const GetSpaceBoundResults& a, const GetSpaceBoundResults& b)
+{
+	return GetSpaceBoundResults(a.stack_space + b.stack_space, a.heap_space + b.heap_space);
+}
 
 
 class SrcLocation
@@ -374,6 +396,9 @@ public:
 
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const = 0;
 
+	// Only FunctionDefinitions need return stack size information, other nodes can return 0.
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const = 0;
+
 
 	const SrcLocation& srcLocation() const { return location; }
 
@@ -423,6 +448,7 @@ public:
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 
 };
 
@@ -441,6 +467,7 @@ public:
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const { return true; }
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const { return 1; }
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const { return GetSpaceBoundResults(4, 0); }
 
 	float value;
 };
@@ -460,6 +487,7 @@ public:
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const { return true; }
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const { return 1; }
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const { return GetSpaceBoundResults(8, 0); }
 
 	double value;
 };
@@ -482,6 +510,7 @@ public:
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const { return true; }
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const { return 1; }
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 };
 
 
@@ -501,8 +530,10 @@ public:
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const { return true; }
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 
 	std::string value;
+	mutable bool llvm_allocated_on_heap;
 };
 
 
@@ -522,6 +553,7 @@ public:
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const { return true; }
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const { return 1; }
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const { return GetSpaceBoundResults(1, 0); }
 
 	std::string value; // utf-8 encoded char.
 };
@@ -542,6 +574,7 @@ public:
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const { return true; }
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const { return 1; }
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const { return GetSpaceBoundResults(1, 0); }
 };
 
 
@@ -560,7 +593,7 @@ public:
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
-
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 
 
 	TypeRef maptype;
@@ -583,6 +616,7 @@ public:
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 
 	bool typeCheck(TraversalPayload& payload) const;
 
@@ -608,6 +642,7 @@ public:
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 
 	bool typeCheck(TraversalPayload& payload) const;
 
@@ -633,6 +668,7 @@ public:
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 
 	bool typeCheck(TraversalPayload& payload) const;
 
@@ -659,6 +695,7 @@ public:
 	virtual bool isConstant() const;
 	virtual bool provenDefined() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 
 	bool typeCheck(TraversalPayload& payload) const;
 
@@ -697,6 +734,7 @@ public:
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 
 private:
 	const std::string opToken() const;
@@ -727,6 +765,7 @@ public:
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 
 	Type t;
 	ASTNodeRef a;
@@ -749,6 +788,7 @@ public:
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 
 	ASTNodeRef expr;
 };
@@ -770,6 +810,7 @@ public:
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 
 	ASTNodeRef expr;
 };
@@ -791,6 +832,7 @@ public:
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 
 	const std::string getOverloadedFuncName() const; // returns e.g. op_lt, op_gt   etc..
 
@@ -819,6 +861,7 @@ public:
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 	
 	ASTNodeRef subscript_expr;
 };
@@ -842,6 +885,7 @@ public:
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 
 	TypeRef declared_type; // May be NULL if no type was declared.
 	std::string name;

@@ -174,25 +174,12 @@ private:
 	ProgramStats stats;
 
 	std::vector<AllocationBlock> jit_mem_blocks;
+
+	std::unordered_map<const llvm::Function*, uint64> stack_sizes;
 };
 
 
 typedef Reference<VirtualMachine> VirtualMachineRef;
-
-
-// In-memory string representation for a Winter string
-class StringRep
-{
-public:
-	uint64 refcount;
-	uint64 len;
-	uint64 flags;
-	// Data follows..
-};
-
-
-void debugIncrStringCount();
-void debugDecrStringCount();
 
 
 } // end namespace Winter

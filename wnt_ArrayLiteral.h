@@ -34,6 +34,7 @@ public:
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 
 	// See NamedConstant::emitOpenCLC()
 	std::string getFileScopeOpenCLC(EmitOpenCLCodeParams& params, const std::string& varname) const;

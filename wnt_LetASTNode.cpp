@@ -235,4 +235,10 @@ size_t LetASTNode::getTimeBound(GetTimeBoundParams& params) const
 }
 
 
+GetSpaceBoundResults LetASTNode::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return expr->getSpaceBound(params);
+}
+
+
 } // end namespace Winter

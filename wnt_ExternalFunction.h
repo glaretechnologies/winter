@@ -28,6 +28,9 @@ class ExternalFunction : public RefCounted
 public:
 	typedef ValueRef (* INTERPRETED_FUNC)(const std::vector<ValueRef>& arg_values);
 
+	static size_t unknownTimeBound() { return std::numeric_limits<size_t>::max(); }
+	static size_t unknownSpaceBound() { return std::numeric_limits<size_t>::max(); }
+
 	// Interpreted function must be set, unless the function type is one of
 	//
 	// (float) -> float
@@ -39,14 +42,19 @@ public:
 	//
 	// in which case NULL can be passed instead.
 	ExternalFunction(void* func_, INTERPRETED_FUNC interpreted_func_, const FunctionSignature& sig_, const TypeVRef& return_type_,
-		size_t time_bound_ = 1000)
+		size_t time_bound_ = unknownTimeBound(),
+		size_t stack_size_bound_ = unknownSpaceBound(),
+		size_t heap_size_bound_ = unknownSpaceBound()
+	)
 	:	func(func_),
 		interpreted_func(interpreted_func_),
 		sig(sig_),
 		return_type(return_type_),
 		has_side_effects(false),
 		is_allocation_function(false),
-		time_bound(time_bound_)
+		time_bound(time_bound_),
+		stack_size_bound(stack_size_bound_),
+		heap_size_bound(heap_size_bound_)
 	{}
 
 	~ExternalFunction();
@@ -60,7 +68,7 @@ public:
 	bool has_side_effects; // Such as the function freeString()
 	bool is_allocation_function;
 
-	size_t time_bound;
+	size_t time_bound, stack_size_bound, heap_size_bound;
 private:
 
 };

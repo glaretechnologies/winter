@@ -9,6 +9,7 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 
 #include "Linker.h"
 #include "Value.h"
+#include "CompiledValue.h"
 #include "TokenBase.h"
 #include "wnt_Lexer.h"
 #include "wnt_LangParser.h"
@@ -74,6 +75,9 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Analysis/Lint.h"
+#include "llvm/IR/DiagnosticHandler.h"
+#include "llvm/IR/DiagnosticPrinter.h"
+#include "llvm/IR/DiagnosticInfo.h"
 #ifdef _MSC_VER
 #pragma warning(pop) // Re-enable warnings
 #endif
@@ -103,13 +107,6 @@ static const bool DUMP_MODULE_IR_AND_ASSEMBLY = false;
 //=====================================================================================
 
 
-static void* getVoidPtrArg(const vector<ValueRef>& arg_values, int i)
-{
-	assert(arg_values[i]->valueType() == Value::ValueType_VoidPtr);
-	return static_cast<const VoidPtrValue*>(arg_values[i].getPointer())->value;
-}
-
-
 static const std::string& getStringArg(const vector<ValueRef>& arg_values, int i)
 {
 	assert(arg_values[i]->valueType() == Value::ValueType_String);
@@ -131,50 +128,8 @@ static const std::string& getCharArg(const vector<ValueRef>& arg_values, int i)
 }
 
 
-static int64 string_count = 0;//TEMP
-static int64 varray_count = 0;//TEMP
+
 static int64 closure_count = 0;//TEMP
-
-
-
-void debugIncrStringCount()
-{
-	string_count++;
-}
-
-
-void debugDecrStringCount()
-{
-	string_count--;
-}
-
-
-static StringRep* allocateString(const char* initial_string_val/*, void* env*/)
-{
-	string_count++;//TEMP
-
-	const size_t string_len = strlen(initial_string_val);
-	StringRep* string_val = (StringRep*)malloc(sizeof(StringRep) + string_len);
-	std::memcpy((char*)string_val + sizeof(StringRep), initial_string_val, string_len);
-	return string_val;
-}
-
-
-static ValueRef allocateStringInterpreted(const vector<ValueRef>& args)
-{
-	return new StringValue((const char*)(getVoidPtrArg(args, 0)));
-}
-
-
-// NOTE: just return an int here as all external funcs need to return something (non-void).
-static int freeString(StringRep* str/*, void* env*/)
-{
-	string_count--;//TEMP
-
-	assert(str->refcount == 1);
-	free(str);
-	return 0;
-}
 
 
 // Returns number of unicode chars in the string.
@@ -194,13 +149,9 @@ static ValueRef stringLengthInterpreted(const vector<ValueRef>& args)
 
 static StringRep* concatStrings(StringRep* a, StringRep* b, void* env)
 {
-	string_count++;//TEMP
-
 	const uint64 new_len = a->len + b->len;
-	StringRep* new_s = (StringRep*)malloc(sizeof(StringRep) + new_len);
+	StringRep* new_s = allocateStringWithLen(new_len);
 	new_s->refcount = 1;
-	new_s->len = new_len;
-	new_s->flags = 1; // heap allocated
 	std::memcpy((uint8*)new_s + sizeof(StringRep), (uint8*)a + sizeof(StringRep), a->len);
 	std::memcpy((uint8*)new_s + sizeof(StringRep) + a->len, (uint8*)b + sizeof(StringRep), b->len);
 	return new_s;
@@ -243,15 +194,11 @@ static ValueRef compareNotEqualStringInterpreted(const vector<ValueRef>& args)
 
 static StringRep* charToString(uint32 c, void* env)
 {
-	string_count++;//TEMP
-
 	// Work out number of bytes used
 	const int num_bytes = (int)UTF8Utils::numBytesForChar((uint8)(c & 0xFF));
 
-	StringRep* new_s = (StringRep*)malloc(sizeof(StringRep) + num_bytes);
+	StringRep* new_s = allocateStringWithLen(num_bytes);
 	new_s->refcount = 1;
-	new_s->len = num_bytes;
-	new_s->flags = 1; // heap allocated
 	std::memcpy((uint8*)new_s + sizeof(StringRep), &c, num_bytes); // Copy data
 	return new_s;
 }
@@ -311,49 +258,6 @@ static ValueRef stringElemInterpreted(const vector<ValueRef>& args)
 //=====================================================================================
 
 
-// In-memory string representation for a Winter VArray
-class VArrayRep
-{
-public:
-	uint64 refcount;
-	uint64 len;
-	uint64 flags;
-	// Data follows..
-};
-
-
-static VArrayRep* allocateVArray(uint64 elem_size_B, uint64 num_elems)
-{
-	varray_count++;//TEMP
-
-	// Allocate space for the reference count, length, flags, and data.
-	VArrayRep* varray = (VArrayRep*)malloc(sizeof(VArrayRep) + elem_size_B * num_elems);
-	return varray;
-}
-
-
-static ValueRef allocateVArrayInterpreted(const vector<ValueRef>& args)
-{
-	assert(0);
-	return NULL;
-}
-
-
-// NOTE: just return an int here as all external funcs need to return something (non-void).
-static int freeVArray(VArrayRep* varray)
-{
-	assert(varray_count >= 1);
-	varray_count--;//TEMP
-
-	assert(varray->refcount == 1);
-	free(varray);
-	return 0;
-}
-
-
-//=====================================================================================
-
-
 // In-memory string representation for a Winter Closure
 class ClosureRep
 {
@@ -392,7 +296,7 @@ static int freeClosure(ClosureRep* closure)
 	closure_count--;//TEMP
 
 	assert(closure->refcount == 1);
-	free(closure);
+	::free(closure);
 	return 0;
 }
 
@@ -710,7 +614,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 	llvm_exec_engine(NULL),
 	vm_args(args)
 {
-	assert(string_count == 0 && varray_count == 0 && closure_count == 0);
+	//assert(string_count == 0 && varray_count == 0 && closure_count == 0);
 
 	stats.num_heap_allocation_calls = 0;
 	stats.num_closure_allocations = 0;
@@ -748,7 +652,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			vector<TypeVRef> arg_types(1, new String());
 			//arg_types.push_back(new VoidPtrType());
 			external_functions.push_back(new ExternalFunction(
-				(void*)freeString,
+				(void*)(int (*)(StringRep*))free,
 				NULL, // interpreted func TEMP
 				FunctionSignature("freeString", arg_types),
 				new Int() // return type
@@ -761,7 +665,10 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			(void*)stringLength,
 			stringLengthInterpreted, // interpreted func
 			FunctionSignature("length", vector<TypeVRef>(1, new String())),
-			new Int() // return type
+			new Int(), // return type
+			ExternalFunction::unknownTimeBound(), // time bound
+			1024, // stack space bound
+			0 // heap space bound
 		));
 
 		// Add concatStrings
@@ -777,7 +684,10 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			(void*)charToString,
 			charToStringInterpreted, // interpreted func
 			FunctionSignature("toString", vector<TypeVRef>(1, new CharType())),
-			new String() // return type
+			new String(), // return type
+			1000, // time bound
+			1024, // stack size bound
+			sizeof(StringRep) + 4 // heap size bound - a single char may take up to 4 bytes to store.
 		));
 
 		// Add codePoint(char c) int
@@ -785,7 +695,10 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			(void*)codePoint,
 			codePointInterpreted, // interpreted func
 			FunctionSignature("codePoint", vector<TypeVRef>(1, new CharType())),
-			new Int() // return type
+			new Int(), // return type
+			16, // time bound
+			1024, // stack space bound
+			0 // heap space bound
 		));
 
 		// Add elem(string s, uint64 index) char
@@ -793,7 +706,10 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			(void*)stringElem,
 			stringElemInterpreted, // interpreted func
 			FunctionSignature("elem", typePair(new String(), new Int(64))),
-			new CharType() // return type
+			new CharType(), // return type
+			ExternalFunction::unknownTimeBound(), // time bound
+			1024, // stack space bound
+			0 // heap space bound
 		));
 
 		// Add compareEqualString
@@ -801,7 +717,9 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			(void*)compareEqualString,
 			compareEqualStringInterpreted, // interpreted func
 			FunctionSignature("compareEqualString", std::vector<TypeVRef>(2, new String())),
-			new Bool() // return type
+			new Bool(), // return type
+			1024, // stack space bound
+			0 // heap space bound
 		));
 
 		// Add compareNotEqualString
@@ -809,7 +727,9 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			(void*)compareNotEqualString,
 			compareNotEqualStringInterpreted, // interpreted func
 			FunctionSignature("compareNotEqualString", std::vector<TypeVRef>(2, new String())),
-			new Bool() // return type
+			new Bool(), // return type
+			1024, // stack space bound
+			0 // heap space bound
 		));
 
 		// Add allocateVArray
@@ -827,7 +747,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 		// Add freeVArray
 		{
 			external_functions.push_back(new ExternalFunction(
-				(void*)freeVArray,
+				(void*)(int (*)(VArrayRep*))free,
 				NULL, // interpreted func TEMP
 				FunctionSignature("freeVArray", vector<TypeVRef>(1, new VArrayType(new Int()))), // new OpaqueType())),
 				new Int() // return type
@@ -869,12 +789,6 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 
 			this->llvm_context = new llvm::LLVMContext();
 			this->llvm_module = new llvm::Module("WinterModule", *this->llvm_context);
-
-			//llvm::TargetOptions to;
-			//const char* argv[] = { "dummyprogname", "-vectorizer-min-trip-count=4"};
-			//llvm::cl::ParseCommandLineOptions(2, argv, "my tool");
-			//const char* argv[] = { "dummyprogname", "-debug"};
-			//llvm::cl::ParseCommandLineOptions(2, argv, "my tool");
 
 #if TARGET_LLVM_VERSION >= 36
 			llvm::EngineBuilder engine_builder(std::unique_ptr<llvm::Module>(this->llvm_module));
@@ -958,7 +872,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 VirtualMachine::~VirtualMachine()
 {
 	// llvm_exec_engine will delete llvm_module.
-	assert(string_count == 0 && varray_count == 0 && closure_count == 0);
+	//assert(string_count == 0 && varray_count == 0 && closure_count == 0);
 
 	delete this->llvm_exec_engine;
 
@@ -983,6 +897,12 @@ void VirtualMachine::init()
 
 	llvm::InitializeNativeTarget();
 	llvm::InitializeNativeTargetAsmPrinter();
+
+	// Enable -warn-stack-size= option.
+	// We use this to get the stack size for compiled functions.
+	// The option boolean is a global static, so set it once here.
+	const char* argv[] = { "dummyprogname", "-warn-stack-size=0" };
+	llvm::cl::ParseCommandLineOptions(2, argv);
 }
 
 
@@ -1484,8 +1404,45 @@ static const llvm::DataLayout* getDataLayout(llvm::ExecutionEngine* llvm_exec_en
 }
 
 
+struct WinterDiagHandler : public llvm::DiagnosticHandler
+{
+	virtual bool handleDiagnostics(const llvm::DiagnosticInfo& info)
+	{
+		// We'll use this diagnostic handler to get warnings about stack size, in order to get the stack sizes
+		// for compiled functions.
+		if(info.getKind() == llvm::DK_StackSize)
+		{
+			const llvm::DiagnosticInfoStackSize& stack_info = llvm::cast<llvm::DiagnosticInfoStackSize>(info);
+			const llvm::Function& func = stack_info.getFunction();
+			const uint64 stack_size = stack_info.getResourceSize();
+			stack_sizes->insert(std::make_pair(&func, stack_size));
+		}
+		else
+		{
+			if(false)
+			{
+				std::string msg;
+				llvm::raw_string_ostream stream(msg);
+				llvm::DiagnosticPrinterRawOStream printer(stream);
+				info.print(printer);
+				stream.flush();
+				conPrint(msg);
+			}
+		}
+		return true;
+	}
+
+	std::unordered_map<const llvm::Function*, uint64>* stack_sizes;
+};
+
+
 void VirtualMachine::build(const VMConstructionArgs& args)
 {
+	WinterDiagHandler* handler = new WinterDiagHandler();
+	handler->stack_sizes = &this->stack_sizes;
+	this->llvm_context->setDiagnosticHandler(std::unique_ptr<WinterDiagHandler>(handler));
+
+
 	this->llvm_module->setDataLayout(getDataLayout(llvm_exec_engine)->getStringRepresentation());
 
 	
@@ -1735,6 +1692,18 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 		this->compileToNativeAssembly(this->llvm_module, "module_assembly.txt");
 
 	this->llvm_exec_engine->finalizeObject();
+
+
+	// Assign reported stack sizes to our functions
+	for(auto i = linker.sig_to_function_map.begin(); i != linker.sig_to_function_map.end(); ++i)
+	{
+		if(i->second->built_llvm_function != NULL)
+		{
+			auto res = stack_sizes.find(i->second->built_llvm_function);
+			if(res != stack_sizes.end())
+				i->second->llvm_reported_stack_size = (int64)res->second;
+		}
+	}
 }
 
 

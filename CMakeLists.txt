@@ -189,6 +189,8 @@ set(WINTER_FILES
 "${winterdir}/LLVMUtils.h"
 "${winterdir}/PerfTests.cpp"
 "${winterdir}/PerfTests.h"
+"${winterdir}/CompiledValue.cpp"
+"${winterdir}/CompiledValue.h"
 )
 
 

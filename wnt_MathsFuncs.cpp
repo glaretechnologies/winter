@@ -47,12 +47,16 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 	// This is because (with MSVC at least), Using std::tan just results in a call to std::tan from the winter code,
 	// which then in turn calls tanf, resulting in an extra call.
 
+	const size_t MATHS_FUNC_STACK_BOUND = 1024;
+
 	external_functions.push_back(new ExternalFunction(
 		(void*)tanf, // func
 		NULL, // interpreted func.  Can be null here since this is a float -> float function which can be called directly from the interpreter.
 		FunctionSignature("tan", vector<TypeVRef>(1, float_type)), // function signature
 		float_type, // return type
-		30 // time_bound
+		30, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
@@ -60,7 +64,9 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		NULL, // interpreted func
 		FunctionSignature("tan", vector<TypeVRef>(1, double_type)), // function signature
 		double_type, // return type
-		30 // time_bound
+		30, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
@@ -68,7 +74,9 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		NULL,
 		FunctionSignature("asin", vector<TypeVRef>(1, float_type)),
 		float_type,
-		30 // time_bound
+		30, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
@@ -76,7 +84,9 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		NULL,
 		FunctionSignature("asin", vector<TypeVRef>(1, double_type)),
 		double_type,
-		30 // time_bound
+		30, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
@@ -84,7 +94,9 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		NULL,
 		FunctionSignature("acos", vector<TypeVRef>(1, float_type)),
 		float_type,
-		30 // time_bound
+		30, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
@@ -92,7 +104,9 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		NULL,
 		FunctionSignature("acos", vector<TypeVRef>(1, double_type)),
 		double_type,
-		30 // time_bound
+		30, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
@@ -100,7 +114,9 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		NULL,
 		FunctionSignature("atan", vector<TypeVRef>(1, float_type)),
 		float_type,
-		30 // time_bound
+		30, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
@@ -108,7 +124,9 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		NULL,
 		FunctionSignature("sinh", vector<TypeVRef>(1, float_type)),
 		float_type,
-		30 // time_bound
+		30, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
@@ -116,7 +134,9 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		NULL,
 		FunctionSignature("sinh", vector<TypeVRef>(1, double_type)),
 		double_type,
-		30 // time_bound
+		30, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
 	));
 
 	// asinh etc.. are only available in Visual Studio 2013+
@@ -126,7 +146,9 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		NULL,
 		FunctionSignature("asinh", vector<TypeVRef>(1, float_type)),
 		float_type,
-		30 // time_bound
+		30, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
@@ -134,7 +156,9 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		NULL,
 		FunctionSignature("asinh", vector<TypeVRef>(1, double_type)),
 		double_type,
-		30 // time_bound
+		30, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
 	));
 #endif
 
@@ -143,7 +167,9 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		NULL,
 		FunctionSignature("cosh", vector<TypeVRef>(1, float_type)),
 		float_type,
-		30 // time_bound
+		30, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
@@ -151,7 +177,9 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		NULL,
 		FunctionSignature("cosh", vector<TypeVRef>(1, double_type)),
 		double_type,
-		30 // time_bound
+		30, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
 	));
 
 #if !defined(_MSC_VER) || _MSC_VER >= 1800
@@ -160,7 +188,9 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		NULL,
 		FunctionSignature("acosh", vector<TypeVRef>(1, float_type)),
 		float_type,
-		30 // time_bound
+		30, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
@@ -168,7 +198,9 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		NULL,
 		FunctionSignature("acosh", vector<TypeVRef>(1, double_type)),
 		double_type,
-		30 // time_bound
+		30, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
 	));
 #endif
 
@@ -177,7 +209,9 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		NULL,
 		FunctionSignature("tanh", vector<TypeVRef>(1, float_type)),
 		float_type,
-		30 // time_bound
+		30, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
@@ -185,7 +219,9 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		NULL,
 		FunctionSignature("tanh", vector<TypeVRef>(1, double_type)),
 		double_type,
-		30 // time_bound
+		30, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
 	));
 
 #if !defined(_MSC_VER) || _MSC_VER >= 1800
@@ -194,7 +230,9 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		NULL,
 		FunctionSignature("atanh", vector<TypeVRef>(1, float_type)),
 		float_type,
-		30 // time_bound
+		30, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
@@ -202,7 +240,9 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		NULL,
 		FunctionSignature("atanh", vector<TypeVRef>(1, double_type)),
 		double_type,
-		30 // time_bound
+		30, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
 	));
 #endif
 
@@ -211,7 +251,9 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		NULL,
 		FunctionSignature("atan", vector<TypeVRef>(1, double_type)),
 		double_type,
-		30 // time_bound
+		30, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
@@ -219,7 +261,9 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		NULL,
 		FunctionSignature("atan2", vector<TypeVRef>(2, float_type)),
 		float_type,
-		60 // time_bound
+		60, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
@@ -227,7 +271,9 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		NULL,
 		FunctionSignature("atan2", vector<TypeVRef>(2, double_type)),
 		double_type,
-		60 // time_bound
+		60, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
@@ -235,7 +281,9 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		NULL,
 		FunctionSignature("mod", vector<TypeVRef>(2, float_type)),
 		float_type,
-		10 // time_bound
+		10, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
@@ -243,7 +291,9 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		NULL,
 		FunctionSignature("mod", vector<TypeVRef>(2, double_type)),
 		double_type,
-		10 // time_bound
+		10, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
 	));
 	
 	external_functions.push_back(new ExternalFunction(
@@ -251,7 +301,9 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		intModInterpreted,
 		FunctionSignature("mod", vector<TypeVRef>(2, int_type)),
 		int_type,
-		10 // time_bound
+		10, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
@@ -259,7 +311,9 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		NULL,
 		FunctionSignature("isFinite", vector<TypeVRef>(1, float_type)),
 		bool_type, // return type
-		10 // time_bound
+		10, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
@@ -267,7 +321,9 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		NULL,
 		FunctionSignature("isFinite", vector<TypeVRef>(1, double_type)),
 		bool_type, // return type
-		10 // time_bound
+		10, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
@@ -275,7 +331,9 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		NULL,
 		FunctionSignature("isNAN", vector<TypeVRef>(1, float_type)),
 		bool_type, // return type
-		10 // time_bound
+		10, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
 	));
 
 	external_functions.push_back(new ExternalFunction(
@@ -283,7 +341,9 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		NULL,
 		FunctionSignature("isNAN", vector<TypeVRef>(1, double_type)),
 		bool_type, // return type
-		10 // time_bound
+		10, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
 	));
 }
 

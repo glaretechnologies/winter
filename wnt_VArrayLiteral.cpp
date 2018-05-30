@@ -12,6 +12,7 @@ Copyright Glare Technologies Limited 2015 -
 #include "VMState.h"
 #include "VirtualMachine.h"
 #include "Value.h"
+#include "CompiledValue.h"
 #include "Linker.h"
 #include "BuiltInFunctionImpl.h"
 #include "LLVMUtils.h"
@@ -52,7 +53,8 @@ VArrayLiteral::VArrayLiteral(const std::vector<ASTNodeRef>& elems, const SrcLoca
 	elements(elems),
 	has_int_suffix(has_int_suffix_),
 	int_suffix(int_suffix_),
-	make_varray_func_def(NULL)
+	make_varray_func_def(NULL),
+	llvm_heap_allocated(false)
 {
 	if(has_int_suffix && int_suffix <= 0)
 		throw BaseException("VArray literal int suffix must be > 0." + errorContext(*this));
@@ -230,6 +232,7 @@ llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 	const bool alloc_on_heap = mayEscapeCurrentlyBuildingFunction(params, this->type()) ||
 		(num_elems > max_num_stack_elems) ||
 		(all_elems_size_B > max_on_stack_size);
+	this->llvm_heap_allocated = alloc_on_heap;
 
 	llvm::Value* varray_ptr;
 	uint64 initial_flags;
@@ -449,6 +452,37 @@ size_t VArrayLiteral::getTimeBound(GetTimeBoundParams& params) const
 			sum += elements[i]->getTimeBound(params);
 		return sum;
 	}
+}
+
+
+GetSpaceBoundResults VArrayLiteral::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	TypeRef this_type = this->type();
+	assert(this_type->getType() == Type::VArrayTypeType);
+	VArrayType* varray_type = static_cast<VArrayType*>(this_type.getPointer());
+
+	// Compute space to compute the element values:
+	GetSpaceBoundResults sum(0, 0);
+	if(has_int_suffix)
+	{
+		sum += elements[0]->getSpaceBound(params);
+	}
+	else
+	{
+		for(size_t i=0; i<elements.size(); ++i)
+			sum += elements[i]->getSpaceBound(params);
+	}
+
+	if(llvm_heap_allocated)
+	{
+		const size_t single_elem_heap_size = varray_type->elem_type->isHeapAllocated() ? sizeof(void*) : varray_type->elem_type->memSize();
+		const size_t header_and_data_size = sizeof(VArrayRep) + single_elem_heap_size * numElementsInValue();
+		
+		// We have to take into account the stack space that the C++ function allocateVArray(), which will be called, will take.
+		sum += GetSpaceBoundResults(1024, /*heap space=*/header_and_data_size);
+	}
+
+	return sum;
 }
 
 

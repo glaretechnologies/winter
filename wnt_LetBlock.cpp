@@ -473,6 +473,16 @@ size_t LetBlock::getTimeBound(GetTimeBoundParams& params) const
 }
 
 
+GetSpaceBoundResults LetBlock::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	GetSpaceBoundResults sum_bound(0, 0);
+	for(size_t i=0; i<lets.size(); ++i)
+		sum_bound += lets[i]->getSpaceBound(params);
+
+	return sum_bound;
+}
+
+
 //llvm::Value* LetBlock::getLetExpressionLLVMValue(EmitLLVMCodeParams& params, unsigned int let_index, llvm::Value* ret_space_ptr)
 //{
 	/*if(let_exprs_llvm_value[let_index] == NULL)

@@ -122,7 +122,8 @@ FunctionDefinition::FunctionDefinition(const SrcLocation& src_loc, int order_num
 	is_anon_func(false),
 	num_uses(0),
 	noinline(false),
-	sig(name, makeArgTypeVector(args_))
+	sig(name, makeArgTypeVector(args_)),
+	llvm_reported_stack_size(-1)
 {
 	
 	// TODO: fix this, make into method
@@ -1545,18 +1546,60 @@ bool FunctionDefinition::isConstant() const
 
 size_t FunctionDefinition::getTimeBound(GetTimeBoundParams& params) const
 {
-	
 	if(built_in_func_impl.nonNull())
 	{
 		return built_in_func_impl->getTimeBound(params);
 	}
 	else if(external_function.nonNull())
+	{
+		if(external_function->time_bound == ExternalFunction::unknownTimeBound())
+			throw BaseException("Could not bound time for external function " + external_function->sig.toString());
+
 		return external_function->time_bound;
+	}
 	else
 	{
 		return this->body->getTimeBound(params);
 	}
 	
+}
+
+
+GetSpaceBoundResults FunctionDefinition::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	// TODO: handle space for lambdas as well
+
+	//llvm::MachineFrameInfo &MFI = built_llvm_function->,machinefiunc getFrameInfo();
+
+	// If llvm_used_stack_size == -1, then this information wasn't set by LLVM.  This probably means that this 
+	// function wasn't compiled, due it being inlined and then dead-code removed.
+	// It could also mean that it literally used zero stack size, for instance if it just gets compiled down to 
+	// a single tail call.
+	size_t use_stack_size = (this->llvm_reported_stack_size == -1) ? 0 : (size_t)this->llvm_reported_stack_size;
+
+	use_stack_size += sizeof(void*);// The call instruction pushes the return address onto the stack.
+	// Consider this space part of the stack used by functions.
+
+	if(built_in_func_impl.nonNull())
+	{
+		GetSpaceBoundResults bounds = built_in_func_impl->getSpaceBound(params);
+		bounds.stack_space += use_stack_size;
+		return bounds;
+	}
+	else if(external_function.nonNull())
+	{
+		if(external_function->stack_size_bound == ExternalFunction::unknownSpaceBound() ||
+			external_function->heap_size_bound == ExternalFunction::unknownSpaceBound())
+			throw BaseException("Could not bound space for external function " + external_function->sig.toString());
+
+		return GetSpaceBoundResults(external_function->stack_size_bound, external_function->heap_size_bound);
+	}
+	else
+	{
+		GetSpaceBoundResults bounds = this->body->getSpaceBound(params);
+		bounds.stack_space += use_stack_size;
+		return bounds;
+	}
 }
 
 

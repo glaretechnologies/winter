@@ -101,6 +101,7 @@ public:
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 
 	bool isGenericFunction() const; // true if it is parameterised by type.
 	bool isExternalFunction() const { return external_function.nonNull(); }
@@ -169,6 +170,8 @@ public:
 	int order_num; // Used for establishing an ordering between function definitions and named constants, to avoid circular references.
 
 	bool noinline; // Optional attribute.  False by default.  If true, function won't be inlined.
+
+	int64 llvm_reported_stack_size; // -1 if this information is not returned by LLVM
 private:
 };
 

@@ -20,6 +20,7 @@ File created by ClassTemplate on Wed Jun 11 03:55:25 2008
 #include "wnt_LetBlock.h"
 #include "VMState.h"
 #include "VirtualMachine.h"
+#include "CompiledValue.h"
 #include "Value.h"
 #include "VMState.h"
 #include "Linker.h"
@@ -1175,6 +1176,13 @@ size_t BufferRoot::getTimeBound(GetTimeBoundParams& params) const
 }
 
 
+GetSpaceBoundResults BufferRoot::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	assert(0);
+	return GetSpaceBoundResults(0, 0);
+}
+
+
 //----------------------------------------------------------------------------------
 
 
@@ -1396,6 +1404,12 @@ Reference<ASTNode> IntLiteral::clone(CloneMapType& clone_map)
 }
 
 
+GetSpaceBoundResults IntLiteral::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return GetSpaceBoundResults(0, 0);
+}
+
+
 //-------------------------------------------------------------------------------------
 
 
@@ -1569,11 +1583,22 @@ size_t MapLiteral::getTimeBound(GetTimeBoundParams& params) const
 }
 
 
+GetSpaceBoundResults MapLiteral::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	GetSpaceBoundResults sum(0, 0);
+	for(size_t i=0; i<items.size(); ++i)
+		sum += items[i].first->getSpaceBound(params) + items[i].second->getSpaceBound(params);
+
+	sum += GetSpaceBoundResults(0, 0);
+	return sum;
+}
+
+
 //----------------------------------------------------------------------------------------------
 
 
 StringLiteral::StringLiteral(const std::string& v, const SrcLocation& loc) 
-:	ASTNode(StringLiteralType, loc), value(v)
+:	ASTNode(StringLiteralType, loc), value(v), llvm_allocated_on_heap(false)
 {
 	this->can_maybe_constant_fold = true;
 }
@@ -1638,6 +1663,7 @@ llvm::Value* StringLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 
 
 	const bool alloc_on_heap = mayEscapeCurrentlyBuildingFunction(params, this->type());
+	this->llvm_allocated_on_heap = alloc_on_heap;
 
 	llvm::Value* string_value;
 	uint64 initial_flags;
@@ -1756,6 +1782,14 @@ Reference<ASTNode> StringLiteral::clone(CloneMapType& clone_map)
 size_t StringLiteral::getTimeBound(GetTimeBoundParams& params) const
 {
 	return value.size();
+}
+
+
+GetSpaceBoundResults StringLiteral::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	// Currently strings may be allocated either on the stack or the heap.
+	// If the string is allocated on the heap, then we have to bound the stack space that allocateString will take.
+	return GetSpaceBoundResults(llvm_allocated_on_heap ? 1024 : 0, /*heap_space=*/llvm_allocated_on_heap ? (sizeof(StringRep) + value.size()) : 0);
 }
 
 
@@ -2321,6 +2355,13 @@ size_t AdditionExpression::getTimeBound(GetTimeBoundParams& params) const
 }
 
 
+GetSpaceBoundResults AdditionExpression::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return a->getSpaceBound(params) + b->getSpaceBound(params);
+}
+
+
+
 //-------------------------------------------------------------------------------------------------
 
 
@@ -2562,6 +2603,12 @@ size_t SubtractionExpression::getTimeBound(GetTimeBoundParams& params) const
 	const size_t op_cost = (type()->getType() == Type::VectorTypeType) ? (type().downcastToPtr<VectorType>()->num * scalar_cost) : scalar_cost;
 
 	return a->getTimeBound(params) + b->getTimeBound(params) + op_cost;
+}
+
+
+GetSpaceBoundResults SubtractionExpression::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return a->getSpaceBound(params) + b->getSpaceBound(params);
 }
 
 
@@ -2950,6 +2997,12 @@ size_t MulExpression::getTimeBound(GetTimeBoundParams& params) const
 	const size_t op_cost = (type()->getType() == Type::VectorTypeType) ? (type().downcastToPtr<VectorType>()->num * scalar_cost) : scalar_cost;
 
 	return a->getTimeBound(params) + b->getTimeBound(params) + op_cost;
+}
+
+
+GetSpaceBoundResults MulExpression::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return a->getSpaceBound(params) + b->getSpaceBound(params);
 }
 
 
@@ -3572,6 +3625,12 @@ size_t DivExpression::getTimeBound(GetTimeBoundParams& params) const
 }
 
 
+GetSpaceBoundResults DivExpression::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return a->getSpaceBound(params) + b->getSpaceBound(params);
+}
+
+
 //-----------------------------------------------------------------------------------------------
 
 
@@ -3797,6 +3856,11 @@ size_t BinaryBitwiseExpression::getTimeBound(GetTimeBoundParams& params) const
 }
 
 
+GetSpaceBoundResults BinaryBitwiseExpression::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return a->getSpaceBound(params) + b->getSpaceBound(params);
+}
+
 //-------------------------------------------------------------------------------------------------------
 
 
@@ -3967,6 +4031,12 @@ bool BinaryBooleanExpr::isConstant() const
 size_t BinaryBooleanExpr::getTimeBound(GetTimeBoundParams& params) const
 {
 	return a->getTimeBound(params) + b->getTimeBound(params) + 1;
+}
+
+
+GetSpaceBoundResults BinaryBooleanExpr::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return a->getSpaceBound(params) + b->getSpaceBound(params);
 }
 
 
@@ -4189,6 +4259,12 @@ size_t UnaryMinusExpression::getTimeBound(GetTimeBoundParams& params) const
 }
 
 
+GetSpaceBoundResults UnaryMinusExpression::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return expr->getSpaceBound(params);
+}
+
+
 //----------------------------------------------------------------------------------------
 
 
@@ -4297,6 +4373,12 @@ bool LogicalNegationExpr::isConstant() const
 size_t LogicalNegationExpr::getTimeBound(GetTimeBoundParams& params) const
 {
 	return expr->getTimeBound(params) + 1;
+}
+
+
+GetSpaceBoundResults LogicalNegationExpr::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return expr->getSpaceBound(params);
 }
 
 
@@ -4658,6 +4740,12 @@ size_t ComparisonExpression::getTimeBound(GetTimeBoundParams& params) const
 }
 
 
+GetSpaceBoundResults ComparisonExpression::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return a->getSpaceBound(params) + b->getSpaceBound(params);
+}
+
+
 //---------------------------------------------------------------------------------
 
 
@@ -4763,6 +4851,12 @@ bool ArraySubscript::isConstant() const
 size_t ArraySubscript::getTimeBound(GetTimeBoundParams& params) const
 {
 	return subscript_expr->getTimeBound(params) + 1;
+}
+
+
+GetSpaceBoundResults ArraySubscript::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return subscript_expr->getSpaceBound(params);
 }
 
 
@@ -4970,6 +5064,12 @@ bool NamedConstant::isConstant() const
 size_t NamedConstant::getTimeBound(GetTimeBoundParams& params) const
 {
 	return value_expr->getTimeBound(params);
+}
+
+
+GetSpaceBoundResults NamedConstant::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return value_expr->getSpaceBound(params);
 }
 
 

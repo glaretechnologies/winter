@@ -19,6 +19,8 @@ class EmitOpenCLCodeParams;
 class ASTNode;
 class TraversalPayload;
 struct GetTimeBoundParams;
+struct GetSpaceBoundParams;
+struct GetSpaceBoundResults;
 
 
 class BuiltInFunctionImpl : public RefCounted
@@ -74,6 +76,7 @@ public:
 	virtual bool callIsExpensive() const { return true; } 
 
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const = 0;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const = 0;
 
 	 // Built-in functions may call other functions, so we need to be able to traverse them when getting set of alive functions.
 	virtual void deadFunctionEliminationTraverse(TraversalPayload& payload) const {}
@@ -99,6 +102,7 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual bool callIsExpensive() const { return false; }
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 private:
 	VRef<StructureType> struct_type;
 };
@@ -114,6 +118,7 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual bool callIsExpensive() const { return false; }
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 //private:
 	VRef<StructureType> struct_type;
 	unsigned int index;
@@ -141,6 +146,7 @@ public:
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 
 	TypeVRef collection_type; // Should be one of array, vector, or tuple
 	//TypeRef value_type; // T
@@ -157,6 +163,7 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual bool callIsExpensive() const { return false; }
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 
 	void setIndex(unsigned int i) { index = i; }
 //private:
@@ -175,6 +182,7 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual bool callIsExpensive() const { return false; }
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 private:
 	VRef<VectorType> vector_type;
 	unsigned int index;
@@ -193,6 +201,7 @@ public:
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 
 	// Specialise for a particular first argument.
 	void specialiseForFunctionArg(FunctionDefinition* f);
@@ -237,6 +246,7 @@ public:
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 private:
 	VRef<Function> func_type;
 	VRef<ArrayType> array_type;
@@ -256,6 +266,7 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual bool callIsExpensive() const { return false; }
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 private:
 	VRef<ArrayType> array_type;
 	TypeVRef index_type;
@@ -272,6 +283,7 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual bool callIsExpensive() const { return false; }
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 private:
 	VRef<VArrayType> array_type;
 	TypeVRef index_type;
@@ -287,6 +299,7 @@ public:
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 private:
 	VRef<VArrayType> array_type;
 };
@@ -302,6 +315,7 @@ public:
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual bool callIsExpensive() const { return false; }
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 private:
 	VRef<VectorType> vec_type;
 	TypeVRef index_type;
@@ -317,6 +331,7 @@ public:
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 private:
 	VRef<ArrayType> array_type;
 	TypeVRef index_type;
@@ -332,6 +347,7 @@ public:
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 private:
 	VRef<VectorType> vector_type;
 	TypeVRef index_type;
@@ -376,6 +392,7 @@ public:
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 
 	const std::string emitOpenCLForFunctionArg(EmitOpenCLCodeParams& params,
 		const FunctionDefinition* f, // arg 0
@@ -401,6 +418,7 @@ public:
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 private:
 	VRef<VectorType> vector_type;
 	int num_components; // -1 if default
@@ -416,6 +434,7 @@ public:
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 private:
 	VRef<VectorType> vector_type;
 };
@@ -430,6 +449,7 @@ public:
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 private:
 	VRef<VectorType> vector_type;
 };
@@ -451,6 +471,7 @@ public:
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 
 	void setShuffleMask(const std::vector<int>& shuffle_mask);
 private:
@@ -468,6 +489,7 @@ public:
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 private:
 	TypeVRef type;
 };
@@ -481,6 +503,7 @@ public:
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 private:
 	TypeVRef type;
 };
@@ -494,6 +517,7 @@ public:
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 private:
 	TypeVRef type;
 };
@@ -507,6 +531,7 @@ public:
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 private:
 	TypeVRef type;
 };
@@ -520,6 +545,7 @@ public:
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 private:
 	TypeVRef type;
 };
@@ -533,6 +559,7 @@ public:
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 private:
 	TypeVRef type;
 };
@@ -546,6 +573,7 @@ public:
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 private:
 	TypeVRef type;
 };
@@ -559,6 +587,7 @@ public:
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 private:
 	TypeVRef type;
 };
@@ -572,6 +601,7 @@ public:
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 private:
 	TypeVRef type;
 };
@@ -585,6 +615,7 @@ public:
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 private:
 	TypeVRef type;
 };
@@ -600,6 +631,7 @@ public:
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 private:
 	TypeVRef type;
 };
@@ -616,6 +648,7 @@ public:
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 private:
 	TypeVRef type;
 };
@@ -632,6 +665,7 @@ public:
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 private:
 	TypeVRef type;
 };
@@ -646,6 +680,7 @@ public:
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 private:
 	TypeVRef type;
 };
@@ -660,6 +695,7 @@ public:
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 private:
 	TypeVRef type;
 };
@@ -674,6 +710,7 @@ public:
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 };
 
 
@@ -685,6 +722,7 @@ public:
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 
 	TypeVRef type;
 };
@@ -698,6 +736,7 @@ public:
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 	virtual void deadFunctionEliminationTraverse(TraversalPayload& payload) const;
 	virtual void linkInCalledFunctions(TraversalPayload& payload) const;
 

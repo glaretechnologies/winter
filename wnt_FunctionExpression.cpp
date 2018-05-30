@@ -2138,4 +2138,35 @@ size_t FunctionExpression::getTimeBound(GetTimeBoundParams& params) const
 	}
 }
 
+
+GetSpaceBoundResults FunctionExpression::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	params.steps++;
+	if(params.steps > (1 << 22))
+		throw BaseException("Too many steps when computing space bound.");
+
+	GetSpaceBoundResults arg_eval_bound(0, 0);
+	for(size_t i=0; i<argument_expressions.size(); ++i)
+		arg_eval_bound += argument_expressions[i]->getSpaceBound(params);
+
+	if(static_target_function)
+	{
+		try
+		{
+			return arg_eval_bound + static_target_function->getSpaceBound(params);
+		}
+		catch(BaseException& e)
+		{
+			throw BaseException(e.what() + errorContext(this->srcLocation()));
+		}
+	}
+	else
+	{
+		// TODO: Compute a maximum over all functions that this expression may be calling.
+		// TEMP:
+		throw BaseException("Unable to bound space of function expression." + errorContext(this->srcLocation()));
+	}
+}
+
+
 } // end namespace Winter

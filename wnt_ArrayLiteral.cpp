@@ -460,4 +460,28 @@ size_t ArrayLiteral::getTimeBound(GetTimeBoundParams& params) const
 }
 
 
+GetSpaceBoundResults ArrayLiteral::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	TypeRef this_type = this->type();
+	assert(this_type->getType() == Type::ArrayTypeType);
+	ArrayType* array_type = static_cast<ArrayType*>(this_type.getPointer());
+
+	
+	// Compute space to compute the element values:
+	GetSpaceBoundResults sum(0, 0);
+	if(has_int_suffix)
+	{
+		sum += elements[0]->getSpaceBound(params);
+	}
+	else
+	{
+		for(size_t i=0; i<elements.size(); ++i)
+			sum += elements[i]->getSpaceBound(params);
+	}
+
+	//TEMP array is always stored on the stack currently, so no need to add heap space
+	return sum;
+}
+
+
 } // end namespace Winter

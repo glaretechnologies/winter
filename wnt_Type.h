@@ -79,6 +79,7 @@ public:
 	virtual bool containsType(const Type& other_type) const { return false; }
 	virtual bool isHeapAllocated() const { return false; } // same as 'is refcounted'.
 	virtual bool requiresCompareEqualFunction() const { return false; } // Do we need to make a __compare_equal function for this type, or can we use some code built into llvm.
+	virtual size_t memSize() const = 0; // in bytes
 
 	inline TypeType getType() const { return type; }
 
@@ -111,6 +112,7 @@ public:
 	virtual const std::string OpenCLCType() const;
 	virtual llvm::Value* getInvalidLLVMValue(llvm::Module& module) const; // For array out-of-bounds
 	virtual Reference<Value> getInvalidValue() const; // For array out-of-bounds
+	virtual size_t memSize() const { return 4; }
 };
 
 
@@ -125,6 +127,7 @@ public:
 	virtual const std::string OpenCLCType() const;
 	virtual llvm::Value* getInvalidLLVMValue(llvm::Module& module) const; // For array out-of-bounds
 	virtual Reference<Value> getInvalidValue() const; // For array out-of-bounds
+	virtual size_t memSize() const { return 8; }
 };
 
 
@@ -138,6 +141,7 @@ public:
 	virtual llvm::Type* LLVMType(llvm::Module& module) const;
 	virtual const std::string OpenCLCType() const { return name; }
 	const int genericTypeParamIndex() const { return generic_type_param_index; }
+	virtual size_t memSize() const { return 0; }
 private:
 	std::string name;
 	int generic_type_param_index;
@@ -174,6 +178,7 @@ public:
 	virtual const std::string OpenCLCType() const;
 	virtual llvm::Value* getInvalidLLVMValue(llvm::Module& module) const; // For array out-of-bounds
 	virtual Reference<Value> getInvalidValue() const; // For array out-of-bounds
+	virtual size_t memSize() const;
 
 	int numBits() const { return num_bits; }
 //private:
@@ -191,6 +196,7 @@ public:
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 	virtual llvm::Type* LLVMType(llvm::Module& module) const;
 	virtual const std::string OpenCLCType() const { return "bool"; }
+	virtual size_t memSize() const { return 1; }
 };
 
 
@@ -210,6 +216,7 @@ public:
 	virtual bool hasDestructor() const { return true; }
 	virtual bool isHeapAllocated() const { return true; }
 	virtual bool requiresCompareEqualFunction() const { return true; }
+	virtual size_t memSize() const { return 24; } // just returning header size here
 };
 
 
@@ -223,6 +230,7 @@ public:
 	virtual llvm::Type* LLVMType(llvm::Module& module) const;
 	virtual const std::string OpenCLCType() const { return "char"; }
 	virtual bool passByValue() const { return true; }
+	virtual size_t memSize() const { return 1; }
 };
 
 
@@ -268,6 +276,7 @@ public:
 	virtual void getContainedTypesWithDestructors(std::set<ConstTypeVRef, ConstTypeVRefLessThan>& types) const;
 	virtual bool containsType(const Type& other_type) const;
 	virtual bool requiresCompareEqualFunction() const { return true; }
+	virtual size_t memSize() const { return 24; } // TODO: work this out
 
 	virtual bool lessThan(const Type& b) const
 	{
@@ -342,6 +351,7 @@ public:
 	virtual const std::string OpenCLCType() const;
 	virtual bool passByValue() const { return false; }
 	virtual bool requiresCompareEqualFunction() const { return true; }
+	virtual size_t memSize() const { return 24; } // Just header size
 
 	TypeVRef from_type;
 	TypeVRef to_type;
@@ -379,6 +389,7 @@ public:
 	virtual bool passByValue() const { return false; }
 	virtual bool containsType(const Type& other_type) const;
 	virtual bool requiresCompareEqualFunction() const { return true; }
+	virtual size_t memSize() const { return 24; } // Just header size
 
 
 	VRef<Type> elem_type;
@@ -420,6 +431,7 @@ public:
 	virtual bool containsType(const Type& other_type) const;
 	virtual bool isHeapAllocated() const { return true; }
 	virtual bool requiresCompareEqualFunction() const { return true; }
+	virtual size_t memSize() const { return 24; } // Just header size
 
 	TypeVRef elem_type;
 };
@@ -460,6 +472,7 @@ public:
 	virtual void getContainedTypesWithDestructors(std::set<ConstTypeVRef, ConstTypeVRefLessThan>& types) const;
 	virtual bool containsType(const Type& other_type) const;
 	virtual bool requiresCompareEqualFunction() const { return true; }
+	virtual size_t memSize() const;
 
 	const std::string definitionString() const; // Winter definition string, e.g "struct a { float b }"
 	const std::string getOpenCLCDefinition(EmitOpenCLCodeParams& params, bool emit_comments) const; // Get full definition string, e.g. "struct a { float b; };"
@@ -527,6 +540,7 @@ public:
 	virtual void getContainedTypesWithDestructors(std::set<ConstTypeVRef, ConstTypeVRefLessThan>& types) const;
 	virtual bool containsType(const Type& other_type) const;
 	virtual bool requiresCompareEqualFunction() const { return true; }
+	virtual size_t memSize() const;
 
 
 	std::vector<TypeVRef> component_types;
@@ -565,6 +579,7 @@ public:
 	virtual llvm::Type* LLVMType(llvm::Module& module) const;
 	virtual const std::string OpenCLCType() const;
 	virtual bool requiresCompareEqualFunction() const { return true; }
+	virtual size_t memSize() const { return elem_type->memSize() * num; }
 
 	TypeVRef elem_type;
 	unsigned int num;
@@ -592,6 +607,7 @@ public:
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 	virtual llvm::Type* LLVMType(llvm::Module& module) const;
 	virtual const std::string OpenCLCType() const;
+	virtual size_t memSize() const { return 8; }
 };
 
 
@@ -636,6 +652,7 @@ public:
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 	virtual llvm::Type* LLVMType(llvm::Module& module) const;
 	virtual const std::string OpenCLCType() const;
+	virtual size_t memSize() const;
 
 	std::vector<TypeVRef> types;
 };
@@ -661,6 +678,7 @@ public:
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 	virtual llvm::Type* LLVMType(llvm::Module& module) const;
 	virtual const std::string OpenCLCType() const;
+	virtual size_t memSize() const;
 };
 
 
@@ -689,6 +707,7 @@ public:
 	virtual llvm::Type* LLVMType(llvm::Module& module) const;
 	virtual const std::string OpenCLCType() const;
 	virtual bool OpenCLPassByPointer() const { return true; }
+	virtual size_t memSize() const { return 0; }
 
 	std::string name;
 };

@@ -696,4 +696,11 @@ size_t Variable::getTimeBound(GetTimeBoundParams& params) const
 }
 
 
+GetSpaceBoundResults Variable::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	// A variable just refers to some existing value, so doesn't really take any space.
+	return GetSpaceBoundResults(0, 0);
+}
+
+
 } // end namespace Winter
