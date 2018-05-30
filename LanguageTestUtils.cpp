@@ -108,7 +108,7 @@ static GLARE_NO_INLINE void* getStackPointer()
 #ifdef _WIN32
 	return (void*)((char*)_AddressOfReturnAddress() + sizeof(void*));
 #else
-	return (void*)((char*)__builtin_frame_address() + sizeof(void*));
+	return (void*)((char*)__builtin_frame_address(0) + sizeof(void*));
 #endif
 }
 
