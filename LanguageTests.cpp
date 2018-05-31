@@ -4234,6 +4234,12 @@ static void testVectors()
 		def main(float x) float : f([x, 2.0, 3.0, 4.0]v, [1.0, 2.0, 3.0, 4.0]v) ? 1.0 : 0.0",
 		1.5f, 0.0f);
 
+	// Test for vector<float, 8>
+	testMainFloatArg(
+		"def f(vector<float, 8> a, vector<float, 8> b) !noinline bool : a == b   \n\
+		def main(float x) float : f([x, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]v, [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]v) ? 1.0 : 0.0",
+		1.0f, 1.0f);
+
 	// Test for vector<double, 2>
 	testMainDoubleArg(
 		"def f(vector<double, 2> a, vector<double, 2> b) !noinline bool : a == b   \n\

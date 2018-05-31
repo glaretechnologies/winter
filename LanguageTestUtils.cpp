@@ -1841,7 +1841,7 @@ void testMainStructInputAndOutput(const std::string& src, const InStructType& st
 }
 
 
-inline bool epsEqual(const float4& a, const float4& b)
+bool epsEqual(const float4& a, const float4& b)
 {
 	for(int i=0; i<4; ++i)
 		if(!epsEqual(a.e[i], b.e[i]))
@@ -1850,13 +1850,13 @@ inline bool epsEqual(const float4& a, const float4& b)
 }
 
 
-inline bool epsEqual(const StructWithVec& a, const StructWithVec& b)
+bool epsEqual(const StructWithVec& a, const StructWithVec& b)
 {
 	return epsEqual(a.a, b.a) && epsEqual(a.b, b.b) && epsEqual(a.data2, b.data2);
 }
 
 
-inline bool epsEqual(const Float4Struct& a, const Float4Struct& b)
+bool epsEqual(const Float4Struct& a, const Float4Struct& b)
 {
 	for(int i=0; i<4; ++i)
 		if(!epsEqual(a.v.e[i], b.v.e[i]))
@@ -1865,7 +1865,7 @@ inline bool epsEqual(const Float4Struct& a, const Float4Struct& b)
 }
 
 
-inline bool epsEqual(const Float8Struct& a, const Float8Struct& b)
+bool epsEqual(const Float8Struct& a, const Float8Struct& b)
 {
 	for(int i=0; i<8; ++i)
 		if(!epsEqual(a.v.e[i], b.v.e[i]))

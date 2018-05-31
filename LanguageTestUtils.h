@@ -134,6 +134,12 @@ struct TestStructIn
 };
 
 
+bool epsEqual(const float4& a, const float4& b);
+bool epsEqual(const StructWithVec& a, const StructWithVec& b);
+bool epsEqual(const Float4Struct& a, const Float4Struct& b);
+bool epsEqual(const Float8Struct& a, const Float8Struct& b);
+
+
 size_t getTimeBoundForMainFloatArg(const std::string& src, uint32 test_flags = 0);
 void testTimeBoundInvalidForMainFloatArg(const std::string& src, uint32 test_flags = 0);
 TestResults testMainFloat(const std::string& src, float target_return_val);
