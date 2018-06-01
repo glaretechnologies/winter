@@ -543,15 +543,15 @@ static void testVArrays()
 	testMainInt64Arg("def main(int64 x) int64 : length(makeVArray(1, 10i64))", 10, 10);
 
 	// Test makeVArray with runtime-variable, but bounded count arg
-	testMainInt64Arg("def main(int64 x) int64 : length(makeVArray(1, x > 10i64 ? 10i64 : x))", 10, 10);
+	testMainInt64Arg("def main(int64 x) int64 : length(makeVArray(1, x > 10i64 ? 10i64 : x))", 10, 10, ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);
 
-	testMainInt64Arg("def main(int64 x) int64 : length(makeVArray(1, x))", 1, 1);
-	testMainInt64Arg("def main(int64 x) int64 : length(makeVArray(1, x))", 4, 4);
-	testMainInt64Arg("def main(int64 x) int64 : length(makeVArray(1, x))", 0, 0);
+	testMainInt64Arg("def main(int64 x) int64 : length(makeVArray(1, x))", 1, 1, ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);
+	testMainInt64Arg("def main(int64 x) int64 : length(makeVArray(1, x))", 4, 4, ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);
+	testMainInt64Arg("def main(int64 x) int64 : length(makeVArray(1, x))", 0, 0, ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);
 
-	testMainInt64Arg("def main(int64 x) int64 : makeVArray(x, x)[0]", 1, 1, ALLOW_UNSAFE);
-	testMainInt64Arg("def main(int64 x) int64 : makeVArray(x, x)[0]", 2, 2, ALLOW_UNSAFE);
-	testMainInt64Arg("def main(int64 x) int64 : makeVArray(x, x)[1]", 2, 2, ALLOW_UNSAFE);
+	testMainInt64Arg("def main(int64 x) int64 : makeVArray(x, x)[0]", 1, 1, ALLOW_UNSAFE | ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);
+	testMainInt64Arg("def main(int64 x) int64 : makeVArray(x, x)[0]", 2, 2, ALLOW_UNSAFE | ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);
+	testMainInt64Arg("def main(int64 x) int64 : makeVArray(x, x)[1]", 2, 2, ALLOW_UNSAFE | ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);
 
 	
 
@@ -902,24 +902,24 @@ static void testStringFunctions()
 	testMainIntegerArg("def main(int x) int : codePoint(elem(\"hello\", 0i64))", 0, (int)'h', ALLOW_UNSAFE | INVALID_OPENCL);
 	testMainIntegerArg("def main(int x) int : codePoint(elem(\"hello\", 1i64))", 0, (int)'e', ALLOW_UNSAFE | INVALID_OPENCL);
 	testMainIntegerArg("def main(int x) int : codePoint(elem(\"hello\", 4i64))", 0, (int)'o', ALLOW_UNSAFE | INVALID_OPENCL);
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"abc\", x)))", 0, (int)'a', ALLOW_UNSAFE | INVALID_OPENCL);
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"abc\", x)))", 1, (int)'b', ALLOW_UNSAFE | INVALID_OPENCL);
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"abc\", x)))", 2, (int)'c', ALLOW_UNSAFE | INVALID_OPENCL);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"abc\", x)))", 0, (int)'a', ALLOW_UNSAFE | INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"abc\", x)))", 1, (int)'b', ALLOW_UNSAFE | INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"abc\", x)))", 2, (int)'c', ALLOW_UNSAFE | INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
 
 	// with multi-byte chars:
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"\\u{393}\", x)))", 0, 0x393, ALLOW_UNSAFE | INVALID_OPENCL);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"\\u{393}\", x)))", 0, 0x393, ALLOW_UNSAFE | INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
 
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"\\u{393}bc\", x)))", 0, 0x393, ALLOW_UNSAFE | INVALID_OPENCL);
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"\\u{393}bc\", x)))", 1, (int)'b', ALLOW_UNSAFE | INVALID_OPENCL);
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"\\u{393}bc\", x)))", 2, (int)'c', ALLOW_UNSAFE | INVALID_OPENCL);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"\\u{393}bc\", x)))", 0, 0x393, ALLOW_UNSAFE | INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"\\u{393}bc\", x)))", 1, (int)'b', ALLOW_UNSAFE | INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"\\u{393}bc\", x)))", 2, (int)'c', ALLOW_UNSAFE | INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
 
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"a\\u{393}c\", x)))", 0, (int)'a', ALLOW_UNSAFE | INVALID_OPENCL);
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"a\\u{393}c\", x)))", 1, 0x393, ALLOW_UNSAFE | INVALID_OPENCL);
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"a\\u{393}c\", x)))", 2, (int)'c', ALLOW_UNSAFE | INVALID_OPENCL);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"a\\u{393}c\", x)))", 0, (int)'a', ALLOW_UNSAFE | INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"a\\u{393}c\", x)))", 1, 0x393, ALLOW_UNSAFE | INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"a\\u{393}c\", x)))", 2, (int)'c', ALLOW_UNSAFE | INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
 
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"ab\\u{393}\", x)))", 0, (int)'a', ALLOW_UNSAFE | INVALID_OPENCL);
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"ab\\u{393}\", x)))", 1, (int)'b', ALLOW_UNSAFE | INVALID_OPENCL);
-	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"ab\\u{393}\", x)))", 2, 0x393, ALLOW_UNSAFE | INVALID_OPENCL);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"ab\\u{393}\", x)))", 0, (int)'a', ALLOW_UNSAFE | INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"ab\\u{393}\", x)))", 1, (int)'b', ALLOW_UNSAFE | INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
+	testMainInt64Arg("def main(int64 x) int64 : toInt64(codePoint(elem(\"ab\\u{393}\", x)))", 2, 0x393, ALLOW_UNSAFE | INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
 
 	// ===================================================================
 	// Test Escaped characters in string literals
@@ -1030,15 +1030,15 @@ static void testStringFunctions()
 	// ===================================================================
 	testMainStringArg("def main(string s) string : toString('a')", "", "a");
 
-	testMainStringArg("def main(string s) string : toString(length(s) < 2 ? 'a' : 'b')", "", "a"); // Test with runtime character choice
-	testMainStringArg("def main(string s) string : toString(length(s) < 2 ? 'a' : 'b')", "hello", "b"); // Test with runtime character choice
+	testMainStringArg("def main(string s) string : toString(length(s) < 2 ? 'a' : 'b')", "", "a", ALLOW_TIME_BOUND_FAILURE); // Test with runtime character choice
+	testMainStringArg("def main(string s) string : toString(length(s) < 2 ? 'a' : 'b')", "hello", "b", ALLOW_TIME_BOUND_FAILURE); // Test with runtime character choice
 
 	testMainIntegerArg("def main(int x) int : length(toString('a'))", 2, 1, INVALID_OPENCL);
 
 	testMainIntegerArg("def main(int x) int : length(toString(x < 5 ? 'a' : 'b'))", 2, 1, INVALID_OPENCL); // Test with runtime character
 
 
-	testMainStringArg("def main(string s) string : concatStrings(toString('a'), toString('b'))", "", "ab");
+	testMainStringArg("def main(string s) string : concatStrings(toString('a'), toString('b'))", "", "ab", ALLOW_TIME_BOUND_FAILURE);
 
 	// ===================================================================
 	// Test == and !=
@@ -1603,7 +1603,7 @@ static void testIterate()
 				[State(current_state.i), false]t # break		\n\
 			else												\n\
 				[State(current_state.i + 1.0), true]t			\n\
-		def main(float x) float :  iterate(f, State(0.0)).i", 1.0f, 100.0f, INVALID_OPENCL);// NOTE: this was actually working with OpenCL until struct pass by ptr.
+		def main(float x) float :  iterate(f, State(0.0)).i", 1.0f, 100.0f, INVALID_OPENCL | ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);// NOTE: this was actually working with OpenCL until struct pass by ptr.
 
 	// Test iterate with optional invariant data:
 
@@ -1614,7 +1614,7 @@ static void testIterate()
 				[current_state, false]t # break										\n\
 			else																	\n\
 				[current_state + invariant_data, true]t											\n\
-		def main(int x) int :  iterate(f, 0, 2)", 17, 200, INVALID_OPENCL);
+		def main(int x) int :  iterate(f, 0, 2)", 17, 200, INVALID_OPENCL | ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);
 
 	// Test with pass-by-reference data (struct)
 	testMainIntegerArg("															\n\
@@ -1624,7 +1624,7 @@ static void testIterate()
 				[current_state, false]t # break										\n\
 			else																	\n\
 				[current_state + invariant_data.x, true]t											\n\
-		def main(int x) int :  iterate(f, 0, s(3, 4))", 17, 300, INVALID_OPENCL);
+		def main(int x) int :  iterate(f, 0, s(3, 4))", 17, 300, INVALID_OPENCL | ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);
 
 	// Test with two invariant data args pass-by-reference data (struct)
 	testMainIntegerArg("															\n\
@@ -1634,7 +1634,7 @@ static void testIterate()
 				[current_state, false]t # break										\n\
 			else																	\n\
 				[current_state + invariant_data.x, true]t											\n\
-		def main(int x) int :  iterate(f, 0, s(3, 4), x)", 17, 3 * 17, INVALID_OPENCL);
+		def main(int x) int :  iterate(f, 0, s(3, 4), x)", 17, 3 * 17, INVALID_OPENCL | ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);
 }
 
 
@@ -3290,8 +3290,8 @@ static void testLambdaExpressionsAndClosures()
 	testAssert(results.maindef->body->nodeType() == ASTNode::MulExpressionType);
 
 	// Test Lambda applied directly (with same variable names)
-	testMainFloatArg("def main(float x) float : (\\(float x) : x*x) (x)", 4.0f, 16.0f, INVALID_OPENCL);
-	testMainFloatArg("def main(float x) float : (\\(float x) : x*x) (x + 1)", 4.0f, 25.0f, INVALID_OPENCL);
+	testMainFloatArg("def main(float x) float : (\\(float x) : x*x) (x)", 4.0f, 16.0f, INVALID_OPENCL | ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);
+	testMainFloatArg("def main(float x) float : (\\(float x) : x*x) (x + 1)", 4.0f, 25.0f, INVALID_OPENCL | ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);
 
 	
 
@@ -4723,7 +4723,7 @@ void LanguageTests::run()
 	testMainFloatArgInvalidProgram("def main(float x) float : (1 * (1 * ((1 + 1) * (1 - 1 + 1)) - 1 - ((1 + (((((1 + 		 1 / (1 + (((1 + 1 / (1 * (1 - 1 + 1 / 1 / 1))) - 1 - 1 - (1 + 1 / 1) + (((1 * 1 		) * 1) * 1) / 1) - 1 + 1)) - 1 / 1) + (1 * 1)) + 1 - 1) + 1) * 1)) + 1) / (1 + 1 		) / 1 - ((1 + 1 / 1 - (((1 * ((1 - 1 - 1 / 1 - 1 * 1) - (1 / 1 - 1 * 1) + ((1 +	 		1) - 1 * 1) - 1 / 1)) + (1 / 1 / 1 - 1 - (1 + 1) / (1 + 1) + 1)) * (1 * ((((1 +	 		1) * 1) / 1 - 1 - 1 - (((1 + 1) * 1 - (((1 / 1 * 1) * (1 + 1) - 1) / 1 / 1 / 1 - 		 (1 + (((1 + 1) + 1) * 1)) - 1 / ((1 + 1) / (1 * 1) / (1 + (1 / 1 * 1 / 1 - 1 -	 		(1 * 1) / (1 + 1) - 1 - 1 - 1 - 1 - 1 / 1)) / (1 / 1 * 1) + (((1 + 1) * ((1 + 1) 		 * 1)) / 1 + ((1 - ((1 * 1) + 1) + 1) + 1 - 1 / ((1 / (1 - ((1 + 1) - ((((1 - (( 		1 * ((1 * ((1 + 1) + ((1 - (1 * 1) + (1 - (1 - 1 - (1 * 1) / (1 + 1) / 1 * (1 -	 		1 + (1 + 1) - ((1 / 1 / 1 + 1) * 1) - (1 - 1 * 1))) * 1) - 1 - 1 - 1 - (1 * (((1 		 * 1) * ((1 + (1 / (1 * 1) * 1 - 1)) * (1 + (((1 + 1) + 1) + 1)))) + 1)) / 1)) +	 		1 / 1) / 1 - 1)) * 1 - 1)) / 1 * (1 * 1) - 1 - 1 / (1 * ((((1 + 1) + 1) * 1 - 1	 		- 1 / ((1 + 1) / (1 * 1) - ((1 / 1 + 1) * 1) + (1 + (1 * 1) - 1 - 1 - 1 - (1 + ( 		1 + 1))) / 1)) - 1 * (1 / ((1 * 1) + ((1 - 1 + (1 + 1)) + ((1 + 1) * 1))) / 1 *	 		1)) - 1) / 1 / 1 / 1) / 1 + 1) / (1 / (1 + (1 + (1 * 1 - 1)) - 1) / 1 - ((1 * 1	 		/ 1 / (1 / (1 * 1 / 1 - 1) / 1 * 1) / 1) - 1 * ((1 + (((1 + 1) + 1) - ((1 * ((1	 		+ 1) + 1)) * ((1 * 1) * 1) - 1) / 1 / (1 - 1 / (1 - 1 * 1) / 1 * 1) / ((1 - (1 + 		 1) / 1 * 1) + 1 - (1 + (1 * 1)) - 1) - 1 * 1) - 1 / 1) * 1)) + (((1 - (1 / 1 -	 		1 + 1 - (1 * (1 + 1)) / (1 + (1 + 1))) + 1) - ((1 + 1) * (1 * 1 / 1)) * 1 - 1) + 		 1) - 1 / 1 - (((1 * 1 - 1) + 1) - (1 + 1) - 1 - 1 * 1)) / (1 + 1) + (((1 * ((1	 		/ (1 * 1) * 1) * 1)) * 1) + 1 - (1 * 1)) / 1) * 1) + (1 / 1 * 1 / (1 * (1 + (1 / 		 1 / 1 - ((1 + ((1 - 1 / 1 + 1 / 1 - 1) * 1)) * 1) - 1 / 1 / 1 / (1 + 1) - (1 +	 		((1 + (((1 + 1 - 1 / ((1 + 1) * (1 + (1 / 1 + (1 + 1))))) * 1) * ((1 - 1 / (1 +	 		1 - (((1 / 1 - 1 / 1 * (1 + (((1 * 1) * (1 - 1 * (1 * 1))) - 1 + ((1 * 1) * ((1	 		- 1 * 1) / 1 + (1 + 1))()))) * 1) + 1 - 1 - 1 / (1 + ((1 * (1 + 1)) * 1)))) / (1	 		+ 1 - 1) + 1) - 1 * 1) / 1 - 1 / 1 - ((((1 + (1 * 1 - 1)) * ((1 + (1 * 1)) * 1)) 		 * ((1 + 1) + 1)) + 1) / 1 / 1 - ((1 / 1 - (((1 + (1 * 1) - 1) - 1 * 1 - (1 + 1) 		 - 1) + 1) + (1 / (1 + (1 * 1)) / 1 * 1 / 1) / (1 + 1)) * 1 / 1 - 1) - 1 - 1 - 1 		) / 1) * 1) / 1) + 1))) / 1 / 1)) / 1) * ((((1 / 1 + 1) - 1 * 1 / (1 + 1)) * 1 /	 		1) / 1 * 1) / 1 / 1 / 1 - ((1 * (((1 / 1 * (1 * (1 / ((1 - 1 * (1 * 1 / 1)) + (( 		1 * (1 + 1)) * 1)) * (1 + (1 + (1 * (1 + 1 / 1 - (1 - 1 * ((1 + 1) + 1 - (1 * 1) 		) / ((1 - 1 + 1) - 1 + 1)))) - 1 / (1 + 1) / 1 / 1 / 1 / (1 + (1 * (1 - (1 * 1 / 		 1) * 1))) / 1 - 1 - 1))) / ((1 + 1) + 1 / (1 * 1) / 1 / (1 * 1 / 1) - 1 - 1 - 1 		 / (1 * ((1 / 1 - 1 / 1 - 1 / 1 / 1 / 1 / 1 * 1) - 1 / (1 - ((1 / 1 + 1) + 1) -	 		1 / (1 * (1 + 1)) / 1 * (1 * 1) / 1) / 1 * 1)) / (1 + 1) / (((1 - 1 * 1) + (1 -	 		(1 + 1) + 1 / 1)) * 1) - (1 / 1 / 1 * 1) - (1 - ((1 * (1 - (1 + 1) + 1)) * (1 +	 		1)) / 1 / 1 + (1 - 1 - (1 + (1 * 1)) - ((1 + 1 - ((1 + ((1 * 1) * 1 - 1 / 1)) +	 		1) - 1) / 1 - 1 + 1) / (((1 * 1) + 1) + 1) * (1 * 1)))) / 1 / ((1 * 1) + 1 - 1)) 		 / 1) * 1) * 1)) * ((1 - (1 * 1 / 1) + 1) * 1 / 1)) / (1 + 1) / 1) + (1 / 1 * (1 		 + 1 / 1 - (1 / (1 - 1 + 1) + 1) / (1 + 1) - (1 * 1)) - (((1 / 1 + 1 - 1 - 1) /	 		1 * 1) + (1 * 1) / (1 / 1 * 1) - 1 - (1 + 1))) / 1) + 1) + 1)) / 1 / 1)) + 1) -	 		1( - (1 * 1 - 1)) * ((1 + 1) * 1)) - 1 * (1 + ((1 * 1) + (1 * 1)))) - 1 * 1)))) * 		 1) - 1 - 1 - 1))");
 	testMainFloatArgInvalidProgram("def main(float x) float : (1 * (1 * ((1 + 1) * (1 - 1 + 1)) - 1 - ((1 + (((((1 + 		 1 / (1 + (((1 + 1 / (1 * (1 - 1 + 1 / 1 / 1))) - 1 - 1 - (1 + 1 / 1) + (((1 * 1 		) * 1) * 1) / 1) - 1 + 1)) - 1 / 1) + (1 * 1)) + 1 - 1) + 1) * 1)) + 1) / (1 + 1 		) / 1 - ((1 + 1 / 1 - (((1 * ((1 - 1 - 1 / 1 - 1 * 1) - (1 / 1 - 1 * 1) + ((1 +	 		1) - 1 * 1) - 1 / 1)) + (1 / 1 / 1 - 1 - (1 + 1) / (1 + 1) + 1)) * (1 * ((((1 +	 		1) * 1) / 1 - 1 - 1 - (((1 + 1) * 1 - (((1 / 1 * 1) * (1 + 1) - 1) / 1 / 1 / 1 - 		 (1 + (((1 + 1) + 1) * 1)) - 1 / ((1 + 1) / (1 * 1) / (1 + (1 / 1 * 1 / 1 - 1 -	 		(1 * 1) / (1 + 1) - 1 - 1 - 1 - 1 - 1 / 1)) / (1 / 1 * 1) + (((1 + 1) * ((1 + 1) 		 * 1)) / 1 + ((1 -  true ((1 * 1) + 1) + 1) + 1 - 1 / ((1 / (1 - ((1 + 1) - ((((1 - (( 		1 * ((1 * ((1 + 1) + ((1 - (1 * 1) + (1 - (1 - 1 - (1 * 1) / (1 + 1) / 1 * (1 -	 		1 + (1 + 1) - ((1 / 1 / 1 + 1) * 1) - (1 - 1 * 1))) * 1) - 1 - 1 - 1 - (1 * (((1 		 * 1) * ((1 + (1 / (1 * 1) * 1 - 1)) * (1 + (((1 + 1) + 1) + 1)))) + 1) / 1)) +	 		1 / 1) / 1 - 1)) * 1 - 1)) / 1 * (1 * 1) - 1 - 1 / (1 * ((((1 + 1) + 1) * 1 - 1	 		- 1 / ((1 + 1) / (1 * 1) - ((1 / 1 + 1) * 1) + (1 + (1 * 1) - 1 - 1 - 1 - (1 + ( 		1 + 1))) / 1)) - 1 * (1 / ((1 * 1) + ((1 - 1 + (1 + 1)) + ((1 + 1) * 1))) / 1 *	 		1)) - 1) / 1 / 1 / 1) / 1 + 1) / (1 / (1 + (1 + (1 * 1 - 1)) - 1) / 1 - ((1 * 1	 		/ 1 / (1 / (1 * 1 / 1 - 1) / 1 * 1) / 1) - 1 * ((1 + (((1 + 1) + 1) - ((1 * ((1	 		+ 1) + 1)) * ((1 * 1) * 1) - 1) / 1 / (1 - 1 / (1 - 1 * 1) / 1 * 1) / ((1 - (1 + 		 1) / 1 * 1) + 1 - (1 + (1 * 1)) - 1) - 1 * 1) - 1 / 1) * 1)) + (((1 - (1 / 1 -	 		1 + 1 - (1 * (1 + 1)) / (1 + (1 + 1))) + 1) - ((1 + 1) * (1 * 1 / 1)) * 1 - 1) + 		 1) - 1 / 1 - (((1 * 1 - 1) + 1) - (1 + 1) - 1 - 1 * 1)) / (1 + 1) + (((1 * ((1	 		/ (1 * 1) * 1) * 1)) * 1) + 1 - (1 * 1)) / 1) * 1) + (1 / 1 * 1 / (1 * (1 + (1 / 		 1 / 1 - ((1 + ((1 - 1 / 1 + 1 / 1 - 1) * 1)) * 1) - 1 / 1 / 1 / (1 + 1) - (1 +	 		((1 + (((1 + 1 - 1 / ((1 + 1) * (1 + (1 / 1 + (1 + 1))))) * 1) * ((1 - 1 / (1 +	 		1 - (((1 / 1 - 1 / 1 * (1 + (((1 * 1) * (1 - 1 * (1 * 1))) - 1 + ((1 * 1) * ((1	 		- 1 * 1) / 1 + (1 + 1)))))) * 1) + 1 - 1 - 1 / (1 + ((1 * (1 + 1)) * 1)))) / (1	 		+ 1 - 1) + 1) - 1 * 1) / 1 - 1 / 1 - ((((1 + (1 * 1 - 1)) * ((1 + (1 * 1)) * 1)) 		 * ((1 + 1) + 1)) + 1) / 1 / 1 - ((1 / 1 - (((1 + (1 * 1) - 1) - 1 * 1 - (1 + 1) 		 - 1) + 1) + (1 / (1 + (1 * 1)) / 1 * 1 / 1) / (1 + 1)) * 1 / 1 - 1) - 1 - 1 - 1 		) / 1) * 1) / 1) + 1)) / 1 / 1)) / 1) * ((((1 / 1 + 1) - 1 * 1 / (1 + 1)) * 1 /	 		1) / 1 * 1) / 1 / 1 / 1 - ((1 * (((1 / 1 * (1 * (1 / ((1 - 1 * (1 * 1 / 1)) + (( 		1 * (1 + 1)) * 1)) * (1 + (1 + (1 * (1 + 1 / 1 - (1 - 1 * ((1 + 1) + 1 - (1 * 1) 		) / ((1 - 1 + 1) - 1 + 1)))) - 1 / (1 + 1) / 1 / 1 / 1 / (1 + (1 * (1 - (1 * 1 / 		 1) * 1))) / 1 - 1 - 1))) / ((1 + 1) + 1 / (1 * 1) / 1 / (1 * 1 / 1) - 1 - 1 - 1 		 / (1 * ((1 / 1 - 1 / 1 - 1 / 1 / 1 / 1 / 1 * 1) - 1 / (1 - ((1 / 1 + 1) + 1) -	 		1 / (1 * (1 + 1)) / 1 * (1 * 1) / 1) / 1 * 1)) / (1 + 1) / (((1 - 1 * 1) + (1 -	 		(1 + 1) + 1 / 1)) * 1) - (1 / 1 / 1 * 1) - (1 - ((1 * (1 - (1 + 1) + 1)) * (1 +	 		1)) / 1 / 1 + (1 - 1 - (1 + (1 * 1)) - ((1 + 1 - ((1 + ((1 * 1) * 1 - 1 / 1)) +	 		1) - 1) / 1 - 1 + 1) / (((1 * 1) + 1) + 1) * (1 * 1)))) / 1 / ((1 * 1) + 1 - 1)) 		 / 1) * 1) * 1)) * ((1 - (1 * 1 / 1) + 1) * 1 / 1)) / (1 + 1) / 1) + (1 / 1 * (1 		 + 1 / 1 - (1 / (1 - 1 + 1) + 1) / (1 + 1) - (1 * 1)) - (((1 / 1 + 1 - 1 - 1) /	 		1 * 1) + (1 * 1) / (1 / 1 * 1) - 1 - (1 + 1))) / 1) + 1) + 1)) / 1 / 1)) + 1) -	 		1 - (1 * 1 - 1)) * ((1 + 1) * 1)) - 1 * (1 + ((1 * 1) + (1 * 1)))) - 1 * 1)))) * 		 1) - 1 - 1 - 1))");
 
-	testMainFloatArg("def g(function<float> f) float : f()       def main(float x) float : g(\\() float : x)",  4.0f, 4.0f, ALLOW_UNSAFE | INVALID_OPENCL);
+	testMainFloatArg("def g(function<float> f) float : f()       def main(float x) float : g(\\() float : x)",  4.0f, 4.0f, ALLOW_UNSAFE | INVALID_OPENCL | ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);
 
 	// Test first class function with OpenCL code-gen
 	//testMainFloatArg("def f(array<float, 16> a, int i) float : a[i]    def g(function<array<float, 16>, int, float>      def main(float x) float : g(f, [truncateToInt(x)]", 2.1f, 3.0f, ALLOW_UNSAFE);

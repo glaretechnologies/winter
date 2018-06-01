@@ -268,14 +268,24 @@ public:
 
 struct GetTimeBoundParams
 {
-	GetTimeBoundParams() : steps(0) {}
+	GetTimeBoundParams() : max_bound_computation_steps(1 << 22), steps(0) {}
+
+	// Maximum number of 'steps' (function call expressions encountered currently) to allow when computing the bound,
+	// before the computation is terminated and an exception thrown.
+	size_t max_bound_computation_steps;
+
 	size_t steps;
 };
 
 
 struct GetSpaceBoundParams
 {
-	GetSpaceBoundParams() : steps(0) {}
+	GetSpaceBoundParams() : max_bound_computation_steps(1 << 22), steps(0) {}
+
+	// Maximum number of 'steps' (function call expressions encountered currently) to allow when computing the bound,
+	// before the computation is terminated and an exception thrown.
+	size_t max_bound_computation_steps;
+
 	size_t steps;
 };
 

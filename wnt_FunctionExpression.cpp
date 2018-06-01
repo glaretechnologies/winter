@@ -18,6 +18,7 @@ Generated at 2011-04-30 18:53:38 +0100
 #include "wnt_LetBlock.h"
 #include "VMState.h"
 #include "Value.h"
+#include "CompiledValue.h"
 #include "Linker.h"
 #include "BuiltInFunctionImpl.h"
 #include "LLVMUtils.h"
@@ -2085,7 +2086,7 @@ bool FunctionExpression::isConstant() const
 size_t FunctionExpression::getTimeBound(GetTimeBoundParams& params) const
 {
 	params.steps++;
-	if(params.steps > (1 << 22))
+	if(params.steps > params.max_bound_computation_steps)
 		throw BaseException("Too many steps when computing time bound.");
 
 	size_t arg_eval_bound = 0;
@@ -2142,7 +2143,7 @@ size_t FunctionExpression::getTimeBound(GetTimeBoundParams& params) const
 GetSpaceBoundResults FunctionExpression::getSpaceBound(GetSpaceBoundParams& params) const
 {
 	params.steps++;
-	if(params.steps > (1 << 22))
+	if(params.steps > params.max_bound_computation_steps)
 		throw BaseException("Too many steps when computing space bound.");
 
 	GetSpaceBoundResults arg_eval_bound(0, 0);
@@ -2151,6 +2152,34 @@ GetSpaceBoundResults FunctionExpression::getSpaceBound(GetSpaceBoundParams& para
 
 	if(static_target_function)
 	{
+		// Handle special case of makeVArray built-in function, when the second arg (num elems) is constant.
+		if(static_target_function->built_in_func_impl.nonNull() &&
+			static_target_function->built_in_func_impl->builtInType() == BuiltInFunctionImpl::BuiltInType_MakeVArrayBuiltInFunc)
+		{
+			if(this->argument_expressions[1]->isConstant())
+			{
+				// Evaluate the num-values expression
+				VMState vmstate;
+				vmstate.func_args_start.push_back(0);
+				ValueRef retval = this->argument_expressions[1]->exec(vmstate);
+				const int64 num_elems = checkedCast<IntValue>(retval)->value;
+				
+				VArrayType* varray_type = static_target_function->returnType().downcastToPtr<VArrayType>();
+				const size_t single_elem_heap_size = varray_type->elem_type->isHeapAllocated() ? sizeof(void*) : varray_type->elem_type->memSize();
+				const size_t header_and_data_size = sizeof(VArrayRep) + single_elem_heap_size * num_elems;
+
+				// We have to take into account the stack space that the C++ function allocateVArray(), which will be called, will take.
+				return arg_eval_bound +  GetSpaceBoundResults(1024, /*heap space=*/header_and_data_size);
+			}
+		}
+
+		if(static_target_function->sig.name == "concatStrings" && static_target_function->sig.param_types.size() == 2 &&
+			static_target_function->sig.param_types[0]->getType() == Type::StringType && 
+			static_target_function->sig.param_types[1]->getType() == Type::StringType)
+		{
+			return arg_eval_bound + arg_eval_bound; // The resulting in string size should be <= the sum of the arg sizes.
+		}
+
 		try
 		{
 			return arg_eval_bound + static_target_function->getSpaceBound(params);

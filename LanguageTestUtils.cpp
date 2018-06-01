@@ -395,21 +395,6 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 
 		float(WINTER_JIT_CALLING_CONV*f)(float, void*) = (float(WINTER_JIT_CALLING_CONV*)(float, void*))vm.getJittedFunction(mainsig);
 
-
-		/*conPrint("==================== original src: =====================");
-		conPrint(src);
-		conPrint("========================================================");
-		try
-		{
-			GetTimeBoundParams params;
-			conPrint("Time bound: " + toString(maindef->getTimeBound(params)) + " virtual cycles");
-		}
-		catch(BaseException& e)
-		{
-			conPrint("Exception: " + e.what());
-		}
-		conPrint("");*/
-
 		resetMemUsageStats();
 
 		// Put some special byte patterns on the stack
@@ -456,6 +441,22 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 		catch(BaseException& e)
 		{
 			conPrint("Failed to get space bound: " + e.what());
+			if((test_flags & ALLOW_SPACE_BOUND_FAILURE) == 0)
+				failTest("Failed to get space bound: " + e.what());
+		}
+
+		try
+		{
+			GetTimeBoundParams params;
+			const size_t time_bound = maindef->getTimeBound(params);
+			if(time_bound > (1 << 22)) // Just do something with the time bound so it doesn't get compiled away.
+				failTest("Time bound too large.");
+		}
+		catch(BaseException& e)
+		{
+			conPrint("Failed to get time bound: " + e.what());
+			if((test_flags & ALLOW_TIME_BOUND_FAILURE) == 0)
+				failTest("Failed to get time bound: " + e.what());
 		}
 
 
@@ -1068,7 +1069,24 @@ void testMainStringArg(const std::string& src, const std::string& arg, const std
 		catch(BaseException& e)
 		{
 			conPrint("Failed to get space bound: " + e.what());
+			if((test_flags & ALLOW_SPACE_BOUND_FAILURE) == 0)
+				failTest("Failed to get space bound: " + e.what());
 		}
+
+		try
+		{
+			GetTimeBoundParams params;
+			const size_t time_bound = maindef->getTimeBound(params);
+			if(time_bound > (1 << 22)) // Just do something with the time bound so it doesn't get compiled away.
+				failTest("Time bound too large.");
+		}
+		catch(BaseException& e)
+		{
+			conPrint("Failed to get time bound: " + e.what());
+			if((test_flags & ALLOW_TIME_BOUND_FAILURE) == 0)
+				failTest("Failed to get time bound: " + e.what());
+		}
+
 
 		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
@@ -1294,16 +1312,6 @@ void testMainInt64Arg(const std::string& src, int64 x, int64 target_return_val, 
 		// Get main function
 		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
 
-		/*try
-		{
-			GetTimeBoundParams params;
-			printVar(maindef->getTimeBound(params));
-		}
-		catch(BaseException& e)
-		{
-			conPrint("Exception: " + e.what());
-		}*/
-
 		int64 (WINTER_JIT_CALLING_CONV *f)(int64, void*) = (int64 (WINTER_JIT_CALLING_CONV *)(int64, void*)) vm.getJittedFunction(mainsig);
 
 		TestEnv test_env;
@@ -1355,6 +1363,22 @@ void testMainInt64Arg(const std::string& src, int64 x, int64 target_return_val, 
 		catch(BaseException& e)
 		{
 			conPrint("Failed to get space bound: " + e.what());
+			if((test_flags & ALLOW_SPACE_BOUND_FAILURE) == 0)
+				failTest("Failed to get space bound: " + e.what());
+		}
+
+		try
+		{
+			GetTimeBoundParams params;
+			const size_t time_bound = maindef->getTimeBound(params);
+			if(time_bound > (1 << 22)) // Just do something with the time bound so it doesn't get compiled away.
+				failTest("Time bound too large.");
+		}
+		catch(BaseException& e)
+		{
+			conPrint("Failed to get time bound: " + e.what());
+			if((test_flags & ALLOW_TIME_BOUND_FAILURE) == 0)
+				failTest("Failed to get time bound: " + e.what());
 		}
 
 
