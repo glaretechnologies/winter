@@ -1677,7 +1677,6 @@ llvm::Value* StringLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 		llvm::Function* allocateStringLLVMFunc = params.common_functions.allocateStringFunc->getOrInsertFunction(
 			params.module,
 			false // use_cap_var_struct_ptr: False as global functions don't have captured vars. ?!?!?
-			//true // target_takes_voidptr_arg // params.hidden_voidptr_arg
 		);
 
 		llvm::SmallVector<llvm::Value*, 4> args(1, elem_bitcast);

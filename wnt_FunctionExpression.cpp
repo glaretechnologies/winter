@@ -1999,10 +1999,6 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 	if(captured_var_struct_ptr != NULL)
 		args.push_back(captured_var_struct_ptr);
 
-	// Set hidden voidptr argument
-	//if(target_takes_voidptr_arg) // params.hidden_voidptr_arg)
-	//	args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));
-
 	llvm::CallInst* call_inst = params.builder->CreateCall(target_llvm_func, args);
 
 	// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.

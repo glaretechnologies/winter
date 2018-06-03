@@ -763,12 +763,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 		llvm::Value* alloc_closure_func_args[] = { llvm::ConstantInt::get(*params.context, llvm::APInt(64, struct_size_B, true)) };
 	
-		// Set hidden voidptr argument
-		//if(params.hidden_voidptr_arg)
-		//	args.push_back(LLVMTypeUtils::getLastArg(params.currently_building_func));
-
 		// Call our allocateClosureFunc function
-	
 		llvm::CallInst* alloc_closure_func_call = params.builder->CreateCall(alloc_closure_func, alloc_closure_func_args, "base_closure_ptr");
 		addMetaDataCommentToInstruction(params, alloc_closure_func_call, "alloc closure for " + this->sig.typeMangledName());
 		llvm::Value* closure_void_pointer = alloc_closure_func_call;
@@ -1026,7 +1021,6 @@ static void setArgumentAttributes(llvm::LLVMContext* context, llvm::Function::ar
 llvm::Function* FunctionDefinition::getOrInsertFunction(
 		llvm::Module* module,
 		bool use_cap_var_struct_ptr
-		//bool hidden_voidptr_arg
 	) const
 {
 	const vector<TypeVRef> arg_types = this->sig.param_types;
@@ -1223,7 +1217,6 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 llvm::Function* FunctionDefinition::buildLLVMFunction(
 	llvm::Module* module,
 	const PlatformUtils::CPUInfo& cpu_info,
-	bool hidden_voidptr_arg, 
 	const llvm::DataLayout/*TargetData*/* target_data,
 	const CommonFunctions& common_functions,
 	std::set<VRef<const Type>, ConstTypeVRefLessThan>& destructors_called_types,
@@ -1243,8 +1236,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 
 	llvm::Function* llvm_func = this->getOrInsertFunction(
 		module,
-		with_captured_var_struct_ptr//this->use_captured_vars // use_cap_var_struct_ptr
-		//hidden_voidptr_arg
+		with_captured_var_struct_ptr // use_cap_var_struct_ptr
 	);
 
 	llvm::BasicBlock* block = llvm::BasicBlock::Create(
@@ -1272,7 +1264,6 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	EmitLLVMCodeParams params;
 	params.currently_building_func_def = this;
 	params.cpu_info = &cpu_info;
-	//params.hidden_voidptr_arg = hidden_voidptr_arg;
 	params.builder = &builder;
 	params.module = module;
 	params.currently_building_func = llvm_func;

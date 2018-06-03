@@ -131,11 +131,8 @@ struct TestEnv
 };
 
 
-static float testExternalFunc(float x/*, TestEnv* env*/)
+static float testExternalFunc(float x)
 {
-	//std::cout << "In test func!, " << x << std::endl;
-	//std::cout << "In test func!, env->val: " << env->val << std::endl;
-	//return env->val;
 	return x * x;
 }
 
@@ -144,34 +141,12 @@ static ValueRef testExternalFuncInterpreted(const std::vector<ValueRef>& arg_val
 {
 	assert(arg_values.size() == 1);
 	assert(arg_values[0]->valueType() == Value::ValueType_Float);
-	//assert(dynamic_cast<const VoidPtrValue*>(arg_values[1].getPointer()));
 
 	// Cast argument 0 to type FloatValue
 	const FloatValue* float_val = static_cast<const FloatValue*>(arg_values[0].getPointer());
-	//const VoidPtrValue* voidptr_val = static_cast<const VoidPtrValue*>(arg_values[1].getPointer());
 
-	return new FloatValue(testExternalFunc(float_val->value/*, (TestEnv*)voidptr_val->value*/));
+	return new FloatValue(testExternalFunc(float_val->value));
 }
-
-
-/*static float externalSin(float x, TestEnv* env)
-{
-	return std::sin(x);
-}*/
-
-
-//static ValueRef externalSinInterpreted(const vector<ValueRef>& arg_values)
-//{
-//	assert(arg_values.size() == 1);
-//	assert(dynamic_cast<const FloatValue*>(arg_values[0].getPointer()));
-//	//assert(dynamic_cast<const VoidPtrValue*>(arg_values[1].getPointer()));
-//
-//	// Cast argument 0 to type FloatValue
-//	const FloatValue* float_val = static_cast<const FloatValue*>(arg_values[0].getPointer());
-//	//const VoidPtrValue* voidptr_val = static_cast<const VoidPtrValue*>(arg_values[1].getPointer());
-//
-//	return ValueRef(new FloatValue(std::sin(float_val->value/*, (TestEnv*)voidptr_val->value*/)));
-//}
 
 
 static void testPrint(const std::string& s)
@@ -181,7 +156,7 @@ static void testPrint(const std::string& s)
 }
 
 
-typedef float(WINTER_JIT_CALLING_CONV * float_void_func)(void* env);
+typedef float(WINTER_JIT_CALLING_CONV * float_void_func)();
 
 
 TestResults testMainFloat(const std::string& src, float target_return_val)
@@ -189,32 +164,10 @@ TestResults testMainFloat(const std::string& src, float target_return_val)
 	testPrint("===================== Winter testMainFloat() =====================");
 	try
 	{
-		TestEnv test_env;
-		test_env.val = 10;
-
 		VMConstructionArgs vm_args;
 		vm_args.source_buffers.push_back(new SourceBuffer("buffer", src));
-		vm_args.env = &test_env;
 		vm_args.floating_point_literals_default_to_double = false;
 		vm_args.real_is_double = false;
-
-		//{
-		//	ExternalFunctionRef f = new ExternalFunction(
-		//		(void*)testExternalFunc,
-		//		testExternalFuncInterpreted,
-		//		FunctionSignature("testExternalFunc", std::vector<TypeVRef>(1, new Float())),
-		//		new Float() // ret type
-		//	);
-		//	vm_args.external_functions.push_back(f);
-		//}
-		//{
-		//	ExternalFunctionRef f(new ExternalFunction());
-		//	f->func = (void*)(float(*)(float))std::sin; //externalSin;
-		//	f->interpreted_func = externalSinInterpreted;
-		//	f->return_type = TypeRef(new Float());
-		//	f->sig = FunctionSignature("sin", vector<TypeRef>(1, TypeRef(new Float())));
-		//	vm_args.external_functions.push_back(f);
-		//}
 
 		const FunctionSignature mainsig("main", std::vector<TypeVRef>());
 
@@ -233,7 +186,7 @@ TestResults testMainFloat(const std::string& src, float target_return_val)
 
 
 		//// Call the JIT'd function
-		const float jitted_result = mainf(&test_env);
+		const float jitted_result = mainf();
 
 
 		// Check JIT'd result.
@@ -246,7 +199,6 @@ TestResults testMainFloat(const std::string& src, float target_return_val)
 
 		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
-		//vmstate.argument_stack.push_back(new VoidPtrValue(&test_env));
 
 		ValueRef retval = maindef->invoke(vmstate);
 
@@ -288,12 +240,8 @@ void testMainFloatArgInvalidProgram(const std::string& src)
 	testPrint("===================== Winter testMainFloatArgInvalidProgram() =====================");
 	try
 	{
-		TestEnv test_env;
-		test_env.val = 10;
-
 		VMConstructionArgs vm_args;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
-		vm_args.env = &test_env;
 		vm_args.real_is_double = false;
 
 		const FunctionSignature mainsig("main", std::vector<TypeVRef>(1, new Float()));
@@ -331,9 +279,6 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 	testPrint("===================== Winter testMainFloatArg() =====================");
 	try
 	{
-		TestEnv test_env;
-		test_env.val = 10;
-
 		/*Obfuscator obfusctor(
 			true, // collapse_whitespace
 			true, // remove_comments
@@ -351,7 +296,6 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 
 		VMConstructionArgs vm_args;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
-		vm_args.env = &test_env;
 		vm_args.allow_unsafe_operations = (test_flags & ALLOW_UNSAFE) != 0;
 		vm_args.floating_point_literals_default_to_double = false;
 		vm_args.try_coerce_int_to_double_first = false;
@@ -393,7 +337,7 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 			if(maindef->body.isNull() || maindef->body->nodeType() != ASTNode::FloatLiteralType) // body may be null if it is a built-in function (e.g. elem())
 				throw BaseException("main was not folded to a float literal.");
 
-		float(WINTER_JIT_CALLING_CONV*f)(float, void*) = (float(WINTER_JIT_CALLING_CONV*)(float, void*))vm.getJittedFunction(mainsig);
+		float(WINTER_JIT_CALLING_CONV*f)(float) = (float(WINTER_JIT_CALLING_CONV*)(float))vm.getJittedFunction(mainsig);
 
 		resetMemUsageStats();
 
@@ -401,7 +345,7 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 		MARK_STACK;
 
 		//================= Call the JIT'd function ====================
-		const float jitted_result = f(argument, &test_env);
+		const float jitted_result = f(argument);
 
 		// Try and detect how much stack we actually used.
 		size_t touched_stack_size;
@@ -464,7 +408,6 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
 		vmstate.argument_stack.push_back(new FloatValue(argument));
-		//vmstate.argument_stack.push_back(new VoidPtrValue(&test_env));
 
 		ValueRef retval = maindef->invoke(vmstate);
 
@@ -694,12 +637,8 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 	testPrint("===================== Winter doTestMainDoubleArg() =====================");
 	try
 	{
-		TestEnv test_env;
-		test_env.val = 10;
-
 		VMConstructionArgs vm_args;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
-		vm_args.env = &test_env;
 		vm_args.allow_unsafe_operations = (test_flags & ALLOW_UNSAFE) != 0;
 		vm_args.floating_point_literals_default_to_double = true;
 		vm_args.real_is_double = true;
@@ -734,12 +673,12 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 		//	if(maindef->body.isNull() || maindef->body->nodeType() != ASTNode::DoubleLiteralType) // body may be null if it is a built-in function (e.g. elem())
 		//		throw BaseException("main was not folded to a float literal.");
 
-		double(WINTER_JIT_CALLING_CONV*f)(double, void*) = (double(WINTER_JIT_CALLING_CONV*)(double, void*))vm.getJittedFunction(mainsig);
+		double(WINTER_JIT_CALLING_CONV*f)(double) = (double(WINTER_JIT_CALLING_CONV*)(double))vm.getJittedFunction(mainsig);
 
 
 
 		// Call the JIT'd function
-		const double jitted_result = f(argument, &test_env);
+		const double jitted_result = f(argument);
 
 		// Check JIT'd result.
 		if(!epsEqual(jitted_result, target_return_val))
@@ -752,7 +691,6 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
 		vmstate.argument_stack.push_back(new DoubleValue(argument));
-		//vmstate.argument_stack.push_back(new VoidPtrValue(&test_env));
 
 		ValueRef retval = maindef->invoke(vmstate);
 
@@ -935,13 +873,10 @@ void testMainInteger(const std::string& src, int target_return_val)
 		// Get main function
 		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
 
-		int (WINTER_JIT_CALLING_CONV *f)(void*) = (int (WINTER_JIT_CALLING_CONV *)(void*)) vm.getJittedFunction(mainsig);
-
-		TestEnv test_env;
-		test_env.val = 10;
+		int (WINTER_JIT_CALLING_CONV *f)() = (int (WINTER_JIT_CALLING_CONV *)()) vm.getJittedFunction(mainsig);
 
 		// Call the JIT'd function
-		const int jitted_result = f(&test_env);
+		const int jitted_result = f();
 
 
 		// Check JIT'd result.
@@ -954,7 +889,6 @@ void testMainInteger(const std::string& src, int target_return_val)
 
 		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
-		//vmstate.argument_stack.push_back(new VoidPtrValue(&test_env));
 
 		ValueRef retval = maindef->invoke(vmstate);
 
@@ -1005,10 +939,7 @@ void testMainStringArg(const std::string& src, const std::string& arg, const std
 		// Get main function
 		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
 
-		StringRep* (WINTER_JIT_CALLING_CONV *f)(const StringRep*, void*) = (StringRep* (WINTER_JIT_CALLING_CONV *)(const StringRep*, void*)) vm.getJittedFunction(mainsig);
-
-		TestEnv test_env;
-		test_env.val = 10;
+		StringRep* (WINTER_JIT_CALLING_CONV *f)(const StringRep*) = (StringRep* (WINTER_JIT_CALLING_CONV *)(const StringRep*)) vm.getJittedFunction(mainsig);
 
 		testAssert(getCurrentHeapMemUsage() == 0);
 		resetMemUsageStats();
@@ -1021,7 +952,7 @@ void testMainStringArg(const std::string& src, const std::string& arg, const std
 			
 			MARK_STACK; // Put some special byte patterns on the stack
 
-			CompiledValRef<StringRep> jitted_result = f(arg_string_ref.getPointer(), &test_env);
+			CompiledValRef<StringRep> jitted_result = f(arg_string_ref.getPointer());
 
 			// Try and detect how much stack we actually used.
 			GET_TOUCHED_STACK_SIZE(touched_stack_size);
@@ -1091,7 +1022,6 @@ void testMainStringArg(const std::string& src, const std::string& arg, const std
 		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
 		vmstate.argument_stack.push_back(new StringValue(arg));
-		//vmstate.argument_stack.push_back(new VoidPtrValue(&test_env));
 
 		ValueRef retval = maindef->invoke(vmstate);
 
@@ -1149,13 +1079,10 @@ TestResults testMainIntegerArg(const std::string& src, int x, int target_return_
 		// Get main function
 		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
 
-		int (WINTER_JIT_CALLING_CONV *f)(int, void*) = (int (WINTER_JIT_CALLING_CONV *)(int, void*)) vm.getJittedFunction(mainsig);
-
-		TestEnv test_env;
-		test_env.val = 10;
+		int (WINTER_JIT_CALLING_CONV *f)(int) = (int (WINTER_JIT_CALLING_CONV *)(int)) vm.getJittedFunction(mainsig);
 
 		// Call the JIT'd function
-		const int jitted_result = f(x, &test_env);
+		const int jitted_result = f(x);
 
 
 		// Check JIT'd result.
@@ -1169,7 +1096,6 @@ TestResults testMainIntegerArg(const std::string& src, int x, int target_return_
 		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
 		vmstate.argument_stack.push_back(new IntValue(x, true));
-		//vmstate.argument_stack.push_back(new VoidPtrValue(&test_env));
 
 		ValueRef retval = maindef->invoke(vmstate);
 
@@ -1312,17 +1238,14 @@ void testMainInt64Arg(const std::string& src, int64 x, int64 target_return_val, 
 		// Get main function
 		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
 
-		int64 (WINTER_JIT_CALLING_CONV *f)(int64, void*) = (int64 (WINTER_JIT_CALLING_CONV *)(int64, void*)) vm.getJittedFunction(mainsig);
-
-		TestEnv test_env;
-		test_env.val = 10;
+		int64 (WINTER_JIT_CALLING_CONV *f)(int64) = (int64 (WINTER_JIT_CALLING_CONV *)(int64)) vm.getJittedFunction(mainsig);
 
 		resetMemUsageStats();
 
 		MARK_STACK; // Put some special byte patterns on the stack
 
 		// Call the JIT'd function
-		const int64 jitted_result = f(x, &test_env);
+		const int64 jitted_result = f(x);
 
 		// Try and detect how much stack we actually used.
 		size_t touched_stack_size;
@@ -1385,7 +1308,6 @@ void testMainInt64Arg(const std::string& src, int64 x, int64 target_return_val, 
 		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
 		vmstate.argument_stack.push_back(new IntValue(x, true));
-		//vmstate.argument_stack.push_back(new VoidPtrValue(&test_env));
 
 		ValueRef retval = maindef->invoke(vmstate);
 
@@ -1439,13 +1361,10 @@ void testMainInt16Arg(const std::string& src, int16 x, int16 target_return_val, 
 		// Get main function
 		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
 
-		int16 (WINTER_JIT_CALLING_CONV *f)(int16, void*) = (int16 (WINTER_JIT_CALLING_CONV *)(int16, void*)) vm.getJittedFunction(mainsig);
-
-		TestEnv test_env;
-		test_env.val = 10;
+		int16 (WINTER_JIT_CALLING_CONV *f)(int16) = (int16 (WINTER_JIT_CALLING_CONV *)(int16)) vm.getJittedFunction(mainsig);
 
 		// Call the JIT'd function
-		const int16 jitted_result = f(x, &test_env);
+		const int16 jitted_result = f(x);
 
 
 		// Check JIT'd result.
@@ -1459,7 +1378,6 @@ void testMainInt16Arg(const std::string& src, int16 x, int16 target_return_val, 
 		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
 		vmstate.argument_stack.push_back(new IntValue(x, true));
-		//vmstate.argument_stack.push_back(new VoidPtrValue(&test_env));
 
 		ValueRef retval = maindef->invoke(vmstate);
 
@@ -1513,13 +1431,10 @@ void testMainUInt32Arg(const std::string& src, uint32 x, uint32 target_return_va
 		// Get main function
 		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
 
-		uint32 (WINTER_JIT_CALLING_CONV *f)(uint32, void*) = (uint32 (WINTER_JIT_CALLING_CONV *)(uint32, void*)) vm.getJittedFunction(mainsig);
-
-		TestEnv test_env;
-		test_env.val = 10;
+		uint32 (WINTER_JIT_CALLING_CONV *f)(uint32) = (uint32 (WINTER_JIT_CALLING_CONV *)(uint32)) vm.getJittedFunction(mainsig);
 
 		// Call the JIT'd function
-		const uint32 jitted_result = f(x, &test_env);
+		const uint32 jitted_result = f(x);
 
 
 		// Check JIT'd result.
@@ -1533,7 +1448,6 @@ void testMainUInt32Arg(const std::string& src, uint32 x, uint32 target_return_va
 		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
 		vmstate.argument_stack.push_back(new IntValue(x, false));
-		//vmstate.argument_stack.push_back(new VoidPtrValue(&test_env));
 
 		ValueRef retval = maindef->invoke(vmstate);
 
@@ -1638,12 +1552,8 @@ void testMainIntegerArgInvalidProgram(const std::string& src)
 	testPrint("===================== Winter testMainIntegerArgInvalidProgram() =====================");
 	try
 	{
-		TestEnv test_env;
-		test_env.val = 10;
-
 		VMConstructionArgs vm_args;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
-		vm_args.env = &test_env;
 
 		const FunctionSignature mainsig("main", std::vector<TypeVRef>(1, new Int()));
 
@@ -1719,15 +1629,12 @@ void testMainStruct(const std::string& src, const StructType& target_return_val)
 
 		SSE_ALIGN StructType jitted_result;
 		
-		void (WINTER_JIT_CALLING_CONV *f)(StructType*, void*) = (void (WINTER_JIT_CALLING_CONV *)(StructType*, void*))vm.getJittedFunction(mainsig);
+		void (WINTER_JIT_CALLING_CONV *f)(StructType*) = (void (WINTER_JIT_CALLING_CONV *)(StructType*))vm.getJittedFunction(mainsig);
 		//StructType (WINTER_JIT_CALLING_CONV *f)() = (StructType (WINTER_JIT_CALLING_CONV *)())vm.getJittedFunction(mainsig);
-
-		TestEnv test_env;
-		test_env.val = 10;
 
 
 		// Call the JIT'd function
-		f(&jitted_result, &test_env);
+		f(&jitted_result);
 		//jitted_result = f();
 
 		/*std::cout << "============================" << std::endl;
@@ -1813,17 +1720,14 @@ void testMainStructInputAndOutput(const std::string& src, const InStructType& st
 
 
 		// __cdecl
-		void (WINTER_JIT_CALLING_CONV *f)(OutStructType*, InStructType*, void*) = (void (WINTER_JIT_CALLING_CONV *)(OutStructType*, InStructType*, void*))vm.getJittedFunction(mainsig);
+		void (WINTER_JIT_CALLING_CONV *f)(OutStructType*, InStructType*) = (void (WINTER_JIT_CALLING_CONV *)(OutStructType*, InStructType*))vm.getJittedFunction(mainsig);
 
 		// Call the JIT'd function
 		SSE_ALIGN OutStructType jitted_result;
 
 		SSE_ALIGN InStructType aligned_struct_in = struct_in;
 
-		TestEnv test_env;
-		test_env.val = 10;
-
-		f(&jitted_result, &aligned_struct_in, &test_env);
+		f(&jitted_result, &aligned_struct_in);
 
 		// Check JIT'd result.
 		if(!(jitted_result == target_return_val))
@@ -2036,17 +1940,14 @@ void testVectorInStruct(const std::string& src, const StructWithVec& struct_in, 
 
 
 		// __cdecl
-		void (WINTER_JIT_CALLING_CONV *f)(StructWithVec*, StructWithVec*, void*) = (void (WINTER_JIT_CALLING_CONV *)(StructWithVec*, StructWithVec*, void*))vm.getJittedFunction(mainsig);
+		void (WINTER_JIT_CALLING_CONV *f)(StructWithVec*, StructWithVec*) = (void (WINTER_JIT_CALLING_CONV *)(StructWithVec*, StructWithVec*))vm.getJittedFunction(mainsig);
 
 		// Call the JIT'd function
 		SSE_ALIGN StructWithVec jitted_result;
 
 		SSE_ALIGN StructWithVec aligned_struct_in = struct_in;
 
-		TestEnv test_env;
-		test_env.val = 10;
-
-		f(&jitted_result, &aligned_struct_in, &test_env);
+		f(&jitted_result, &aligned_struct_in);
 
 		// Check JIT'd result.
 		if(!epsEqual(jitted_result, target_return_val))
@@ -2125,16 +2026,13 @@ void testFloat4Struct(const std::string& src, const Float4Struct& a, const Float
 
 
 		// __cdecl
-		void (WINTER_JIT_CALLING_CONV *f)(Float4Struct*, const Float4Struct*, const Float4Struct*, void*) = 
-			(void (WINTER_JIT_CALLING_CONV *)(Float4Struct*, const Float4Struct*, const Float4Struct*, void*))vm.getJittedFunction(mainsig);
+		void (WINTER_JIT_CALLING_CONV *f)(Float4Struct*, const Float4Struct*, const Float4Struct*) = 
+			(void (WINTER_JIT_CALLING_CONV *)(Float4Struct*, const Float4Struct*, const Float4Struct*))vm.getJittedFunction(mainsig);
 
 		// Call the JIT'd function
 		Float4Struct jitted_result;
 
-		TestEnv test_env;
-		test_env.val = 10;
-
-		f(&jitted_result, &a, &b, &test_env);
+		f(&jitted_result, &a, &b);
 
 		// Check JIT'd result.
 		if(!epsEqual(jitted_result, target_return_val))
@@ -2189,16 +2087,13 @@ void testFloat8Struct(const std::string& src, const Float8Struct& a, const Float
 
 
 		// __cdecl
-		void (WINTER_JIT_CALLING_CONV *f)(Float8Struct*, const Float8Struct*, const Float8Struct*, void*) = 
-			(void (WINTER_JIT_CALLING_CONV *)(Float8Struct*, const Float8Struct*, const Float8Struct*, void*))vm.getJittedFunction(mainsig);
+		void (WINTER_JIT_CALLING_CONV *f)(Float8Struct*, const Float8Struct*, const Float8Struct*) = 
+			(void (WINTER_JIT_CALLING_CONV *)(Float8Struct*, const Float8Struct*, const Float8Struct*))vm.getJittedFunction(mainsig);
 
 		// Call the JIT'd function
 		Float8Struct jitted_result;
 
-		TestEnv test_env;
-		test_env.val = 10;
-
-		f(&jitted_result, &a, &b, &test_env);
+		f(&jitted_result, &a, &b);
 
 		// Check JIT'd result.
 		if(!epsEqual(jitted_result, target_return_val))
@@ -2239,17 +2134,14 @@ void testIntArray(const std::string& src, const int* a, const int* b, const int*
 		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
 
 		// __cdecl
-		void (WINTER_JIT_CALLING_CONV *f)(int*, const int*, const int*, void*) = 
-			(void (WINTER_JIT_CALLING_CONV *)(int*, const int*, const int*, void*))vm.getJittedFunction(mainsig);
+		void (WINTER_JIT_CALLING_CONV *f)(int*, const int*, const int*) = 
+			(void (WINTER_JIT_CALLING_CONV *)(int*, const int*, const int*))vm.getJittedFunction(mainsig);
 
 		// Call the JIT'd function
 		js::Vector<int, 32> jitted_result(len);
 		int* jitted_result_ptr = &jitted_result[0];
 
-		TestEnv test_env;
-		test_env.val = 10;
-
-		f(jitted_result_ptr, a, b, &test_env);
+		f(jitted_result_ptr, a, b);
 
 		// Check JIT'd result.
 		for(size_t i=0; i<len; ++i)
@@ -2296,8 +2188,8 @@ void testFloatArray(const std::string& src, const float* a, const float* b, cons
 		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
 
 		// __cdecl
-		void (WINTER_JIT_CALLING_CONV *f)(float*, const float*, const float*, void*) = 
-			(void (WINTER_JIT_CALLING_CONV *)(float*, const float*, const float*, void*))vm.getJittedFunction(mainsig);
+		void (WINTER_JIT_CALLING_CONV *f)(float*, const float*, const float*) = 
+			(void (WINTER_JIT_CALLING_CONV *)(float*, const float*, const float*))vm.getJittedFunction(mainsig);
 
 		// Call the JIT'd function
 		js::Vector<float, 32> jitted_result(len);
@@ -2307,11 +2199,8 @@ void testFloatArray(const std::string& src, const float* a, const float* b, cons
 
 		float* jitted_result_ptr = &jitted_result[0];
 
-		TestEnv test_env;
-		test_env.val = 10;
-
 		Timer timer;
-		f(jitted_result_ptr, a, b, &test_env);
+		f(jitted_result_ptr, a, b);
 		const double elapsed = timer.elapsed();
 		testPrint("JITed code elapsed: " + toString(elapsed) + " s");
 		const double bandwidth = len * sizeof(float) / elapsed;

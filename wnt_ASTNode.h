@@ -211,7 +211,6 @@ class EmitLLVMCodeParams
 public:
 	FunctionDefinition* currently_building_func_def;
 	const PlatformUtils::CPUInfo* cpu_info;
-	//bool hidden_voidptr_arg;
 	
 	// These template arguments are the defaults from IRBuilder.h.  Written explicitly here so we can forwards declare this type.
 #if TARGET_LLVM_VERSION >= 60

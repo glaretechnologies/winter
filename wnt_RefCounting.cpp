@@ -137,7 +137,6 @@ void emitFreeCall(llvm::Module* module, llvm::IRBuilder<>& builder, const Common
 		llvm::Function* freeValueLLVMFunc = common_functions.freeVArrayFunc->getOrInsertFunction(
 			module,
 			false // use_cap_var_struct_ptr: False as global functions don't have captured vars. ?!?!?
-			//true // target_takes_voidptr_arg // params.hidden_voidptr_arg
 		);
 		builder.CreateCall(freeValueLLVMFunc, cast_val);
 	}
@@ -147,7 +146,6 @@ void emitFreeCall(llvm::Module* module, llvm::IRBuilder<>& builder, const Common
 		llvm::Function* freeValueLLVMFunc = common_functions.freeStringFunc->getOrInsertFunction(
 			module,
 			false // use_cap_var_struct_ptr: False as global functions don't have captured vars. ?!?!?
-			//true // target_takes_voidptr_arg // params.hidden_voidptr_arg
 		);
 		builder.CreateCall(freeValueLLVMFunc, refcounted_val);
 	}
@@ -161,7 +159,6 @@ void emitFreeCall(llvm::Module* module, llvm::IRBuilder<>& builder, const Common
 		llvm::Function* freeClosureLLVMFunc = common_functions.freeClosureFunc->getOrInsertFunction(
 			module,
 			false // use_cap_var_struct_ptr: False as global functions don't have captured vars. ?!?!?
-			//true // target_takes_voidptr_arg // params.hidden_voidptr_arg
 		);
 		builder.CreateCall(freeClosureLLVMFunc, cast_val);
 	}

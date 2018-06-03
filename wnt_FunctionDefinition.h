@@ -111,7 +111,6 @@ public:
 	llvm::Function* buildLLVMFunction(
 		llvm::Module* module,
 		const PlatformUtils::CPUInfo& cpu_info,
-		bool hidden_voidptr_arg, 
 		const llvm::DataLayout* data_layout,
 		const CommonFunctions& common_functions,
 		std::set<VRef<const Type>, ConstTypeVRefLessThan>& destructors_called_types,
@@ -128,7 +127,6 @@ public:
 	llvm::Function* getOrInsertFunction(
 		llvm::Module* module,
 		bool use_cap_var_struct_ptr
-		//bool hidden_voidptr_arg
 	) const;
 
 	// Conservative, >= than the actual num uses.

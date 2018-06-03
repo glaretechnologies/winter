@@ -604,19 +604,16 @@ public:
 
 VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 :	linker(
-		true, // hidden_voidptr_arg
 		args.try_coerce_int_to_double_first,
 		args.emit_in_bound_asserts,
-		args.real_is_double,
-		args.env
+		args.real_is_double
 	),
-	//env(args.env),
 	llvm_context(NULL),
 	llvm_module(NULL),
 	llvm_exec_engine(NULL),
 	vm_args(args)
 {
-	//assert(string_count == 0 && varray_count == 0 && closure_count == 0);
+	assert(closure_count == 0);
 
 	stats.num_heap_allocation_calls = 0;
 	stats.num_closure_allocations = 0;
@@ -632,8 +629,6 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 
 	try
 	{
-		hidden_voidptr_arg = true;
-
 		this->external_functions = args.external_functions;
 
 
@@ -879,7 +874,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 VirtualMachine::~VirtualMachine()
 {
 	// llvm_exec_engine will delete llvm_module.
-	//assert(string_count == 0 && varray_count == 0 && closure_count == 0);
+	assert(closure_count == 0);
 
 	delete this->llvm_exec_engine;
 

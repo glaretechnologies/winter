@@ -57,16 +57,15 @@ public:
 class VMConstructionArgs
 {
 public:
-	VMConstructionArgs() : env(NULL), allow_unsafe_operations(false), emit_trace_code(false), build_llvm_code(true), floating_point_literals_default_to_double(true), 
+	VMConstructionArgs() : allow_unsafe_operations(false), emit_trace_code(false), build_llvm_code(true), floating_point_literals_default_to_double(true), 
 		try_coerce_int_to_double_first(true), real_is_double(true), opencl_double_support(true), comments_in_opencl_output(true), emit_in_bound_asserts(false), emit_opencl_printf_calls(true),
-		small_code_model(false)/*, add_opaque_env_arg(false)*/ {}
+		small_code_model(false) {}
 
 	std::vector<ExternalFunctionRef> external_functions;
 	std::vector<SourceBufferRef> source_buffers;
 	std::vector<FunctionSignature> entry_point_sigs;
 
 	std::vector<FunctionDefinitionRef> preconstructed_func_defs;//TEMP
-	void* env;
 	bool allow_unsafe_operations; // If this is true, in-bounds proof requirements of elem() etc.. are disabled.
 	bool emit_trace_code; // If this is true, information is printed out to std out as the program executes.
 	std::vector<Reference<FunctionRewriter> > function_rewriters;
@@ -156,14 +155,11 @@ private:
 	friend class WinterMemoryManager;
 
 	std::vector<ExternalFunctionRef> external_functions;
-	//ASTNodeRef rootref;
 	Linker linker;
 	llvm::LLVMContext* llvm_context;
 	llvm::Module* llvm_module;
 	llvm::ExecutionEngine* llvm_exec_engine;
 	llvm::TargetMachine* target_machine;
-	bool hidden_voidptr_arg;
-	//void* env;
 	std::string triple;
 	std::unordered_map<std::string, void*> func_map;
 

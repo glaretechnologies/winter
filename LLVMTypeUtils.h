@@ -45,7 +45,6 @@ llvm::FunctionType* llvmFunctionType(const std::vector<TypeVRef>& arg_types,
 									 bool captured_var_struct_ptr_arg,
 									 TypeVRef return_type, 
 									 llvm::Module& module
-									 //bool hidden_voidptr_arg
 									 );
 
 }; // end namespace LLVMTypeUtils

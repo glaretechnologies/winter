@@ -99,9 +99,6 @@ llvm::FunctionType* llvmFunctionType(const vector<TypeVRef>& arg_types,
 		if(captured_var_struct_ptr_arg)
 			llvm_arg_types.push_back(getPtrToBaseCapturedVarStructType(module));
 
-		//if(hidden_voidptr_arg)
-		//	llvm_arg_types.push_back(voidPtrType(context));
-
 		return llvm::FunctionType::get(
 			return_type->LLVMType(module), // return type
 			llvm_arg_types,
@@ -121,9 +118,6 @@ llvm::FunctionType* llvmFunctionType(const vector<TypeVRef>& arg_types,
 
 		if(captured_var_struct_ptr_arg)
 			llvm_arg_types.push_back(getPtrToBaseCapturedVarStructType(module));
-
-		//if(hidden_voidptr_arg)
-		//	llvm_arg_types.push_back(voidPtrType(context));
 
 		return llvm::FunctionType::get(
 			llvm::Type::getVoidTy(module.getContext()), // return type - void as return value will be written to mem via zero-th arg.
