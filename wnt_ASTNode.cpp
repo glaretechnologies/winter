@@ -1712,11 +1712,6 @@ llvm::Value* StringLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 
 		const uint64 total_string_size_B = sizeof(uint64)*3 + value.size();
 
-		//llvm::Value* alloca_ptr = entry_block_builder.CreateAlloca(
-		//	llvm::Type::getInt8Ty(*params.context), // byte
-		//	llvm::ConstantInt::get(*params.context, llvm::APInt(64, total_string_size_B, true)), // number of bytes needed.
-		//	"string_stack_space"
-		//);
 		llvm::Value* alloca_ptr = entry_block_builder.Insert(new llvm::AllocaInst(
 			llvm::Type::getInt8Ty(*params.context), // type - byte
 #if TARGET_LLVM_VERSION >= 60

@@ -292,11 +292,16 @@ llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 
 		const uint64 total_varray_size_B = sizeof(uint64)*3 + elem_size_B * num_elems;
 
-		llvm::Value* alloca_ptr = entry_block_builder.CreateAlloca(
-			llvm::Type::getInt8Ty(*params.context), // byte
+		llvm::Value* alloca_ptr = entry_block_builder.Insert(new llvm::AllocaInst(
+			llvm::Type::getInt8Ty(*params.context), // byte, 
+#if TARGET_LLVM_VERSION >= 60
+			0, // address space
+#endif
 			llvm::ConstantInt::get(*params.context, llvm::APInt(64, total_varray_size_B, true)), // number of bytes needed.
+			8, // alignment
 			this->type()->toString() + " stack space"
-		);
+		));
+
 
 		// Cast resulting allocated uint8* down to VArrayRep for the right type, e.g. varray<T>
 		llvm::Type* varray_T_type = this->type()->LLVMType(*params.module);
