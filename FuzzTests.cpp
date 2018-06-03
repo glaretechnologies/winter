@@ -252,14 +252,7 @@ static bool testFuzzASTProgram(Reference<BufferRoot>& root)//const std::vector<F
 {
 	try
 	{
-		//TestEnv test_env;
-		//test_env.val = 10;
-
-		//const std::string src_string = func->sourceString();
-
 		VMConstructionArgs vm_args;
-		//vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
-		//vm_args.env = &test_env;
 
 		vm_args.comments_in_opencl_output = false;
 		for(size_t i=0; i<root->top_level_defs.size(); ++i)
@@ -279,7 +272,7 @@ static bool testFuzzASTProgram(Reference<BufferRoot>& root)//const std::vector<F
 		// Get main function
 		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
 
-		float(WINTER_JIT_CALLING_CONV*f)(float, void*) = (float(WINTER_JIT_CALLING_CONV*)(float, void*))vm.getJittedFunction(mainsig);
+		float(WINTER_JIT_CALLING_CONV*f)(float) = (float(WINTER_JIT_CALLING_CONV*)(float))vm.getJittedFunction(mainsig);
 
 		// Check it has return type float
 		if(maindef->returnType()->getType() != Type::FloatType)
@@ -288,12 +281,11 @@ static bool testFuzzASTProgram(Reference<BufferRoot>& root)//const std::vector<F
 
 		// Call the JIT'd function
 		const float argument = 1.0f;
-		const float jitted_result = f(argument, NULL);//&test_env);
+		const float jitted_result = f(argument);
 
 		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
 		vmstate.argument_stack.push_back(new FloatValue(argument));
-		//vmstate.argument_stack.push_back(new VoidPtrValue(&test_env));
 
 		ValueRef retval = maindef->invoke(vmstate);
 
