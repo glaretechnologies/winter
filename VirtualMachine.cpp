@@ -1566,14 +1566,14 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 	const bool optimise = true;
 	const bool verbose = false;
 
-	// Do Linting
-	/*llvm::lintModule(*this->llvm_module);
+#if BUILD_TESTS
+	// Add a 'lint' pass that detects common mistakes.
+	llvm::lintModule(*this->llvm_module);
 
 	for(llvm::Module::iterator i = this->llvm_module->begin(); i != this->llvm_module->end(); ++i)
 		if(!i->isIntrinsic() && !i->isDeclaration())
 			llvm::lintFunction(*i);
-	*/
-
+#endif
 
 
 	// Do LLVM optimisations
