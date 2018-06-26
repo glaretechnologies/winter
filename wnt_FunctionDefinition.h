@@ -61,13 +61,11 @@ public:
 	class FunctionArg
 	{
 	public:
-		FunctionArg(TypeVRef type_, const std::string& n) : type(type_), name(n)/*, referenced(true)*/ {}
+		FunctionArg(TypeVRef type_, const std::string& n) : type(type_), name(n), ref_count(0) {}
 		TypeVRef type;
 		std::string name;
 
-		//bool isReferenced() const { return referenced; }
-		//bool referenced; // Is this argument bound to by a variable in the function body?  Will be conservatively set to true if unknown.
-		//int ref_count;
+		int ref_count; // number of references in the function body to the argument.  Built by CountArgumentRefs pass.
 	};
 
 	
@@ -94,6 +92,7 @@ public:
 	virtual TypeRef type() const;
 
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
+	virtual void updateChild(const ASTNode* old_val, ASTNodeRef& new_val);
 	virtual void print(int depth, std::ostream& s) const;
 	virtual std::string sourceString() const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
@@ -102,6 +101,7 @@ public:
 	virtual bool isConstant() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
+	virtual size_t getSubtreeCodeComplexity() const;
 
 	bool isGenericFunction() const; // true if it is parameterised by type.
 	bool isExternalFunction() const { return external_function.nonNull(); }

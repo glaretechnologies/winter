@@ -48,11 +48,13 @@ public:
 	virtual std::string sourceString() const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
+	virtual void updateChild(const ASTNode* old_val, ASTNodeRef& new_val);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
+	virtual size_t getSubtreeCodeComplexity() const;
 
 	ASTNodeRef expr;
 	std::vector<LetNodeVar> vars; // One or more variable names (And possible associated declared types).  Will be more than one in the case of destructuring assignment.

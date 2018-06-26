@@ -149,7 +149,7 @@ std::string VectorLiteral::sourceString() const
 
 std::string VectorLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
-	// TODO: check vector width
+	// TODO: check vector width is valid for OpenCL C.
 
 	if(!(this->elements[0]->type()->getType() == Type::FloatType || this->elements[0]->type()->getType() == Type::DoubleType || (this->elements[0]->type()->getType() == Type::IntType && this->elements[0]->type().downcastToPtr<Int>()->numBits() == 32)))
 		throw BaseException("Only vectors of float or int32 supported for OpenCL currently.");
@@ -157,19 +157,14 @@ std::string VectorLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 	const std::string elem_typename = this->elements[0]->type()->OpenCLCType();
 	if(has_int_suffix)
 	{
-		// "(float4)(1.0f, 2.0f, 3.0f, 4.0)"
-		std::string s = "(" + elem_typename + toString(this->int_suffix) + ")(";
-		for(int i=0; i<this->int_suffix; ++i)
-		{
-			s += elements[0]->emitOpenCLC(params);
-			if(i + 1 < this->int_suffix)
-				s += ", ";
-		}
-		s += ")";
+		// "(float4)(1.0f)"
+		std::string s = "(" + elem_typename + toString(this->int_suffix) + ")(" + 
+			elements[0]->emitOpenCLC(params) + ")";
 		return s;
 	}
 	else
 	{
+		// "(float4)(1.0f, 2.0f, 3.0f, 4.0)"
 		std::string s = "(" + elem_typename + toString(elements.size()) + ")(";
 		for(size_t i=0; i<elements.size(); ++i)
 		{
@@ -299,6 +294,18 @@ void VectorLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 }
 
 
+void VectorLiteral::updateChild(const ASTNode* old_val, ASTNodeRef& new_val)
+{
+	for(size_t i=0; i<this->elements.size(); ++i)
+		if(this->elements[i].ptr() == old_val)
+		{
+			this->elements[i] = new_val;
+			return;
+		}
+	assert(0);
+}
+
+
 bool VectorLiteral::areAllElementsConstant() const
 {
 	for(size_t i=0; i<this->elements.size(); ++i)
@@ -419,6 +426,15 @@ GetSpaceBoundResults VectorLiteral::getSpaceBound(GetSpaceBoundParams& params) c
 	}
 
 	return sum;
+}
+
+
+size_t VectorLiteral::getSubtreeCodeComplexity() const
+{
+	size_t sum = 0;
+	for(size_t i=0; i<elements.size(); ++i)
+		sum += elements[i]->getSubtreeCodeComplexity();
+	return 1 + sum;
 }
 
 

@@ -33,7 +33,7 @@
 
 
 //#define WINTER_OPENCL_TESTS 1
-static const bool DUMP_OPENCL_C_SOURCE = false;
+static const bool DUMP_OPENCL_C_SOURCE = false; // Dumps to opencl_source.c
 static const bool PRINT_MEM_BOUNDS_AND_USAGE = false;
 
 
@@ -450,6 +450,7 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 				{
 					std::ofstream file("opencl_source.c");
 					file << extended_source;
+					conPrint("Dumped OpenCL C source to opencl_source.c.");
 				}
 
 				const OpenCLDeviceRef device = ::getGlobalOpenCL()->getOpenCLDevices()[0];
@@ -733,6 +734,7 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 				{
 					std::ofstream file("opencl_source.c");
 					file << extended_source;
+					conPrint("Dumped OpenCL C source to opencl_source.c.");
 				}
 
 				const OpenCLDeviceRef& device = ::getGlobalOpenCL()->getOpenCLDevices()[0];
@@ -1133,6 +1135,7 @@ TestResults testMainIntegerArg(const std::string& src, int x, int target_return_
 				{
 					std::ofstream file("opencl_source.c");
 					file << extended_source;
+					conPrint("Dumped OpenCL C source to opencl_source.c.");
 				}
 
 				const OpenCLDeviceRef& device = ::getGlobalOpenCL()->getOpenCLDevices()[0];

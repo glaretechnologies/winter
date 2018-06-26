@@ -95,13 +95,16 @@ public:
 		DeadCodeElimination_ComputeAlive,
 		DeadCodeElimination_RemoveDead,
 		CountFunctionCalls,
+		CountArgumentRefs,
 		AddAnonFuncsToLinker,
 		GetAllNamesInScope,
-		UnbindVariables
+		UnbindVariables,
+		SimplifyIfExpression
 	};
 
 	TraversalPayload(Operation e) : 
-		operation(e), tree_changed(false), current_named_constant(NULL), check_bindings(false) {}
+		operation(e), tree_changed(false), current_named_constant(NULL), check_bindings(false),
+		last_visited_child_index(-1) {}
 
 	Linker* linker;
 
@@ -147,6 +150,10 @@ public:
 
 	// GetAllNamesInScope, InlineFunctionCalls:
 	std::unordered_set<std::string>* used_names;
+
+	int last_visited_child_index;
+
+	Reference<ASTNode> garbarge; // For Storing a ref to a node so it won't get deleted (due to ref count going to zero) while a function on it is still being executed.
 };
 
 
@@ -377,6 +384,9 @@ public:
 
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack) {}
 
+	// Replace the given child node reference.
+	virtual void updateChild(const ASTNode* old_val, Reference<ASTNode>& new_val) { assert(0); }
+
 	// Emit LLVM code to compute the value for this AST node.
 	// If the value type is pass-by-pointer, and return_space_pointer is non-null, then code MAY be emitted
 	// to store the value at the memory pointed to by return_space_pointer.
@@ -407,6 +417,10 @@ public:
 
 	// Only FunctionDefinitions need return stack size information, other nodes can return 0.
 	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const = 0;
+
+	// e.g. number of AST nodes in subtree.
+	// For deciding whether to inline a function.
+	virtual size_t getSubtreeCodeComplexity() const = 0;
 
 
 	const SrcLocation& srcLocation() const { return location; }
@@ -458,7 +472,7 @@ public:
 	virtual bool isConstant() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
-
+	virtual size_t getSubtreeCodeComplexity() const;
 };
 
 
@@ -477,6 +491,7 @@ public:
 	virtual bool isConstant() const { return true; }
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const { return 1; }
 	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const { return GetSpaceBoundResults(4, 0); }
+	virtual size_t getSubtreeCodeComplexity() const { return 1; }
 
 	float value;
 };
@@ -497,6 +512,7 @@ public:
 	virtual bool isConstant() const { return true; }
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const { return 1; }
 	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const { return GetSpaceBoundResults(8, 0); }
+	virtual size_t getSubtreeCodeComplexity() const { return 1; }
 
 	double value;
 };
@@ -520,6 +536,7 @@ public:
 	virtual bool isConstant() const { return true; }
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const { return 1; }
 	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
+	virtual size_t getSubtreeCodeComplexity() const { return 1; }
 };
 
 
@@ -540,6 +557,7 @@ public:
 	virtual bool isConstant() const { return true; }
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
+	virtual size_t getSubtreeCodeComplexity() const;
 
 	std::string value;
 	mutable bool llvm_allocated_on_heap;
@@ -563,6 +581,7 @@ public:
 	virtual bool isConstant() const { return true; }
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const { return 1; }
 	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const { return GetSpaceBoundResults(1, 0); }
+	virtual size_t getSubtreeCodeComplexity() const { return 1; }
 
 	std::string value; // utf-8 encoded char.
 };
@@ -584,6 +603,7 @@ public:
 	virtual bool isConstant() const { return true; }
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const { return 1; }
 	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const { return GetSpaceBoundResults(1, 0); }
+	virtual size_t getSubtreeCodeComplexity() const { return 1; }
 };
 
 
@@ -603,6 +623,7 @@ public:
 	virtual bool isConstant() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
+	virtual size_t getSubtreeCodeComplexity() const;
 
 
 	TypeRef maptype;
@@ -621,11 +642,13 @@ public:
 	virtual std::string sourceString() const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
+	virtual void updateChild(const ASTNode* old_val, ASTNodeRef& new_val);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
+	virtual size_t getSubtreeCodeComplexity() const;
 
 	bool typeCheck(TraversalPayload& payload) const;
 
@@ -647,11 +670,13 @@ public:
 	virtual std::string sourceString() const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
+	virtual void updateChild(const ASTNode* old_val, ASTNodeRef& new_val);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
+	virtual size_t getSubtreeCodeComplexity() const;
 
 	bool typeCheck(TraversalPayload& payload) const;
 
@@ -673,11 +698,13 @@ public:
 	virtual std::string sourceString() const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
+	virtual void updateChild(const ASTNode* old_val, ASTNodeRef& new_val);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
+	virtual size_t getSubtreeCodeComplexity() const;
 
 	bool typeCheck(TraversalPayload& payload) const;
 
@@ -699,12 +726,14 @@ public:
 	virtual std::string sourceString() const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
+	virtual void updateChild(const ASTNode* old_val, ASTNodeRef& new_val);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual bool provenDefined() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
+	virtual size_t getSubtreeCodeComplexity() const;
 
 	bool typeCheck(TraversalPayload& payload) const;
 
@@ -739,11 +768,13 @@ public:
 	virtual std::string sourceString() const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
+	virtual void updateChild(const ASTNode* old_val, ASTNodeRef& new_val);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
+	virtual size_t getSubtreeCodeComplexity() const;
 
 private:
 	const std::string opToken() const;
@@ -770,11 +801,13 @@ public:
 	virtual std::string sourceString() const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
+	virtual void updateChild(const ASTNode* old_val, ASTNodeRef& new_val);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
+	virtual size_t getSubtreeCodeComplexity() const;
 
 	Type t;
 	ASTNodeRef a;
@@ -793,11 +826,13 @@ public:
 	virtual std::string sourceString() const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
+	virtual void updateChild(const ASTNode* old_val, ASTNodeRef& new_val);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
+	virtual size_t getSubtreeCodeComplexity() const;
 
 	ASTNodeRef expr;
 };
@@ -815,11 +850,13 @@ public:
 	virtual std::string sourceString() const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
+	virtual void updateChild(const ASTNode* old_val, ASTNodeRef& new_val);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
+	virtual size_t getSubtreeCodeComplexity() const;
 
 	ASTNodeRef expr;
 };
@@ -837,11 +874,13 @@ public:
 	virtual std::string sourceString() const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
+	virtual void updateChild(const ASTNode* old_val, ASTNodeRef& new_val);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
+	virtual size_t getSubtreeCodeComplexity() const;
 
 	const std::string getOverloadedFuncName() const; // returns e.g. op_lt, op_gt   etc..
 
@@ -866,11 +905,13 @@ public:
 	virtual std::string sourceString() const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
+	virtual void updateChild(const ASTNode* old_val, ASTNodeRef& new_val);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
+	virtual size_t getSubtreeCodeComplexity() const;
 	
 	ASTNodeRef subscript_expr;
 };
@@ -890,11 +931,13 @@ public:
 	virtual std::string sourceString() const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
+	virtual void updateChild(const ASTNode* old_val, ASTNodeRef& new_val);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
 	virtual bool isConstant() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
+	virtual size_t getSubtreeCodeComplexity() const;
 
 	TypeRef declared_type; // May be NULL if no type was declared.
 	std::string name;

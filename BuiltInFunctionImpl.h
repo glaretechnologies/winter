@@ -83,6 +83,8 @@ public:
 
 	virtual void linkInCalledFunctions(TraversalPayload& payload) const {}
 
+	virtual size_t getSubtreeCodeComplexity() const { return 1; } // TEMP HACK
+
 	const BuiltInFunctionImplType builtInType() const { return builtin_type; }
 private:
 	BuiltInFunctionImplType builtin_type;
@@ -100,7 +102,7 @@ public:
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
-	virtual bool callIsExpensive() const { return false; }
+	virtual bool callIsExpensive() const { return true; }
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 private:

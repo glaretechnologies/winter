@@ -44,6 +44,7 @@ public:
 	virtual bool isConstant() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
+	virtual size_t getSubtreeCodeComplexity() const;
 
 private:
 	void bindVariables(TraversalPayload& payload, const std::vector<ASTNode*>& stack);

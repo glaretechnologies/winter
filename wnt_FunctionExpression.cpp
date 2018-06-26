@@ -934,6 +934,18 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 }
 
 
+void FunctionExpression::updateChild(const ASTNode* old_val, ASTNodeRef& new_val)
+{
+	for(size_t i=0; i<argument_expressions.size(); ++i)
+		if(argument_expressions[i].ptr() == old_val)
+		{
+			argument_expressions[i] = new_val;
+			return;
+		}
+	assert(0);
+}
+
+
 bool FunctionExpression::provenDefined() const
 {
 	//return proven_defined;
@@ -1645,7 +1657,8 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 			throw BaseException("Error while emitting OpenCL C: invalid eN() function '" + static_function_name + "'.");
 		}
 	}
-	else if(static_target_function && static_target_function->built_in_func_impl.nonNull() && (static_target_function->built_in_func_impl->builtInType() == BuiltInFunctionImpl::BuiltInType_GetField))
+	else if(static_target_function && static_target_function->built_in_func_impl.nonNull() && 
+		(static_target_function->built_in_func_impl->builtInType() == BuiltInFunctionImpl::BuiltInType_GetField))
 	{
 		// Transform get field built-in functions like so:
 		// struct s { int x; }
@@ -1727,6 +1740,23 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 			return "fabs(" + argument_expressions[0]->emitOpenCLC(params) + ")";
 		else
 			return "abs(" + argument_expressions[0]->emitOpenCLC(params) + ")";*/
+	}
+	else if(static_target_function && static_target_function->built_in_func_impl.nonNull() &&
+		(static_target_function->built_in_func_impl->builtInType() == BuiltInFunctionImpl::BuiltInType_Constructor))
+	{
+		// Struct constructor: for this we will emit a 'compound literal' expression such as 
+		// b = (struct point) { 5, 6 };
+		// (See http://nickdesaulniers.github.io/blog/2013/07/25/designated-initialization-with-pointers-in-c/)
+
+		std::string s = "(" + this->type()->OpenCLCType() + ") {";
+		for(unsigned int i=0; i<argument_expressions.size(); ++i)
+		{
+			s += argument_expressions[i]->emitOpenCLC(params);
+			if(i + 1 < argument_expressions.size())
+				s += ", ";
+		}
+		s += "}";
+		return s;
 	}
 	else
 	{
@@ -2169,12 +2199,13 @@ GetSpaceBoundResults FunctionExpression::getSpaceBound(GetSpaceBoundParams& para
 			}
 		}
 
-		if(static_target_function->sig.name == "concatStrings" && static_target_function->sig.param_types.size() == 2 &&
-			static_target_function->sig.param_types[0]->getType() == Type::StringType && 
-			static_target_function->sig.param_types[1]->getType() == Type::StringType)
-		{
-			return arg_eval_bound + arg_eval_bound; // The resulting in string size should be <= the sum of the arg sizes.
-		}
+		// NOTE: this logic is incorrect for variable ASTNode args.
+		// if(static_target_function->sig.name == "concatStrings" && static_target_function->sig.param_types.size() == 2 &&
+		// 	static_target_function->sig.param_types[0]->getType() == Type::StringType && 
+		// 	static_target_function->sig.param_types[1]->getType() == Type::StringType)
+		// {
+		// 	return arg_eval_bound + arg_eval_bound; // The resulting in string size should be <= the sum of the arg sizes.
+		// }
 
 		try
 		{
@@ -2191,6 +2222,15 @@ GetSpaceBoundResults FunctionExpression::getSpaceBound(GetSpaceBoundParams& para
 		// TEMP:
 		throw BaseException("Unable to bound space of function expression." + errorContext(this->srcLocation()));
 	}
+}
+
+
+size_t FunctionExpression::getSubtreeCodeComplexity() const
+{
+	size_t sum = 0;
+	for(size_t i=0; i<argument_expressions.size(); ++i)
+		sum += argument_expressions[i]->getSubtreeCodeComplexity();
+	return 1 + sum;
 }
 
 

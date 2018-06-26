@@ -155,8 +155,34 @@ void IfExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 		doDeadCodeElimination(then_expr, payload, stack);
 		doDeadCodeElimination(else_expr, payload, stack);
 	}
+	else if(payload.operation == TraversalPayload::SimplifyIfExpression)
+	{
+		if(condition->nodeType() == ASTNode::BoolLiteralType)
+		{
+			const bool val = condition.downcast<BoolLiteral>()->value;
+			ASTNodeRef replacement = val ? then_expr : else_expr;
+
+			payload.garbarge = this; // Store a ref in payload so this node won't get deleted while we are still executing this function.
+			assert(stack.back() == this);
+			stack[stack.size() - 2]->updateChild(/*payload.last_visited_child_index, */this, replacement);
+			payload.tree_changed = true;
+		}
+	}
 	
 	stack.pop_back();
+}
+
+
+void IfExpression::updateChild(const ASTNode* old_val, ASTNodeRef& new_val)
+{
+	if(condition.ptr() == old_val)
+		condition = new_val;
+	else if(then_expr.ptr() == old_val)
+		then_expr = new_val;
+	else if(else_expr.ptr() == old_val)
+		else_expr = new_val;
+	else
+		assert(0);
 }
 
 
@@ -398,6 +424,14 @@ GetSpaceBoundResults IfExpression::getSpaceBound(GetSpaceBoundParams& params) co
 {
 	// Assuming we don't know the value of condition here.
 	return this->condition->getSpaceBound(params) + this->then_expr->getSpaceBound(params) +  this->else_expr->getSpaceBound(params);
+}
+
+
+size_t IfExpression::getSubtreeCodeComplexity() const
+{
+	return this->condition->getSubtreeCodeComplexity() + 
+		this->then_expr->getSubtreeCodeComplexity() + 
+		this->else_expr->getSubtreeCodeComplexity();
 }
 
 

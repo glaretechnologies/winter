@@ -267,6 +267,18 @@ void ArrayLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 }
 
 
+void ArrayLiteral::updateChild(const ASTNode* old_val, ASTNodeRef& new_val)
+{
+	for(size_t i=0; i<this->elements.size(); ++i)
+		if(this->elements[i].ptr() == old_val)
+		{
+			this->elements[i] = new_val;
+			return;
+		}
+	assert(0);
+}
+
+
 static bool areAllElementsIntLiterals(const std::vector<ASTNodeRef>& elements)
 {
 	for(size_t i=0; i<elements.size(); ++i)
@@ -475,6 +487,15 @@ GetSpaceBoundResults ArrayLiteral::getSpaceBound(GetSpaceBoundParams& params) co
 	}
 
 	//TEMP array is always stored on the stack currently, so no need to add heap space
+	return sum;
+}
+
+
+size_t ArrayLiteral::getSubtreeCodeComplexity() const
+{
+	size_t sum = 0;
+	for(size_t i=0; i<elements.size(); ++i)
+		sum += elements[i]->getSubtreeCodeComplexity();
 	return sum;
 }
 

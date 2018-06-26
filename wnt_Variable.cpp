@@ -408,6 +408,13 @@ void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 		if(payload.custom_visitor.nonNull())
 			payload.custom_visitor->visit(*this, payload);
 	}
+	else if(payload.operation == TraversalPayload::CountArgumentRefs)
+	{
+		if(this->binding_type == ArgumentVariable)
+		{
+			bound_function->args[arg_index].ref_count++;
+		}
+	}
 }
 
 
@@ -700,6 +707,12 @@ GetSpaceBoundResults Variable::getSpaceBound(GetSpaceBoundParams& params) const
 {
 	// A variable just refers to some existing value, so doesn't really take any space.
 	return GetSpaceBoundResults(0, 0);
+}
+
+
+size_t Variable::getSubtreeCodeComplexity() const
+{
+	return 1;
 }
 
 

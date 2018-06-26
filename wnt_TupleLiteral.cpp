@@ -229,6 +229,18 @@ void TupleLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 }
 
 
+void TupleLiteral::updateChild(const ASTNode* old_val, ASTNodeRef& new_val)
+{
+	for(size_t i=0; i<this->elements.size(); ++i)
+		if(this->elements[i].ptr() == old_val)
+		{
+			this->elements[i] = new_val;
+			return;
+		}
+	assert(0);
+}
+
+
 bool TupleLiteral::areAllElementsConstant() const
 {
 	for(size_t i=0; i<this->elements.size(); ++i)
@@ -338,6 +350,15 @@ GetSpaceBoundResults TupleLiteral::getSpaceBound(GetSpaceBoundParams& params) co
 		sum += elements[i]->getSpaceBound(params);
 
 	return sum;
+}
+
+
+size_t TupleLiteral::getSubtreeCodeComplexity() const
+{
+	size_t sum = 0;
+	for(size_t i=0; i<elements.size(); ++i)
+		sum += elements[i]->getSubtreeCodeComplexity();
+	return 1 + sum;
 }
 
 

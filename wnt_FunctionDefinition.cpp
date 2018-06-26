@@ -326,6 +326,11 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 			payload.processed_nodes.clear();
 		}
 	}
+	else if(payload.operation == TraversalPayload::CountArgumentRefs)
+	{
+		for(size_t i = 0; i<this->args.size(); ++i)
+			this->args[i].ref_count = 0;
+	}
 
 	//if(payload.operation == TraversalPayload::BindVariables) // LinkFunctions)
 	//{
@@ -578,6 +583,13 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 }
 
 
+void FunctionDefinition::updateChild(const ASTNode* old_val, ASTNodeRef& new_val)
+{
+	assert(body.ptr() == old_val);
+	this->body = new_val;
+}
+
+
 void FunctionDefinition::print(int depth, std::ostream& s) const
 {
 	printMargin(depth, s);
@@ -639,7 +651,10 @@ std::string FunctionDefinition::sourceString() const
 	if(this->declared_return_type.nonNull())
 		s += this->declared_return_type->toString() + " ";
 	s += ": ";
-	return s + body->sourceString();
+	if(body.isNull())
+		return s + " [NULL BODY]";
+	else
+		return s + body->sourceString();
 }
 
 
@@ -1594,6 +1609,23 @@ GetSpaceBoundResults FunctionDefinition::getSpaceBound(GetSpaceBoundParams& para
 		GetSpaceBoundResults bounds = this->body->getSpaceBound(params);
 		bounds.stack_space += use_stack_size;
 		return bounds;
+	}
+}
+
+
+size_t FunctionDefinition::getSubtreeCodeComplexity() const
+{
+	if(built_in_func_impl.nonNull())
+	{
+		return built_in_func_impl->getSubtreeCodeComplexity();
+	}
+	else if(external_function.nonNull())
+	{
+		return 100;
+	}
+	else
+	{
+		return body->getSubtreeCodeComplexity();
 	}
 }
 

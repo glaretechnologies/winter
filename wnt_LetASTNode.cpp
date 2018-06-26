@@ -185,6 +185,15 @@ void LetASTNode::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 }
 
 
+void LetASTNode::updateChild(const ASTNode* old_val, ASTNodeRef& new_val)
+{
+	if(expr.ptr() == old_val)
+		expr = new_val;
+	else
+		assert(0);
+}
+
+
 llvm::Value* LetASTNode::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
 	//if(!llvm_value)
@@ -238,6 +247,12 @@ size_t LetASTNode::getTimeBound(GetTimeBoundParams& params) const
 GetSpaceBoundResults LetASTNode::getSpaceBound(GetSpaceBoundParams& params) const
 {
 	return expr->getSpaceBound(params);
+}
+
+
+size_t LetASTNode::getSubtreeCodeComplexity() const
+{
+	return expr->getSubtreeCodeComplexity();
 }
 
 

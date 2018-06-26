@@ -209,6 +209,18 @@ void VArrayLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 }
 
 
+void VArrayLiteral::updateChild(const ASTNode* old_val, ASTNodeRef& new_val)
+{
+	for(size_t i=0; i<this->elements.size(); ++i)
+		if(this->elements[i].ptr() == old_val)
+		{
+			this->elements[i] = new_val;
+			return;
+		}
+	assert(0);
+}
+
+
 bool VArrayLiteral::areAllElementsConstant() const
 {
 	for(size_t i=0; i<this->elements.size(); ++i)
@@ -488,6 +500,15 @@ GetSpaceBoundResults VArrayLiteral::getSpaceBound(GetSpaceBoundParams& params) c
 	}
 
 	return sum;
+}
+
+
+size_t VArrayLiteral::getSubtreeCodeComplexity() const
+{
+	size_t sum = 0;
+	for(size_t i=0; i<elements.size(); ++i)
+		sum += elements[i]->getSubtreeCodeComplexity();
+	return 1 + sum;
 }
 
 

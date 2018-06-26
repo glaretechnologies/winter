@@ -313,6 +313,18 @@ void LetBlock::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 }
 
 
+void LetBlock::updateChild(const ASTNode* old_val, ASTNodeRef& new_val)
+{
+	/*for(size_t i=0; i<this->lets.size(); ++i)
+		if(this->lets[i].ptr() == old_val)
+		{
+			this->lets[i] = new_val;
+			return;
+		}*/
+	assert(0);
+}
+
+
 bool shouldRefCount(EmitLLVMCodeParams& params, const ASTNodeRef& expr)
 {
 	return shouldRefCount(params, *expr);
@@ -480,6 +492,15 @@ GetSpaceBoundResults LetBlock::getSpaceBound(GetSpaceBoundParams& params) const
 		sum_bound += lets[i]->getSpaceBound(params);
 
 	return sum_bound;
+}
+
+
+size_t LetBlock::getSubtreeCodeComplexity() const
+{
+	size_t sum = 0;
+	for(size_t i=0; i<lets.size(); ++i)
+		sum += lets[i]->getSubtreeCodeComplexity();
+	return 1 + sum;
 }
 
 

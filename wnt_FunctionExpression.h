@@ -62,6 +62,7 @@ public:
 	virtual ValueRef exec(VMState& vmstate);
 	virtual TypeRef type() const;
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
+	virtual void updateChild(const ASTNode* old_val, ASTNodeRef& new_val);
 	virtual void print(int depth, std::ostream& s) const;
 	virtual std::string sourceString() const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
@@ -71,6 +72,7 @@ public:
 	virtual bool provenDefined() const;
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
+	virtual size_t getSubtreeCodeComplexity() const;
 
 	///////
 

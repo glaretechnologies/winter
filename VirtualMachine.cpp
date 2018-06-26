@@ -973,6 +973,14 @@ bool VirtualMachine::doInliningPass()
 		assert(stack.size() == 0);
 	}
 
+	// Do a CountArgumentRefs pass.  This will count the number of references to each function argument in the body of each function.
+	{
+		payload.operation = TraversalPayload::CountArgumentRefs;
+		for(size_t i=0; i<linker.top_level_defs.size(); ++i)
+			linker.top_level_defs[i]->traverse(payload, stack);
+		assert(stack.size() == 0);
+	}
+
 	for(size_t i=0; i<linker.top_level_defs.size(); ++i)
 	{
 		std::unordered_set<std::string> used_names;
@@ -1247,9 +1255,31 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 
 	while(true)
 	{
+		/*{
+			std::ofstream file("pre_inlining_source.win");
+			for(size_t i=0; i<linker.top_level_defs.size(); ++i)
+				file << linker.top_level_defs[i]->sourceString() << "\n\n";
+		}*/
+
 		bool inline_change = doInliningPass();
 
 		bool dce_change = doDeadCodeEliminationPass();
+
+		// Do SimplifyIfExpression pass
+		bool simplify_if_change = false;
+		{
+			std::vector<ASTNode*> stack;
+			TraversalPayload payload(TraversalPayload::SimplifyIfExpression);
+			for(size_t i=0; i<linker.top_level_defs.size(); ++i)
+				linker.top_level_defs[i]->traverse(payload, stack);
+			simplify_if_change = payload.tree_changed;
+		}
+
+		/*{
+			std::ofstream file("post_inlining_source.win");
+			for(size_t i=0; i<linker.top_level_defs.size(); ++i)
+				file << linker.top_level_defs[i]->sourceString() << "\n\n";
+		}*/
 
 		bool changed = inline_change || dce_change;
 		if(!changed)

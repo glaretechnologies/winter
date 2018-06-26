@@ -385,26 +385,26 @@ void checkInlineExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector
 		{
 			const bool verbose = false;
 			if(verbose) conPrint("\n=================== Considering inlining function call =====================\n");
-			
+			if(verbose) conPrint("target func: " + target_func->sig.toString());
+
 			const int call_count = payload.calls_to_func_count[target_func];
 			
-			const bool is_target_func_just_a_call = target_func->body->nodeType() == ASTNode::FunctionExpressionType;
+			if(verbose) conPrint("target complexity: " + toString(target_func->getSubtreeCodeComplexity()));
+			const bool target_func_simple = target_func->getSubtreeCodeComplexity() < 20;
 
 			// Work out if the argument expressions are 'expensive' to evaluate.
-			// If they are, don't inline this function expression, because the argument expression *may* be duplicated.
+			// If they are, don't inline this function expression if the expensive argument expression is duplicated.
 			// e.g. def f(float x) : x + x + x + x, 
 			// main(float x) : f(sin(x))    would get inlined to      main(float x) : sin(x) + sin(x) + sin(x) + sin(x)
 			//
-			// This is very crude, and should be improved in the following way:
-			// Instead of not inlining, inline to a let expression, e.g. to
+			// NOTE: Instead of not inlining the function body directly, we could inline to a let expression, e.g. to
 			//
 			// let f_arg0 = sin(x) in f(f_arg0)
-			//
-			// Also it doesn't matter if the argument expression is expensive, if it will only be substituted 0 or 1 times.
 
-			bool are_arg_expressions_expensive = false;
+			bool expensive_arg_expr_duplicated = false;
 			for(size_t i=0; i<func_expr->argument_expressions.size(); ++i)
 			{
+				bool arg_expr_is_expensive = false;
 				if(func_expr->argument_expressions[i]->nodeType() == ASTNode::FunctionExpressionType)
 				{
 					// Consider function calls expensive, with some exceptions, such as:
@@ -412,32 +412,40 @@ void checkInlineExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector
 					bool func_call_is_expensive = true;
 					const FunctionDefinition* arg_target_func = func_expr->argument_expressions[i].downcastToPtr<FunctionExpression>()->static_target_function;
 					if(arg_target_func->built_in_func_impl.nonNull())
-					{
-						//if(dynamic_cast<const GetField*>(arg_target_func->built_in_func_impl.getPointer()))
-						//	func_call_is_expensive = false;
 						func_call_is_expensive = arg_target_func->built_in_func_impl->callIsExpensive();
-					}
 					
 					if(func_call_is_expensive)
-						are_arg_expressions_expensive = true;
+						arg_expr_is_expensive = true;
 				}
 				else
 				{
+					// Some literal expressions are sufficiently simple that it doesn't matter if they are duplicated.
 					if(!(func_expr->argument_expressions[i]->nodeType() == ASTNode::VariableASTNodeType || func_expr->argument_expressions[i]->nodeType() == ASTNode::IntLiteralType ||
 						func_expr->argument_expressions[i]->nodeType() == ASTNode::FloatLiteralType || func_expr->argument_expressions[i]->nodeType() == ASTNode::DoubleLiteralType ||
 						func_expr->argument_expressions[i]->nodeType() == ASTNode::BoolLiteralType || func_expr->argument_expressions[i]->nodeType() == ASTNode::CharLiteralType))
 					{
 						// This argument expression is expensive to evaluate.
-						are_arg_expressions_expensive = true;
+						arg_expr_is_expensive = true;
+					}
+				}
+
+				if(verbose) conPrint("arg " + toString(i) + " expensive: " + boolToString(arg_expr_is_expensive));
+				if(arg_expr_is_expensive)
+				{
+					// See if the arg is duplicated
+					if(target_func->args[i].ref_count > 1)
+					{
+						expensive_arg_expr_duplicated = true;
+						if(verbose) conPrint("Expensive arg " + toString(i) + " is duplicated in target function.  Not inlining.");
 					}
 				}
 			}
 
 			if(verbose) conPrint("target: " + target_func->sig.toString() + ", call_count=" + toString(call_count) + ", beta reduction=" + boolToString(is_beta_reduction) +
-				", is_target_func_just_a_call: " + boolToString(is_target_func_just_a_call) + ", are_arg_expressions_expensive: " + boolToString(are_arg_expressions_expensive) + "\n");
+				", target_func_simple: " + boolToString(target_func_simple) + ", expensive_arg_expr_duplicated: " + boolToString(expensive_arg_expr_duplicated) + "\n");
 
 
-			const bool should_inline = (is_beta_reduction || (call_count <= 1) || is_target_func_just_a_call) && !are_arg_expressions_expensive;
+			const bool should_inline = (is_beta_reduction || (call_count <= 1) || target_func_simple) && !expensive_arg_expr_duplicated;
 			if(should_inline)
 			{
 				if(verbose) conPrint("------------original expr----------: ");
@@ -1183,6 +1191,13 @@ GetSpaceBoundResults BufferRoot::getSpaceBound(GetSpaceBoundParams& params) cons
 }
 
 
+size_t BufferRoot::getSubtreeCodeComplexity() const
+{
+	assert(0);
+	return 0;
+}
+
+
 //----------------------------------------------------------------------------------
 
 
@@ -1594,6 +1609,15 @@ GetSpaceBoundResults MapLiteral::getSpaceBound(GetSpaceBoundParams& params) cons
 }
 
 
+size_t MapLiteral::getSubtreeCodeComplexity() const
+{
+	size_t sum = 0;
+	for(size_t i=0; i<items.size(); ++i)
+		sum += items[i].first->getSubtreeCodeComplexity() + items[i].second->getSubtreeCodeComplexity();
+	return 1 + sum;
+}
+
+
 //----------------------------------------------------------------------------------------------
 
 
@@ -1784,6 +1808,12 @@ GetSpaceBoundResults StringLiteral::getSpaceBound(GetSpaceBoundParams& params) c
 	// Currently strings may be allocated either on the stack or the heap.
 	// If the string is allocated on the heap, then we have to bound the stack space that allocateString will take.
 	return GetSpaceBoundResults(llvm_allocated_on_heap ? 1024 : 0, /*heap_space=*/llvm_allocated_on_heap ? (sizeof(StringRep) + value.size()) : 0);
+}
+
+
+size_t StringLiteral::getSubtreeCodeComplexity() const
+{
+	return 1;
 }
 
 
@@ -2247,6 +2277,19 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 }
 
 
+void AdditionExpression::updateChild(const ASTNode* old_val, ASTNodeRef& new_val)
+{
+	if(a.ptr() == old_val)
+		a = new_val;
+	else if(b.ptr() == old_val)
+		b = new_val;
+	else
+	{
+		assert(0);
+	}
+}
+
+
 //bool AdditionExpression::typeCheck(TraversalPayload& payload) const
 //{
 //	const TypeRef& this_type = this->type();
@@ -2354,6 +2397,12 @@ GetSpaceBoundResults AdditionExpression::getSpaceBound(GetSpaceBoundParams& para
 	return a->getSpaceBound(params) + b->getSpaceBound(params);
 }
 
+
+
+size_t AdditionExpression::getSubtreeCodeComplexity() const
+{
+	return 1 + a->getSubtreeCodeComplexity() + b->getSubtreeCodeComplexity();
+}
 
 
 //-------------------------------------------------------------------------------------------------
@@ -2518,6 +2567,19 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 }
 
 
+void SubtractionExpression::updateChild(const ASTNode* old_val, ASTNodeRef& new_val)
+{
+	if(a.ptr() == old_val)
+		a = new_val;
+	else if(b.ptr() == old_val)
+		b = new_val;
+	else
+	{
+		assert(0);
+	}
+}
+
+
 //bool SubtractionExpression::typeCheck(TraversalPayload& payload) const
 //{
 //	const TypeRef& this_type = this->type();
@@ -2603,6 +2665,12 @@ size_t SubtractionExpression::getTimeBound(GetTimeBoundParams& params) const
 GetSpaceBoundResults SubtractionExpression::getSpaceBound(GetSpaceBoundParams& params) const
 {
 	return a->getSpaceBound(params) + b->getSpaceBound(params);
+}
+
+
+size_t SubtractionExpression::getSubtreeCodeComplexity() const
+{
+	return 1 + a->getSubtreeCodeComplexity() + b->getSubtreeCodeComplexity();
 }
 
 
@@ -2768,6 +2836,19 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	}
 
 	stack.pop_back();
+}
+
+
+void MulExpression::updateChild(const ASTNode* old_val, ASTNodeRef& new_val)
+{
+	if(a.ptr() == old_val)
+		a = new_val;
+	else if(b.ptr() == old_val)
+		b = new_val;
+	else
+	{
+		assert(0);
+	}
 }
 
 
@@ -2997,6 +3078,12 @@ size_t MulExpression::getTimeBound(GetTimeBoundParams& params) const
 GetSpaceBoundResults MulExpression::getSpaceBound(GetSpaceBoundParams& params) const
 {
 	return a->getSpaceBound(params) + b->getSpaceBound(params);
+}
+
+
+size_t MulExpression::getSubtreeCodeComplexity() const
+{
+	return 1 + a->getSubtreeCodeComplexity() + b->getSubtreeCodeComplexity();
 }
 
 
@@ -3273,6 +3360,19 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	}
 
 	stack.pop_back();
+}
+
+
+void DivExpression::updateChild(const ASTNode* old_val, ASTNodeRef& new_val)
+{
+	if(a.ptr() == old_val)
+		a = new_val;
+	else if(b.ptr() == old_val)
+		b = new_val;
+	else
+	{
+		assert(0);
+	}
 }
 
 
@@ -3625,6 +3725,12 @@ GetSpaceBoundResults DivExpression::getSpaceBound(GetSpaceBoundParams& params) c
 }
 
 
+size_t DivExpression::getSubtreeCodeComplexity() const
+{
+	return 1 + a->getSubtreeCodeComplexity() + b->getSubtreeCodeComplexity();
+}
+
+
 //-----------------------------------------------------------------------------------------------
 
 
@@ -3802,6 +3908,19 @@ void BinaryBitwiseExpression::traverse(TraversalPayload& payload, std::vector<AS
 }
 
 
+void BinaryBitwiseExpression::updateChild(const ASTNode* old_val, ASTNodeRef& new_val)
+{
+	if(a.ptr() == old_val)
+		a = new_val;
+	else if(b.ptr() == old_val)
+		b = new_val;
+	else
+	{
+		assert(0);
+	}
+}
+
+
 llvm::Value* BinaryBitwiseExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
 	if(this->type()->getType() == Type::IntType)
@@ -3854,6 +3973,13 @@ GetSpaceBoundResults BinaryBitwiseExpression::getSpaceBound(GetSpaceBoundParams&
 {
 	return a->getSpaceBound(params) + b->getSpaceBound(params);
 }
+
+
+size_t BinaryBitwiseExpression::getSubtreeCodeComplexity() const
+{
+	return 1 + a->getSubtreeCodeComplexity() + b->getSubtreeCodeComplexity();
+}
+
 
 //-------------------------------------------------------------------------------------------------------
 
@@ -3955,6 +4081,19 @@ void BinaryBooleanExpr::traverse(TraversalPayload& payload, std::vector<ASTNode*
 }
 
 
+void BinaryBooleanExpr::updateChild(const ASTNode* old_val, ASTNodeRef& new_val)
+{
+	if(a.ptr() == old_val)
+		a = new_val;
+	else if(b.ptr() == old_val)
+		b = new_val;
+	else
+	{
+		assert(0);
+	}
+}
+
+
 void BinaryBooleanExpr::print(int depth, std::ostream& s) const
 {
 	printMargin(depth, s);
@@ -4031,6 +4170,12 @@ size_t BinaryBooleanExpr::getTimeBound(GetTimeBoundParams& params) const
 GetSpaceBoundResults BinaryBooleanExpr::getSpaceBound(GetSpaceBoundParams& params) const
 {
 	return a->getSpaceBound(params) + b->getSpaceBound(params);
+}
+
+
+size_t BinaryBooleanExpr::getSubtreeCodeComplexity() const
+{
+	return 1 + a->getSubtreeCodeComplexity() + b->getSubtreeCodeComplexity();
 }
 
 
@@ -4149,6 +4294,17 @@ void UnaryMinusExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 }
 
 
+void UnaryMinusExpression::updateChild(const ASTNode* old_val, ASTNodeRef& new_val)
+{
+	if(expr.ptr() == old_val)
+		expr = new_val;
+	else
+	{
+		assert(0);
+	}
+}
+
+
 void UnaryMinusExpression::print(int depth, std::ostream& s) const
 {
 	printMargin(depth, s);
@@ -4259,6 +4415,12 @@ GetSpaceBoundResults UnaryMinusExpression::getSpaceBound(GetSpaceBoundParams& pa
 }
 
 
+size_t UnaryMinusExpression::getSubtreeCodeComplexity() const
+{
+	return 1 + expr->getSubtreeCodeComplexity();
+}
+
+
 //----------------------------------------------------------------------------------------
 
 
@@ -4311,6 +4473,17 @@ void LogicalNegationExpr::traverse(TraversalPayload& payload, std::vector<ASTNod
 	}
 
 	stack.pop_back();
+}
+
+
+void LogicalNegationExpr::updateChild(const ASTNode* old_val, ASTNodeRef& new_val)
+{
+	if(expr.ptr() == old_val)
+		expr = new_val;
+	else
+	{
+		assert(0);
+	}
 }
 
 
@@ -4373,6 +4546,12 @@ size_t LogicalNegationExpr::getTimeBound(GetTimeBoundParams& params) const
 GetSpaceBoundResults LogicalNegationExpr::getSpaceBound(GetSpaceBoundParams& params) const
 {
 	return expr->getSpaceBound(params);
+}
+
+
+size_t LogicalNegationExpr::getSubtreeCodeComplexity() const
+{
+	return 1 + expr->getSubtreeCodeComplexity();
 }
 
 
@@ -4617,6 +4796,19 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 }
 
 
+void ComparisonExpression::updateChild(const ASTNode* old_val, ASTNodeRef& new_val)
+{
+	if(a.ptr() == old_val)
+		a = new_val;
+	else if(b.ptr() == old_val)
+		b = new_val;
+	else
+	{
+		assert(0);
+	}
+}
+
+
 llvm::Value* ComparisonExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
 	llvm::Value* a_code = a->emitLLVMCode(params);
@@ -4740,6 +4932,12 @@ GetSpaceBoundResults ComparisonExpression::getSpaceBound(GetSpaceBoundParams& pa
 }
 
 
+size_t ComparisonExpression::getSubtreeCodeComplexity() const
+{
+	return 1 + a->getSubtreeCodeComplexity() + b->getSubtreeCodeComplexity();
+}
+
+
 //---------------------------------------------------------------------------------
 
 
@@ -4821,6 +5019,17 @@ void ArraySubscript::traverse(TraversalPayload& payload, std::vector<ASTNode*>& 
 }
 
 
+void ArraySubscript::updateChild(const ASTNode* old_val, ASTNodeRef& new_val)
+{
+	if(subscript_expr.ptr() == old_val)
+		subscript_expr = new_val;
+	else
+	{
+		assert(0);
+	}
+}
+
+
 llvm::Value* ArraySubscript::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
 	assert(0);
@@ -4851,6 +5060,12 @@ size_t ArraySubscript::getTimeBound(GetTimeBoundParams& params) const
 GetSpaceBoundResults ArraySubscript::getSpaceBound(GetSpaceBoundParams& params) const
 {
 	return subscript_expr->getSpaceBound(params);
+}
+
+
+size_t ArraySubscript::getSubtreeCodeComplexity() const
+{
+	return 1 + subscript_expr->getSubtreeCodeComplexity();
 }
 
 
@@ -5027,6 +5242,17 @@ void NamedConstant::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 }
 
 
+void NamedConstant::updateChild(const ASTNode* old_val, ASTNodeRef& new_val)
+{
+	if(value_expr.ptr() == old_val)
+		value_expr = new_val;
+	else
+	{
+		assert(0);
+	}
+}
+
+
 llvm::Value* NamedConstant::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
 	/*if(isLiteral(*this->value_expr))
@@ -5064,6 +5290,12 @@ size_t NamedConstant::getTimeBound(GetTimeBoundParams& params) const
 GetSpaceBoundResults NamedConstant::getSpaceBound(GetSpaceBoundParams& params) const
 {
 	return value_expr->getSpaceBound(params);
+}
+
+
+size_t NamedConstant::getSubtreeCodeComplexity() const
+{
+	return value_expr->getSubtreeCodeComplexity();
 }
 
 
