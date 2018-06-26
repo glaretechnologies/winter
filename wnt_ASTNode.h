@@ -84,27 +84,27 @@ public:
 		ComputeCanConstantFold,
 		ConstantFolding,
 		//SubstituteType, // for making concrete types out of generic types.
-		OperatorOverloadConversion, // Converting '+' to op_add
+		//OperatorOverloadConversion, // Converting '+' to op_add etc..
 		//GetCleanupNodes,
 		CheckInDomain, // Check that calls to elem() etc.. are in bounds.
 		InlineFunctionCalls, // inline function calls
 		SubstituteVariables, // Used in InlineFunctionCalls passes: replace all variables in the function body with the argument values.
 		CustomVisit, // Calls supplied ASTNodeVisitor on each node visited.
 		UpdateUpRefs,
-		DeadFunctionElimination,
-		DeadCodeElimination_ComputeAlive,
-		DeadCodeElimination_RemoveDead,
-		CountFunctionCalls,
-		CountArgumentRefs,
-		AddAnonFuncsToLinker,
-		GetAllNamesInScope,
-		UnbindVariables,
-		SimplifyIfExpression
+		DeadFunctionElimination, // Removes all function definitions that are not reachable (through direct or indirect function calls) from the set of entry functions.
+		DeadCodeElimination_ComputeAlive, // Works out which let variables are referenced.
+		DeadCodeElimination_RemoveDead, // Removes let variables that are not referenced.
+		CountFunctionCalls, // Compute calls_to_func_count.  calls_to_func_count is used in inlining decision.
+		CountArgumentRefs, // Count the number of references to each function argument in the body of each function.  Used for inlining decision.
+		AddAnonFuncsToLinker, // Adds anonymous functions to linker, to codegen.
+		GetAllNamesInScope, // A pass over a function to get the set of names used, so that we can avoid them when generating new names for inlined let vars.
+		UnbindVariables, // Unbind certain variables.  Used after cloning an expression during inlining.
+		SimplifyIfExpression // Replace "if(true, a, b)" with "a" etc..
 	};
 
 	TraversalPayload(Operation e) : 
-		operation(e), tree_changed(false), current_named_constant(NULL), check_bindings(false),
-		last_visited_child_index(-1) {}
+		operation(e), tree_changed(false), current_named_constant(NULL), check_bindings(false)
+	{}
 
 	Linker* linker;
 
@@ -150,8 +150,6 @@ public:
 
 	// GetAllNamesInScope, InlineFunctionCalls:
 	std::unordered_set<std::string>* used_names;
-
-	int last_visited_child_index;
 
 	Reference<ASTNode> garbarge; // For Storing a ref to a node so it won't get deleted (due to ref count going to zero) while a function on it is still being executed.
 };

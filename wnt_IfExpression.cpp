@@ -164,7 +164,7 @@ void IfExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 
 			payload.garbarge = this; // Store a ref in payload so this node won't get deleted while we are still executing this function.
 			assert(stack.back() == this);
-			stack[stack.size() - 2]->updateChild(/*payload.last_visited_child_index, */this, replacement);
+			stack[stack.size() - 2]->updateChild(this, replacement);
 			payload.tree_changed = true;
 		}
 	}
