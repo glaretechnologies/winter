@@ -257,6 +257,18 @@ public:
 
 	std::string file_scope_code;
 
+	/*
+	An expression in Winter, when transformed to OpenCL C, may not be expressible just as an expression.
+	Rather, it may require one or more additional statements.  Such statements will be writted to blocks.back().
+	
+	For example, let blocks are not easily (efficiently) expressible in C:  (we don't want to duplicate sin call)
+	let
+		x = sin(x)
+	in 
+		x + x
+
+	In this case the directly returned OpenCL C code will be "x + x", but the code "x = sin(x)" will be put in blocks.back().
+	*/
 	std::vector<std::string> blocks;
 
 	std::set<TupleTypeRef, TypeRefLessThan> tuple_types_used;

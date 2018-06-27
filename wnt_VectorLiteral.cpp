@@ -157,22 +157,23 @@ std::string VectorLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 	const std::string elem_typename = this->elements[0]->type()->OpenCLCType();
 	if(has_int_suffix)
 	{
-		// "(float4)(1.0f)"
-		std::string s = "(" + elem_typename + toString(this->int_suffix) + ")(" + 
-			elements[0]->emitOpenCLC(params) + ")";
+		// "((float4)(1.0f))"
+		std::string s = "((" + elem_typename + toString(this->int_suffix) + ")(" + 
+			elements[0]->emitOpenCLC(params) + "))";
 		return s;
 	}
 	else
 	{
-		// "(float4)(1.0f, 2.0f, 3.0f, 4.0)"
-		std::string s = "(" + elem_typename + toString(elements.size()) + ")(";
+		// "((float4)(1.0f, 2.0f, 3.0f, 4.0))"
+		// Note that the extra surrounding parentheses seem to be required to avoid syntax errors in some cases.
+		std::string s = "((" + elem_typename + toString(elements.size()) + ")(";
 		for(size_t i=0; i<elements.size(); ++i)
 		{
 			s += elements[i]->emitOpenCLC(params);
 			if(i + 1 < elements.size())
 				s += ", ";
 		}
-		s += ")";
+		s += "))";
 		return s;
 	}
 }

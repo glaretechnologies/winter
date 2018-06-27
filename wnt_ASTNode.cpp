@@ -436,7 +436,7 @@ void checkInlineExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector
 					if(target_func->args[i].ref_count > 1)
 					{
 						expensive_arg_expr_duplicated = true;
-						if(verbose) conPrint("Expensive arg " + toString(i) + " is duplicated in target function.  Not inlining.");
+						if(verbose) conPrint("Expensive arg " + toString(i) + " is duplicated (refs=" + toString(target_func->args[i].ref_count) + ") in target function.  Not inlining.");
 					}
 				}
 			}
@@ -522,11 +522,17 @@ void checkInlineExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector
 					temp_payload.func_def_stack = payload.func_def_stack;
 					e->traverse(temp_payload, stack);
 				}
+				// Do a CountArgumentRefs pass as the ref counts may have changed.  This will count the number of references to each function argument in the body of each function.
+				{
+					// Run on this entire function, so we zero out the counts when traverse the FunctionDef.
+					TraversalPayload temp_payload(TraversalPayload::CountArgumentRefs);
+					temp_payload.linker = payload.linker;
+					temp_payload.func_def_stack = payload.func_def_stack;
+					payload.func_def_stack[0]->traverse(temp_payload, stack);
+				}
 
 				if(verbose) conPrint("------------Rebound expression-----------: ");
 				if(verbose) e->print(0, std::cout);
-
-				
 
 				payload.tree_changed = true;
 			}

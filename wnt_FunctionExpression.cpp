@@ -1461,6 +1461,7 @@ std::string FunctionExpression::sourceString() const
 // From https://www.khronos.org/registry/cl/sdk/1.0/docs/man/xhtml/mathFunctions.html
 static const char* opencl_built_in_func_names[] = { 
 	"sign",
+	"clamp",
 
 	"acos", "acosh", "acospi", "asin",
 	"asinh", "asinpi", "atan", "atan2",

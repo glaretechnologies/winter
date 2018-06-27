@@ -174,8 +174,6 @@ set(WINTER_FILES
 "${winterdir}/wnt_VArrayLiteral.h"
 "${winterdir}/wnt_Variable.h"
 "${winterdir}/FuzzTests.h"
-"${winterdir}/TestUtils.cpp"
-"${winterdir}/TestUtils.h"
 "${winterdir}/winter.cpp"
 "${winterdir}/notes.txt"
 "${winterdir}/todo.txt"
@@ -253,6 +251,11 @@ ${INDIGO_TRUNK_DIR}/maths/SSE.cpp
 ${INDIGO_TRUNK_DIR}/maths/SSE.h
 )
 
+SET(testutils_files
+${INDIGO_TRUNK_DIR}/indigo/TestUtils.cpp
+${INDIGO_TRUNK_DIR}/indigo/TestUtils.h
+)
+
 
 SET(double_conversion_files
 ${INDIGO_TRUNK_DIR}/double-conversion/bignum-dtoa.cc
@@ -307,6 +310,7 @@ SOURCE_GROUP(maths FILES ${maths_files})
 SOURCE_GROUP(double_conversion FILES ${double_conversion_files})
 SOURCE_GROUP(opencl FILES ${glare_opencl_files})
 SOURCE_GROUP(xxhash FILES ${xxhash_files})
+SOURCE_GROUP(testutils FILES ${testutils_files})
 
 
 include_directories(
@@ -327,6 +331,7 @@ ${maths_files}
 ${double_conversion_files}
 ${glare_opencl_files}
 ${xxhash_files}
+${testutils_files}
 )
 
 

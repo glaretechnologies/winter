@@ -476,7 +476,6 @@ public:
 
 	const std::string definitionString() const; // Winter definition string, e.g "struct a { float b }"
 	const std::string getOpenCLCDefinition(EmitOpenCLCodeParams& params, bool emit_comments) const; // Get full definition string, e.g. "struct a { float b; };"
-	const std::string getOpenCLCConstructor(EmitOpenCLCodeParams& params, bool emit_comments) const; // Emit constructor for type
 
 	std::vector<Reference<TupleType> > getElementTupleTypes() const;
 
@@ -530,7 +529,6 @@ public:
 	virtual bool passByValue() const { return false; }
 
 	const std::string getOpenCLCDefinition(bool emit_comments) const; // Get full definition string, e.g. struct a { float b; };
-	const std::string getOpenCLCConstructor(bool emit_comments) const; // Emit constructor for type
 
 	virtual void emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const;
 	virtual void emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const;

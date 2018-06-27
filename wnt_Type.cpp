@@ -998,39 +998,6 @@ const std::string StructureType::getOpenCLCDefinition(EmitOpenCLCodeParams& para
 }
 
 
-const std::string StructureType::getOpenCLCConstructor(EmitOpenCLCodeParams& params, bool emit_comments) const // Emit constructor for type
-{
-	std::string s;
-
-	const std::string use_name = mapOpenCLCVarName(params.opencl_c_keywords, name);
-
-	// FunctionDefinition::Funct
-	FunctionSignature sig(name, component_types); // Just use raw name here for now.  Will probably not clash with OpenCL C keywords due to type decoration.
-
-	if(emit_comments)
-		s += "// Constructor for " + toString() + "\n";
-	s += use_name + " " + sig.typeMangledName() + "(";
-
-	for(size_t i=0; i<component_types.size(); ++i)
-	{
-		// Non pass-by-value types are passed with a const C pointer.
-		const std::string use_type = !component_types[i]->OpenCLPassByPointer() ? component_types[i]->OpenCLCType() : ("const " + component_types[i]->OpenCLCType() + "* const ");
-		s += use_type + " " + component_names[i];
-		if(i + 1 < component_types.size())
-			s += ", ";
-	}
-
-	s += ") { " + use_name + " s_; ";
-
-	for(size_t i=0; i<component_types.size(); ++i)
-		s += "s_." + component_names[i] + " = " + (!component_types[i]->OpenCLPassByPointer() ? "" : "*") + component_names[i] + "; ";
-
-	s += "return s_; }\n\n";
-
-	return s;
-}
-
-
 std::vector<Reference<TupleType> > StructureType::getElementTupleTypes() const
 {
 	// TODO: recursive search for tuples.
@@ -1301,46 +1268,6 @@ const std::string TupleType::getOpenCLCDefinition(bool emit_comments) const // G
 
 	s += "return s_; }\n\n";
 	*/
-	return s;
-}
-
-
-const std::string TupleType::getOpenCLCConstructor(bool emit_comments) const
-{
-	std::string s;
-
-	const std::string tuple_typename = OpenCLCType(); // makeSafeStringForFunctionName(this->toString());
-
-	// Make constructor.
-	// for struct tuple_float__float_ { float a, float b }, will look like    
-	// tuple_float__float_ tuple_float__float_cnstr(float a, float b) { tuple_float__float_ s;  s.a = a; s.b = b; return s; }
-	//
-	// for struct tuple_S_ { S s }, will look like    
-	// tuple_S_ tuple_S_cnstr(const S* const s) { tuple_S_ res;  res.s = *s; return s; }
-
-
-	const std::string constructor_name = makeSafeStringForFunctionName(this->toString()) + "_cnstr";
-
-	if(emit_comments)
-		s += "// Constructor for " + toString() + "\n";
-	s += tuple_typename + " " + constructor_name + "(";
-
-	for(size_t i=0; i<component_types.size(); ++i)
-	{
-		// Non pass-by-value types are passed with a const C pointer.
-		const std::string use_type = !component_types[i]->OpenCLPassByPointer() ? component_types[i]->OpenCLCType() : ("const " + component_types[i]->OpenCLCType() + "* const ");
-		s += use_type + " field_" + ::toString(i);
-		if(i + 1 < component_types.size())
-			s += ", ";
-	}
-
-	s += ") { " + tuple_typename + " s_; ";
-
-	for(size_t i=0; i<component_types.size(); ++i)
-		s += "s_.field_" + ::toString(i) + " = " + (!component_types[i]->OpenCLPassByPointer() ? "" : "*") + "field_" + ::toString(i) + "; ";
-
-	s += "return s_; }\n\n";
-
 	return s;
 }
 

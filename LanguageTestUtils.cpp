@@ -23,6 +23,7 @@
 #include <Platform.h>
 #include <FileUtils.h>
 #include <StringUtils.h>
+#include <FileUtils.h>
 #include <Timer.h>
 #include <cassert>
 #include <fstream>
@@ -32,7 +33,7 @@
 //#include "utils/Obfuscator.h"
 
 
-//#define WINTER_OPENCL_TESTS 1
+#define WINTER_OPENCL_TESTS 1
 static const bool DUMP_OPENCL_C_SOURCE = false; // Dumps to opencl_source.c
 static const bool PRINT_MEM_BOUNDS_AND_USAGE = false;
 
@@ -192,9 +193,7 @@ TestResults testMainFloat(const std::string& src, float target_return_val)
 		// Check JIT'd result.
 		if(!epsEqual(jitted_result, target_return_val))
 		{
-			stdErrPrint("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
-			assert(0);
-			exit(1);
+			failTest("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
 		}
 
 		VMState vmstate;
@@ -207,19 +206,12 @@ TestResults testMainFloat(const std::string& src, float target_return_val)
 		vmstate.func_args_start.pop_back();
 		
 		if(retval->valueType() != Value::ValueType_Float)
-		{
-			stdErrPrint("main() Return value was of unexpected type.");
-			assert(0);
-			exit(1);
-		}
+			failTest("main() Return value was of unexpected type.");
+
 		FloatValue* val = static_cast<FloatValue*>(retval.getPointer());
 
 		if(!epsEqual(val->value, target_return_val))
-		{
-			stdErrPrint("Test failed: main returned " + toString(val->value) + ", target was " + toString(target_return_val));
-			assert(0);
-			exit(1);
-		}
+			failTest("Test failed: main returned " + toString(val->value) + ", target was " + toString(target_return_val));
 
 		TestResults res;
 		res.stats = vm->getProgramStats();
@@ -228,8 +220,7 @@ TestResults testMainFloat(const std::string& src, float target_return_val)
 	}
 	catch(Winter::BaseException& e)
 	{
-		stdErrPrint(e.what());
-		assert(0);
+		failTest(e.what());
 		exit(1);
 	}
 }
@@ -261,9 +252,7 @@ void testMainFloatArgInvalidProgram(const std::string& src)
 
 		vm.getJittedFunction(mainsig);
 
-		stdErrPrint("Test failed: Expected compilation failure.");
-		assert(0);
-		exit(1);
+		failTest("Test failed: Expected compilation failure.");
 	}
 	catch(Winter::BaseException& e)
 	{
@@ -353,11 +342,7 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 
 		// Check JIT'd result.
 		if(!epsEqual(jitted_result, target_return_val))
-		{
-			stdErrPrint("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
-			assert(0);
-			exit(1);
-		}
+			failTest("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
 
 		testAssert(getCurrentHeapMemUsage() == 0);
 
@@ -414,19 +399,11 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 		vmstate.func_args_start.pop_back();
 		
 		if(retval->valueType() != Value::ValueType_Float)
-		{
-			stdErrPrint("main() Return value was of unexpected type.");
-			assert(0);
-			exit(1);
-		}
+			failTest("main() Return value was of unexpected type.");
 		FloatValue* val = static_cast<FloatValue*>(retval.getPointer());
 
 		if(!epsEqual(val->value, target_return_val))
-		{
-			stdErrPrint("Test failed: main returned " + toString(val->value) + ", target was " + toString(target_return_val));
-			assert(0);
-			exit(1);
-		}
+			failTest("Test failed: main returned " + toString(val->value) + ", target was " + toString(target_return_val));
 
 		//delete retval;
 
@@ -442,15 +419,23 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 				Winter::VirtualMachine::BuildOpenCLCodeArgs opencl_args;
 				std::string opencl_code = vm.buildOpenCLCodeCombined(opencl_args);
 
-				const std::string extended_source = opencl_code + "\n" + "__kernel void main_kernel(float x, __global float * const restrict output_buffer) { \n" +
+				std::string extended_source = opencl_code + "\n" + "__kernel void main_kernel(float x, __global float * const restrict output_buffer) { \n" +
 					"	output_buffer[0] = main_float_(x);		\n" +
 					" }";
 
-				if(DUMP_OPENCL_C_SOURCE)
+				if(false)
 				{
-					std::ofstream file("opencl_source.c");
-					file << extended_source;
-					conPrint("Dumped OpenCL C source to opencl_source.c.");
+					conPrint("!!!   USING SRC FROM test_opencl_source.c   !!!");
+					extended_source = FileUtils::readEntireFileTextMode("test_opencl_source.c");
+				}
+				else
+				{
+					if(DUMP_OPENCL_C_SOURCE)
+					{
+						std::ofstream file("opencl_source.c");
+						file << extended_source;
+						conPrint("Dumped OpenCL C source to opencl_source.c.");
+					}
 				}
 
 				const OpenCLDeviceRef device = ::getGlobalOpenCL()->getOpenCLDevices()[0];
@@ -465,17 +450,33 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 						extended_source,
 						context->getContext(),
 						devices,
-						"", // options
+						"", //"-cl-nv-verbose", // options
 						build_log
 					);
 				}
 				catch(Indigo::Exception& e)
 				{
-					conPrint("Build failed: " + e.what() + "\nbuild_log:\n" + build_log);
-					assert(0);
-					exit(1);
+					failTest("Build failed: " + e.what() + "\nbuild_log:\n" + build_log);
 				}
-				//conPrint("build_log: \n" + build_log);
+
+				
+				if(DUMP_OPENCL_C_SOURCE)
+				{
+					// Print build log:
+					const std::string log = ::getGlobalOpenCL()->getBuildLog(program->getProgram(), device->opencl_device_id);
+					conPrint("build_log: \n" + log);
+
+					// Dump program binary:
+					std::vector<OpenCLProgram::Binary> binaries;
+					program->getProgramBinaries(binaries);
+
+					for(size_t i=0; i<binaries.size(); ++i)
+					{
+						const std::string path = "binary_" + toString(i) + ".txt";
+						FileUtils::writeEntireFile(path, (const char*)binaries[i].data.data(), binaries[i].data.size());
+						conPrint("Wrote program binary to '" + path + "'.");
+					}
+				}
 
 				OpenCLKernelRef kernel = new OpenCLKernel(program->getProgram(), "main_kernel", device->opencl_device_id, /*profile=*/false);
 
@@ -508,11 +509,7 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 				const float opencl_result = host_output_buffer[0];
 
 				if(!epsEqual(opencl_result, target_return_val))
-				{
-					stdErrPrint("Test failed: OpenCL returned " + toString(opencl_result) + ", target was " + toString(target_return_val));
-					assert(0);
-					exit(1);
-				}
+					failTest("Test failed: OpenCL returned " + toString(opencl_result) + ", target was " + toString(target_return_val));
 			}
 #endif // #if WINTER_OPENCL_TESTS
 		}
@@ -524,16 +521,13 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 	}
 	catch(Winter::BaseException& e)
 	{
-		stdErrPrint(e.what());
-		assert(0);
-		exit(1);
+		failTest(e.what());
 	}
 	catch(Indigo::Exception& e)
 	{
-		stdErrPrint(e.what());
-		assert(0);
-		exit(1);
+		failTest(e.what());
 	}
+	exit(1);
 }
 
 
@@ -573,8 +567,7 @@ size_t getTimeBoundForMainFloatArg(const std::string& src, uint32 test_flags)
 	}
 	catch(Winter::BaseException& e)
 	{
-		stdErrPrint(e.what());
-		assert(0);
+		failTest(e.what());
 		exit(1);
 	}
 }
@@ -614,9 +607,7 @@ void testTimeBoundInvalidForMainFloatArg(const std::string& src, uint32 test_fla
 			GetTimeBoundParams params;
 			maindef->getTimeBound(params);
 
-			stdErrPrint("Error: expected getTimeBound() to throw an exception.");
-			assert(0);
-			exit(1);
+			failTest("Error: expected getTimeBound() to throw an exception.");
 		}
 		catch(Winter::BaseException& e)
 		{
@@ -626,9 +617,7 @@ void testTimeBoundInvalidForMainFloatArg(const std::string& src, uint32 test_fla
 	}
 	catch(Winter::BaseException& e)
 	{
-		stdErrPrint(e.what());
-		assert(0);
-		exit(1);
+		failTest(e.what());
 	}
 }
 
@@ -683,11 +672,7 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 
 		// Check JIT'd result.
 		if(!epsEqual(jitted_result, target_return_val))
-		{
-			stdErrPrint("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
-			assert(0);
-			exit(1);
-		}
+			failTest("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
 
 		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
@@ -698,19 +683,12 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 		vmstate.func_args_start.pop_back();
 		
 		if(retval->valueType() != Value::ValueType_Double)
-		{
-			stdErrPrint("main() Return value was of unexpected type.");
-			assert(0);
-			exit(1);
-		}
+			failTest("main() Return value was of unexpected type.");
+
 		DoubleValue* val = static_cast<DoubleValue*>(retval.getPointer());
 
 		if(!epsEqual(val->value, target_return_val))
-		{
-			stdErrPrint("Test failed: main returned " + toString(val->value) + ", target was " + toString(target_return_val));
-			assert(0);
-			exit(1);
-		}
+			failTest("Test failed: main returned " + toString(val->value) + ", target was " + toString(target_return_val));
 
 		//delete retval;
 
@@ -755,9 +733,7 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 				}
 				catch(Indigo::Exception& e)
 				{
-					conPrint("Build failed: " + e.what() + "\nbuild_log:\n" + build_log);
-					assert(0);
-					exit(1);
+					failTest("Build failed: " + e.what() + "\nbuild_log:\n" + build_log);
 				}
 				//conPrint("build_log: \n" + build_log);
 
@@ -795,9 +771,7 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 
 				if(!epsEqual(opencl_result, target_return_val))
 				{
-					stdErrPrint("Test failed: OpenCL returned " + toString(opencl_result) + ", target was " + toString(target_return_val));
-					assert(0);
-					exit(1);
+					failTest("Test failed: OpenCL returned " + toString(opencl_result) + ", target was " + toString(target_return_val));
 				}
 			}
 #endif // #if WINTER_OPENCL_TESTS
@@ -810,16 +784,13 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 	}
 	catch(Winter::BaseException& e)
 	{
-		stdErrPrint(e.what());
-		assert(0);
-		exit(1);
+		failTest(e.what());
 	}
 	catch(Indigo::Exception& e)
 	{
-		stdErrPrint(e.what());
-		assert(0);
-		exit(1);
+		failTest(e.what());
 	}
+	exit(1);
 }
 
 
@@ -883,11 +854,7 @@ void testMainInteger(const std::string& src, int target_return_val)
 
 		// Check JIT'd result.
 		if(jitted_result != target_return_val)
-		{
-			stdErrPrint("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
-			assert(0);
-			exit(1);
-		}
+			failTest("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
 
 		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
@@ -897,28 +864,18 @@ void testMainInteger(const std::string& src, int target_return_val)
 		vmstate.func_args_start.pop_back();
 		
 		if(retval->valueType() != Value::ValueType_Int)
-		{
-			stdErrPrint("main() Return value was of unexpected type.");
-			assert(0);
-			exit(1);
-		}
+			failTest("main() Return value was of unexpected type.");
 		IntValue* val = static_cast<IntValue*>(retval.getPointer());
 
 		if(val->value != target_return_val)
-		{
-			stdErrPrint("Test failed: main returned " + toString(val->value) + ", target was " + toString(target_return_val));
-			assert(0);
-			exit(1);
-		}
+			failTest("Test failed: main returned " + toString(val->value) + ", target was " + toString(target_return_val));
 
 		//delete retval;
 
 	}
 	catch(Winter::BaseException& e)
 	{
-		stdErrPrint(e.what());
-		assert(0);
-		exit(1);
+		failTest(e.what());
 	}
 }
 
@@ -963,11 +920,7 @@ void testMainStringArg(const std::string& src, const std::string& arg, const std
 
 			// Check JIT'd result.
 			if(jitted_result->toStdString() != target_return_val)
-			{
-				stdErrPrint("Test failed: JIT'd main returned " + jitted_result->toStdString() + ", target was " + target_return_val);
-				assert(0);
-				exit(1);
-			}
+				failTest("Test failed: JIT'd main returned " + jitted_result->toStdString() + ", target was " + target_return_val);
 
 			testAssert(arg_string_ref->getRefCount() == 1);
 			testAssert(jitted_result->getRefCount() == 1);
@@ -1030,31 +983,21 @@ void testMainStringArg(const std::string& src, const std::string& arg, const std
 		vmstate.func_args_start.pop_back();
 		
 		if(retval->valueType() != Value::ValueType_String)
-		{
-			stdErrPrint("main() Return value was of unexpected type.");
-			assert(0);
-			exit(1);
-		}
+			failTest("main() Return value was of unexpected type.");
+
 		StringValue* val = static_cast<StringValue*>(retval.getPointer());
 
 		if(val->value != target_return_val)
-		{
-			stdErrPrint("Test failed: main returned " + val->value + ", target was " + target_return_val);
-			assert(0);
-			exit(1);
-		}
+			failTest("Test failed: main returned " + val->value + ", target was " + target_return_val);
 	}
 	catch(Winter::BaseException& e)
 	{
-		stdErrPrint(e.what());
-		assert(0);
-		exit(1);
+		failTest(e.what());
+
 	}
 	catch(Indigo::Exception& e)
 	{
-		stdErrPrint(e.what());
-		assert(0);
-		exit(1);
+		failTest(e.what());
 	}
 }
 
@@ -1089,11 +1032,7 @@ TestResults testMainIntegerArg(const std::string& src, int x, int target_return_
 
 		// Check JIT'd result.
 		if(jitted_result != target_return_val)
-		{
-			stdErrPrint("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
-			assert(0);
-			exit(1);
-		}
+			failTest("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
 
 		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
@@ -1104,19 +1043,12 @@ TestResults testMainIntegerArg(const std::string& src, int x, int target_return_
 		vmstate.func_args_start.pop_back();
 		
 		if(retval->valueType() != Value::ValueType_Int)
-		{
-			stdErrPrint("main() Return value was of unexpected type.");
-			assert(0);
-			exit(1);
-		}
+			failTest("main() Return value was of unexpected type.");
+
 		IntValue* val = static_cast<IntValue*>(retval.getPointer());
 
 		if(val->value != target_return_val)
-		{
-			stdErrPrint("Test failed: main returned " + toString(val->value) + ", target was " + toString(target_return_val));
-			assert(0);
-			exit(1);
-		}
+			failTest("Test failed: main returned " + toString(val->value) + ", target was " + toString(target_return_val));
 
 		//============================= New: test with OpenCL ==============================
 		if(!(test_flags & INVALID_OPENCL))
@@ -1157,8 +1089,6 @@ TestResults testMainIntegerArg(const std::string& src, int x, int target_return_
 				catch(Indigo::Exception& e)
 				{
 					conPrint("Build failed: " + e.what() + "\nbuild_log:\n" + build_log);
-					assert(0);
-					exit(1);
 				}
 				//conPrint("build_log: \n" + build_log);
 
@@ -1194,11 +1124,7 @@ TestResults testMainIntegerArg(const std::string& src, int x, int target_return_
 				const int opencl_result = host_output_buffer[0];
 
 				if(opencl_result != target_return_val)
-				{
-					stdErrPrint("Test failed: OpenCL returned " + toString(opencl_result) + ", target was " + toString(target_return_val));
-					assert(0);
-					exit(1);
-				}
+					failTest("Test failed: OpenCL returned " + toString(opencl_result) + ", target was " + toString(target_return_val));
 			}
 #endif // #if WINTER_OPENCL_TESTS
 		}
@@ -1210,16 +1136,13 @@ TestResults testMainIntegerArg(const std::string& src, int x, int target_return_
 	}
 	catch(Winter::BaseException& e)
 	{
-		stdErrPrint(e.what());
-		assert(0);
-		exit(1);
+		failTest(e.what());
 	}
 	catch(Indigo::Exception& e)
 	{
-		stdErrPrint(e.what());
-		assert(0);
-		exit(1);
+		failTest(e.what());
 	}
+	exit(1);
 }
 
 
@@ -1256,11 +1179,7 @@ void testMainInt64Arg(const std::string& src, int64 x, int64 target_return_val, 
 
 		// Check JIT'd result.
 		if(jitted_result != target_return_val)
-		{
-			stdErrPrint("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
-			assert(0);
-			exit(1);
-		}
+			failTest("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
 
 
 		testAssert(getCurrentHeapMemUsage() == 0);
@@ -1317,31 +1236,19 @@ void testMainInt64Arg(const std::string& src, int64 x, int64 target_return_val, 
 		vmstate.func_args_start.pop_back();
 		
 		if(retval->valueType() != Value::ValueType_Int)
-		{
-			stdErrPrint("main() Return value was of unexpected type.");
-			assert(0);
-			exit(1);
-		}
+			failTest("main() Return value was of unexpected type.");
 		IntValue* val = static_cast<IntValue*>(retval.getPointer());
 
 		if(val->value != target_return_val)
-		{
-			stdErrPrint("Test failed: main returned " + toString(val->value) + ", target was " + toString(target_return_val));
-			assert(0);
-			exit(1);
-		}
+			failTest("Test failed: main returned " + toString(val->value) + ", target was " + toString(target_return_val));
 	}
 	catch(Winter::BaseException& e)
 	{
-		stdErrPrint(e.what());
-		assert(0);
-		exit(1);
+		failTest(e.what());
 	}
 	catch(Indigo::Exception& e)
 	{
-		stdErrPrint(e.what());
-		assert(0);
-		exit(1);
+		failTest(e.what());
 	}
 }
 
@@ -1372,11 +1279,7 @@ void testMainInt16Arg(const std::string& src, int16 x, int16 target_return_val, 
 
 		// Check JIT'd result.
 		if(jitted_result != target_return_val)
-		{
-			stdErrPrint("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
-			assert(0);
-			exit(1);
-		}
+			failTest("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
 
 		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
@@ -1387,31 +1290,19 @@ void testMainInt16Arg(const std::string& src, int16 x, int16 target_return_val, 
 		vmstate.func_args_start.pop_back();
 		
 		if(retval->valueType() != Value::ValueType_Int)
-		{
-			stdErrPrint("main() Return value was of unexpected type.");
-			assert(0);
-			exit(1);
-		}
+			failTest("main() Return value was of unexpected type.");
 		IntValue* val = static_cast<IntValue*>(retval.getPointer());
 
 		if(val->value != target_return_val)
-		{
-			stdErrPrint("Test failed: main returned " + toString(val->value) + ", target was " + toString(target_return_val));
-			assert(0);
-			exit(1);
-		}
+			failTest("Test failed: main returned " + toString(val->value) + ", target was " + toString(target_return_val));
 	}
 	catch(Winter::BaseException& e)
 	{
-		stdErrPrint(e.what());
-		assert(0);
-		exit(1);
+		failTest(e.what());
 	}
 	catch(Indigo::Exception& e)
 	{
-		stdErrPrint(e.what());
-		assert(0);
-		exit(1);
+		failTest(e.what());
 	}
 }
 
@@ -1442,11 +1333,7 @@ void testMainUInt32Arg(const std::string& src, uint32 x, uint32 target_return_va
 
 		// Check JIT'd result.
 		if(jitted_result != target_return_val)
-		{
-			stdErrPrint("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
-			assert(0);
-			exit(1);
-		}
+			failTest("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
 
 		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
@@ -1457,31 +1344,19 @@ void testMainUInt32Arg(const std::string& src, uint32 x, uint32 target_return_va
 		vmstate.func_args_start.pop_back();
 		
 		if(retval->valueType() != Value::ValueType_Int)
-		{
-			stdErrPrint("main() Return value was of unexpected type.");
-			assert(0);
-			exit(1);
-		}
+			failTest("main() Return value was of unexpected type.");
 		IntValue* val = static_cast<IntValue*>(retval.getPointer());
 
 		if(val->value != target_return_val)
-		{
-			stdErrPrint("Test failed: main returned " + toString(val->value) + ", target was " + toString(target_return_val));
-			assert(0);
-			exit(1);
-		}
+			failTest("Test failed: main returned " + toString(val->value) + ", target was " + toString(target_return_val));
 	}
 	catch(Winter::BaseException& e)
 	{
-		stdErrPrint(e.what());
-		assert(0);
-		exit(1);
+		failTest(e.what());
 	}
 	catch(Indigo::Exception& e)
 	{
-		stdErrPrint(e.what());
-		assert(0);
-		exit(1);
+		failTest(e.what());
 	}
 }
 
@@ -1507,11 +1382,7 @@ void testMainBoolArg(const std::string& src, bool x, bool target_return_val, uin
 
 		// Check JIT'd result.
 		if(jitted_result != target_return_val)
-		{
-			stdErrPrint("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
-			assert(0);
-			exit(1);
-		}
+			failTest("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
 
 		VMState vmstate;
 		vmstate.func_args_start.push_back(0);
@@ -1521,31 +1392,21 @@ void testMainBoolArg(const std::string& src, bool x, bool target_return_val, uin
 		vmstate.func_args_start.pop_back();
 		
 		if(retval->valueType() != Value::ValueType_Bool)
-		{
-			stdErrPrint("main() Return value was of unexpected type.");
-			assert(0);
-			exit(1);
-		}
+			failTest("main() Return value was of unexpected type.");
+
 		BoolValue* val = static_cast<BoolValue*>(retval.getPointer());
 
 		if(val->value != target_return_val)
-		{
-			stdErrPrint("Test failed: main returned " + toString(val->value) + ", target was " + toString(target_return_val));
-			assert(0);
-			exit(1);
-		}
+			failTest("Test failed: main returned " + toString(val->value) + ", target was " + toString(target_return_val));
+
 	}
 	catch(Winter::BaseException& e)
 	{
-		stdErrPrint(e.what());
-		assert(0);
-		exit(1);
+		failTest(e.what());
 	}
 	catch(Indigo::Exception& e)
 	{
-		stdErrPrint(e.what());
-		assert(0);
-		exit(1);
+		failTest(e.what());
 	}
 }
 
@@ -1569,9 +1430,7 @@ void testMainIntegerArgInvalidProgram(const std::string& src)
 
 		vm.getJittedFunction(mainsig);
 
-		stdErrPrint("Test failed: Expected compilation failure.");
-		assert(0);
-		exit(1);
+		failTest("Test failed: Expected compilation failure.");
 	}
 	catch(Winter::BaseException& e)
 	{
@@ -1648,11 +1507,8 @@ void testMainStruct(const std::string& src, const StructType& target_return_val)
 
 		// Check JIT'd result.
 		if(!(jitted_result == target_return_val)) //!epsEqual(jitted_result, target_return_val))
-		{
-			stdErrPrint("Test failed: jitted_result != target_return_val");
-			assert(0);
-			exit(1);
-		}
+			failTest("Test failed: jitted_result != target_return_val");
+
 
 		/*VMState vmstate;
 		vmstate.func_args_start.push_back(0);
@@ -1679,9 +1535,7 @@ void testMainStruct(const std::string& src, const StructType& target_return_val)
 	}
 	catch(Winter::BaseException& e)
 	{
-		stdErrPrint(e.what());
-		assert(0);
-		exit(1);
+		failTest(e.what());
 	}
 }
 
@@ -1734,11 +1588,7 @@ void testMainStructInputAndOutput(const std::string& src, const InStructType& st
 
 		// Check JIT'd result.
 		if(!(jitted_result == target_return_val))
-		{
-			stdErrPrint("Test failed: jitted_result != target_return_val");
-			assert(0);
-			exit(1);
-		}
+			failTest("Test failed: jitted_result != target_return_val");
 
 		/*VMState vmstate;
 		vmstate.func_args_start.push_back(0);
@@ -1765,9 +1615,7 @@ void testMainStructInputAndOutput(const std::string& src, const InStructType& st
 	}
 	catch(Winter::BaseException& e)
 	{
-		stdErrPrint(e.what());
-		assert(0);
-		exit(1);
+		failTest(e.what());
 	}
 }
 
@@ -1867,9 +1715,7 @@ void testFloat4StructPairRetFloat(const std::string& src, const Float4StructPair
 		// Check JIT'd result.
 		if(!epsEqual(jitted_result, target_return_val))
 		{
-			stdErrPrint("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
-			assert(0);
-			exit(1);
+			failTest("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
 		}
 
 		/*VMState vmstate;
@@ -1897,9 +1743,7 @@ void testFloat4StructPairRetFloat(const std::string& src, const Float4StructPair
 	}
 	catch(Winter::BaseException& e)
 	{
-		stdErrPrint(e.what());
-		assert(0);
-		exit(1);
+		failTest(e.what());
 	}
 }
 
@@ -1954,11 +1798,7 @@ void testVectorInStruct(const std::string& src, const StructWithVec& struct_in, 
 
 		// Check JIT'd result.
 		if(!epsEqual(jitted_result, target_return_val))
-		{
-			stdErrPrint("Test failed: JIT'd main returned value != expected.");
-			assert(0);
-			exit(1);
-		}
+			failTest("Test failed: JIT'd main returned value != expected.");
 
 		/*VMState vmstate;
 		vmstate.func_args_start.push_back(0);
@@ -1985,9 +1825,7 @@ void testVectorInStruct(const std::string& src, const StructWithVec& struct_in, 
 	}
 	catch(Winter::BaseException& e)
 	{
-		stdErrPrint(e.what());
-		assert(0);
-		exit(1);
+		failTest(e.what());
 	}
 }
 
@@ -2039,17 +1877,11 @@ void testFloat4Struct(const std::string& src, const Float4Struct& a, const Float
 
 		// Check JIT'd result.
 		if(!epsEqual(jitted_result, target_return_val))
-		{
-			stdErrPrint("Test failed: JIT'd main returned different value than target.");
-			assert(0);
-			exit(1);
-		}
+			failTest("Test failed: JIT'd main returned different value than target.");
 	}
 	catch(Winter::BaseException& e)
 	{
-		stdErrPrint(e.what());
-		assert(0);
-		exit(1);
+		failTest(e.what());
 	}
 }
 
@@ -2100,17 +1932,11 @@ void testFloat8Struct(const std::string& src, const Float8Struct& a, const Float
 
 		// Check JIT'd result.
 		if(!epsEqual(jitted_result, target_return_val))
-		{
-			stdErrPrint("Test failed: jitted_result != target_return_val");
-			assert(0);
-			exit(1);
-		}
+			failTest("Test failed: jitted_result != target_return_val");
 	}
 	catch(Winter::BaseException& e)
 	{
-		stdErrPrint(e.what());
-		assert(0);
-		exit(1);
+		failTest(e.what());
 	}
 }
 
@@ -2154,17 +1980,13 @@ void testIntArray(const std::string& src, const int* a, const int* b, const int*
 				stdErrPrint("Test failed: jitted_result[i] != target_return_val[i]");
 				stdErrPrint("i: " + toString(i));
 				stdErrPrint("jitted_result[i]: " + toString(jitted_result[i]));
-				stdErrPrint("target_return_val[i]: " + toString(target_return_val[i]));
-				assert(0);
-				exit(1);
+				failTest("target_return_val[i]: " + toString(target_return_val[i]));
 			}
 		}
 	}
 	catch(Winter::BaseException& e)
 	{
-		stdErrPrint(e.what());
-		assert(0);
-		exit(1);
+		failTest(e.what());
 	}
 }
 
@@ -2213,18 +2035,12 @@ void testFloatArray(const std::string& src, const float* a, const float* b, cons
 		for(size_t i=0; i<len; ++i)
 		{
 			if(!epsEqual(jitted_result[i], target_return_val[i]))
-			{
-				stdErrPrint("Test failed: jitted_result != target_return_val  ");
-				assert(0);
-				exit(1);
-			}
+				failTest("Test failed: jitted_result != target_return_val  ");
 		}
 	}
 	catch(Winter::BaseException& e)
 	{
-		stdErrPrint(e.what());
-		assert(0);
-		exit(1);
+		failTest(e.what());
 	}
 }
 

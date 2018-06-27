@@ -321,6 +321,22 @@ static void testFunctionInlining()
 	// ===================================================================
 	Winter::TestResults results;
 
+	/*
+	Check that clamp is not inlined, since it duplicates an expensive arg.
+	max gets inlined into clmap, so we have
+	def clamp(real x, real lo, real hi) real : min(hi, if(x > lo, x, lo))			   \n\
+	so arg x appears twice
+	*/
+	results = testMainFloatArg(
+		"def min(real a, real b) real : if(a < b, a, b)							   \n\
+		def max(real a, real b) real : if(a > b, a, b)							   \n\
+		def clamp(real x, real lo, real hi) real : min(hi, max(x, lo))			   \n\
+		def main(float x) float : clamp(sin(x), 0.f, 1.f)", 0.3f, std::sin(0.3f));
+	testAssert(results.maindef->body->nodeType() == ASTNode::FunctionExpressionType);
+	testAssert(results.maindef->body.downcastToPtr<FunctionExpression>()->static_function_name == "clamp");
+
+
+
 	// A function that has a body which is just a function call should be inlined.
 	results = testMainFloatArg("def f1(float z) !noinline float : z*z						\n\
 		def f2(float z) float : f1(z)										\n\

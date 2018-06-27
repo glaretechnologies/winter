@@ -1904,7 +1904,6 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 
 	std::set<TupleTypeRef, TypeRefLessThan> emitted_tuples;
 	std::string struct_def_code = this->vm_args.comments_in_opencl_output ? "// OpenCL structure definitions for Winter structs and tuples, from VirtualMachine::buildOpenCLCode()\n" : "";
-	std::string constructor_code = "// Constructor OpenCL code, from VirtualMachine::buildOpenCLCode()\n";
 
 	// Spit out structure definitions and constructors
 	for(size_t i = 0; i != named_types_ordered.size(); ++i)
@@ -1924,7 +1923,6 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 			}
 
 			struct_def_code += struct_type->getOpenCLCDefinition(params, vm_args.comments_in_opencl_output); // Emit structure definition
-			constructor_code += struct_type->getOpenCLCConstructor(params, vm_args.comments_in_opencl_output);
 		}
 
 	// Spit out any remaining tuple definitions
@@ -1932,7 +1930,6 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 		if(!ContainerUtils::contains(emitted_tuples, *i)) // If not emitted yet:
 		{
 			struct_def_code += (*i)->getOpenCLCDefinition(vm_args.comments_in_opencl_output);
-			constructor_code += (*i)->getOpenCLCConstructor(vm_args.comments_in_opencl_output);
 			emitted_tuples.insert(*i); // Add to set of emitted tuples
 		}
 
@@ -1940,7 +1937,6 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 		if(!ContainerUtils::contains(emitted_tuples, *i)) // If not emitted yet:
 		{
 			struct_def_code += (*i)->getOpenCLCDefinition(vm_args.comments_in_opencl_output);
-			constructor_code += (*i)->getOpenCLCConstructor(vm_args.comments_in_opencl_output);
 			emitted_tuples.insert(*i); // Add to set of emitted tuples
 		}
 
@@ -2057,7 +2053,7 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 	built_in_func_code += "// End Winter built-in functions\n";
 
 	res.struct_def_code = struct_def_code;
-	res.function_code = constructor_code + "\n\n" + built_in_func_code + "\n\n" + params.file_scope_code + "\n\n" + top_level_def_src;
+	res.function_code = built_in_func_code + "\n\n" + params.file_scope_code + "\n\n" + top_level_def_src;
 	return res;
 }
 

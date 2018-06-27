@@ -107,64 +107,38 @@ std::string TupleLiteral::sourceString() const
 	return s;
 }
 
-/*
-Generate something like
 
-struct
-{
-	float field_0;
-	float field_1;
-} temp_xx;
-
-temp_xx.field_0 = 1;
-temp_xx.field_1 = 2;
-
-*/
 std::string TupleLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
 	const Reference<TupleType> t = this->type().downcast<TupleType>();
 
 	params.tuple_types_used.insert(t);
 
-	const std::string struct_var_name = "tuple_" + toString(params.uid++);
+	/*
+	[1.0, 2.0, 3.0]t
+
+	will be emitted as something like, using compound literals:
+
+	(tuple_float_float_float) { 1.0, 2.0, 3.0 }
 	
-	// struct { float e0; float e1; } temp_xx;
-	/*std::string s = "struct { ";
-
-	for(size_t i=0; i<t->component_types.size(); ++i)
-	{
-		s += t->component_types[i]->OpenCLCType() + " field_" + ::toString(i) + "; ";
-	}
-
-	s += "} " + struct_var_name + ";\n";*/
-	std::string s = t->OpenCLCType() + " " + struct_var_name + ";\n";
-
-
+	*/
+	std::string statements;
+	std::string s = "(" + t->OpenCLCType() + "){";
 	for(size_t i=0; i<elements.size(); ++i)
 	{
-		// Emit code for let variable
 		params.blocks.push_back("");
 		const std::string elem_expression = this->elements[i]->emitOpenCLC(params);
-		StringUtils::appendTabbed(s, params.blocks.back(), 1);
+		StringUtils::appendTabbed(statements, params.blocks.back(), 1);
 		params.blocks.pop_back();
 
-		s += struct_var_name + ".field_" + toString(i) + " = " + elem_expression + ";\n";
-	}
-	params.blocks.back() += s;
-
-	return struct_var_name;
-
-	/*const std::string constructor_name = t.downcast<TupleType>()->OpenCLCType() + "_cnstr";
-
-	std::string s = constructor_name + "(";
-	for(size_t i=0; i<elements.size(); ++i)
-	{
-		s += elements[i]->emitOpenCLC(params);
+		s += elem_expression;
 		if(i + 1 < elements.size())
 			s += ", ";
 	}
-	s += ")";
-	return s;*/
+	s += "}";
+
+	params.blocks.back() += statements;
+	return s;
 }
 
 
