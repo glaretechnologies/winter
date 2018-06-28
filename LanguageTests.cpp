@@ -3871,6 +3871,14 @@ static void testLambdaExpressionsAndClosures()
 
 static void testStructs()
 {
+	// Test construction of a structure (ComplexPair) using a structure passed as an arg (Complex).
+	// Exposed an issue with OpenCL and arg dereferencing.
+	testMainFloatArg("struct Complex { float re, float im }		\n\
+		struct ComplexPair { Complex a, Complex b }		\n\
+		def f(Complex c) !noinline ComplexPair : ComplexPair(c, c)		\n\
+ 		def main(float x) float : f(Complex(x, 3.0)).a.im", 1.0f, 3.0f);
+
+
 	// Test creation of struct
 	{
 		Float4Struct a(1.0f, -2.0f, 3.0f, -4.0f);

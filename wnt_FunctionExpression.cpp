@@ -1752,7 +1752,10 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 		std::string s = "(" + this->type()->OpenCLCType() + ") {";
 		for(unsigned int i=0; i<argument_expressions.size(); ++i)
 		{
+			if((argument_expressions[i]->nodeType() == ASTNode::VariableASTNodeType) && (argument_expressions[i].downcastToPtr<Variable>()->binding_type == Variable::ArgumentVariable) && argument_expressions[i]->type()->OpenCLPassByPointer())
+				s += "*"; // Will need to deref pointer args.
 			s += argument_expressions[i]->emitOpenCLC(params);
+
 			if(i + 1 < argument_expressions.size())
 				s += ", ";
 		}
