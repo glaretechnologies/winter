@@ -1281,7 +1281,7 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 				file << linker.top_level_defs[i]->sourceString() << "\n\n";
 		}*/
 
-		bool changed = inline_change || dce_change;
+		bool changed = inline_change || dce_change || simplify_if_change;
 		if(!changed)
 			break;
 	}
