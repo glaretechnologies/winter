@@ -523,6 +523,7 @@ void checkInlineExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector
 					e->traverse(temp_payload, stack);
 				}
 				// Do a CountArgumentRefs pass as the ref counts may have changed.  This will count the number of references to each function argument in the body of each function.
+				if(!payload.func_def_stack.empty())
 				{
 					// Run on this entire function, so we zero out the counts when traverse the FunctionDef.
 					TraversalPayload temp_payload(TraversalPayload::CountArgumentRefs);
