@@ -1742,9 +1742,13 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 		else
 			return "abs(" + argument_expressions[0]->emitOpenCLC(params) + ")";*/
 	}
-	else if(static_target_function && static_target_function->built_in_func_impl.nonNull() &&
+	/*else if(static_target_function && static_target_function->built_in_func_impl.nonNull() &&
 		(static_target_function->built_in_func_impl->builtInType() == BuiltInFunctionImpl::BuiltInType_Constructor))
 	{
+		// NOTE: Unforunately this code crashes the AMD OpenCL C compiler, see
+		// https://community.amd.com/message/2867567
+		// So we can't use this approach for now.
+
 		// Struct constructor: for this we will emit a 'compound literal' expression such as 
 		// b = (struct point) { 5, 6 };
 		// (See http://nickdesaulniers.github.io/blog/2013/07/25/designated-initialization-with-pointers-in-c/)
@@ -1761,7 +1765,7 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 		}
 		s += "}";
 		return s;
-	}
+	}*/
 	else
 	{
 		//std::string use_func_name;

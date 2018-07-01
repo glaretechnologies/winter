@@ -51,7 +51,8 @@ public:
 		SumTypeType,
 		ErrorTypeType,
 		TupleTypeType,
-		OpaqueStructureTypeType
+		OpaqueStructureTypeType,
+		OpenCLImageTypeType
 	};
 
 	Type(TypeType t) : type(t) {}
@@ -476,6 +477,7 @@ public:
 
 	const std::string definitionString() const; // Winter definition string, e.g "struct a { float b }"
 	const std::string getOpenCLCDefinition(EmitOpenCLCodeParams& params, bool emit_comments) const; // Get full definition string, e.g. "struct a { float b; };"
+	const std::string getOpenCLCConstructor(EmitOpenCLCodeParams& params, bool emit_comments) const; // Emit constructor for type
 
 	std::vector<Reference<TupleType> > getElementTupleTypes() const;
 
@@ -529,6 +531,7 @@ public:
 	virtual bool passByValue() const { return false; }
 
 	const std::string getOpenCLCDefinition(bool emit_comments) const; // Get full definition string, e.g. struct a { float b; };
+	const std::string getOpenCLCConstructor(bool emit_comments) const; // Emit constructor for type
 
 	virtual void emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const;
 	virtual void emitDecrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const;
@@ -708,6 +711,45 @@ public:
 	virtual size_t memSize() const { return 0; }
 
 	std::string name;
+};
+
+
+class OpenCLImageType : public Type
+{
+public:
+	enum ImageType
+	{
+		ImageType_Image2D,
+		ImageType_Image3D,
+		ImageType_Image2DArray,
+		ImageType_Image1D,
+		ImageType_Image1DBuffer,
+		ImageType_Image1DArray
+	};
+	OpenCLImageType(ImageType image_type);
+
+	virtual const std::string toString() const;
+	virtual bool lessThan(const Type& b) const
+	{
+		if(getType() < b.getType())
+			return true;
+		else if(b.getType() < getType())
+			return false;
+		else
+		{
+			// else b is a OpenCLImageType as well
+			const OpenCLImageType& b_struct = static_cast<const OpenCLImageType&>(b);
+
+			return this->image_type < b_struct.image_type;
+		}
+	}
+	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
+	virtual llvm::Type* LLVMType(llvm::Module& module) const;
+	virtual const std::string OpenCLCType() const;
+	virtual bool OpenCLPassByPointer() const { return false; }
+	virtual size_t memSize() const { return 0; }
+
+	ImageType image_type;
 };
 
 
