@@ -114,31 +114,58 @@ std::string TupleLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 	params.tuple_types_used.insert(t);
 
-	/*
-	[1.0, 2.0, 3.0]t
-
-	will be emitted as something like, using compound literals:
-
-	(tuple_float_float_float) { 1.0, 2.0, 3.0 }
-	
-	*/
-	std::string statements;
-	std::string s = "(" + t->OpenCLCType() + "){";
-	for(size_t i=0; i<elements.size(); ++i)
+	if(false)
 	{
-		params.blocks.push_back("");
-		const std::string elem_expression = this->elements[i]->emitOpenCLC(params);
-		StringUtils::appendTabbed(statements, params.blocks.back(), 1);
-		params.blocks.pop_back();
+		// NOTE: Unforunately this code (using compound literals) crashes the AMD OpenCL C compiler, see
+		// https://community.amd.com/message/2867567
+		// So we can't use this approach for now.
 
-		s += elem_expression;
-		if(i + 1 < elements.size())
-			s += ", ";
+		/*
+		[1.0, 2.0, 3.0]t
+
+		will be emitted as something like, using compound literals:
+
+		(tuple_float_float_float) { 1.0, 2.0, 3.0 }
+
+		*/
+		std::string statements;
+		std::string s = "(" + t->OpenCLCType() + "){";
+		for(size_t i=0; i<elements.size(); ++i)
+		{
+			params.blocks.push_back("");
+			const std::string elem_expression = this->elements[i]->emitOpenCLC(params);
+			StringUtils::appendTabbed(statements, params.blocks.back(), 1);
+			params.blocks.pop_back();
+
+			s += elem_expression;
+			if(i + 1 < elements.size())
+				s += ", ";
+		}
+		s += "}";
+
+		params.blocks.back() += statements;
+		return s;
 	}
-	s += "}";
+	else
+	{
+		const std::string struct_var_name = "tuple_" + toString(params.uid++);
+	
+		std::string s = t->OpenCLCType() + " " + struct_var_name + ";\n";
 
-	params.blocks.back() += statements;
-	return s;
+		for(size_t i=0; i<elements.size(); ++i)
+		{
+			// Emit code for let variable
+			params.blocks.push_back("");
+			const std::string elem_expression = this->elements[i]->emitOpenCLC(params);
+			StringUtils::appendTabbed(s, params.blocks.back(), 1);
+			params.blocks.pop_back();
+
+			s += struct_var_name + ".field_" + toString(i) + " = " + elem_expression + ";\n";
+		}
+		params.blocks.back() += s;
+
+		return struct_var_name;
+	}
 }
 
 
