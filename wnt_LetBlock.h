@@ -56,4 +56,7 @@ public:
 };
 
 
+typedef Reference<LetBlock> LetBlockRef;
+
+
 } //end namespace Winter

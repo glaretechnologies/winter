@@ -47,7 +47,10 @@ void doTestAssert(bool expr, const char* test, long line, const char* file)
 {
 	if(!expr)
 	{
-		conPrint("Test assertion failed: " + std::string(file) + ", line " + toString((int)line) + ":\n" + std::string(test));
+		stdErrPrint("Test assertion failed: " + std::string(file) + ", line " + toString((int)line) + ":\n" + std::string(test));
+#if defined(_WIN32)
+		__debugbreak();
+#endif
 		exit(1);
 	}
 }
@@ -4463,6 +4466,22 @@ static void testIfSimplification()
 	ArrayLiteralRef array_lit = results.maindef->body.downcast<FunctionExpression>()->argument_expressions[0].downcast<ArrayLiteral>();
 	testAssert(array_lit->getElements().size() == 1);
 	testAssert(array_lit->getElements()[0]->nodeType() == ASTNode::MulExpressionType);
+
+	// Test in let var expr
+	results = testMainFloatArg("def main(float x) float : let a = (if true then x*3.1 else x+2.0) in a", 1.f, 3.1f);
+	{
+		testAssert(results.maindef->body->nodeType() == ASTNode::LetBlockType);
+		LetBlockRef let_block = results.maindef->body.downcast<LetBlock>();
+		testAssert(let_block->lets.size() == 1 && let_block->lets[0]->expr->nodeType() == ASTNode::MulExpressionType);
+	}
+
+	// Test in let block body
+	results = testMainFloatArg("def main(float x) float : let a = x in (if true then a*3.1 else a+2.0)", 1.f, 3.1f);
+	{
+		testAssert(results.maindef->body->nodeType() == ASTNode::LetBlockType);
+		LetBlockRef let_block = results.maindef->body.downcast<LetBlock>();
+		testAssert(let_block->expr->nodeType() == ASTNode::MulExpressionType);
+	}
 }
 
 
