@@ -38,6 +38,14 @@ static const bool DUMP_OPENCL_C_SOURCE = false; // Dumps to opencl_source.c
 static const bool PRINT_MEM_BOUNDS_AND_USAGE = false;
 
 
+// Checking stack size usage doesn't seem to be working properly on macOS yet.
+#if defined(OSX)
+static const bool CHECK_STACK_USAGE = false;
+#else
+static const bool CHECK_STACK_USAGE = true;
+#endif
+
+
 // OpenCL:
 #if WINTER_OPENCL_TESTS
 #include <opencl/OpenCL.h>
@@ -365,7 +373,7 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 			}
 			
 			testAssert(getMaxHeapMemUsage() <= total_allowed_heap);
-			testAssert(touched_stack_size <= space_bounds.stack_space);
+			if(CHECK_STACK_USAGE) testAssert(touched_stack_size <= space_bounds.stack_space);
 		}
 		catch(BaseException& e)
 		{
@@ -950,7 +958,7 @@ void testMainStringArg(const std::string& src, const std::string& arg, const std
 			}
 			
 			testAssert(getMaxHeapMemUsage() <= total_allowed_heap);
-			testAssert(touched_stack_size <= space_bounds.stack_space);
+			if(CHECK_STACK_USAGE) testAssert(touched_stack_size <= space_bounds.stack_space);
 		}
 		catch(BaseException& e)
 		{
@@ -1203,7 +1211,7 @@ void testMainInt64Arg(const std::string& src, int64 x, int64 target_return_val, 
 			}
 			
 			testAssert(getMaxHeapMemUsage() <= total_allowed_heap);
-			testAssert(touched_stack_size <= space_bounds.stack_space);
+			if(CHECK_STACK_USAGE) testAssert(touched_stack_size <= space_bounds.stack_space);
 		}
 		catch(BaseException& e)
 		{
