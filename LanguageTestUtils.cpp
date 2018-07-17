@@ -86,6 +86,15 @@ In this case, sp - 6 contains the lowest byte that is not 0xEE.
 	
 	*/
 
+
+// Stack marking stuff is causing a crash on macOS currently.
+#if defined(OSX)
+
+#define MARK_STACK
+#define GET_TOUCHED_STACK_SIZE(touched_stack_size_out) touched_stack_size_out = 0;
+
+#else
+
 static const int MARKED_ZONE_SIZE = 1000;
 
 // Put some special byte patterns on the stack
@@ -108,6 +117,8 @@ for(uint8* p = _sp - MARKED_ZONE_SIZE; p < _sp; ++p)	\
 		break;											\
 	}													\
 }
+
+#endif
 
 
 // Returns the stack pointer (value in RSP register) of the calling function.
