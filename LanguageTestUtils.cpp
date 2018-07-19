@@ -308,6 +308,7 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 		vm_args.floating_point_literals_default_to_double = false;
 		vm_args.try_coerce_int_to_double_first = false;
 		vm_args.real_is_double = false;
+		vm_args.opencl_double_support = false; // This will allow this test to run on an OpenCL device without double fp support.
 
 		if(test_flags & INCLUDE_EXTERNAL_MATHS_FUNCS)
 			MathsFuncs::appendExternalMathsFuncs(vm_args.external_functions);
@@ -651,6 +652,7 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 		vm_args.allow_unsafe_operations = (test_flags & ALLOW_UNSAFE) != 0;
 		vm_args.floating_point_literals_default_to_double = true;
 		vm_args.real_is_double = true;
+		vm_args.opencl_double_support = true;
 
 		if(test_flags & INCLUDE_EXTERNAL_MATHS_FUNCS)
 			MathsFuncs::appendExternalMathsFuncs(vm_args.external_functions);
@@ -720,77 +722,93 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 #if WINTER_OPENCL_TESTS
 			if(::getGlobalOpenCL() && !::getGlobalOpenCL()->getOpenCLDevices().empty())
 			{
-				Winter::VirtualMachine::BuildOpenCLCodeArgs opencl_args;
-				std::string opencl_code = vm.buildOpenCLCodeCombined(opencl_args);
-
-				const std::string extended_source = opencl_code + "\n" + "__kernel void main_kernel(double x, __global double * const restrict output_buffer) { \n" +
-					"	output_buffer[0] = main_double_(x);		\n" +
-					" }";
-
-				if(DUMP_OPENCL_C_SOURCE)
+				// Look through the OpenCL devices for a device that supports doubles.
+				int device_index = -1;
+				for(size_t z=0; z<::getGlobalOpenCL()->getOpenCLDevices().size(); ++z)
+					if(::getGlobalOpenCL()->getOpenCLDevices()[z]->supports_doubles)
+					{
+						device_index = (int)z;
+						break;
+					}
+				
+				if(device_index == -1)
 				{
-					std::ofstream file("opencl_source.c");
-					file << extended_source;
-					conPrint("Dumped OpenCL C source to opencl_source.c.");
+					conPrint("Skipping OpenCL tests in doTestMainDoubleArg() as could not find OpenCL device with double floating-point support.");
 				}
-
-				const OpenCLDeviceRef& device = ::getGlobalOpenCL()->getOpenCLDevices()[0];
-				std::vector<OpenCLDeviceRef> devices(1, device);
-				OpenCLContextRef context = new OpenCLContext(device->opencl_platform_id);
-				OpenCLCommandQueueRef command_queue = new OpenCLCommandQueue(context, device->opencl_device_id, /*profile=*/false);
-				std::string build_log;
-				OpenCLProgramRef program;
-				try
+				else
 				{
-					program = ::getGlobalOpenCL()->buildProgram(
-						extended_source,
-						context->getContext(),
-						devices,
-						"", // options
-						build_log
+					Winter::VirtualMachine::BuildOpenCLCodeArgs opencl_args;
+					std::string opencl_code = vm.buildOpenCLCodeCombined(opencl_args);
+
+					const std::string extended_source = opencl_code + "\n" + "__kernel void main_kernel(double x, __global double * const restrict output_buffer) { \n" +
+						"	output_buffer[0] = main_double_(x);		\n" +
+						" }";
+
+					if(DUMP_OPENCL_C_SOURCE)
+					{
+						std::ofstream file("opencl_source.c");
+						file << extended_source;
+						conPrint("Dumped OpenCL C source to opencl_source.c.");
+					}
+
+					const OpenCLDeviceRef& device = ::getGlobalOpenCL()->getOpenCLDevices()[0];
+					std::vector<OpenCLDeviceRef> devices(1, device);
+					OpenCLContextRef context = new OpenCLContext(device->opencl_platform_id);
+					OpenCLCommandQueueRef command_queue = new OpenCLCommandQueue(context, device->opencl_device_id, /*profile=*/false);
+					std::string build_log;
+					OpenCLProgramRef program;
+					try
+					{
+						program = ::getGlobalOpenCL()->buildProgram(
+							extended_source,
+							context->getContext(),
+							devices,
+							"", // options
+							build_log
+						);
+					}
+					catch(Indigo::Exception& e)
+					{
+						failTest("Build failed: " + e.what() + "\nbuild_log:\n" + build_log);
+					}
+					//conPrint("build_log: \n" + build_log);
+
+					OpenCLKernelRef kernel = new OpenCLKernel(program->getProgram(), "main_kernel", device->opencl_device_id, /*profile=*/false);
+
+
+					OpenCLBuffer output_buffer(context->getContext(), sizeof(double), CL_MEM_READ_WRITE);
+
+					kernel->setKernelArgDouble(0, argument);
+					kernel->setKernelArgBuffer(1, output_buffer.getDevicePtr());
+
+					const size_t global_work_size = 1;
+					kernel->launchKernel(command_queue->getCommandQueue(), global_work_size);
+
+
+
+					SSE_ALIGN double host_output_buffer[1];
+
+					// Read back result
+					cl_int result = ::getGlobalOpenCL()->clEnqueueReadBuffer(
+						command_queue->getCommandQueue(),
+						output_buffer.getDevicePtr(), // buffer
+						CL_TRUE, // blocking read
+						0, // offset
+						sizeof(double), // size in bytes
+						host_output_buffer, // host buffer pointer
+						0, // num events in wait list
+						NULL, // wait list
+						NULL // event
 					);
-				}
-				catch(Indigo::Exception& e)
-				{
-					failTest("Build failed: " + e.what() + "\nbuild_log:\n" + build_log);
-				}
-				//conPrint("build_log: \n" + build_log);
+					if(result != CL_SUCCESS)
+						throw Indigo::Exception("clEnqueueReadBuffer failed: " + OpenCL::errorString(result));
 
-				OpenCLKernelRef kernel = new OpenCLKernel(program->getProgram(), "main_kernel", device->opencl_device_id, /*profile=*/false);
+					const double opencl_result = host_output_buffer[0];
 
-
-				OpenCLBuffer output_buffer(context->getContext(), sizeof(double), CL_MEM_READ_WRITE);
-
-				kernel->setKernelArgDouble(0, argument);
-				kernel->setKernelArgBuffer(1, output_buffer.getDevicePtr());
-
-				const size_t global_work_size = 1;
-				kernel->launchKernel(command_queue->getCommandQueue(), global_work_size);
-
-
-
-				SSE_ALIGN double host_output_buffer[1];
-
-				// Read back result
-				cl_int result = ::getGlobalOpenCL()->clEnqueueReadBuffer(
-					command_queue->getCommandQueue(),
-					output_buffer.getDevicePtr(), // buffer
-					CL_TRUE, // blocking read
-					0, // offset
-					sizeof(double), // size in bytes
-					host_output_buffer, // host buffer pointer
-					0, // num events in wait list
-					NULL, // wait list
-					NULL // event
-				);
-				if(result != CL_SUCCESS)
-					throw Indigo::Exception("clEnqueueReadBuffer failed: " + OpenCL::errorString(result));
-
-				const double opencl_result = host_output_buffer[0];
-
-				if(!epsEqual(opencl_result, target_return_val))
-				{
-					failTest("Test failed: OpenCL returned " + toString(opencl_result) + ", target was " + toString(target_return_val));
+					if(!epsEqual(opencl_result, target_return_val))
+					{
+						failTest("Test failed: OpenCL returned " + toString(opencl_result) + ", target was " + toString(target_return_val));
+					}
 				}
 			}
 #endif // #if WINTER_OPENCL_TESTS
@@ -1029,6 +1047,7 @@ TestResults testMainIntegerArg(const std::string& src, int x, int target_return_
 		VMConstructionArgs vm_args;
 		vm_args.allow_unsafe_operations = (test_flags & ALLOW_UNSAFE) != 0;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
+		vm_args.opencl_double_support = false; // This will allow this test to run on an OpenCL device without double fp support.
 
 		if(test_flags & INCLUDE_EXTERNAL_MATHS_FUNCS)
 			MathsFuncs::appendExternalMathsFuncs(vm_args.external_functions);
