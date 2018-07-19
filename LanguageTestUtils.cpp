@@ -751,7 +751,7 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 						conPrint("Dumped OpenCL C source to opencl_source.c.");
 					}
 
-					const OpenCLDeviceRef& device = ::getGlobalOpenCL()->getOpenCLDevices()[0];
+					const OpenCLDeviceRef& device = ::getGlobalOpenCL()->getOpenCLDevices()[device_index];
 					std::vector<OpenCLDeviceRef> devices(1, device);
 					OpenCLContextRef context = new OpenCLContext(device->opencl_platform_id);
 					OpenCLCommandQueueRef command_queue = new OpenCLCommandQueue(context, device->opencl_device_id, /*profile=*/false);
@@ -769,7 +769,7 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 					}
 					catch(Indigo::Exception& e)
 					{
-						failTest("Build failed: " + e.what() + "\nOpenCL device: " + device->description() + "\nbuild_log:\n" + build_log);
+						failTest("Build failed: " + e.what() + "\nOpenCL device: " + device->description() + "\nbuild_log:\n" + build_log + "\nextended_source: \n" + extended_source);
 					}
 					//conPrint("build_log: \n" + build_log);
 
