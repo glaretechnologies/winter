@@ -476,7 +476,7 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 				}
 				catch(Indigo::Exception& e)
 				{
-					failTest("Build failed: " + e.what() + "\nbuild_log:\n" + build_log);
+					failTest("Build failed: " + e.what() + "\nOpenCL device: " + device->description() + "\nbuild_log:\n" + build_log);
 				}
 
 				
@@ -769,7 +769,7 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 					}
 					catch(Indigo::Exception& e)
 					{
-						failTest("Build failed: " + e.what() + "\nbuild_log:\n" + build_log);
+						failTest("Build failed: " + e.what() + "\nOpenCL device: " + device->description() + "\nbuild_log:\n" + build_log);
 					}
 					//conPrint("build_log: \n" + build_log);
 
@@ -1126,7 +1126,7 @@ TestResults testMainIntegerArg(const std::string& src, int x, int target_return_
 				}
 				catch(Indigo::Exception& e)
 				{
-					conPrint("Build failed: " + e.what() + "\nbuild_log:\n" + build_log);
+					failTest("Build failed: " + e.what() + "\nOpenCL device: " + device->description() + "\nbuild_log:\n" + build_log);
 				}
 				//conPrint("build_log: \n" + build_log);
 
