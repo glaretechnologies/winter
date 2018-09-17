@@ -118,8 +118,6 @@ for(uint8* p = _sp - MARKED_ZONE_SIZE; p < _sp; ++p)	\
 	}													\
 }
 
-#endif
-
 
 // Returns the stack pointer (value in RSP register) of the calling function.
 static GLARE_NO_INLINE void* getStackPointer()
@@ -131,6 +129,8 @@ static GLARE_NO_INLINE void* getStackPointer()
 	return (void*)((char*)__builtin_frame_address(0) + sizeof(void*));
 #endif
 }
+
+#endif // !defined(OSX)
 
 
 static bool epsEqual(float x, float y)
