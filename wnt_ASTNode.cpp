@@ -764,7 +764,7 @@ void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::v
 				new_payload.func_def_stack = payload.func_def_stack;
 				e->traverse(new_payload, stack);
 			}
-			break;
+		break;
 	}
 	default:
 		break;
