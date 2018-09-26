@@ -112,7 +112,7 @@ public:
 	~VirtualMachine();
 
 
-	static void init(); // Initialise LLVM
+	static void init(); // Initialise LLVM.  Throws Winter::BaseException on failure.
 	static void shutdown(); // Calls llvm_shutdown()
 
 	Reference<FunctionDefinition> findMatchingFunction(const FunctionSignature& sig);

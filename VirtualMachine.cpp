@@ -902,10 +902,16 @@ void VirtualMachine::init()
 
 #if TARGET_LLVM_VERSION >= 60
 	// Enable -warn-stack-size= option.
-	// We use this to get the stack size for compiled functions.
+	// We use this to get the stack size for compiled functions - 
+	// see use of llvm::DiagnosticInfoStackSize below.
 	// The option boolean is a global static, so set it once here.
 	const char* argv[] = { "dummyprogname", "-warn-stack-size=0" };
-	llvm::cl::ParseCommandLineOptions(2, argv);
+
+	std::string msg;
+	llvm::raw_string_ostream stream(msg);
+	const bool res = llvm::cl::ParseCommandLineOptions(2, argv, /*overview=*/"", &stream);
+	if(!res)
+		throw BaseException("VirtualMachine::init(): Failed to set command line options: " + msg);
 #endif
 }
 
@@ -1438,7 +1444,7 @@ static const llvm::DataLayout* getDataLayout(llvm::ExecutionEngine* llvm_exec_en
 }
 
 
-// DiagnosticHandler does not seem to be present in earlier LLVMS (e.g. 3.4).
+// DiagnosticHandler does not seem to be present in earlier LLVMs (e.g. 3.4).
 #if TARGET_LLVM_VERSION >= 60
 struct WinterDiagHandler : public llvm::DiagnosticHandler
 {
