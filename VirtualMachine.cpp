@@ -923,7 +923,14 @@ void VirtualMachine::init()
 
 void VirtualMachine::shutdown() // Calls llvm_shutdown()
 {
-	llvm::llvm_shutdown(); // This calls llvm::llvm_stop_multithreaded() as well (on <= LLVM 3.4 at least).
+	// NOTE: We can't call llvm::llvm_shutdown() because it will delete all LLVM managed statics, including options handling, which 
+	// will cause subsequent llvm::cl::ParseCommandLineOptions() to fail.
+
+	// llvm::llvm_shutdown(); // This calls llvm::llvm_stop_multithreaded() as well (on <= LLVM 3.4 at least).
+
+#if TARGET_LLVM_VERSION < 36
+	llvm::llvm_stop_multithreaded(); // Call this manually since we're not calling llvm::llvm_shutdown().
+#endif
 }
 
 
