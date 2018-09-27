@@ -916,7 +916,7 @@ void VirtualMachine::init()
 	llvm::raw_string_ostream stream(msg);
 	const bool res = llvm::cl::ParseCommandLineOptions(2, argv, /*overview=*/"", &stream);
 	if(!res)
-		throw BaseException("VirtualMachine::init(): Failed to set command line options: " + msg);
+		throw BaseException("VirtualMachine::init(): Failed to set command line options: " + stream.str());
 #endif
 }
 
