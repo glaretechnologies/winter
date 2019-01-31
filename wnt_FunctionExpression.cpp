@@ -1458,7 +1458,7 @@ std::string FunctionExpression::sourceString() const
 }
 
 
-// From https://www.khronos.org/registry/cl/sdk/1.0/docs/man/xhtml/mathFunctions.html
+// From https://www.khronos.org/registry/OpenCL/sdk/1.2/docs/man/xhtml/mathFunctions.html
 static const char* opencl_built_in_func_names[] = { 
 	"sign",
 	"clamp",
