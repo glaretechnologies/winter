@@ -1615,7 +1615,7 @@ static void testIterate()
 				[current_state, false]t # break										\n\
 			else																	\n\
 				[current_state + 1, true]t											\n\
-		def main(int x) int :  iterate(f, 0)", 17, 100, INVALID_OPENCL);
+		def main(int x) int :  iterate(f, 0)", 17, 100);
 
 	testMainIntegerArg("struct State { int bound, int i }							\n\
 		def f(State current_state, int iteration) tuple<State, bool> :				\n\
@@ -1623,7 +1623,7 @@ static void testIterate()
 				[State(current_state.bound, current_state.i), false]t # break		\n\
 			else																	\n\
 				[State(current_state.bound, current_state.i + 1), true]t			\n\
-		def main(int x) int :  iterate(f, State(x, 0)).i", 17, 17, INVALID_OPENCL);
+		def main(int x) int :  iterate(f, State(x, 0)).i", 17, 17);
 
 	testMainFloatArg("struct State { float i }					\n\
 		def f(State current_state, int iteration) tuple<State, bool> :	\n\
@@ -1631,7 +1631,7 @@ static void testIterate()
 				[State(current_state.i), false]t # break		\n\
 			else												\n\
 				[State(current_state.i + 1.0), true]t			\n\
-		def main(float x) float :  iterate(f, State(0.0)).i", 1.0f, 100.0f, INVALID_OPENCL | ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);// NOTE: this was actually working with OpenCL until struct pass by ptr.
+		def main(float x) float :  iterate(f, State(0.0)).i", 1.0f, 100.0f, ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);// NOTE: this was actually working with OpenCL until struct pass by ptr.
 
 	// Test iterate with optional invariant data:
 
@@ -1642,7 +1642,7 @@ static void testIterate()
 				[current_state, false]t # break										\n\
 			else																	\n\
 				[current_state + invariant_data, true]t											\n\
-		def main(int x) int :  iterate(f, 0, 2)", 17, 200, INVALID_OPENCL | ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);
+		def main(int x) int :  iterate(f, 0, 2)", 17, 200, ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);
 
 	// Test with pass-by-reference data (struct)
 	testMainIntegerArg("															\n\
@@ -1652,9 +1652,9 @@ static void testIterate()
 				[current_state, false]t # break										\n\
 			else																	\n\
 				[current_state + invariant_data.x, true]t											\n\
-		def main(int x) int :  iterate(f, 0, s(3, 4))", 17, 300, INVALID_OPENCL | ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);
+		def main(int x) int :  iterate(f, 0, s(3, 4))", 17, 300, ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);
 
-	// Test with two invariant data args pass-by-reference data (struct)
+	// Test with two invariant data args - pass-by-reference data (struct) and an int.
 	testMainIntegerArg("															\n\
 		struct s { int x, int y }													\n\
 		def f(int current_state, int iteration, s invariant_data, int m) tuple<int, bool> :					\n\
@@ -1662,7 +1662,7 @@ static void testIterate()
 				[current_state, false]t # break										\n\
 			else																	\n\
 				[current_state + invariant_data.x, true]t											\n\
-		def main(int x) int :  iterate(f, 0, s(3, 4), x)", 17, 3 * 17, INVALID_OPENCL | ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);
+		def main(int x) int :  iterate(f, 0, s(3, 4), x)", 17, 3 * 17, ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);
 }
 
 

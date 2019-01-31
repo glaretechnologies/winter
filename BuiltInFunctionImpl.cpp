@@ -2482,7 +2482,8 @@ const std::string IterateBuiltInFunc::emitOpenCLForFunctionArg(EmitOpenCLCodePar
 		const std::vector<ASTNodeRef>& argument_expressions
 	)
 {
-	const std::string state_typename = argument_expressions[1]->type()->OpenCLCType();
+	const TypeRef state_type = argument_expressions[1]->type();
+	const std::string state_typename = state_type->OpenCLCType();
 	const std::string tuple_typename = f->returnType()->OpenCLCType();
 
 	std::string s;
@@ -2501,9 +2502,17 @@ const std::string IterateBuiltInFunc::emitOpenCLForFunctionArg(EmitOpenCLCodePar
 	s += "\t{\n";
 
 	// Emit "tuple<State, bool> res = f(state, iteration, LoopInvariantData0, LoopInvariantData1, ..., LoopInvariantDataN)"
-	s += "\t\t" + tuple_typename + " res = " + f->sig.typeMangledName() + "(state, iteration";
+	s += "\t\t" + tuple_typename + " res = " + f->sig.typeMangledName() + "(";
+	if(state_type->OpenCLPassByPointer())
+		s += "&";
+	s += "state, iteration";
 	for(size_t i = 0; i<invariant_data_types.size(); ++i)
-		s += ", LoopInvariantData" + toString(i);
+	{
+		s += ", ";
+		if(invariant_data_types[i]->OpenCLPassByPointer())
+			s += "&";
+		s += "LoopInvariantData" + toString(i);
+	}
 	s += ");\n";
 
 	// Emit "if(tuple_alloca->second == false)"
