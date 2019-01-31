@@ -26,6 +26,7 @@ Copyright Glare Technologies Limited 2015 -
 #include <utils/StringUtils.h>
 #include <utils/PlatformUtils.h>
 #include <utils/ConPrint.h>
+#include <utils/IncludeXXHash.h>
 #include <StandardPrintOutput.h>
 #include <Mutex.h>
 #include <Lock.h>
@@ -33,7 +34,6 @@ Copyright Glare Technologies Limited 2015 -
 #include <Vector.h>
 #include <unordered_set>
 #include <fstream>
-#include <xxhash.h>
 
 #if FUZZING_USE_OPENCL
 #include "../../indigo/trunk/opencl/OpenCL.h"
