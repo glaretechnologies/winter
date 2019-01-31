@@ -294,6 +294,8 @@ if(WINTER_USE_OPENCL)
 	${INDIGO_TRUNK_DIR}/opencl/OpenCLBuffer.h
 	${INDIGO_TRUNK_DIR}/opencl/OpenCLContext.cpp
 	${INDIGO_TRUNK_DIR}/opencl/OpenCLContext.h
+	${INDIGO_TRUNK_DIR}/opencl/OpenCLDevice.cpp
+	${INDIGO_TRUNK_DIR}/opencl/OpenCLDevice.h
 	${INDIGO_TRUNK_DIR}/opencl/OpenCLPlatform.cpp
 	${INDIGO_TRUNK_DIR}/opencl/OpenCLPlatform.h
 	${INDIGO_TRUNK_DIR}/opencl/OpenCLProgram.cpp
