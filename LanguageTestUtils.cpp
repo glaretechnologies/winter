@@ -468,7 +468,7 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 				{
 					program = ::getGlobalOpenCL()->buildProgram(
 						extended_source,
-						context->getContext(),
+						context,
 						devices,
 						"", //"-cl-nv-verbose", // options
 						build_log
@@ -498,9 +498,9 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 					}
 				}
 
-				OpenCLKernelRef kernel = new OpenCLKernel(program->getProgram(), "main_kernel", device->opencl_device_id, /*profile=*/false);
+				OpenCLKernelRef kernel = new OpenCLKernel(program, "main_kernel", device->opencl_device_id, /*profile=*/false);
 
-				OpenCLBuffer output_buffer(context->getContext(), sizeof(float), CL_MEM_READ_WRITE);
+				OpenCLBuffer output_buffer(context, sizeof(float), CL_MEM_READ_WRITE);
 
 				kernel->setKernelArgFloat(0, argument);
 				kernel->setKernelArgBuffer(1, output_buffer.getDevicePtr());
@@ -761,7 +761,7 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 					{
 						program = ::getGlobalOpenCL()->buildProgram(
 							extended_source,
-							context->getContext(),
+							context,
 							devices,
 							"", // options
 							build_log
@@ -773,10 +773,10 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 					}
 					//conPrint("build_log: \n" + build_log);
 
-					OpenCLKernelRef kernel = new OpenCLKernel(program->getProgram(), "main_kernel", device->opencl_device_id, /*profile=*/false);
+					OpenCLKernelRef kernel = new OpenCLKernel(program, "main_kernel", device->opencl_device_id, /*profile=*/false);
 
 
-					OpenCLBuffer output_buffer(context->getContext(), sizeof(double), CL_MEM_READ_WRITE);
+					OpenCLBuffer output_buffer(context, sizeof(double), CL_MEM_READ_WRITE);
 
 					kernel->setKernelArgDouble(0, argument);
 					kernel->setKernelArgBuffer(1, output_buffer.getDevicePtr());
@@ -1118,7 +1118,7 @@ TestResults testMainIntegerArg(const std::string& src, int x, int target_return_
 				{
 					program = ::getGlobalOpenCL()->buildProgram(
 						extended_source,
-						context->getContext(),
+						context,
 						devices,
 						"", // options
 						build_log
@@ -1130,10 +1130,10 @@ TestResults testMainIntegerArg(const std::string& src, int x, int target_return_
 				}
 				//conPrint("build_log: \n" + build_log);
 
-				OpenCLBuffer output_buffer(context->getContext(), sizeof(int), CL_MEM_READ_WRITE);
+				OpenCLBuffer output_buffer(context, sizeof(int), CL_MEM_READ_WRITE);
 
 
-				OpenCLKernelRef kernel = new OpenCLKernel(program->getProgram(), "main_kernel", device->opencl_device_id, /*profile=*/false);
+				OpenCLKernelRef kernel = new OpenCLKernel(program, "main_kernel", device->opencl_device_id, /*profile=*/false);
 
 				kernel->setKernelArgInt(0, x);
 				kernel->setKernelArgBuffer(1, output_buffer.getDevicePtr());
