@@ -1,7 +1,7 @@
 /*=====================================================================
 wnt_MathsFuncs.h
 ----------------
-Copyright Glare Technologies Limited 2018 -
+Copyright Glare Technologies Limited 2019 -
 =====================================================================*/
 #pragma once
 
@@ -15,17 +15,30 @@ namespace Winter
 /*=====================================================================
 MathsFuncs
 ----------
-Adds some external maths functions from the C++ standard library,
-such as 
-tan, asin, acos, atan2 etc..
+Adds some external maths functions from the C++ standard library.
+These functions will have both float and double overloads.
 
-Some maths functions are built into Winter because they are supported as LLVM intrinsics, e.g.
+tan
+asin
+acos
+atan
+sinh
+asinh
+cosh
+acosh
+tanh
+atanh
+atan2
+
+Some maths functions are already built into Winter because they are supported as LLVM intrinsics, e.g.
 sin, pow, log, exp.  Such functions are not added with appendExternalMathsFuncs(). 
 
-Also adds some other functions like
-mod,
-isFinite,
+Also adds some other functions:
+
+mod  (Euclidean modulo)
+isFinite
 isNAN
+
 =====================================================================*/
 namespace MathsFuncs
 {

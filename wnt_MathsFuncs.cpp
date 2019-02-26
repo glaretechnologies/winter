@@ -120,6 +120,16 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 	));
 
 	external_functions.push_back(new ExternalFunction(
+		(void*)(double(*)(double))atan,
+		NULL,
+		FunctionSignature("atan", vector<TypeVRef>(1, double_type)),
+		double_type,
+		30, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
+	));
+
+	external_functions.push_back(new ExternalFunction(
 		(void*)sinhf,
 		NULL,
 		FunctionSignature("sinh", vector<TypeVRef>(1, float_type)),
@@ -245,16 +255,6 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		0 // heap size bound
 	));
 #endif
-
-	external_functions.push_back(new ExternalFunction(
-		(void*)(double(*)(double))atan,
-		NULL,
-		FunctionSignature("atan", vector<TypeVRef>(1, double_type)),
-		double_type,
-		30, // time_bound
-		MATHS_FUNC_STACK_BOUND, // stack size bound
-		0 // heap size bound
-	));
 
 	external_functions.push_back(new ExternalFunction(
 		(void*)atan2f,
