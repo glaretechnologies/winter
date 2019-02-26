@@ -2482,7 +2482,7 @@ const std::string IterateBuiltInFunc::emitOpenCLForFunctionArg(EmitOpenCLCodePar
 		const std::vector<ASTNodeRef>& argument_expressions
 	)
 {
-	const TypeRef state_type = argument_expressions[1]->type();
+	assert(*this->state_type == *argument_expressions[1]->type());
 	const std::string state_typename = state_type->OpenCLCType();
 	const std::string tuple_typename = f->returnType()->OpenCLCType();
 
@@ -3616,6 +3616,87 @@ size_t SignBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
 GetSpaceBoundResults SignBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
 {
 	return GetSpaceBoundResults(0, 0);
+}
+
+
+//----------------------------------------------------------------------------------------------
+
+
+FRemBuiltInFunc::FRemBuiltInFunc(const TypeVRef& type_)
+	: BuiltInFunctionImpl(BuiltInType_FRemBuiltInFunc),
+	type(type_)
+{}
+
+
+ValueRef FRemBuiltInFunc::invoke(VMState& vmstate)
+{
+	if(type->getType() == Type::FloatType)
+	{
+		const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()    ].getPointer());
+		const FloatValue* b = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
+		return new FloatValue(::fmodf(a->value, b->value));
+	}
+	else if(type->getType() == Type::DoubleType)
+	{
+		const DoubleValue* a = checkedCast<const DoubleValue>(vmstate.argument_stack[vmstate.func_args_start.back()    ].getPointer());
+		const DoubleValue* b = checkedCast<const DoubleValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
+		return new DoubleValue(::fmod(a->value, b->value));
+	}
+	else
+	{
+		assert(type->getType() == Type::VectorTypeType);
+
+		const VectorType* vector_type = static_cast<const VectorType*>(type.getPointer());
+
+		const VectorValue* a = checkedCast<const VectorValue>(vmstate.argument_stack[vmstate.func_args_start.back()    ].getPointer());
+		const VectorValue* b = checkedCast<const VectorValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
+
+		vector<ValueRef> res_values(vector_type->num);
+		if(vector_type->elem_type->getType() == Type::FloatType)
+		{
+			for(unsigned int i=0; i<vector_type->num; ++i)
+			{
+				const float x = checkedCast<const FloatValue>(a->e[i].getPointer())->value;
+				const float y = checkedCast<const FloatValue>(b->e[i].getPointer())->value;
+				res_values[i] = new FloatValue(::fmodf(x, y));
+			}
+		}
+		else
+		{
+			assert(vector_type->elem_type->getType() == Type::DoubleType);
+
+			for(unsigned int i=0; i<vector_type->num; ++i)
+			{
+				const double x = checkedCast<const DoubleValue>(a->e[i].getPointer())->value;
+				const double y = checkedCast<const DoubleValue>(b->e[i].getPointer())->value;
+				res_values[i] = new DoubleValue(::fmod(x, y));
+			}
+		}
+
+		return new VectorValue(res_values);
+	}
+}
+
+
+llvm::Value* FRemBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	return params.builder->CreateFRem(
+		LLVMUtils::getNthArg(params.currently_building_func, 0),
+		LLVMUtils::getNthArg(params.currently_building_func, 1)
+	);
+}
+
+
+size_t FRemBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	const size_t scalar_cost = 30;
+	return (type->getType() == Type::VectorTypeType) ? (type.downcastToPtr<VectorType>()->num * scalar_cost) : scalar_cost;
+}
+
+
+GetSpaceBoundResults FRemBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return GetSpaceBoundResults(512, 0); // The CMath function called (fmod) may use some stack space.
 }
 
 

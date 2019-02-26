@@ -2596,15 +2596,30 @@ static void testMathsFunctions()
 		);
 	}
 
-	// mod(float)
-/*	testMainFloatArg("def main(float x) float : mod(x, 4.0f)", -6.f, 2.f);
-	testMainFloatArg("def main(float x) float : mod(x, 4.0f)", -5.f, 3.f);
-	testMainFloatArg("def main(float x) float : mod(x, 4.0f)", -4.f, 0.f);
-	testMainFloatArg("def main(float x) float : mod(x, 4.0f)", -3.f, 1.f);
-	testMainFloatArg("def main(float x) float : mod(x, 4.0f)", 0.f, 0.f);
-	testMainFloatArg("def main(float x) float : mod(x, 4.0f)", 1.f, 1.f);
-	testMainFloatArg("def main(float x) float : mod(x, 1.0f)", 4.f, 0.f);
-	testMainFloatArg("def main(float x) float : mod(x, 1.0f)", 5.f, 1.f);*/
+	// _frem_ (same as libc fmod)
+	testMainFloatArg("def main(float x) float : _frem_(5.1, x)", 3.0f, std::fmod(5.1f, 3.0f));
+	testMainFloatArg("def main(float x) float : _frem_(-5.1, x)", 3.0f, std::fmod(-5.1f, 3.0f));
+	testMainFloatArg("def main(float x) float : _frem_(5.1, x)", -3.0f, std::fmod(5.1f, -3.0f));
+	testMainFloatArg("def main(float x) float : _frem_(-5.1, x)", -3.0f, std::fmod(-5.1f, -3.0f));
+
+	testMainFloatArgCheckConstantFolded("def main(float x) float : _frem_(5.1, 3.0)", 3.0f, std::fmod(5.1f, 3.0f));
+
+	testMainDoubleArg("def main(double x) double : _frem_(5.1, x)", 3.0, std::fmod(5.1, 3.0));
+
+	// Test _frem_ on vector
+	{
+		Float4Struct a(1.0f, 2.0f, 3.0f, 4.0f);
+		Float4Struct b(1.4f, 2.4f, 3.4f, 4.4f);
+		Float4Struct target_result(std::fmod(1.0f, 1.4f), std::fmod(2.0f, 2.4f), std::fmod(3.0f, 3.4f), std::fmod(4.0f, 4.4f));
+
+		testFloat4Struct(
+			"struct Float4Struct { vector<float, 4> v } \n\
+			def _frem_(Float4Struct a, Float4Struct b) : Float4Struct(_frem_(a.v, b.v))		\n\
+			def main(Float4Struct a, Float4Struct b) Float4Struct : \n\
+				_frem_(a, b)",
+			a, b, target_result
+		);
+	}
 }
 
 

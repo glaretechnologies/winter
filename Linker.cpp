@@ -704,6 +704,23 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 				this->sig_to_function_map.insert(std::make_pair(sig, def));
 				return def;
 			}
+			else if(sig.name == "_frem_")
+			{
+				const vector<FunctionDefinition::FunctionArg> args = makeFunctionArgPair("x", sig.param_types[0], "y", sig.param_types[1]);
+
+				FunctionDefinitionRef def = new FunctionDefinition(
+					SrcLocation::invalidLocation(),
+					-1, // order number
+					"_frem_", // name
+					args, // args
+					NULL, // body expr
+					sig.param_types[0], // return type
+					new FRemBuiltInFunc(sig.param_types[0]) // built in impl.
+				);
+
+				this->sig_to_function_map.insert(std::make_pair(sig, def));
+				return def;
+			}
 		}
 
 		if(
@@ -800,6 +817,23 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 						NULL, // body expr
 						sig.param_types[0], // return type
 						new PowBuiltInFunc(sig.param_types[0]) // built in impl.
+					);
+
+					this->sig_to_function_map.insert(std::make_pair(sig, def));
+					return def;
+				}
+				else if(sig.name == "_frem_")
+				{
+					const vector<FunctionDefinition::FunctionArg> args = makeFunctionArgPair("x", sig.param_types[0], "y", sig.param_types[1]);
+
+					FunctionDefinitionRef def = new FunctionDefinition(
+						SrcLocation::invalidLocation(),
+						-1, // order number
+						"_frem_", // name
+						args, // args
+						NULL, // body expr
+						sig.param_types[0], // return type
+						new FRemBuiltInFunc(sig.param_types[0]) // built in impl.
 					);
 
 					this->sig_to_function_map.insert(std::make_pair(sig, def));

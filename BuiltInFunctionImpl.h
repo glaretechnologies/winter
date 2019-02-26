@@ -56,6 +56,7 @@ public:
 		BuiltInType_FloorBuiltInFunc,
 		BuiltInType_CeilBuiltInFunc,
 		BuiltInType_SignBuiltInFunc,
+		BuiltInType_FRemBuiltInFunc,
 		BuiltInType_TruncateToIntBuiltInFunc,
 		BuiltInType_ToFloatBuiltInFunc,
 		BuiltInType_ToDoubleBuiltInFunc,
@@ -613,6 +614,21 @@ class SignBuiltInFunc : public BuiltInFunctionImpl
 {
 public:
 	SignBuiltInFunc(const TypeVRef& type);
+
+	virtual ValueRef invoke(VMState& vmstate);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
+private:
+	TypeVRef type;
+};
+
+
+// Exposed as '_frem_' for now, until I decide the proper name to expose it as.   Maybe 'rem'?
+class FRemBuiltInFunc : public BuiltInFunctionImpl
+{
+public:
+	FRemBuiltInFunc(const TypeVRef& type);
 
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
