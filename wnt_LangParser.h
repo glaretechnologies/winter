@@ -73,7 +73,7 @@ public:
 	static void test();
 
 private:
-	const std::string errorPosition(const SourceBuffer& buffer, unsigned int pos);
+	const std::string errorPosition(const SourceBuffer& buffer, size_t pos);
 	const std::string errorPosition(const ParseInfo& parseinfo);
 	const std::string errorPositionPrevToken(ParseInfo& parseinfo);
 

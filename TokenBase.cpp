@@ -50,7 +50,7 @@ const std::string tokenName(unsigned int t)
 }
 
 
-Reference<TokenBase> makeTokenObject(unsigned int token_type, unsigned int char_index)
+Reference<TokenBase> makeTokenObject(unsigned int token_type, size_t char_index)
 {
 	switch(token_type) {
 		case 10: return Reference<TokenBase>(new COMMA_Token(char_index));

@@ -74,7 +74,7 @@ void Lexer::parseStringLiteral(const SourceBufferRef& buffer, Parser& parser, st
 	assert(parser.notEOF());
 	assert(parser.current() == '"');
 	
-	const unsigned int char_index = parser.currentPos();
+	const size_t char_index = parser.currentPos();
 
 	parser.advance();
 
@@ -143,7 +143,7 @@ void Lexer::parseCharLiteral(const SourceBufferRef& buffer, Parser& parser, std:
 	assert(parser.notEOF());
 	assert(parser.current() == '\'');
 	
-	const unsigned int char_index = parser.currentPos();
+	const size_t char_index = parser.currentPos();
 
 	parser.advance(); // Consume '
 
@@ -214,7 +214,7 @@ void Lexer::parseNumericLiteral(const SourceBufferRef& buffer, Parser& parser, s
 {
 	assert(parser.notEOF());
 	
-	const unsigned int char_index = parser.currentPos();
+	const size_t char_index = parser.currentPos();
 
 	if(parser.fractionalNumberNext())
 	{
@@ -254,7 +254,7 @@ void Lexer::parseNumericLiteral(const SourceBufferRef& buffer, Parser& parser, s
 		{
 			if(!parser.parseInt64(x))
 			{
-				const unsigned int pos = parser.currentPos();
+				const size_t pos = parser.currentPos();
 				string_view next_token;
 				parser.parseNonWSToken(next_token);
 				throw LexerExcep("Failed to parse int.  (Next chars '" + next_token.to_string() + "')" + errorPosition(buffer, pos));
@@ -264,14 +264,14 @@ void Lexer::parseNumericLiteral(const SourceBufferRef& buffer, Parser& parser, s
 		int num_bits = 32;
 		// Parse suffix if present
 
-		const unsigned int suffix_pos = parser.currentPos(); // Suffix position (if present)
+		const size_t suffix_pos = parser.currentPos(); // Suffix position (if present)
 		bool is_signed = true;
 		if(parser.currentIsChar('i'))
 		{
 			parser.advance();
 			if(!parser.parseInt(num_bits))
 			{
-				const unsigned int pos = parser.currentPos();
+				const size_t pos = parser.currentPos();
 				string_view next_token;
 				parser.parseNonWSToken(next_token);
 				throw LexerExcep("Failed to parse integer suffix after 'i':.  (Next chars '" + next_token.to_string() + "')" + errorPosition(buffer, pos));
@@ -286,7 +286,7 @@ void Lexer::parseNumericLiteral(const SourceBufferRef& buffer, Parser& parser, s
 			{
 				if(!parser.parseInt(num_bits))
 				{
-					const unsigned int pos = parser.currentPos();
+					const size_t pos = parser.currentPos();
 					string_view next_token;
 					parser.parseNonWSToken(next_token);
 					throw LexerExcep("Failed to parse integer suffix after 'u':.  (Next chars '" + next_token.to_string() + "')" + errorPosition(buffer, pos));
@@ -307,7 +307,7 @@ void Lexer::parseIdentifier(const SourceBufferRef& buffer, Parser& parser, std::
 	assert(parser.notEOF());
 	assert(::isAlphabetic(parser.current()) || parser.current() == '_');
 
-	const unsigned int char_index = parser.currentPos();
+	const size_t char_index = parser.currentPos();
 
 	std::string s;
 	while(parser.notEOF() && (::isAlphaNumeric(parser.current()) || parser.current() == '_'))
@@ -336,7 +336,7 @@ void Lexer::parseComment(const SourceBufferRef& buffer, Parser& parser)
 
 void Lexer::process(const SourceBufferRef& src, std::vector<Reference<TokenBase> >& tokens_out)
 {
-	Parser parser(src->source.c_str(), (unsigned int)src->source.length());
+	Parser parser(src->source.c_str(), src->source.length());
 
 	while(parser.notEOF())
 	{
@@ -603,9 +603,9 @@ void Lexer::process(const SourceBufferRef& src, std::vector<Reference<TokenBase>
 }
 
 
-const std::string Lexer::errorPosition(const SourceBufferRef& buffer, unsigned int pos)
+const std::string Lexer::errorPosition(const SourceBufferRef& buffer, size_t pos)
 {
-	return Diagnostics::positionString(*buffer, myMin(pos, (unsigned int)buffer->source.size() - 1));
+	return Diagnostics::positionString(*buffer, myMin(pos, buffer->source.size() - 1));
 }
 
 

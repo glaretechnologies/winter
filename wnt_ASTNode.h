@@ -325,7 +325,7 @@ inline GetSpaceBoundResults operator + (const GetSpaceBoundResults& a, const Get
 class SrcLocation
 {
 public:
-	SrcLocation(uint32 char_index_, /*uint32 line_, uint32 column_, */const SourceBuffer* buf) : 
+	SrcLocation(size_t char_index_, /*uint32 line_, uint32 column_, */const SourceBuffer* buf) :
 	  char_index(char_index_), /*line(line_), column(column_),*/ source_buffer(buf) {}
 	//uint32 line;
 	//uint32 column;
@@ -334,7 +334,7 @@ public:
 
 	bool isValid() const { return char_index != 4000000000u; }
 
-	uint32 char_index;
+	size_t char_index;
 	//const std::string* text_buffer;
 	const SourceBuffer* source_buffer;
 };

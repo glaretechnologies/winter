@@ -1871,7 +1871,7 @@ void LangParser::parseParameterList(ParseInfo& p, std::vector<FunctionDefinition
 }
 
 
-const std::string LangParser::errorPosition(const SourceBuffer& buffer, unsigned int char_index)
+const std::string LangParser::errorPosition(const SourceBuffer& buffer, size_t char_index)
 {
 	return Diagnostics::positionString(buffer, char_index);
 }

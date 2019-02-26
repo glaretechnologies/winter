@@ -18,7 +18,7 @@ namespace Diagnostics
 {
 
 
-const std::string positionString(const SourceBuffer& source_buffer, uint32 char_index)
+const std::string positionString(const SourceBuffer& source_buffer, size_t char_index)
 {
 	size_t line, col;
 	StringUtils::getPosition(source_buffer.source, char_index, line, col);

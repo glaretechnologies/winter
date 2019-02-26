@@ -40,7 +40,7 @@ public:
 	static void test();
 
 private:
-	static const std::string errorPosition(const SourceBufferRef& buffer, unsigned int pos);
+	static const std::string errorPosition(const SourceBufferRef& buffer, size_t pos);
 	static void parseStringLiteral(const SourceBufferRef& buffer, Parser& parser, std::vector<Reference<TokenBase> >& tokens_out);
 	static void parseCharLiteral(const SourceBufferRef& buffer, Parser& parser, std::vector<Reference<TokenBase> >& tokens_out);
 	static void parseNumericLiteral(const SourceBufferRef& buffer, Parser& parser, std::vector<Reference<TokenBase> >& tokens_out);
