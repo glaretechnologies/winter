@@ -488,7 +488,7 @@ GetSpaceBoundResults LetBlock::getSpaceBound(GetSpaceBoundParams& params) const
 	for(size_t i=0; i<lets.size(); ++i)
 		sum_bound += lets[i]->getSpaceBound(params);
 
-	return sum_bound;
+	return sum_bound + expr->getSpaceBound(params);
 }
 
 

@@ -758,7 +758,7 @@ static void testVArrays()
 
 	testMainFloatArg("def main(float x) float : let a = [[\"hello\"]va]va in x", 10.f, 10.0f, INVALID_OPENCL);
 
-	testMainIntegerArg("def main(int x) int : let a = [\"hello\"]va in length(a[0])", 0, 5, INVALID_OPENCL);
+	testMainInt64Arg("def main(int64 x) int64 : let a = [\"hello\"]va in length(a[0])", 0, 5, INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
 
 	//------------------------ Test a struct in a VArray, with access --------------------------
 	testMainFloatArg("struct s { float x }		def main(float x) float : [s(4.0)]va[0].x", 0, 4.0f, INVALID_OPENCL);
@@ -976,9 +976,9 @@ static void testStringFunctions()
 	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\"); // EOF in middle of literal
 
 	// Test Unicode code-point escape sequence
-	testMainIntegerArg("def main(int x) int : length(" + DBL_QUOTE + "\\u{0}" + DBL_QUOTE + ")", 2, 1, INVALID_OPENCL);
-	testMainIntegerArg("def main(int x) int : length(" + DBL_QUOTE + "\\u{7FFF}" + DBL_QUOTE + ")", 2, 1, INVALID_OPENCL);
-	testMainIntegerArg("def main(int x) int : length(" + DBL_QUOTE + "\\u{10FFFF}" + DBL_QUOTE + ")", 2, 1, INVALID_OPENCL);
+	testMainInt64Arg("def main(int64 x) int64 : length(" + DBL_QUOTE + "\\u{0}" + DBL_QUOTE + ")", 2, 1, INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
+	testMainInt64Arg("def main(int64 x) int64 : length(" + DBL_QUOTE + "\\u{7FFF}" + DBL_QUOTE + ")", 2, 1, INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
+	testMainInt64Arg("def main(int64 x) int64 : length(" + DBL_QUOTE + "\\u{10FFFF}" + DBL_QUOTE + ")", 2, 1, INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
 
 	testMainStringArg("def main(string s) string : " + DBL_QUOTE + "\\u{393}" + DBL_QUOTE, "hello", "\xCE\x93"); // Greek capital letter gamma, U+393, http://unicodelookup.com/#gamma/1, 
 	testMainStringArg("def main(string s) string : " + DBL_QUOTE + "\\u{20AC}" + DBL_QUOTE, "hello", "\xE2\x82\xAC"); // Euro sign, U+20AC
@@ -986,12 +986,12 @@ static void testStringFunctions()
 
 
 	// Test some invalid Unicode code-point escape sequences
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{-0}" + DBL_QUOTE + ")");
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{q}" + DBL_QUOTE + ")");
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{7Fq}" + DBL_QUOTE + ")");
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{11FFFF}" + DBL_QUOTE + ")");
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{11FFFF" + DBL_QUOTE + ")");
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(" + DBL_QUOTE + "\\u{" + DBL_QUOTE + ")");
+	testMainInt64ArgInvalidProgram("def main(int64 x) int64 : length(" + DBL_QUOTE + "\\u{-0}" + DBL_QUOTE + ")");
+	testMainInt64ArgInvalidProgram("def main(int64 x) int64 : length(" + DBL_QUOTE + "\\u{q}" + DBL_QUOTE + ")");
+	testMainInt64ArgInvalidProgram("def main(int64 x) int64 : length(" + DBL_QUOTE + "\\u{7Fq}" + DBL_QUOTE + ")");
+	testMainInt64ArgInvalidProgram("def main(int64 x) int64 : length(" + DBL_QUOTE + "\\u{11FFFF}" + DBL_QUOTE + ")");
+	testMainInt64ArgInvalidProgram("def main(int64 x) int64 : length(" + DBL_QUOTE + "\\u{11FFFF" + DBL_QUOTE + ")");
+	testMainInt64ArgInvalidProgram("def main(int64 x) int64 : length(" + DBL_QUOTE + "\\u{" + DBL_QUOTE + ")");
 
 
 	// ===================================================================
@@ -1004,21 +1004,21 @@ static void testStringFunctions()
 	testMainStringArg("def main(string s) string : toString('" + BACKSLASH + SINGLE_QUOTE + "')", "hello", "'"); // test single quote escape
 
 
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\a'))");
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\a"); // EOF in middle of literal
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\"); // EOF in middle of literal
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('"); // EOF in middle of literal
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('"); // EOF in middle of literal
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{0}"); // EOF immediately after literal
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{0"); // EOF in middle of literal
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{"); // EOF in middle of literal
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u"); // EOF in middle of literal
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\"); // EOF in middle of literal
+	testMainInt64ArgInvalidProgram("def main(int64 x) int64 : length(toString('\\a'))");
+	testMainInt64ArgInvalidProgram("def main(int64 x) int64 : length(toString('\\a"); // EOF in middle of literal
+	testMainInt64ArgInvalidProgram("def main(int64 x) int64 : length(toString('\\"); // EOF in middle of literal
+	testMainInt64ArgInvalidProgram("def main(int64 x) int64 : length(toString('"); // EOF in middle of literal
+	testMainInt64ArgInvalidProgram("def main(int64 x) int64 : length(toString('"); // EOF in middle of literal
+	testMainInt64ArgInvalidProgram("def main(int64 x) int64 : length(toString('\\u{0}"); // EOF immediately after literal
+	testMainInt64ArgInvalidProgram("def main(int64 x) int64 : length(toString('\\u{0"); // EOF in middle of literal
+	testMainInt64ArgInvalidProgram("def main(int64 x) int64 : length(toString('\\u{"); // EOF in middle of literal
+	testMainInt64ArgInvalidProgram("def main(int64 x) int64 : length(toString('\\u"); // EOF in middle of literal
+	testMainInt64ArgInvalidProgram("def main(int64 x) int64 : length(toString('\\"); // EOF in middle of literal
 
 	// Test Unicode code-point escape sequence
-	testMainIntegerArg("def main(int x) int : length(toString('\\u{0}'))", 2, 1, INVALID_OPENCL);
-	testMainIntegerArg("def main(int x) int : length(toString('\\u{7FFF}'))", 2, 1, INVALID_OPENCL);
-	testMainIntegerArg("def main(int x) int : length(toString('\\u{10FFFF}'))", 2, 1, INVALID_OPENCL);
+	testMainInt64Arg("def main(int64 x) int64 : length(toString('\\u{0}'))", 2, 1, INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
+	testMainInt64Arg("def main(int64 x) int64 : length(toString('\\u{7FFF}'))", 2, 1, INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
+	testMainInt64Arg("def main(int64 x) int64 : length(toString('\\u{10FFFF}'))", 2, 1, INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
 
 	testMainStringArg("def main(string s) string : toString('\\u{393}')", "hello", "\xCE\x93"); // Greek capital letter gamma, U+393, http://unicodelookup.com/#gamma/1, 
 	testMainStringArg("def main(string s) string : toString('\\u{20AC}')", "hello", "\xE2\x82\xAC"); // Euro sign, U+20AC
@@ -1026,12 +1026,12 @@ static void testStringFunctions()
 
 
 	// Test some invalid Unicode code-point escape sequences
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{-0}'))");
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{q}'))");
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{7Fq}'))");
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{11FFFF}'))");
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{11FFFF'))"); // EOF in middle of literal
-	testMainIntegerArgInvalidProgram("def main(int x) int : length(toString('\\u{'))"); // EOF in middle of literal
+	testMainInt64ArgInvalidProgram("def main(int64 x) int64 : length(toString('\\u{-0}'))");
+	testMainInt64ArgInvalidProgram("def main(int64 x) int64 : length(toString('\\u{q}'))");
+	testMainInt64ArgInvalidProgram("def main(int64 x) int64 : length(toString('\\u{7Fq}'))");
+	testMainInt64ArgInvalidProgram("def main(int64 x) int64 : length(toString('\\u{11FFFF}'))");
+	testMainInt64ArgInvalidProgram("def main(int64 x) int64 : length(toString('\\u{11FFFF'))"); // EOF in middle of literal
+	testMainInt64ArgInvalidProgram("def main(int64 x) int64 : length(toString('\\u{'))"); // EOF in middle of literal
 
 
 	// ===================================================================
@@ -1061,9 +1061,9 @@ static void testStringFunctions()
 	testMainStringArg("def main(string s) string : toString(length(s) < 2 ? 'a' : 'b')", "", "a", ALLOW_TIME_BOUND_FAILURE); // Test with runtime character choice
 	testMainStringArg("def main(string s) string : toString(length(s) < 2 ? 'a' : 'b')", "hello", "b", ALLOW_TIME_BOUND_FAILURE); // Test with runtime character choice
 
-	testMainIntegerArg("def main(int x) int : length(toString('a'))", 2, 1, INVALID_OPENCL);
+	testMainInt64Arg("def main(int64 x) int64 : length(toString('a'))", 2, 1, INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
 
-	testMainIntegerArg("def main(int x) int : length(toString(x < 5 ? 'a' : 'b'))", 2, 1, INVALID_OPENCL); // Test with runtime character
+	testMainInt64Arg("def main(int64 x) int64 : length(toString(x < 5 ? 'a' : 'b'))", 2, 1, INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE); // Test with runtime character
 
 
 	testMainStringArg("def main(string s) string : concatStrings(toString('a'), toString('b'))", "", "ab", ALLOW_TIME_BOUND_FAILURE | ALLOW_SPACE_BOUND_FAILURE);
@@ -2035,7 +2035,7 @@ static void testTypeCoercion()
 
 static void testElem()
 {
-		// Test integer in-bounds runtime index access to array
+	// Test integer in-bounds runtime index access to array
 	testMainIntegerArg(
 		"def main(int i) int : if i >= 0 && i < 10 then elem([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]a, i) else 0", 
 		2, 3);
@@ -2240,80 +2240,80 @@ static void testIfThenElse()
 static void stringTests()
 {
 	// String test - string literal in let statement, with assignment.
-	testMainIntegerArg(
-		"def main(int x) int : length(concatStrings(\"hello\", \"world\"))",
-		2, 10, INVALID_OPENCL | ALLOW_SPACE_BOUND_FAILURE);
+	testMainInt64Arg(
+		"def main(int64 x) int64 : length(concatStrings(\"hello\", \"world\"))",
+		2, 10, INVALID_OPENCL | ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);
 
 	// Double return of a string
-	testMainIntegerArg(
+	testMainInt64Arg(
 		"def f() string : \"hello world\"	\n\
 		def g() string : f()				\n\
-		def main(int x) int : length(g())",
-		2, 11, INVALID_OPENCL);
+		def main(int64 x) int64 : length(g())",
+		2, 11, INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
 	
 
 	
 
 	// String test - string literal in let statement, with assignment.
-	testMainIntegerArg(
-		"def main(int x) int :				\n\
+	testMainInt64Arg(
+		"def main(int64 x) int64 :			\n\
 			let								\n\
 				s = \"hello world\"			\n\
 				s2 = s						\n\
 			in								\n\
 				length(s) + length(s2)",
-		2, 22, INVALID_OPENCL);
+		2, 22, INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
 
 	// String test - string literal in let statement, with assignment.
-	testMainIntegerArg(
-		"def main(int x) int :				\n\
+	testMainInt64Arg(
+		"def main(int64 x) int64 :			\n\
 			let								\n\
 				s = \"hello world\"			\n\
 				s2 = \"hallo thar\"			\n\
 			in								\n\
 				length(s) + length(s2)",
-		2, 21, INVALID_OPENCL);
+		2, 21, INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
 
 	// a function returning a string
-	testMainIntegerArg(
+	testMainInt64Arg(
 		"def f() string : \"hello world\"	\n\
-		def main(int x) int : length(f())",
-		2, 11, INVALID_OPENCL);
+		def main(int64 x) int64 : length(f())",
+		2, 11, INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
 
 	// a function returning a string in a let block
-	testMainIntegerArg(
+	testMainInt64Arg(
 		"def f() string : \"hello world\"	\n\
-		def main(int x) int :				\n\
+		def main(int64 x) int64 :			\n\
 			let								\n\
 				s = f()						\n\
 			in								\n\
 				length(s)",
-		2, 11, INVALID_OPENCL);
+		2, 11, INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
 
 	// String test - string literal in let statement
-	testMainIntegerArg(
-		"def main(int x) int :				\n\
+	testMainInt64Arg(
+		"def main(int64 x) int64 :			\n\
 			let								\n\
 				s = \"hello world\"			\n\
 			in								\n\
 				length(s)",
-		2, 11, INVALID_OPENCL);
+		2, 11, INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
 
 	// String test - string literal as argument
-	testMainIntegerArg(
-		"def main(int x) int :				\n\
+	testMainInt64Arg(
+		"def main(int64 x) int64 :			\n\
 				length(\"hello world\")",
-		2, 11, INVALID_OPENCL);
+		2, 11, INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
 
 	// String test - string literal in let statement, with assignment.
-	testMainIntegerArg(
-		"def main(int x) int :				\n\
+	testMainInt64Arg(
+		"def main(int64 x) int64 :			\n\
 			let								\n\
 				s = \"hello world\"			\n\
 				s2 = s						\n\
 			in								\n\
 				length(s2)",
-		2, 11, INVALID_OPENCL);
+		2, 11, INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
 
 	// Char test
 	testMainIntegerArg(
@@ -2776,7 +2776,7 @@ static void testOperatorOverloading()
 					 def main(float x) float : (s(4.0f) != s(x)) ? 1.0 : 0.0", 5.0f, 1.0f);
 
 
-	// Test that operator overloading overrises the built-in != function - 
+	// Test that operator overloading overrides the built-in != function - 
 	// Make op_neq return false when the built-in != would return true.
 	// in this test: s(4.0f) != s(5.0) should be true, but we use the overloading op_neq to return false.
 	testMainFloatArg("struct s { float x }					\n\
@@ -4909,8 +4909,6 @@ void LanguageTests::run()
 	testMainFloatArgAllowUnsafe("struct S { float x }   def f(S s) float : s.x   def main(float x) float :	f(S(x))", 1.f, 1.f);
 
 
-	testMainIntegerArg("def main(int x) int :	 length(\"hello\")", 1, 5, INVALID_OPENCL);
-
 	// ===================================================================
 	// Test optimisation of varray from heap allocated to stack allocated
 	// ===================================================================
@@ -4956,21 +4954,21 @@ void LanguageTests::run()
 	// Test Refcounting optimisations: test that a let variable used as a function argument is not incremented and decremented
 	// ===================================================================
 
-	testMainIntegerArg("def f(string s, int x) int : length(s) + x       def main(int x) int : let s = \"hello\" in f(s, x)", 1, 6, INVALID_OPENCL);
+	testMainInt64Arg("def f(string s, int64 x) int64 : length(s) + x       def main(int64 x) int64 : let s = \"hello\" in f(s, x)", 1, 6, INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
 
 
 	// ===================================================================
 	// Test Refcounting optimisations: test that a argument variable used as a function argument is not incremented and decremented
 	// ===================================================================
 
-	testMainIntegerArg("def f(string s, int x) int : length(s) + x     def g(string s, int x) int : f(s, x)      def main(int x) int : g(\"hello\", x)", 1, 6, INVALID_OPENCL);
+	testMainInt64Arg("def f(string s, int64 x) int64 : length(s) + x     def g(string s, int64 x) int64 : f(s, x)      def main(int64 x) int64 : g(\"hello\", x)", 1, 6, INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
 
 	// test that a argument variable used as a function argument is not incremented and decremented, even when the argument may be stored and returned in the result.
-	testMainIntegerArg("struct S { string str }      def f(string str) S : S(str)     def g(string s) S : f(s)      def main(int x) int : length(g(\"hello\").str)", 1, 5, INVALID_OPENCL);
+	testMainInt64Arg("struct S { string str }      def f(string str) S : S(str)     def g(string s) S : f(s)      def main(int64 x) int64 : length(g(\"hello\").str)", 1, 5, INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
 
 
 
-	testMainIntegerArg("def f(string s, int x) int : length(s) + x       def main(int x) int : f(\"hello\", x)", 1, 6, INVALID_OPENCL);
+	testMainInt64Arg("def f(string s, int64 x) int64 : length(s) + x       def main(int64 x) int64 : f(\"hello\", x)", 1, 6, INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
 
 	
 	// Test fold built-in function with update
@@ -5561,17 +5559,17 @@ void LanguageTests::run()
 	// Ref counting tests
 	// ===================================================================
 	// Test putting a string in a structure, then returning it.
-	testMainIntegerArg(
+	testMainInt64Arg(
 		"struct teststruct { string str }										\n\
 		def f() teststruct : teststruct(\"hello world\")						\n\
-		def main(int x) int : length(str(f())) ",
-		2, 11, INVALID_OPENCL);
+		def main(int64 x) int64 : length(str(f())) ",
+		2, 11, INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
 
 	// Test a string in a structure
-	testMainIntegerArg(
+	testMainInt64Arg(
 		"struct teststruct { string str }										\n\
-		def main(int x) int : length(teststruct(\"hello world\").str) ",
-		2, 11, INVALID_OPENCL);
+		def main(int64 x) int64 : length(teststruct(\"hello world\").str) ",
+		2, 11, INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE);
 
 
 

@@ -159,6 +159,7 @@ void testMainInt16Arg(const std::string& src, int16 x, int16 target_return_val, 
 void testMainUInt32Arg(const std::string& src, uint32 x, uint32 target_return_val, uint32 test_flags = 0);
 void testMainBoolArg(const std::string& src, bool x, bool target_return_val, uint32 test_flags = 0);
 void testMainIntegerArgInvalidProgram(const std::string& src);
+void testMainInt64ArgInvalidProgram(const std::string& src);
 void testFloat4StructPairRetFloat(const std::string& src, const Float4StructPair& a, const Float4StructPair& b, float target_return_val);
 void testVectorInStruct(const std::string& src, const StructWithVec& struct_in, const StructWithVec& target_return_val);
 void testFloat4Struct(const std::string& src, const Float4Struct& a, const Float4Struct& b, const Float4Struct& target_return_val);

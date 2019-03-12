@@ -135,17 +135,17 @@ static int64 closure_count = 0;//TEMP
 
 
 // Returns number of unicode chars in the string.
-static int stringLength(StringRep* str)
+static int64 stringLength(StringRep* str)
 {
 	const uint64 num_bytes = str->len;
 	const char* const data = (const char*)str + sizeof(StringRep);
-	return (int)UTF8Utils::numCodePointsInString(data, num_bytes);
+	return (int64)UTF8Utils::numCodePointsInString(data, num_bytes);
 }
 
 
 static ValueRef stringLengthInterpreted(const vector<ValueRef>& args)
 {
-	return new IntValue( (int)UTF8Utils::numCodePointsInString(getStringArg(args, 0)), /*is_signed=*/true );
+	return new IntValue( (int64)UTF8Utils::numCodePointsInString(getStringArg(args, 0)), /*is_signed=*/true );
 }
 
 
@@ -662,7 +662,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			(void*)stringLength,
 			stringLengthInterpreted, // interpreted func
 			FunctionSignature("length", vector<TypeVRef>(1, new String())),
-			new Int(), // return type
+			new Int(64), // return type
 			ExternalFunction::unknownTimeBound(), // time bound
 			1024, // stack space bound
 			0 // heap space bound

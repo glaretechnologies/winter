@@ -1478,6 +1478,35 @@ void testMainIntegerArgInvalidProgram(const std::string& src)
 }
 
 
+void testMainInt64ArgInvalidProgram(const std::string& src)
+{
+	testPrint("===================== Winter testMainInt64ArgInvalidProgram() =====================");
+	try
+	{
+		VMConstructionArgs vm_args;
+		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
+
+		const FunctionSignature mainsig("main", std::vector<TypeVRef>(1, new Int(64)));
+
+		vm_args.entry_point_sigs.push_back(mainsig);
+
+		VirtualMachine vm(vm_args);
+
+		// Get main function
+		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
+
+		vm.getJittedFunction(mainsig);
+
+		failTest("Test failed: Expected compilation failure.");
+	}
+	catch(Winter::BaseException& e)
+	{
+		// Expected.
+		testPrint("Expected exception occurred: " + e.what());
+	}
+}
+
+
 //typedef float(*float_void_func)();
 
 
