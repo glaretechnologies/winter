@@ -410,8 +410,13 @@ ValueRef UpdateElementBuiltInFunc::invoke(VMState& vmstate)
 		if(index < 0 || index >= (int64)array_val->e.size())
 			throw BaseException("Index out of bounds");
 
-		ValueRef new_collection = array_val->clone();
-		static_cast<ArrayValue*>(new_collection.getPointer())->e[index] = newval;
+		ArrayValue* new_collection = new ArrayValue();
+		new_collection->e.resize(array_val->e.size());
+
+		for(unsigned int i=0; i<array_val->e.size(); ++i)
+			new_collection->e[i] = array_val->e[i];
+
+		new_collection->e[index] = newval;
 
 		return new_collection;
 	}

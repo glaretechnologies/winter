@@ -51,17 +51,6 @@ StructureValue::~StructureValue()
 }
 
 
-Value* StructureValue::clone() const
-{
-	vector<ValueRef> field_clones(this->fields.size());
-
-	for(unsigned int i=0; i<this->fields.size(); ++i)
-		field_clones[i] = this->fields[i]->clone();
-
-	return new StructureValue(field_clones);
-}
-
-
 const std::string StructureValue::toString() const
 {
 	std::string s = "{";
@@ -76,18 +65,6 @@ const std::string StructureValue::toString() const
 
 ArrayValue::~ArrayValue()
 {
-}
-
-
-Value* ArrayValue::clone() const
-{
-	ArrayValue* ret = new ArrayValue();
-	ret->e.resize(this->e.size());
-
-	for(unsigned int i=0; i<this->e.size(); ++i)
-		ret->e[i] = this->e[i]->clone();
-
-	return ret;
 }
 
 
@@ -110,18 +87,6 @@ VArrayValue::~VArrayValue()
 }
 
 
-Value* VArrayValue::clone() const
-{
-	VArrayValue* ret = new VArrayValue();
-	ret->e.resize(this->e.size());
-
-	for(unsigned int i=0; i<this->e.size(); ++i)
-		ret->e[i] = this->e[i]->clone();
-
-	return ret;
-}
-
-
 const std::string VArrayValue::toString() const
 {
 	std::string s = "varray[";
@@ -141,18 +106,6 @@ VectorValue::~VectorValue()
 }
 
 
-Value* VectorValue::clone() const
-{
-	VectorValue* ret = new VectorValue();
-	ret->e.resize(this->e.size());
-
-	for(unsigned int i=0; i<this->e.size(); ++i)
-		ret->e[i] = this->e[i]->clone();
-
-	return ret;
-}
-
-
 const std::string VectorValue::toString() const
 {
 	std::string s = "vector[";
@@ -169,18 +122,6 @@ const std::string VectorValue::toString() const
 
 TupleValue::~TupleValue()
 {
-}
-
-
-Value* TupleValue::clone() const
-{
-	TupleValue* ret = new TupleValue();
-	ret->e.resize(this->e.size());
-
-	for(unsigned int i=0; i<this->e.size(); ++i)
-		ret->e[i] = this->e[i]->clone();
-
-	return ret;
 }
 
 
