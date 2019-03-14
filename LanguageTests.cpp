@@ -1560,7 +1560,7 @@ static void testFold()
 
 
 	// If first arg to fold() is bound to global def (f), and bound function f has update() as 'last' function call,
-	// and fist arg to update() is first arg to f, then can transform to just setting element on running state.
+	// and first arg to update() is first arg to f, then can transform to just setting element on running state.
 
 	// Test fold built-in function with update
 	{
@@ -1663,6 +1663,94 @@ static void testIterate()
 			else																	\n\
 				[current_state + invariant_data.x, true]t											\n\
 		def main(int x) int :  iterate(f, 0, s(3, 4), x)", 17, 3 * 17, ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);
+
+	// Test iterate with a lambda expression
+	testMainIntegerArg("																	\n\
+		def main(int x) int :																\n\
+			let 																			\n\
+				f = \\(int current_state, int iteration) ->									\n\
+					if iteration >= 100														\n\
+						[current_state, false]t # break										\n\
+					else																	\n\
+						[current_state + 1, true]t											\n\
+			in																				\n\
+				iterate(f, 0)", 17, 100, INVALID_OPENCL);
+
+	// Test iterate with a lambda expression used directly as the first arg: This one is supported for OpenCL
+	testMainIntegerArg("																	\n\
+		def main(int x) int :																\n\
+			iterate(																		\n\
+				\\(int current_state, int iteration) ->										\n\
+					if iteration >= 100														\n\
+						[current_state, false]t # break										\n\
+					else																	\n\
+						[current_state + 1, true]t											\n\
+				,																			\n\
+				0																			\n\
+			)", 17, 100);
+
+
+	// Test where the lambda captures a variable.
+	// Doesn't work in OpenCL currently since closures aren't supported in OpenCL emission.
+	testMainIntegerArg("																	\n\
+		def main(int x) int :																\n\
+		let																					\n\
+			z = 2																			\n\
+		in																					\n\
+			iterate(																		\n\
+				\\(int current_state, int iteration) ->										\n\
+					if iteration >= 100														\n\
+						[current_state, false]t # break										\n\
+					else																	\n\
+						[current_state + z, true]t											\n\
+				,																			\n\
+				0																			\n\
+			)", 17, 200, INVALID_OPENCL);
+	
+
+	testMainDoubleArg("																	\n\
+		def test(vector<double, 2> p)  double  :										\n\
+			let 																		\n\
+				f = \\(vector<double, 2> v, int i) ->									\n\
+					if i >= 10		then												\n\
+						(v, false) # break												\n\
+					else																\n\
+						([v[0], v[1] + 1.0]v, true)										\n\
+			in																			\n\
+				iterate(f, p)[1]														\n\
+		def main(double x) : test([x, x]v)												\n\
+		", 17, 27, INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE | ALLOW_SPACE_BOUND_FAILURE);
+
+	testFloat4Struct("struct Float4Struct { vector<float, 4> v } 						\n\
+		def main(Float4Struct a, Float4Struct b) Float4Struct  :						\n\
+			let 																		\n\
+				x = b.v[0]																\n\
+			in																			\n\
+				iterate(\\(Float4Struct v, int i) ->									\n\
+					if i >= 10		then												\n\
+						(v, false) # break												\n\
+					else																\n\
+						(Float4Struct([v.v[0], v.v[1] * x, v.v[2], v.v[3]]v), true)							\n\
+				, a)																	\n\
+		", 
+		Float4Struct(1.f, 1.f, 1.f, 1.f), Float4Struct(1.f, 1.f, 1.f, 1.f), Float4Struct(1.f, 1.f, 1.f, 1.f));
+
+	testMainDoubleArg("																	\n\
+		def test(vector<double, 2> p)  double  :										\n\
+			let 																		\n\
+				incr = 1.0																\n\
+			in																			\n\
+				let																		\n\
+					f = \\(vector<double, 2> v, int i) ->								\n\
+						if i >= 10		then											\n\
+							(v, false) # break											\n\
+						else															\n\
+							([v[0], v[1] + incr]v, true)								\n\
+				in																		\n\
+					iterate(f, p)[1]													\n\
+		def main(double x) : test([x, x]v)												\n\
+		", 17, 27, INVALID_OPENCL | ALLOW_TIME_BOUND_FAILURE | ALLOW_SPACE_BOUND_FAILURE);
+
 }
 
 
@@ -3324,12 +3412,13 @@ static void testLambdaExpressionsAndClosures()
 	// ===================================================================
 	// Test lambda expressions and closures
 	// ===================================================================
+	Winter::TestResults results;
 
 	// Test lambda with arrow syntax:
 	testMainFloatArg("def main(float x) float : (\\(float x) -> x*x) (x)", 4.0f, 16.0f, INVALID_OPENCL);
 
 	// Test Lambda applied directly.  Function inlining (beta reduction) should be done.
-	Winter::TestResults results = testMainFloatArg("def main(float x) float : (\\(float y) : y*y) (x)", 4.0f, 16.0f, INVALID_OPENCL);
+	results = testMainFloatArg("def main(float x) float : (\\(float y) : y*y) (x)", 4.0f, 16.0f, INVALID_OPENCL);
 	testAssert(results.maindef->body->nodeType() == ASTNode::MulExpressionType);
 
 	// Test Lambda applied directly (with same variable names)
@@ -3612,9 +3701,46 @@ static void testLambdaExpressionsAndClosures()
 					let z = 3.0 in						\n\
 					let f = \\() : z  in				\n\
 					f()", 3.0);
-	
 
-	// TODO: test two lets varables at same level
+
+	// Test a function capturing a variable, then being passed to a higher order function which calls it.
+	testMainIntegerArg("																	\n\
+		def f(function<int> arg_func) !noinline : arg_func()											\n\
+		def main(int x) int :																\n\
+			let																				\n\
+				z = 2																		\n\
+			in																				\n\
+				f(\\() -> z)																\n\
+		", 17, 2, INVALID_OPENCL);
+
+	testMainIntegerArg("																	\n\
+		def f(function<int> arg_func) !noinline : arg_func()								\n\
+		def main(int x) int :																\n\
+			let																				\n\
+				z = x + 1																	\n\
+			in																				\n\
+				f(\\() -> z)																\n\
+		", 17, 18, INVALID_OPENCL);
+
+	testMainIntegerArg("																	\n\
+		def f(function<int> arg_func) : arg_func()								\n\
+		def ident(int x) : x																\n\
+		def main(int x) int :																\n\
+			let																				\n\
+				z = 2																		\n\
+			in																				\n\
+				f(\\() -> 																	\n\
+					let																			\n\
+						y = 3																	\n\
+					in																			\n\
+						ident(z) + y																	\n\
+				)																			 \n\
+		", 17, 5, INVALID_OPENCL);
+
+	
+		
+
+	// TODO: test two lets variables at same level
 
 	// Test capture of let variable up one level.
 	testMainFloat("	def main() float :                          \n\

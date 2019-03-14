@@ -201,7 +201,7 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 
 
 	// Push arguments onto argument stack
-	const unsigned int initial_arg_stack_size = (unsigned int)vmstate.argument_stack.size();
+	const size_t initial_arg_stack_size = vmstate.argument_stack.size();
 
 	for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
 	{
@@ -221,11 +221,8 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 	}
 
 
-	//assert(vmstate.argument_stack.size() == initial_arg_stack_size + this->argument_expressions.size());
-
-
 	// Execute target function
-	vmstate.func_args_start.push_back(initial_arg_stack_size);
+	vmstate.func_args_start.push_back((unsigned int)initial_arg_stack_size);
 
 	if(VERBOSE_EXEC)
 		conPrint(vmstate.indent() + "Calling " + use_target_func->sig.toString() + ", func_args_start: " + toString(vmstate.func_args_start.back()) + "\n");
@@ -234,9 +231,7 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 	vmstate.func_args_start.pop_back();
 
 	// Remove arguments from stack
-	while(vmstate.argument_stack.size() > initial_arg_stack_size)
-		vmstate.argument_stack.pop_back();
-	assert(vmstate.argument_stack.size() == initial_arg_stack_size);
+	vmstate.argument_stack.resize(initial_arg_stack_size);
 
 	return ret;
 }
@@ -1723,17 +1718,29 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 	else if(static_function_name == "iterate")
 	{
 		//TODO: check arg 0 is constant.
-		if(!(this->argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType && this->argument_expressions[0].downcastToPtr<Variable>()->binding_type == Variable::BoundToGlobalDefVariable))
+		if(this->argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType && this->argument_expressions[0].downcastToPtr<Variable>()->binding_type == Variable::BoundToGlobalDefVariable)
+		{
+			return this->static_target_function->built_in_func_impl.downcastToPtr<IterateBuiltInFunc>()->emitOpenCLForFunctionArg(
+				params,
+				this->argument_expressions[0].downcastToPtr<Variable>()->bound_function,
+				this->argument_expressions
+			);
+		}
+		else if(this->argument_expressions[0]->nodeType() == ASTNode::FunctionDefinitionType)
+		{
+			return this->static_target_function->built_in_func_impl.downcastToPtr<IterateBuiltInFunc>()->emitOpenCLForFunctionArg(
+				params,
+				this->argument_expressions[0].downcastToPtr<FunctionDefinition>(),
+				this->argument_expressions
+			);
+		}
+		else
 			throw BaseException("Error while emitting OpenCL C: First arg to iterate must be a constant reference to a globally defined function.");
 
 
 		
 
-		return this->static_target_function->built_in_func_impl.downcastToPtr<IterateBuiltInFunc>()->emitOpenCLForFunctionArg(
-			params,
-			this->argument_expressions[0].downcastToPtr<Variable>()->bound_function,
-			this->argument_expressions
-		);
+		
 		/*if(argument_expressions.size() != 1)
 			throw BaseException("Error while emitting OpenCL C: abs function with != 1 arg.");
 

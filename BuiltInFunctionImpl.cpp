@@ -2193,13 +2193,17 @@ ValueRef IterateBuiltInFunc::invoke(VMState& vmstate)
 	while(1)
 	{
 		// Set up arg stack
-		vmstate.func_args_start.push_back((unsigned int)vmstate.argument_stack.size());
+		const size_t inital_arg_stack_size = vmstate.argument_stack.size();
+		vmstate.func_args_start.push_back((unsigned int)inital_arg_stack_size);
 		vmstate.argument_stack.push_back(running_val); // Push value arg
 		vmstate.argument_stack.push_back(new IntValue(iteration, true)); // Push iteration
 		for(size_t i=0; i<invariant_data_types.size(); ++i)
 			vmstate.argument_stack.push_back(invariant_data[i]);
 		
 		// Call f
+		if(f->func_def->is_anon_func)
+			vmstate.argument_stack.push_back(f->captured_vars.getPointer());
+
 		ValueRef result = f->func_def->invoke(vmstate);
 		
 		// Unpack result
@@ -2208,11 +2212,7 @@ ValueRef IterateBuiltInFunc::invoke(VMState& vmstate)
 		ValueRef new_running_val = tuple_result->e[0];
 		bool continue_bool = checkedCast<const BoolValue>(tuple_result->e[1].ptr())->value;
 
-		for(size_t i=0; i<invariant_data_types.size(); ++i)
-			vmstate.argument_stack.pop_back();
-
-		vmstate.argument_stack.pop_back(); // Pop iteration arg
-		vmstate.argument_stack.pop_back(); // Pop Value arg
+		vmstate.argument_stack.resize(inital_arg_stack_size); // Pop args off stack.
 		vmstate.func_args_start.pop_back();
 
 		if(!continue_bool)
@@ -2299,7 +2299,7 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	llvm::Value* tuple_alloca = entry_block_builder.CreateAlloca(
 		func_type->return_type->LLVMType(*params.module), // tuple<State, bool>
 		llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1, true)), // num elems
-		"Tuple space"
+		"tuple_space"
 	);
 
 	// Allocate space on stack for the running state, if the state type is not pass-by-value.
@@ -2310,7 +2310,7 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 		state_alloca = entry_block_builder.CreateAlloca(
 			state_type->LLVMType(*params.module), // State
 			llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1, true)), // num elems
-			"Running state"
+			"running_state"
 		);
 
 	// Load and store initial state in running state
@@ -2447,8 +2447,7 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	else
 	{
 		// Copy from state_alloca to return_ptr
-		llvm::Value* running_state_ = params.builder->CreateLoad(state_alloca);
-		params.builder->CreateStore(running_state_, return_ptr);
+		params.builder->CreateStore(running_state, return_ptr);
 		return return_ptr;
 	}
 }
@@ -2522,7 +2521,7 @@ const std::string IterateBuiltInFunc::emitOpenCLForFunctionArg(EmitOpenCLCodePar
 	s += "\t\tstate = res.field_0;\n";
 	s += "\t}\n";
 	s += "}\n";
-	params.file_scope_code += s;
+	params.file_scope_func_defs += s;
 
 	// Return a call to the function
 	std::string call_code = "iterate_" + toString(params.uid - 1) + "(" + argument_expressions[1]->emitOpenCLC(params);

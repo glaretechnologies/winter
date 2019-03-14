@@ -90,7 +90,7 @@ public:
 		InlineFunctionCalls, // inline function calls
 		SubstituteVariables, // Used in InlineFunctionCalls passes: replace all variables in the function body with the argument values.
 		CustomVisit, // Calls supplied ASTNodeVisitor on each node visited.
-		UpdateUpRefs,
+		UpdateUpRefs, // When cloning a subtree of nodes, update upwards pointers to point into the new subtree.
 		DeadFunctionElimination, // Removes all function definitions that are not reachable (through direct or indirect function calls) from the set of entry functions.
 		DeadCodeElimination_ComputeAlive, // Works out which let variables are referenced.
 		DeadCodeElimination_RemoveDead, // Removes let variables that are not referenced.
@@ -256,6 +256,8 @@ public:
 	EmitOpenCLCodeParams() : emit_in_bound_asserts(false) {}
 
 	std::string file_scope_code;
+
+	std::string file_scope_func_defs;
 
 	/*
 	An expression in Winter, when transformed to OpenCL C, may not be expressible just as an expression.

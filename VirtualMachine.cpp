@@ -1916,6 +1916,10 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 		}
 	}
 
+	for(size_t i=0; i<linker.anon_functions_to_codegen.size(); ++i)
+	{
+		top_level_def_src += linker.anon_functions_to_codegen[i]->emitOpenCLC(params) + "\n";
+	}
 	
 
 	// TODO: Will need to handle dependencies between tuples here as well.
@@ -2077,7 +2081,9 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 	built_in_func_code += "// End Winter built-in functions\n";
 
 	res.struct_def_code = struct_def_code;
-	res.function_code = constructor_code + "\n\n" + built_in_func_code + "\n\n" + params.file_scope_code + "\n\n" + top_level_def_src;
+	res.function_code = "\n// Constructor code:\n " + constructor_code + "\n// Built-in func code:\n" + built_in_func_code + "\n// File-scope code:\n" + params.file_scope_code + 
+		"\n// File-scope func defs:\n" + params.file_scope_func_defs + 
+		"\n// Top level defs:\n" + top_level_def_src;
 	return res;
 }
 

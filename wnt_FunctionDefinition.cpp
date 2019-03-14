@@ -49,54 +49,6 @@ namespace Winter
 {
 
 
-CapturedVar::CapturedVar()
-:	bound_function(NULL),
-	bound_let_node(NULL),
-	enclosing_lambda(NULL)
-{}
-
-
-TypeRef CapturedVar::type() const
-{
-	if(this->vartype == Let)
-	{
-		// NOTE: duplicated from var, de-duplicate
-
-		const TypeRef let_var_type = this->bound_let_node->type();
-		if(this->bound_let_node->vars.size() == 1)
-			return let_var_type;
-		else // Else if destructuring assignment:
-		{
-			if(let_var_type.isNull() || (let_var_type->getType() != Type::TupleTypeType))
-				return NULL;
-			const TupleType* tuple_type = let_var_type.downcastToPtr<TupleType>();
-			if(this->let_var_index >= 0 && this->let_var_index < (int)tuple_type->component_types.size()) // If in bounds:
-				return tuple_type->component_types[this->let_var_index];
-			else
-				return NULL;
-		}
-	}
-	else if(this->vartype == Arg)
-	{
-		assert(this->bound_function);
-		return this->bound_function->args[this->arg_index].type;
-	}
-	else if(this->vartype == Captured)
-	{
-		assert(this->enclosing_lambda);
-		return this->enclosing_lambda->captured_vars[this->free_index].type();
-	}
-	else
-	{
-		assert(!"Invalid vartype");
-		return TypeRef();
-	}
-}
-
-
-//----------------------------------------------------------------------------------
-
-
 static const std::vector<TypeVRef> makeArgTypeVector(const std::vector<FunctionDefinition::FunctionArg>& args)
 {
 	std::vector<TypeVRef> res;
@@ -164,41 +116,38 @@ ValueRef FunctionDefinition::exec(VMState& vmstate)
 	// Capture variables at this point, by getting them off the arg and let stack.
 	vector<ValueRef> vals;
 	if(vmstate.capture_vars)
-		for(size_t i=0; i<this->captured_vars.size(); ++i)
+	{
+		for(auto it = free_variables.begin(); it != free_variables.end(); ++it)
 		{
-			if(this->captured_vars[i].vartype == CapturedVar::Arg)
-			{
-				vals.push_back(vmstate.argument_stack[vmstate.func_args_start.back() + this->captured_vars[i].arg_index]);
-			}
-			else if(this->captured_vars[i].vartype == CapturedVar::Let)
-			{
-				//const int let_frame_offset = this->captured_vars[i].let_frame_offset;
-				//assert(let_frame_offset < (int)vmstate.let_stack_start.size());
+			Variable* var = *it;
 
-				//const int let_stack_start = (int)vmstate.let_stack_start[vmstate.let_stack_start.size() - 1 - let_frame_offset];
-				//vals.push_back(vmstate.let_stack[let_stack_start + this->captured_vars[i].index]);
-
-				LetASTNode* bound_let_node = this->captured_vars[i].bound_let_node;
-				ValueRef val = this->captured_vars[i].bound_let_node->exec(vmstate);
-
-				if(bound_let_node->vars.size() == 1)
-				{}
-				else
-				{
-					// Destructuring assignment, return the particular element from the tuple.
-					const TupleValue* t = checkedCast<TupleValue>(val.getPointer());
-					val = t->e[this->captured_vars[i].let_var_index];
-				}
-
-				vals.push_back(val);
-			}
-			else if(this->captured_vars[i].vartype == CapturedVar::Captured)
+			// TODO: need to handle this free variable being bound to another free variable?
+			/*if()
 			{
 				// Get ref to capturedVars structure of values, will be passed in as last arg to function
 				ValueRef captured_struct = vmstate.argument_stack.back();
 				const StructureValue* s = checkedCast<StructureValue>(captured_struct.getPointer());
 
-				ValueRef val = s->fields[this->captured_vars[i].free_index];
+				const int free_index = this->getFreeIndexForVar(var);
+				ValueRef val = s->fields[free_index];
+
+				vals.push_back(val);
+			}
+			else */if(var->binding_type == Variable::ArgumentVariable)
+			{
+				vals.push_back(vmstate.argument_stack[vmstate.func_args_start.back() + var->arg_index]);
+			}
+			else if(var->binding_type == Variable::LetVariable)
+			{
+				LetASTNode* bound_let_node = var->bound_let_node;
+				ValueRef val = var->bound_let_node->exec(vmstate);
+
+				if(bound_let_node->vars.size() != 1)
+				{
+					// Destructuring assignment, return the particular element from the tuple.
+					const TupleValue* t = checkedCast<TupleValue>(val.getPointer());
+					val = t->e[var->let_var_index];
+				}
 
 				vals.push_back(val);
 			}
@@ -208,6 +157,7 @@ ValueRef FunctionDefinition::exec(VMState& vmstate)
 				throw BaseException("internal error 136");
 			}
 		}
+	}
 
 	// Put captured values into the variable struct.
 	Reference<StructureValue> var_struct = new StructureValue(vals);
@@ -331,6 +281,10 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 		for(size_t i = 0; i<this->args.size(); ++i)
 			this->args[i].ref_count = 0;
 	}
+	else if(payload.operation == TraversalPayload::UnbindVariables)
+	{
+		this->free_variables.clear();
+	}
 
 	//if(payload.operation == TraversalPayload::BindVariables) // LinkFunctions)
 	//{
@@ -367,33 +321,11 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 	}
 	else if(payload.operation == TraversalPayload::UpdateUpRefs)
 	{
-		for(size_t i=0; i<captured_vars.size(); ++i)
-		{
-			switch(captured_vars[i].vartype)
-			{
-			case CapturedVar::Let:
-				{
-					ASTNode* updated_node = payload.clone_map[captured_vars[i].bound_let_node];
-					if(updated_node)
-						captured_vars[i].bound_let_node = (LetASTNode*)updated_node;
-					break;
-				}
-			case CapturedVar::Arg:
-				break;
-			case CapturedVar::Captured:
-				{
-					break;
-				}
-			}
-		}
 	}
 	else if(payload.operation == TraversalPayload::SubstituteVariables)
 	{
 		if(body.nonNull())
 			checkSubstituteVariable(body, payload);
-
-		// Clear captured vars
-		this->captured_vars.resize(0);
 
 		this->order_num = payload.new_order_num;
 	}
@@ -423,9 +355,9 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 		// If this is an anon func, add any types that it captures to the current set for the top-level function we are in.
 		if(this->is_anon_func)
 		{
-			for(size_t i=0; i<this->captured_vars.size(); ++i)
+			for(auto it = free_variables.begin(); it != free_variables.end(); ++it)
 			{
-				payload.captured_types.insert(this->captured_vars[i].type());
+				payload.captured_types.insert((*it)->type());
 			}
 		}
 
@@ -553,18 +485,6 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 				}
 			}
 		}
-		else
-		{
-			for(size_t i=0; i<captured_vars.size(); ++i)
-			{
-				if(captured_vars[i].vartype == CapturedVar::Let)
-				{
-					payload.reachable_nodes.insert(captured_vars[i].bound_let_node); // Mark as alive
-					if(payload.processed_nodes.find(captured_vars[i].bound_let_node) == payload.processed_nodes.end()) // If has not been processed yet:
-						payload.nodes_to_process.push_back(captured_vars[i].bound_let_node); // Add to to-process list.
-				}
-			}
-		}
 	}
 	else if(payload.operation == TraversalPayload::AddAnonFuncsToLinker)
 	{
@@ -598,10 +518,6 @@ void FunctionDefinition::print(int depth, std::ostream& s) const
 	if(this->declared_return_type.nonNull())
 		s << " (Declared ret type: " + this->declared_return_type->toString() << ")";
 	s << "\n";
-
-	for(size_t i=0; i<this->captured_vars.size(); ++i)
-		captured_vars[i].print(depth + 1, s);
-
 
 	if(this->built_in_func_impl.nonNull())
 	{
@@ -800,7 +716,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		llvm::Value* alloca_ptr = entry_block_builder.CreateAlloca(
 			closure_type, // byte
 			llvm::ConstantInt::get(*params.context, llvm::APInt(64, 1, true)), // array size
-			this->type()->toString() + " closure stack space"
+			"closure"
 		);
 
 		closure_pointer = alloca_ptr;
@@ -878,33 +794,47 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 	llvm::Value* captured_var_struct_ptr = LLVMUtils::createStructGEP(params.builder, closure_pointer, Function::capturedVarStructIndex(), "captured_var_struct_ptr");
 
 	// for each captured var
-	for(size_t i=0; i<this->captured_vars.size(); ++i)
+	size_t free_var_index = 0;
+	for(auto z = free_variables.begin(); z != free_variables.end(); ++z)
 	{
+		Variable* free_var = *z;
+	
 		llvm::Value* val = NULL;
-		if(this->captured_vars[i].vartype == CapturedVar::Arg)
+		// TODO: need to handle this free variable being bound to another free variable?
+		/*if()
+		{
+			// This captured var is bound to a captured var itself.
+			// The target captured var is in the captured var struct for the function, which is passed as the last arg to the function body.
+			//FunctionDefinition* def = this->captured_vars[i].bound_function;
+			llvm::Value* base_current_func_captured_var_struct = LLVMUtils::getLastArg(params.currently_building_func);
+
+			// Now we need to downcast it to the correct type.
+			llvm::Type* actual_cap_var_struct_type = params.currently_building_func_def->getCapturedVariablesStructType()->LLVMType(*params.module);
+
+			llvm::Value* current_func_captured_var_struct = params.builder->CreateBitCast(base_current_func_captured_var_struct, LLVMTypeUtils::pointerType(actual_cap_var_struct_type), "actual_cap_var_struct_type");
+
+			llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, current_func_captured_var_struct, this->captured_vars[i].free_index);
+
+			val = params.builder->CreateLoad(field_ptr);
+		}
+		else */if(free_var->binding_type == Variable::ArgumentVariable)
 		{
 			// Load arg
 			val = LLVMUtils::getNthArg(
 				params.currently_building_func,
-				params.currently_building_func_def->getLLVMArgIndex(this->captured_vars[i].arg_index)
+				params.currently_building_func_def->getLLVMArgIndex(free_var->arg_index)
 			);
 		}
-		else if(this->captured_vars[i].vartype == CapturedVar::Let)
+		else if(free_var->binding_type == Variable::LetVariable)
 		{
 			// Load let:
-			// Walk up AST until we get to the correct let block
-	/*		const int let_frame_offset = this->captured_vars[i].let_frame_offset;
+			LetASTNode* let_node = free_var->bound_let_node;
 
-			const int let_block_index = (int)params.let_block_stack.size() - 1 - let_frame_offset;
-			LetBlock* let_block = params.let_block_stack[let_block_index];*/
-
-			LetASTNode* let_node = this->captured_vars[i].bound_let_node;
-	
 			assert(params.let_values.find(let_node) != params.let_values.end());
 			val = params.let_values[let_node];
 
 			// NOTE: This code is duplicated from Variable.  de-duplicate.
-			TypeRef cap_var_type_win = this->captured_vars[i].type();
+			TypeRef cap_var_type_win = free_var->type();
 
 			if(let_node->vars.size() > 1)
 			{
@@ -912,31 +842,15 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 				// Value should be a pointer to a tuple struct.
 				if(cap_var_type_win->passByValue())
 				{
-					llvm::Value* tuple_elem = params.builder->CreateLoad(LLVMUtils::createStructGEP(params.builder, val, this->captured_vars[i].let_var_index, "tuple_elem_ptr"));
+					llvm::Value* tuple_elem = params.builder->CreateLoad(LLVMUtils::createStructGEP(params.builder, val, free_var->let_var_index, "tuple_elem_ptr"));
 					val = tuple_elem;
 				}
 				else
 				{
-					llvm::Value* tuple_elem = LLVMUtils::createStructGEP(params.builder, val, this->captured_vars[i].let_var_index, "tuple_elem_ptr");
+					llvm::Value* tuple_elem = LLVMUtils::createStructGEP(params.builder, val, free_var->let_var_index, "tuple_elem_ptr");
 					val = tuple_elem;
 				}
 			}
-		}
-		else if(this->captured_vars[i].vartype == CapturedVar::Captured)
-		{
-			// This captured var is bound to a captured var itself.
-			// The target captured var is in the captured var struct for the function, which is passed as the last arg to the function body.
-			//FunctionDefinition* def = this->captured_vars[i].bound_function;
-			llvm::Value* base_current_func_captured_var_struct = LLVMUtils::getLastArg(params.currently_building_func);
-			
-			// Now we need to downcast it to the correct type.
-			llvm::Type* actual_cap_var_struct_type = params.currently_building_func_def->getCapturedVariablesStructType()->LLVMType(*params.module);
-			
-			llvm::Value* current_func_captured_var_struct = params.builder->CreateBitCast(base_current_func_captured_var_struct, LLVMTypeUtils::pointerType(actual_cap_var_struct_type), "actual_cap_var_struct_type");
-
-			llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, current_func_captured_var_struct, this->captured_vars[i].free_index);
-			
-			val = params.builder->CreateLoad(field_ptr);
 		}
 		else
 		{
@@ -945,13 +859,15 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 		
 		// store in captured var structure field
-		llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, captured_var_struct_ptr, (unsigned int)i, "captured_var_" + toString(i) + "_field_ptr");
+		llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, captured_var_struct_ptr, (unsigned int)free_var_index, "captured_var_" + toString(free_var_index) + "_field_ptr");
 		llvm::StoreInst* store_inst_ = params.builder->CreateStore(val, field_ptr);
 
-		addMetaDataCommentToInstruction(params, store_inst_, "Store captured var " + toString(i) + " in closure");
+		addMetaDataCommentToInstruction(params, store_inst_, "Store captured var " + toString(free_var_index) + " in closure");
 
 		// If the captured var is a ref-counted type, we need to increment its reference count, since the struct now holds a reference to it. 
-		captured_var_struct_type->component_types[i]->emitIncrRefCount(params, val, "Capture var ref count increment");
+		captured_var_struct_type->component_types[free_var_index]->emitIncrRefCount(params, val, "Capture var ref count increment");
+
+		free_var_index++;
 	}
 
 
@@ -1505,7 +1421,7 @@ Reference<ASTNode> FunctionDefinition::clone(CloneMapType& clone_map)
 		this->built_in_func_impl
 	);
 
-	f->captured_vars = this->captured_vars;
+	// NOTE: We don't need to copy free_variables as they should be cleared after copying anyway, since variables will be rebound for copied trees.
 	f->captured_var_types = this->captured_var_types;
 	f->is_anon_func = this->is_anon_func;
 	f->need_to_emit_captured_var_struct_version = this->need_to_emit_captured_var_struct_version;
@@ -1665,17 +1581,18 @@ StructureTypeVRef FunctionDefinition::getCapturedVariablesStructType() const
 	vector<TypeVRef> field_types;
 	vector<string> field_names;
 
-	for(size_t i=0; i<this->captured_vars.size(); ++i)
+	size_t free_var_index = 0;
+	for(auto z = free_variables.begin(); z != free_variables.end(); ++z)
 	{
 		// Get the type of the captured variable.
-		const TypeRef field_type = this->captured_vars[i].type();
+		const TypeRef field_type = (*z)->type();
 		if(field_type.isNull())
 			throw BaseException("Error: field type for captured var is null.");
 
 		field_types.push_back(TypeVRef(field_type));
-		field_names.push_back("captured_var_" + toString((uint64)i));
+		field_names.push_back("captured_var_" + toString((uint64)free_var_index));
+		free_var_index++;
 	}
-			
 
 	//NOTE: this is pretty heavyweight.
 	return new StructureType(this->sig.typeMangledName() + "_captured_var_struct", field_types, field_names);
@@ -1697,13 +1614,28 @@ int FunctionDefinition::getCapturedVarStructLLVMArgIndex()
 {
 	// The pointer to the captured vars struct goes after the 'normal' arguments.
 
-	assert(!this->captured_vars.empty());
+	assert(!this->free_variables.empty());
 
 	if(this->returnType()->passByValue())
 		return (int)this->args.size();
 	else
 		return (int)this->args.size() + 1; // allow room for sret argument.
 }
+
+
+int FunctionDefinition::getFreeIndexForVar(const Variable* var)
+{
+	int i=0;
+	for(auto it = free_variables.begin(); it != free_variables.end(); ++it, ++i)
+	{
+		if(*it == var)
+			return i;
+	}
+
+	assert(0);
+	return 0;
+}
+
 
 
 const std::string makeSafeStringForFunctionName(const std::string& s)
@@ -1715,29 +1647,6 @@ const std::string makeSafeStringForFunctionName(const std::string& s)
 			res[i] = '_';
 
 	return res;
-}
-
-
-void CapturedVar::print(int depth, std::ostream& s) const
-{
-	printMargin(depth, s);
-	std::string vartype_s;
-	switch(vartype)
-	{
-	case Let:
-		vartype_s = "Let"; break;
-	case Arg:
-		vartype_s = "Arg"; break;
-	case Captured:
-		vartype_s = "Captured"; break;
-	};
-
-	s << "captured var, vartype=" + vartype_s + ", free_index=" << free_index;
-	if(bound_function)
-		s << " bound func: " + bound_function->sig.toString() + ", arg_index=" << arg_index;
-	if(bound_let_node)
-		s << " bound let node: " + toHexString((uint64)bound_let_node);
-	s << "\n";
 }
 
 

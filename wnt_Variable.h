@@ -22,6 +22,7 @@ Variable AST node.
 class Variable : public ASTNode
 {
 public:
+	// The kind of AST nodes that a variable can be bound to.
 	enum BindingType
 	{
 		UnboundVariable,
@@ -32,6 +33,7 @@ public:
 	};
 
 	Variable(const std::string& name, const SrcLocation& loc);
+	~Variable();
 
 	virtual ValueRef exec(VMState& vmstate);
 	virtual TypeRef type() const;
@@ -50,22 +52,19 @@ private:
 	void bindVariables(TraversalPayload& payload, const std::vector<ASTNode*>& stack);
 public:
 
-
 	std::string name; // variable name.
 
 	BindingType binding_type; // one of BindingType above.
 
-	FunctionDefinition* bound_function; // Function for which the variable is an argument of.  Use in ArgumentVariable case.
-	LetASTNode* bound_let_node; // Used in LetVariable case.
-	NamedConstant* bound_named_constant; // Used in BoundToNamedConstant case.
+	FunctionDefinition* bound_function; // Function for which the variable is an argument of.  Used in binding_type == ArgumentVariable case.
+	LetASTNode* bound_let_node; // Used in binding_type == LetVariable case.
+	NamedConstant* bound_named_constant; // Used in binding_type == BoundToNamedConstant case.
 
 	int arg_index; // index in function argument list, or index of captured var.
+	int let_var_index; // Index of the let variable bound to, for destructing assignment case may be > 0.  Used in binding_type == LetVariable case.
 
-	FunctionDefinition* enclosing_lambda;
-	int free_index; // If this variable is in a lambda expression, and the variable is free in the mostly tightly enclosing lambda, then this is the index of this variable in the list
-	// of free variables of the lambda.  If it's not free in a lambda then it is -1.
-
-	int let_var_index; // Index of the let variable bound to, for destructing assignment case may be > 0.  Used in LetVariable case.
+	FunctionDefinition* enclosing_lambda; // Most tightly-enclosing Lambda expression in which this variable exists, 
+	// if this variable is free (not bound to anything in the lambda expression).
 };
 
 

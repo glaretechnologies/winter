@@ -18,36 +18,7 @@ namespace Winter
 
 const std::string makeSafeStringForFunctionName(const std::string& s);
 struct ProgramStats;
-
-
-class CapturedVar
-{
-public:
-	CapturedVar();
-
-	void print(int depth, std::ostream& s) const;
-
-	enum CapturedVarType
-	{
-		Let,
-		Arg,
-		Captured // we are capturing a captured var from an enclosing lambda expression :)
-	};
-
-	TypeRef type() const;
-
-
-	CapturedVarType vartype;
-	int arg_index; // Argument index
-	//int let_frame_offset; // how many let blocks we need to ignore before we get to the let block with the var we are bound to.
-	int free_index;
-	int let_var_index;
-
-
-	FunctionDefinition* bound_function; // Function for which the variable is an argument of,
-	LetASTNode* bound_let_node;
-	FunctionDefinition* enclosing_lambda;
-};
+class Variable;
 
 
 /*=====================================================================
@@ -79,14 +50,7 @@ public:
 
 	TypeRef returnType() const;
 	
-
-	//bool use_captured_vars; // Set to true if this is an anonymous function, in which case we will always pass it in a closure.
-	std::vector<CapturedVar> captured_vars; // For when parsing anon functions
-
-	// Types that are captured by any lambda expressions in this function definition.
-	std::set<TypeRef> captured_var_types;
-
-
+	
 	virtual ValueRef invoke(VMState& vmstate);
 	virtual ValueRef exec(VMState& vmstate);
 	virtual TypeRef type() const;
@@ -143,6 +107,9 @@ public:
 
 	int getCapturedVarStructLLVMArgIndex();
 
+	// Get index of this variable (which must be in the set of free variables for this lambda) in the list of free variables.
+	int getFreeIndexForVar(const Variable* var);
+
 
 
 	std::vector<FunctionArg> args;
@@ -170,6 +137,12 @@ public:
 	bool noinline; // Optional attribute.  False by default.  If true, function won't be inlined.
 
 	int64 llvm_reported_stack_size; // -1 if this information is not returned by LLVM
+
+	// For lambda expressions (anon functions), this is the set of variables defined in the anon function that are free, e.g. bound to a node outside the anon function.
+	std::set<Variable*> free_variables;
+
+	// Types that are captured by any lambda expressions in this function definition, e.g. types of any free variables.
+	std::set<TypeRef> captured_var_types;
 private:
 };
 
