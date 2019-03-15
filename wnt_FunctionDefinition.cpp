@@ -133,11 +133,11 @@ ValueRef FunctionDefinition::exec(VMState& vmstate)
 
 				vals.push_back(val);
 			}
-			else */if(var->binding_type == Variable::ArgumentVariable)
+			else */if(var->binding_type == Variable::BindingType_Argument)
 			{
 				vals.push_back(vmstate.argument_stack[vmstate.func_args_start.back() + var->arg_index]);
 			}
-			else if(var->binding_type == Variable::LetVariable)
+			else if(var->binding_type == Variable::BindingType_Let)
 			{
 				LetASTNode* bound_let_node = var->bound_let_node;
 				ValueRef val = var->bound_let_node->exec(vmstate);
@@ -606,7 +606,7 @@ std::string FunctionDefinition::emitOpenCLC(EmitOpenCLCodeParams& params) const
 	params.blocks.pop_back();
 
 	// If the body expression is just an argument, and it is pass by pointer, then it will need to be dereferenced.
-	if((body->nodeType() == ASTNode::VariableASTNodeType) && (body.downcastToPtr<Variable>()->binding_type == Variable::ArgumentVariable) && body->type()->OpenCLPassByPointer())
+	if((body->nodeType() == ASTNode::VariableASTNodeType) && (body.downcastToPtr<Variable>()->binding_type == Variable::BindingType_Argument) && body->type()->OpenCLPassByPointer())
 		s += "\treturn *" + body_expr + ";\n";// Deref
 	else
 		s += "\treturn " + body_expr + ";\n";
@@ -817,7 +817,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 			val = params.builder->CreateLoad(field_ptr);
 		}
-		else */if(free_var->binding_type == Variable::ArgumentVariable)
+		else */if(free_var->binding_type == Variable::BindingType_Argument)
 		{
 			// Load arg
 			val = LLVMUtils::getNthArg(
@@ -825,7 +825,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 				params.currently_building_func_def->getLLVMArgIndex(free_var->arg_index)
 			);
 		}
-		else if(free_var->binding_type == Variable::LetVariable)
+		else if(free_var->binding_type == Variable::BindingType_Let)
 		{
 			// Load let:
 			LetASTNode* let_node = free_var->bound_let_node;

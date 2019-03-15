@@ -352,12 +352,12 @@ void checkInlineExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector
 			{
 				// Walk up the tree until we get to a node that is not a variable bound to a let node:
 				ASTNode* cur = func_expr->get_func_expr.getPointer();
-				while((cur->nodeType() == ASTNode::VariableASTNodeType) && (((Variable*)cur)->binding_type == Variable::LetVariable))
+				while((cur->nodeType() == ASTNode::VariableASTNodeType) && (((Variable*)cur)->binding_type == Variable::BindingType_Let))
 					cur = ((Variable*)cur)->bound_let_node->expr.getPointer();
 
 				if(cur->nodeType() == ASTNode::FunctionDefinitionType)
 					target_func = (FunctionDefinition*)cur;
-				else if(cur->nodeType() == ASTNode::VariableASTNodeType && ((Variable*)cur)->binding_type == Variable::BoundToGlobalDefVariable)
+				else if(cur->nodeType() == ASTNode::VariableASTNodeType && ((Variable*)cur)->binding_type == Variable::BindingType_GlobalDef)
 					target_func = ((Variable*)cur)->bound_function;
 			}
 			/*else if(func_expr->get_func_expr->isConstant())
@@ -552,7 +552,7 @@ void checkSubstituteVariable(ASTNodeRef& e, TraversalPayload& payload)
 	{
 		Reference<Variable> var = e.downcast<Variable>();
 
-		if(var->binding_type == Variable::ArgumentVariable && var->bound_function == payload.func_args_to_sub)
+		if(var->binding_type == Variable::BindingType_Argument && var->bound_function == payload.func_args_to_sub)
 		{
 			// Replace the variable with the argument value.	
 			if(var->arg_index >= (int)payload.variable_substitutes.size())
@@ -985,13 +985,13 @@ bool expressionsHaveSameValue(const ASTNodeRef& a, const ASTNodeRef& b)
 		if(avar->binding_type != bvar->binding_type)
 			return false;
 
-		if(avar->binding_type == Variable::ArgumentVariable)
+		if(avar->binding_type == Variable::BindingType_Argument)
 		{
 			return 
 				avar->bound_function == bvar->bound_function && 
 				avar->arg_index == bvar->arg_index;
 		}
-		else if(avar->binding_type == Variable::LetVariable)
+		else if(avar->binding_type == Variable::BindingType_Let)
 		{
 			return 
 				avar->bound_let_node == bvar->bound_let_node && 

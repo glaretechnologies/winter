@@ -151,7 +151,7 @@ std::string LetBlock::emitOpenCLC(EmitOpenCLCodeParams& params) const
 		if(this->lets[i]->vars.size() == 1)
 		{
 			// If let expression is a pass-by-pointer argument, need to dereference it.
-			if(this->lets[i]->expr->type()->OpenCLPassByPointer() && (this->lets[i]->expr->nodeType() == ASTNode::VariableASTNodeType) && (this->lets[i]->expr.downcastToPtr<Variable>()->binding_type == Variable::ArgumentVariable))
+			if(this->lets[i]->expr->type()->OpenCLPassByPointer() && (this->lets[i]->expr->nodeType() == ASTNode::VariableASTNodeType) && (this->lets[i]->expr.downcastToPtr<Variable>()->binding_type == Variable::BindingType_Argument))
 				let_expression = "*" + let_expression;
 
 			s += "\t" + this->lets[i]->type()->OpenCLCType() + " " + mapOpenCLCVarName(params.opencl_c_keywords, this->lets[i]->vars[0].name) + " = " + let_expression + ";\n";

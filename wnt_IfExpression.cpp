@@ -228,7 +228,7 @@ std::string IfExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 	std::string then_block_code;
 	params.blocks.push_back(std::string());
 	std::string then_code = then_expr->emitOpenCLC(params);
-	if(then_expr->type()->OpenCLPassByPointer() && (then_expr->nodeType() == ASTNode::VariableASTNodeType) && (then_expr.downcastToPtr<Variable>()->binding_type == Variable::ArgumentVariable))
+	if(then_expr->type()->OpenCLPassByPointer() && (then_expr->nodeType() == ASTNode::VariableASTNodeType) && (then_expr.downcastToPtr<Variable>()->binding_type == Variable::BindingType_Argument))
 		then_code = "*" + then_code;
 
 	if(!params.blocks.back().empty()) // If some additional statements are required to compute the 'then' expression, then we can't use ternary if operator.
@@ -242,7 +242,7 @@ std::string IfExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 	std::string else_block_code;
 	params.blocks.push_back(std::string());
 	std::string else_code = else_expr->emitOpenCLC(params);
-	if(else_expr->type()->OpenCLPassByPointer() && (else_expr->nodeType() == ASTNode::VariableASTNodeType) && (else_expr.downcastToPtr<Variable>()->binding_type == Variable::ArgumentVariable))
+	if(else_expr->type()->OpenCLPassByPointer() && (else_expr->nodeType() == ASTNode::VariableASTNodeType) && (else_expr.downcastToPtr<Variable>()->binding_type == Variable::BindingType_Argument))
 		else_code = "*" + else_code;
 	if(!params.blocks.back().empty())
 	{

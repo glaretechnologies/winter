@@ -25,11 +25,11 @@ public:
 	// The kind of AST nodes that a variable can be bound to.
 	enum BindingType
 	{
-		UnboundVariable,
-		LetVariable,					// Bound to a let variable
-		ArgumentVariable,				// Bound to an argument of the most-tightly enclosing function
-		BoundToGlobalDefVariable,		// Bound to a globally defined (program scope) function
-		BoundToNamedConstant			// Bound to a named constant
+		BindingType_Unbound,
+		BindingType_Let,			// Bound to a let variable
+		BindingType_Argument,		// Bound to an argument of the most-tightly enclosing function
+		BindingType_GlobalDef,		// Bound to a globally defined (program scope) function
+		BindingType_NamedConstant	// Bound to a named constant
 	};
 
 	Variable(const std::string& name, const SrcLocation& loc);

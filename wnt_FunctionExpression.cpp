@@ -582,7 +582,7 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 	{
 		if(get_func_expr.nonNull() && (get_func_expr->nodeType() == ASTNode::VariableASTNodeType))
 		{
-			if((get_func_expr.downcastToPtr<Variable>()->binding_type == Variable::UnboundVariable) && !varWithNameIsInScope(get_func_expr.downcastToPtr<Variable>()->name, payload, stack))
+			if((get_func_expr.downcastToPtr<Variable>()->binding_type == Variable::BindingType_Unbound) && !varWithNameIsInScope(get_func_expr.downcastToPtr<Variable>()->name, payload, stack))
 			{
 				// Convert to static function
 				this->static_function_name = get_func_expr.downcastToPtr<Variable>()->name;
@@ -596,7 +596,7 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 		if(!this->static_target_function && get_func_expr.nonNull())
 		{
 			if(this->get_func_expr->nodeType() == ASTNode::VariableASTNodeType && 
-				this->get_func_expr.downcastToPtr<Variable>()->binding_type == Variable::BoundToGlobalDefVariable)
+				this->get_func_expr.downcastToPtr<Variable>()->binding_type == Variable::BindingType_GlobalDef)
 			{
 				this->static_target_function = this->get_func_expr.downcastToPtr<Variable>()->bound_function;
 				this->get_func_expr = NULL;
@@ -909,12 +909,12 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 		{
 			// Walk up the tree until we get to a node that is not a variable bound to a let node:
 			ASTNode* cur = this->get_func_expr.getPointer();
-			while((cur->nodeType() == ASTNode::VariableASTNodeType) && (((Variable*)cur)->binding_type == Variable::LetVariable))
+			while((cur->nodeType() == ASTNode::VariableASTNodeType) && (((Variable*)cur)->binding_type == Variable::BindingType_Let))
 				cur = ((Variable*)cur)->bound_let_node->expr.getPointer();
 
 			if(cur->nodeType() == ASTNode::FunctionDefinitionType)
 				payload.calls_to_func_count[(FunctionDefinition*)cur]++;
-			else if(cur->nodeType() == ASTNode::VariableASTNodeType && ((Variable*)cur)->binding_type == Variable::BoundToGlobalDefVariable)
+			else if(cur->nodeType() == ASTNode::VariableASTNodeType && ((Variable*)cur)->binding_type == Variable::BindingType_GlobalDef)
 				payload.calls_to_func_count[((Variable*)cur)->bound_function]++;
 		}
 	}
@@ -1242,7 +1242,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 			else if(argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType)
 			{
 				const Variable* var =  argument_expressions[0].downcastToPtr<Variable>();
-				if(var->binding_type == Variable::LetVariable)
+				if(var->binding_type == Variable::BindingType_Let)
 				{
 					ASTNode* target_let_node = var->bound_let_node->expr.getPointer();
 					if(target_let_node->nodeType() == ASTNode::VArrayLiteralType)
@@ -1250,7 +1250,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 						varray_literal = static_cast<const VArrayLiteral*>(target_let_node);
 					}
 				}
-				else if(var->binding_type == Variable::BoundToNamedConstant)
+				else if(var->binding_type == Variable::BindingType_NamedConstant)
 				{
 					ASTNode* target_named_constant_val = var->bound_named_constant->value_expr.getPointer();
 					if(target_named_constant_val->nodeType() == ASTNode::VArrayLiteralType)
@@ -1573,7 +1573,7 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 			const int64 index = static_cast<const IntLiteral*>(argument_expressions[1].getPointer())->value;
 
-			if(argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType && argument_expressions[0].downcastToPtr<Variable>()->binding_type == Variable::ArgumentVariable)
+			if(argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType && argument_expressions[0].downcastToPtr<Variable>()->binding_type == Variable::BindingType_Argument)
 				return argument_expressions[0]->emitOpenCLC(params) + "->field_" + ::toString(index);
 			else
 				return argument_expressions[0]->emitOpenCLC(params) + ".field_" + ::toString(index);
@@ -1664,8 +1664,8 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 		if(argument_expressions.size() != 1)
 			throw BaseException("Error while emitting OpenCL C: get field function with != 1 args.");
 
-		//if(argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType && argument_expressions[0].downcastToPtr<Variable>()->vartype == Variable::LetVariable)
-		if(argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType && argument_expressions[0].downcastToPtr<Variable>()->binding_type == Variable::ArgumentVariable)
+		//if(argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType && argument_expressions[0].downcastToPtr<Variable>()->vartype == Variable::BindingType_Let)
+		if(argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType && argument_expressions[0].downcastToPtr<Variable>()->binding_type == Variable::BindingType_Argument)
 			return argument_expressions[0]->emitOpenCLC(params) + "->" + static_function_name;
 		else
 			return argument_expressions[0]->emitOpenCLC(params) + "." + static_function_name;
@@ -1718,7 +1718,7 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 	else if(static_function_name == "iterate")
 	{
 		//TODO: check arg 0 is constant.
-		if(this->argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType && this->argument_expressions[0].downcastToPtr<Variable>()->binding_type == Variable::BoundToGlobalDefVariable)
+		if(this->argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType && this->argument_expressions[0].downcastToPtr<Variable>()->binding_type == Variable::BindingType_GlobalDef)
 		{
 			return this->static_target_function->built_in_func_impl.downcastToPtr<IterateBuiltInFunc>()->emitOpenCLForFunctionArg(
 				params,
@@ -1813,11 +1813,11 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 				// "SomeStruct arg_xx = g();"
 
 				// If the argument expression is itself an argument to the current function, then it is already a pointer, so just use as-is.
-				if(argument_expressions[i]->nodeType() == ASTNode::VariableASTNodeType && argument_expressions[i].downcastToPtr<Variable>()->binding_type == Variable::ArgumentVariable)
+				if(argument_expressions[i]->nodeType() == ASTNode::VariableASTNodeType && argument_expressions[i].downcastToPtr<Variable>()->binding_type == Variable::BindingType_Argument)
 				{
 					s += argument_expressions[i]->emitOpenCLC(params);
 				}
-				else if(argument_expressions[i]->nodeType() == ASTNode::VariableASTNodeType && argument_expressions[i].downcastToPtr<Variable>()->binding_type == Variable::LetVariable)
+				else if(argument_expressions[i]->nodeType() == ASTNode::VariableASTNodeType && argument_expressions[i].downcastToPtr<Variable>()->binding_type == Variable::BindingType_Let)
 				{
 					// If the variable is bound to a let variable, then it is on the stack of the C function.  So it is not a pointer
 					s += "&" + argument_expressions[i]->emitOpenCLC(params);
@@ -1929,7 +1929,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			field_type->emitIncrRefCount(params, result, "GetField " + get_field_func->struct_type->name + "." + field_name + " result increment");
 
 			// Decrement argument 0 structure ref count
-			//if(!(argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType)) // && argument_expressions[0].downcastToPtr<Variable>()->vartype == Variable::LetVariable)) // Don't decr let var ref counts, the ref block will do that.
+			//if(!(argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType)) // && argument_expressions[0].downcastToPtr<Variable>()->vartype == Variable::BindingType_Let)) // Don't decr let var ref counts, the ref block will do that.
 			if(shouldRefCount(params, *argument_expressions[0]))
 				emitDestructorOrDecrCall(params, *argument_expressions[0], struct_ptr, "GetField " + get_field_func->struct_type->name + "." + field_name + " struct arg decrement/destructor");
 
@@ -1968,7 +1968,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			field_type->emitIncrRefCount(params, result, "GetTupleElement " + get_field_func->tuple_type->toString() + " " + field_name + " result increment");
 
 			// Decrement argument 0 structure ref count
-			//if(!(argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType)) // && argument_expressions[0].downcastToPtr<Variable>()->vartype == Variable::LetVariable)) // Don't decr let var ref counts, the ref block will do that.
+			//if(!(argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType)) // && argument_expressions[0].downcastToPtr<Variable>()->vartype == Variable::BindingType_Let)) // Don't decr let var ref counts, the ref block will do that.
 			if(shouldRefCount(params, *argument_expressions[0]))
 				emitDestructorOrDecrCall(params, *argument_expressions[0], struct_ptr, "GetTupleElement " + get_field_func->tuple_type->toString() + "." + field_name + " tuple arg decrement/destructor");
 
@@ -2022,7 +2022,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		if(argument_expressions[i]->nodeType() == ASTNode::VariableASTNodeType)
 		{
 			const Variable* var_node = argument_expressions[i].downcastToPtr<Variable>();
-			if(var_node->binding_type == Variable::LetVariable || var_node->binding_type == Variable::ArgumentVariable)
+			if(var_node->binding_type == Variable::BindingType_Let || var_node->binding_type == Variable::BindingType_Argument)
 			{
 				const bool old_emit_refcounting_code = params.emit_refcounting_code;
 				params.emit_refcounting_code = false; // Disable ref counting code
