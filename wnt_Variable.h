@@ -7,6 +7,7 @@ Copyright Glare Technologies Limited 2015 -
 
 
 #include "wnt_ASTNode.h"
+#include <set>
 namespace llvm { class Value; };
 
 
@@ -65,6 +66,8 @@ public:
 
 	FunctionDefinition* enclosing_lambda; // Most tightly-enclosing Lambda expression in which this variable exists, 
 	// if this variable is free (not bound to anything in the lambda expression).
+
+	std::set<FunctionDefinition*> lambdas; // Lambdas for which this variable is in the lambda's free_variables set.
 };
 
 

@@ -87,6 +87,11 @@ FunctionDefinition::FunctionDefinition(const SrcLocation& src_loc, int order_num
 
 FunctionDefinition::~FunctionDefinition()
 {
+	// For any free variables, erase this function definition from the variable's lambda set, as we don't want dangling pointers.
+	for(auto it = free_variables.begin(); it != free_variables.end(); ++it)
+	{
+		(*it)->lambdas.erase(this);
+	}
 }
 
 
@@ -792,6 +797,8 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 	// Store captured vars in closure.
 	
 	llvm::Value* captured_var_struct_ptr = LLVMUtils::createStructGEP(params.builder, closure_pointer, Function::capturedVarStructIndex(), "captured_var_struct_ptr");
+
+	params.stats->num_free_vars += free_variables.size();
 
 	// for each captured var
 	size_t free_var_index = 0;

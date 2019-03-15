@@ -65,9 +65,10 @@ Variable::Variable(const std::string& name_, const SrcLocation& loc)
 
 Variable::~Variable()
 {
-	if(enclosing_lambda)
+	// For any lambdas, erase this variable from the lambdas's free variable set, as we don't want dangling pointers.
+	for(auto it = lambdas.begin(); it != lambdas.end(); ++it)
 	{
-		enclosing_lambda->free_variables.erase(this);
+		(*it)->free_variables.erase(this);
 	}
 }
 
@@ -151,6 +152,7 @@ static BindInfo doBind(const std::vector<ASTNode*>& stack, int s, const std::str
 				// We have found something to bind to in the lexical environment outside of the lambda definition.
 
 				def->free_variables.insert(var); // Add this variable to the list of free vars for this lambda expression
+				var->lambdas.insert(def);
 				
 				bindinfo.enclosing_lambda = def;
 				return bindinfo;

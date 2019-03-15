@@ -102,6 +102,7 @@ struct ProgramStats
 {
 	uint64 num_heap_allocation_calls;
 	uint64 num_closure_allocations; // Num closures allocated, either on stack or on the heap.
+	uint64 num_free_vars; // Num free variables stored during closure allocation.
 };
 
 

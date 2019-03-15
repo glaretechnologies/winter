@@ -3704,14 +3704,15 @@ static void testLambdaExpressionsAndClosures()
 
 
 	// Test a function capturing a variable, then being passed to a higher order function which calls it.
-	testMainIntegerArg("																	\n\
-		def f(function<int> arg_func) !noinline : arg_func()											\n\
+	results = testMainIntegerArg("															\n\
+		def f(function<int> arg_func) !noinline : arg_func()								\n\
 		def main(int x) int :																\n\
 			let																				\n\
 				z = 2																		\n\
 			in																				\n\
 				f(\\() -> z)																\n\
 		", 17, 2, INVALID_OPENCL);
+	testAssert(results.stats.num_free_vars == 1); // z is free and should be captured from lexical env.
 
 	testMainIntegerArg("																	\n\
 		def f(function<int> arg_func) !noinline : arg_func()								\n\
