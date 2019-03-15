@@ -66,7 +66,8 @@ MESSAGE("Target LLVM version: ${LLVM_VERSION}")
 string(REPLACE "." "_" LLVM_VERSION_PATH ${LLVM_VERSION})
 
 
-set(LIBS_ENV "D:/programming")
+#set(LIBS_ENV "D:/programming")
+checkAndGetEnvVar(INDIGO_LIBS LIBS_ENV)
 
 if(WIN32)
 	if(MSVC_VERSION EQUAL 1600) # VS2012
@@ -104,6 +105,8 @@ else() # Mac or Linux.
 #	set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY_SDKDEBUG "$ENV{INDIGO_OUTPUT}/SDKDebug")
 	
 endif()
+
+MESSAGE("llvmdir: ${llvmdir}")
 
 
 set(WINTER_INCLUDE_DIRS "")
@@ -400,7 +403,7 @@ if(WIN32)
 else() # Linux
 	#add_definitions(-D__SSSE3__ -D__NO_AVX__)
 
-	SET(LINUX_C_CXX_OPTIONS "-Wall -pthread -mmmx -msse -msse2 -mssse3")
+	SET(LINUX_C_CXX_OPTIONS "-Wall -pthread -mmmx -msse -msse2 -mssse3 -msse4.1")
 	
 	SET(COMMON_C_CXX_OPTIONS_DEBUG				"${LINUX_C_CXX_OPTIONS} -g")
 	SET(COMMON_C_CXX_OPTIONS_RELEASE			"${LINUX_C_CXX_OPTIONS} -O3 -DNDEBUG")
@@ -621,7 +624,11 @@ else()
 	string(REPLACE "\n" " " LLVM_LIBS_FINAL ${LLVM_LIBS_OUT})
 	
 	target_link_libraries(${CURRENT_TARGET} 
-		${LLVM_LIBS_FINAL})
+		${LLVM_LIBS_FINAL}
+		dl
+		pthread
+		z
+	)
 	
 	# get the llvm flags
 	#execute_process(COMMAND "${llvmdir}/bin/llvm-config" "--ldflags" OUTPUT_VARIABLE LLVM_FLAGS_OUT OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -629,4 +636,6 @@ else()
 	
 	#SET(CMAKE_EXE_LINKER_FLAGS		"${CMAKE_EXE_LINKER_FLAGS} ${LLVM_FLAGS_FINAL}")
 	#SET(CMAKE_MODULE_LINKER_FLAGS	"${CMAKE_MODULE_LINKER_FLAGS} ${LLVM_FLAGS_FINAL}")
+	
+	#set_target_properties(${CURRENT_TARGET} PROPERTIES LINK_FLAGS "-ldl")
 endif()
