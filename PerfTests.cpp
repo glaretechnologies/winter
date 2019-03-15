@@ -36,6 +36,7 @@ static float refFloatTrigFunc(float x)
 
 void PerfTests::run()
 {
+#if BUILD_TESTS
 	const std::string float_trig_winter_src = "def main(float x) float : sin(x) + cos(x + 0.4f) * tan(x * 0.4f) + sin(x * 1.4f)";
 
 	const int num_trials = 100;
@@ -202,6 +203,7 @@ void PerfTests::run()
 	{
 		failTest(e.what());
 	}
+#endif
 }
 
 
