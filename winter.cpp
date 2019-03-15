@@ -44,8 +44,11 @@ int main(int argc, char** argv)
 	{
 #if BUILD_TESTS
 		LanguageTests::run();
-#endif
 		return 0;
+#else
+		std::cerr << "BUILD_TESTS not enabled, can't run tests." << std::endl;
+		return 1;
+#endif
 	}
 	else if(std::string(argv[1]) == "--fuzz")
 	{
@@ -137,6 +140,7 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
+#ifdef _WIN32
 	const bool found_mem_leaks = _CrtDumpMemoryLeaks() != 0; // == TRUE;
 	if(found_mem_leaks)
 	{
@@ -144,6 +148,7 @@ int main(int argc, char** argv)
 	}
 	else
 		std::cout << "------------ No memory leaks detected. -----------" << std::endl;
+#endif
 
 
 	return 0;
