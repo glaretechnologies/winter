@@ -137,12 +137,6 @@ void IfExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 			
 		this->can_maybe_constant_fold = a_is_literal && b_is_literal && c_is_literal;
 	}
-	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
-	{
-		doDeadCodeElimination(condition, payload, stack);
-		doDeadCodeElimination(then_expr, payload, stack);
-		doDeadCodeElimination(else_expr, payload, stack);
-	}
 	else if(payload.operation == TraversalPayload::SimplifyIfExpression)
 	{
 		if(condition->nodeType() == ASTNode::BoolLiteralType)

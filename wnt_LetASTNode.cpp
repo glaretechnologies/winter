@@ -158,10 +158,6 @@ void LetASTNode::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 		for(size_t i=0; i<vars.size(); ++i)
 			payload.used_names->insert(vars[i].name);
 	}
-	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
-	{
-		doDeadCodeElimination(expr, payload, stack);
-	}
 	else if(payload.operation == TraversalPayload::CustomVisit)
 	{
 		if(payload.custom_visitor.nonNull())

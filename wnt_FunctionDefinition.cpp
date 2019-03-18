@@ -473,12 +473,6 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 		if(this->is_anon_func)
 			payload.linker->anon_functions_to_codegen.push_back(this);
 	}
-	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
-	{
-		if(body.nonNull())
-			doDeadCodeElimination(body, payload, stack);
-	}
-	
 
 	stack.pop_back();
 	payload.func_def_stack.pop_back();

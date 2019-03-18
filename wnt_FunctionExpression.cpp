@@ -906,12 +906,6 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 				payload.calls_to_func_count[((Variable*)cur)->bound_function]++;
 		}
 	}
-	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
-	{
-		for(size_t i=0; i<argument_expressions.size(); ++i)
-			doDeadCodeElimination(argument_expressions[i], payload, stack);
-	}
-
 
 	stack.pop_back();
 }

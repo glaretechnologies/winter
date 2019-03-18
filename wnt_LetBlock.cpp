@@ -292,10 +292,18 @@ void LetBlock::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 	}
 	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
 	{
-		for(unsigned int i=0; i<lets.size(); ++i)
-			doDeadCodeElimination(lets[i]->expr, payload, stack);
+		if(this->lets.empty())
+		{
+			// The letblock has no let variables.  So replace it with the value expression.
+			// e.g
+			// let in x    =>   x
+			ASTNodeRef new_expr = this->expr;
 
-		doDeadCodeElimination(expr, payload, stack);
+			payload.tree_changed = true;
+			payload.garbarge.push_back(this); // Store a ref in payload so this node won't get deleted while we are still executing this function.
+			assert(stack.back() == this);
+			stack[stack.size() - 2]->updateChild(this, new_expr); // Tell the parent of this node to set the new expression as the relevant child.
+		}
 	}
 
 	stack.pop_back();

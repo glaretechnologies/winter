@@ -175,7 +175,6 @@ void addMetaDataCommentToInstruction(EmitLLVMCodeParams& params, llvm::Instructi
 void emitDestructorOrDecrCall(EmitLLVMCodeParams& params, const ASTNode& e, llvm::Value* value, const std::string& comment);
 bool mayEscapeCurrentlyBuildingFunction(EmitLLVMCodeParams& params, const TypeRef& type);
 void replaceAllUsesWith(Reference<ASTNode>& old_node, Reference<ASTNode>& new_node);
-void doDeadCodeElimination(Reference<ASTNode>& e, TraversalPayload& payload, std::vector<ASTNode*>& stack);
 const std::string mapOpenCLCVarName(const std::unordered_set<std::string>& opencl_c_keywords, const std::string& s); // Rename to something that isn't a keyword if is one.
 
 

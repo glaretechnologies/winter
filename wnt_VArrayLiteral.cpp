@@ -193,11 +193,6 @@ void VArrayLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 		if(make_varray_func_def)
 			payload.reachable_nodes.insert(make_varray_func_def);
 	}
-	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
-	{
-		for(size_t i=0; i<elements.size(); ++i)
-			doDeadCodeElimination(elements[i], payload, stack);
-	}
 }
 
 

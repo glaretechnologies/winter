@@ -212,11 +212,6 @@ void TupleLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 			this->can_maybe_constant_fold = this->can_maybe_constant_fold && elem_is_literal;
 		}
 	}
-	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
-	{
-		for(size_t i=0; i<elements.size(); ++i)
-			doDeadCodeElimination(elements[i], payload, stack);
-	}
 }
 
 

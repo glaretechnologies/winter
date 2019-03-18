@@ -345,24 +345,6 @@ void checkSubstituteVariable(ASTNodeRef& e, TraversalPayload& payload)
 }
 
 
-void doDeadCodeElimination(Reference<ASTNode>& e, TraversalPayload& payload, std::vector<ASTNode*>& stack)
-{
-	if(e->nodeType() == ASTNode::LetBlockType)
-	{
-		LetBlock* letblock = e.downcastToPtr<LetBlock>();
-		if(letblock->lets.empty())
-		{
-			// The letblock has no let variables.  So replace it with the value expression.
-			// e.g
-			// let in x    =>   x
-			e = letblock->expr;
-
-			payload.tree_changed = true;
-		}
-	}
-}
-
-
 const std::string mapOpenCLCVarName(const std::unordered_set<std::string>& opencl_c_keywords, const std::string& s)
 {
 	if(opencl_c_keywords.count(s))
@@ -1885,11 +1867,6 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 		this->can_maybe_constant_fold = a_is_literal && b_is_literal;
 		//}
 	}
-	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
-	{
-		doDeadCodeElimination(a, payload, stack);
-		doDeadCodeElimination(b, payload, stack);
-	}
 
 	stack.pop_back();
 }
@@ -2186,12 +2163,7 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 			
 		this->can_maybe_constant_fold = a_is_literal && b_is_literal;
 	}
-	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
-	{
-		doDeadCodeElimination(a, payload, stack);
-		doDeadCodeElimination(b, payload, stack);
-	}
-
+	
 	stack.pop_back();
 }
 
@@ -2469,12 +2441,7 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 			
 		this->can_maybe_constant_fold = a_is_literal && b_is_literal;
 	}
-	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
-	{
-		doDeadCodeElimination(a, payload, stack);
-		doDeadCodeElimination(b, payload, stack);
-	}
-
+	
 	stack.pop_back();
 }
 
@@ -3004,12 +2971,7 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 			
 		this->can_maybe_constant_fold = a_is_literal && b_is_literal;
 	}
-	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
-	{
-		doDeadCodeElimination(a, payload, stack);
-		doDeadCodeElimination(b, payload, stack);
-	}
-
+	
 	stack.pop_back();
 }
 
@@ -3539,12 +3501,7 @@ void BinaryBitwiseExpression::traverse(TraversalPayload& payload, std::vector<AS
 			
 		this->can_maybe_constant_fold = a_is_literal && b_is_literal;
 	}
-	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
-	{
-		doDeadCodeElimination(a, payload, stack);
-		doDeadCodeElimination(b, payload, stack);
-	}
-
+	
 	stack.pop_back();
 }
 
@@ -3702,12 +3659,7 @@ void BinaryBooleanExpr::traverse(TraversalPayload& payload, std::vector<ASTNode*
 			
 		this->can_maybe_constant_fold = a_is_literal && b_is_literal;
 	}
-	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
-	{
-		doDeadCodeElimination(a, payload, stack);
-		doDeadCodeElimination(b, payload, stack);
-	}
-
+	
 	stack.pop_back();
 }
 
@@ -3924,11 +3876,7 @@ void UnaryMinusExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 		const bool is_literal = checkFoldExpression(expr, payload);
 		this->can_maybe_constant_fold = is_literal;
 	}
-	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
-	{
-		doDeadCodeElimination(expr, payload, stack);
-	}
-
+	
 	stack.pop_back();
 }
 
@@ -4468,12 +4416,7 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 			
 		this->can_maybe_constant_fold = a_is_literal && b_is_literal;
 	}
-	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
-	{
-		doDeadCodeElimination(a, payload, stack);
-		doDeadCodeElimination(b, payload, stack);
-	}
-
+	
 	stack.pop_back();
 }
 
@@ -4680,11 +4623,7 @@ void ArraySubscript::traverse(TraversalPayload& payload, std::vector<ASTNode*>& 
 		const bool is_literal = checkFoldExpression(subscript_expr, payload);
 		this->can_maybe_constant_fold = is_literal;
 	}
-	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
-	{
-		doDeadCodeElimination(subscript_expr, payload, stack);
-	}
-
+	
 	stack.pop_back();
 }
 
@@ -4883,10 +4822,6 @@ void NamedConstant::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 		ValueRef retval = this->value_expr->exec(vmstate);
 
 		this->value_expr = makeLiteralASTNodeFromValue(retval, this->srcLocation(), this->type());*/
-	}
-	else if(payload.operation == TraversalPayload::DeadCodeElimination_RemoveDead)
-	{
-		doDeadCodeElimination(value_expr, payload, stack);
 	}
 	else if(payload.operation == TraversalPayload::CustomVisit)
 	{
