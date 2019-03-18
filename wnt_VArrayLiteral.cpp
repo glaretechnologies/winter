@@ -138,9 +138,6 @@ void VArrayLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 {
 	if(payload.operation == TraversalPayload::BindVariables)
 	{
-		for(size_t i=0; i<elements.size(); ++i)
-			convertOverloadedOperators(elements[i], payload, stack);
-
 		TypeRef elem_0_type = elements[0]->type();
 		if(elem_0_type.nonNull())
 		{

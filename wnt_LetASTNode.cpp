@@ -79,11 +79,6 @@ void LetASTNode::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 	{
 		checkFoldExpression(expr, payload);
 	}*/
-	/*else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
-	{
-		convertOverloadedOperators(expr, payload, stack);
-	}*/
-
 
 	stack.push_back(this);
 	expr->traverse(payload, stack);
@@ -96,10 +91,6 @@ void LetASTNode::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 	else if(payload.operation == TraversalPayload::SubstituteVariables)
 	{
 		checkSubstituteVariable(expr, payload);
-	}
-	else if(payload.operation == TraversalPayload::BindVariables)
-	{
-		convertOverloadedOperators(expr, payload, stack);
 	}
 	else if(payload.operation == TraversalPayload::TypeCheck)
 	{

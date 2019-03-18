@@ -16,6 +16,7 @@ File created by ClassTemplate on Wed Jun 11 03:55:25 2008
 #include <utils/Reference.h>
 #include <utils/RefCounted.h>
 #include <utils/Platform.h>
+#include <utils/SmallVector.h>
 #include <string>
 #include <vector>
 #include <set>
@@ -151,7 +152,7 @@ public:
 	// GetAllNamesInScope, InlineFunctionCalls:
 	std::unordered_set<std::string>* used_names;
 
-	Reference<ASTNode> garbarge; // For Storing a ref to a node so it won't get deleted (due to ref count going to zero) while a function on it is still being executed.
+	SmallVector<Reference<ASTNode>, 4> garbarge; // For Storing a ref to a node so it won't get deleted (due to ref count going to zero) while a function on it is still being executed.
 };
 
 
@@ -161,7 +162,6 @@ bool isIntExactlyRepresentableAsDouble(int64 x);
 bool checkFoldExpression(Reference<ASTNode>& e, TraversalPayload& payload); // Returns true if folding took place or e is already a literal.
 void checkSubstituteVariable(Reference<ASTNode>& e, TraversalPayload& payload);
 void checkInlineExpression(Reference<ASTNode>& e, TraversalPayload& payload, std::vector<ASTNode*>& stack);
-void convertOverloadedOperators(Reference<ASTNode>& e, TraversalPayload& payload, std::vector<ASTNode*>& stack);
 void doImplicitIntToFloatTypeCoercionForFloatReturn(Reference<ASTNode>& expr, TraversalPayload& payload);
 void doImplicitIntToDoubleTypeCoercionForDoubleReturn(Reference<ASTNode>& expr, TraversalPayload& payload);
 const std::string errorContext(const ASTNode* n);

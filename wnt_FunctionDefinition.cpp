@@ -232,14 +232,6 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 	{
 		checkFoldExpression(body, payload);
 	}*/
-	/*else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
-	{
-		payload.func_def_stack.push_back(this);
-		stack.push_back(this);
-		convertOverloadedOperators(body, payload, stack);
-		stack.pop_back();
-		payload.func_def_stack.pop_back();
-	}*/
 	//if(payload.operation == TraversalPayload::TypeCheck)
 	//{
 	//	if(this->isGenericFunction())
@@ -381,16 +373,6 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 
 	if(payload.operation == TraversalPayload::BindVariables)
 	{
-		// Do operator overloading for body AST node.
-		if(this->body.nonNull()) // Body is NULL for built in functions
-		{
-			//payload.func_def_stack.push_back(this);
-			//stack.push_back(this);
-			convertOverloadedOperators(body, payload, stack);
-			//stack.pop_back();
-			//payload.func_def_stack.pop_back();
-		}
-
 		if(this->built_in_func_impl.nonNull())
 			this->built_in_func_impl->linkInCalledFunctions(payload);
 

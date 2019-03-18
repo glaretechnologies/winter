@@ -186,12 +186,8 @@ void VectorLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 		for(size_t i=0; i<elements.size(); ++i)
 			checkFoldExpression(elements[i], payload);
 	}
-	else */if(payload.operation == TraversalPayload::BindVariables)
-	{
-		for(size_t i=0; i<elements.size(); ++i)
-			convertOverloadedOperators(elements[i], payload, stack);
-	}
-	else if(payload.operation == TraversalPayload::TypeCoercion)
+	else */
+	if(payload.operation == TraversalPayload::TypeCoercion)
 	{
 		// Convert e.g. [1.0, 2.0, 3]v to [1.0, 2.0, 3.0]v
 		// A vector of elements that contains one or more float-typed elements will be considered to be a float-typed vector.

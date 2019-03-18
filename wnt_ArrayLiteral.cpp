@@ -212,11 +212,7 @@ void ArrayLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 		for(size_t i=0; i<elements.size(); ++i)
 			checkFoldExpression(elements[i], payload);
 	}
-	else */if(payload.operation == TraversalPayload::BindVariables)
-	{
-		for(size_t i=0; i<elements.size(); ++i)
-			convertOverloadedOperators(elements[i], payload, stack);
-	}
+	else */
 
 
 	stack.push_back(this);

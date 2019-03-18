@@ -278,13 +278,6 @@ void LetBlock::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 	{
 		checkInlineExpression(expr, payload, stack);
 	}
-	// Convert overloaded operators before we pop this node off the stack.
-	// This node needs to be on the node stack if an operator overloading substitution is made,
-	// as the new op_X function will need to have a bind variables pass run on it.
-	else if(payload.operation == TraversalPayload::BindVariables)
-	{
-		convertOverloadedOperators(expr, payload, stack);
-	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
 		/*this->can_constant_fold = true;

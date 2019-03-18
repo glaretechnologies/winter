@@ -564,13 +564,6 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 			payload.custom_visitor->visit(*this, payload);
 	}
 	
-	/*else if(payload.operation == TraversalPayload::OperatorOverloadConversion)
-	{
-		for(size_t i=0; i<argument_expressions.size(); ++i)
-			convertOverloadedOperators(argument_expressions[i], payload, stack);
-	}*/
-
-
 
 	// NOTE: we want to do a post-order traversal here.
 	// This is because we want our argument expressions to be linked first.
@@ -629,11 +622,6 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 	}
 	else if(payload.operation == TraversalPayload::BindVariables) // LinkFunctions)
 	{
-		// TEMP NEW: Do operator overloading now:
-		for(size_t i=0; i<argument_expressions.size(); ++i)
-			convertOverloadedOperators(argument_expressions[i], payload, stack);
-
-
 		// If this is a generic function, we can't try and bind function expressions yet,
 		// because the binding depends on argument type due to function overloading, so we have to wait
 		// until we know the concrete type.

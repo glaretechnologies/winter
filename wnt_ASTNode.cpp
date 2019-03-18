@@ -592,186 +592,6 @@ const std::string mapOpenCLCVarName(const std::unordered_set<std::string>& openc
 }
 
 
-void convertOverloadedOperators(ASTNodeRef& e, TraversalPayload& payload, std::vector<ASTNode*>& stack)
-{
-	if(e.isNull())
-		return;
-
-	switch(e->nodeType())
-	{
-	case ASTNode::AdditionExpressionType:
-	{
-		AdditionExpression* expr = static_cast<AdditionExpression*>(e.getPointer());
-		if(expr->a->type().nonNull() && expr->b->type().nonNull())
-			if(	expr->a->type()->getType() == Type::StructureTypeType || expr->a->type()->getType() == Type::ArrayTypeType ||
-				expr->b->type()->getType() == Type::StructureTypeType || expr->b->type()->getType() == Type::ArrayTypeType)
-				{
-					// Replace expr with an op_add function call.
-					e = new FunctionExpression(expr->srcLocation(), "op_add", expr->a, expr->b);
-					payload.tree_changed = true;
-
-					// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
-					// This is needed now because we need to know the type of op_X, which is only available once bound.
-					TraversalPayload new_payload(TraversalPayload::BindVariables);
-					new_payload.linker = payload.linker;
-					new_payload.func_def_stack = payload.func_def_stack;
-					e->traverse(new_payload, stack);
-				}
-		break;
-	}
-	case ASTNode::SubtractionExpressionType:
-	{
-		SubtractionExpression* expr = static_cast<SubtractionExpression*>(e.getPointer());
-		if(expr->a->type().nonNull() && expr->b->type().nonNull())
-			if(	expr->a->type()->getType() == Type::StructureTypeType || expr->a->type()->getType() == Type::ArrayTypeType ||
-				expr->b->type()->getType() == Type::StructureTypeType || expr->b->type()->getType() == Type::ArrayTypeType)
-				{
-					// Replace expr with an op_sub function call.
-					e = new FunctionExpression(expr->srcLocation(), "op_sub", expr->a, expr->b);
-					payload.tree_changed = true;
-
-					// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
-					// This is needed now because we need to know the type of op_X, which is only available once bound.
-					TraversalPayload new_payload(TraversalPayload::BindVariables);
-					new_payload.linker = payload.linker;
-					new_payload.func_def_stack = payload.func_def_stack;
-					e->traverse(new_payload, stack);
-				}
-		break;
-	}
-	case ASTNode::MulExpressionType:
-	{
-		MulExpression* expr = static_cast<MulExpression*>(e.getPointer());
-		if(expr->a->type().nonNull() && expr->b->type().nonNull())
-			if(	expr->a->type()->getType() == Type::StructureTypeType || expr->a->type()->getType() == Type::ArrayTypeType ||
-				expr->b->type()->getType() == Type::StructureTypeType || expr->b->type()->getType() == Type::ArrayTypeType)
-			{
-				// Replace expr with an op_mul function call.
-				e = new FunctionExpression(expr->srcLocation(), "op_mul", expr->a, expr->b);
-				payload.tree_changed = true;
-
-				// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
-				// This is needed now because we need to know the type of op_X, which is only available once bound.
-				TraversalPayload new_payload(TraversalPayload::BindVariables);
-				new_payload.linker = payload.linker;
-				new_payload.func_def_stack = payload.func_def_stack;
-				e->traverse(new_payload, stack);
-			}
-		break;
-	}
-	case ASTNode::DivExpressionType:
-	{
-		DivExpression* expr = static_cast<DivExpression*>(e.getPointer());
-		if(expr->a->type().nonNull() && expr->b->type().nonNull())
-			if(	expr->a->type()->getType() == Type::StructureTypeType || expr->a->type()->getType() == Type::ArrayTypeType ||
-				expr->b->type()->getType() == Type::StructureTypeType || expr->b->type()->getType() == Type::ArrayTypeType)
-				{
-					// Replace expr with an op_div function call.
-					e = new FunctionExpression(expr->srcLocation(), "op_div", expr->a, expr->b);
-					payload.tree_changed = true;
-
-					// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
-					// This is needed now because we need to know the type of op_X, which is only available once bound.
-					TraversalPayload new_payload(TraversalPayload::BindVariables);
-					new_payload.linker = payload.linker;
-					new_payload.func_def_stack = payload.func_def_stack;
-					e->traverse(new_payload, stack);
-				}
-		break;
-	}
-	case ASTNode::ComparisonExpressionType:
-	{
-		ComparisonExpression* expr = static_cast<ComparisonExpression*>(e.getPointer());
-		if(expr->a->type().nonNull() && expr->b->type().nonNull())
-		{
-			if(	expr->a->type()->getType() == Type::StructureTypeType ||
-				expr->b->type()->getType() == Type::StructureTypeType)
-			{
-				// == and != are not overloadable, but are instead built-in
-				if(expr->token->getType() == DOUBLE_EQUALS_TOKEN)
-				{
-					// If op_eq for this structure has been defined, use it instead of the built-in __compare_equal.
-					if(payload.linker->findMatchingFunctionSimple(
-						FunctionSignature(expr->getOverloadedFuncName(), typePair(TypeVRef(expr->a->type()), TypeVRef(expr->b->type())))).isNull())
-					{
-						// Replace with built-in func call expression here
-						e = new FunctionExpression(expr->srcLocation(), "__compare_equal", expr->a, expr->b);
-						payload.tree_changed = true;
-						break;
-					}
-				}
-				else if(expr->token->getType() == NOT_EQUALS_TOKEN)
-				{
-					// If op_eq for this structure has been defined, use it instead of the built-in __compare_equal.
-					if(payload.linker->findMatchingFunctionSimple(
-						FunctionSignature(expr->getOverloadedFuncName(), typePair(TypeVRef(expr->a->type()), TypeVRef(expr->b->type())))).isNull())
-					{
-						// Replace with built-in func call expression here
-						e = new FunctionExpression(expr->srcLocation(), "__compare_not_equal", expr->a, expr->b);
-						payload.tree_changed = true;
-						break;
-					}
-				}
-
-				// Replace expr with a function call.
-				e = new FunctionExpression(expr->srcLocation(), expr->getOverloadedFuncName(), expr->a, expr->b);
-				payload.tree_changed = true;
-
-				// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
-				// This is needed now because we need to know the type of op_X, which is only available once bound.
-				TraversalPayload new_payload(TraversalPayload::BindVariables);
-				new_payload.linker = payload.linker;
-				new_payload.func_def_stack = payload.func_def_stack;
-				e->traverse(new_payload, stack);
-				break;
-			}
-
-			if(expr->a->type()->requiresCompareEqualFunction())
-			{
-				// == and != are not overloadable, but are instead built-in
-				if(expr->token->getType() == DOUBLE_EQUALS_TOKEN)
-				{
-					// Replace with built-in func call expression here
-					e = new FunctionExpression(expr->srcLocation(), "__compare_equal", expr->a, expr->b);
-					payload.tree_changed = true;
-					break;
-				}
-				else if(expr->token->getType() == NOT_EQUALS_TOKEN)
-				{
-					// Replace with built-in func call expression here
-					e = new FunctionExpression(expr->srcLocation(), "__compare_not_equal", expr->a, expr->b);
-					payload.tree_changed = true;
-					break;
-				}
-			}
-		}
-		break;
-	}
-	case ASTNode::UnaryMinusExpressionType:
-	{
-		UnaryMinusExpression* expr = static_cast<UnaryMinusExpression*>(e.getPointer());
-		if(expr->expr->type().nonNull())
-			if(expr->expr->type()->getType() == Type::StructureTypeType)
-			{
-				// Replace expr with a function call to op_unary_minus
-				e = new FunctionExpression(expr->srcLocation(), "op_unary_minus", expr->expr);
-				payload.tree_changed = true;
-
-				// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
-				// This is needed now because we need to know the type of op_X, which is only available once bound.
-				TraversalPayload new_payload(TraversalPayload::BindVariables);
-				new_payload.linker = payload.linker;
-				new_payload.func_def_stack = payload.func_def_stack;
-				e->traverse(new_payload, stack);
-			}
-		break;
-	}
-	default:
-		break;
-	};
-}
-
-
 /*
 Process an AST node with two children, a and b.
 
@@ -925,6 +745,12 @@ static bool canDoImplicitIntToDoubleTypeCoercion(const ASTNodeRef& a, const ASTN
 }
 
 
+/*
+Replace code like
+def f() float : 1
+with
+def f() float : 1.0f
+*/
 void doImplicitIntToFloatTypeCoercionForFloatReturn(ASTNodeRef& expr, TraversalPayload& payload)
 {
 	const FunctionDefinition* current_func = payload.func_def_stack.back();
@@ -1549,14 +1375,7 @@ void MapLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 			checkFoldExpression(items[i].second, payload);
 		}
 	}
-	else */if(payload.operation == TraversalPayload::BindVariables)
-	{
-		for(size_t i=0; i<items.size(); ++i)
-		{
-			convertOverloadedOperators(items[i].first, payload, stack);
-			convertOverloadedOperators(items[i].second, payload, stack);
-		}
-	}
+	else */
 
 
 	stack.push_back(this);
@@ -2179,8 +1998,25 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 
 	if(payload.operation == TraversalPayload::BindVariables)
 	{
-		convertOverloadedOperators(a, payload, stack);
-		convertOverloadedOperators(b, payload, stack);
+		// Convert overloaded operator - replace "+" with "op_add" as needed.
+		const TypeRef a_type = a->type();
+		const TypeRef b_type = b->type();
+		if(a_type.nonNull() && b_type.nonNull() &&
+			(a_type->getType() == Type::StructureTypeType || a_type->getType() == Type::ArrayTypeType ||
+			b_type->getType() == Type::StructureTypeType || b_type->getType() == Type::ArrayTypeType))
+			{
+				ASTNodeRef new_expr = new FunctionExpression(srcLocation(), "op_add", a, b);
+				payload.tree_changed = true;
+
+				payload.garbarge.push_back(this); // Store a ref in payload so this node won't get deleted while we are still executing this function.
+				assert(stack.back() == this);
+				stack[stack.size() - 2]->updateChild(this, new_expr);
+
+				// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
+				// This is needed now because we need to know the type of op_X, which is only available once bound.
+				new_expr->traverse(payload, stack);
+			}
+
 	}
 	else if(payload.operation == TraversalPayload::InlineFunctionCalls)
 	{
@@ -2483,8 +2319,24 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 	}
 	else if(payload.operation == TraversalPayload::BindVariables)
 	{
-		convertOverloadedOperators(a, payload, stack);
-		convertOverloadedOperators(b, payload, stack);
+		// Convert overloaded operator - replace "+" with "op_add" as needed.
+		const TypeRef a_type = a->type();
+		const TypeRef b_type = b->type();
+		if(a_type.nonNull() && b_type.nonNull() &&
+			(a_type->getType() == Type::StructureTypeType || a_type->getType() == Type::ArrayTypeType ||
+			b_type->getType() == Type::StructureTypeType || b_type->getType() == Type::ArrayTypeType))
+		{
+			ASTNodeRef new_expr = new FunctionExpression(srcLocation(), "op_sub", a, b);
+			payload.tree_changed = true;
+
+			payload.garbarge.push_back(this); // Store a ref in payload so this node won't get deleted while we are still executing this function.
+			assert(stack.back() == this);
+			stack[stack.size() - 2]->updateChild(this, new_expr);
+
+			// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
+			// This is needed now because we need to know the type of op_X, which is only available once bound.
+			new_expr->traverse(payload, stack);
+		}
 	}
 	else if(payload.operation == TraversalPayload::TypeCoercion)
 	{
@@ -2730,8 +2582,24 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 
 	if(payload.operation == TraversalPayload::BindVariables)
 	{
-		convertOverloadedOperators(a, payload, stack);
-		convertOverloadedOperators(b, payload, stack);
+		// Convert overloaded operator - replace "+" with "op_add" as needed.
+		const TypeRef a_type = a->type();
+		const TypeRef b_type = b->type();
+		if(a_type.nonNull() && b_type.nonNull() &&
+			(a_type->getType() == Type::StructureTypeType || a_type->getType() == Type::ArrayTypeType ||
+			b_type->getType() == Type::StructureTypeType || b_type->getType() == Type::ArrayTypeType))
+		{
+			ASTNodeRef new_expr = new FunctionExpression(srcLocation(), "op_mul", a, b);
+			payload.tree_changed = true;
+
+			payload.garbarge.push_back(this); // Store a ref in payload so this node won't get deleted while we are still executing this function.
+			assert(stack.back() == this);
+			stack[stack.size() - 2]->updateChild(this, new_expr);
+
+			// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
+			// This is needed now because we need to know the type of op_X, which is only available once bound.
+			new_expr->traverse(payload, stack);
+		}
 	}
 	else if(payload.operation == TraversalPayload::InlineFunctionCalls)
 	{
@@ -3231,8 +3099,24 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	}
 	else if(payload.operation == TraversalPayload::BindVariables)
 	{
-		convertOverloadedOperators(a, payload, stack);
-		convertOverloadedOperators(b, payload, stack);
+		// Convert overloaded operator - replace "+" with "op_add" as needed.
+		const TypeRef a_type = a->type();
+		const TypeRef b_type = b->type();
+		if(a_type.nonNull() && b_type.nonNull() &&
+			(a_type->getType() == Type::StructureTypeType || a_type->getType() == Type::ArrayTypeType ||
+			b_type->getType() == Type::StructureTypeType || b_type->getType() == Type::ArrayTypeType))
+		{
+			ASTNodeRef new_expr = new FunctionExpression(srcLocation(), "op_div", a, b);
+			payload.tree_changed = true;
+
+			payload.garbarge.push_back(this); // Store a ref in payload so this node won't get deleted while we are still executing this function.
+			assert(stack.back() == this);
+			stack[stack.size() - 2]->updateChild(this, new_expr);
+
+			// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
+			// This is needed now because we need to know the type of op_X, which is only available once bound.
+			new_expr->traverse(payload, stack);
+		}
 	}
 	else if(payload.operation == TraversalPayload::TypeCoercion)
 	{
@@ -3839,12 +3723,7 @@ void BinaryBitwiseExpression::traverse(TraversalPayload& payload, std::vector<AS
 	b->traverse(payload, stack);
 	
 
-	if(payload.operation == TraversalPayload::BindVariables)
-	{
-		convertOverloadedOperators(a, payload, stack);
-		convertOverloadedOperators(b, payload, stack);
-	}
-	else if(payload.operation == TraversalPayload::InlineFunctionCalls)
+	if(payload.operation == TraversalPayload::InlineFunctionCalls)
 	{
 		checkInlineExpression(a, payload, stack);
 		checkInlineExpression(b, payload, stack);
@@ -4049,11 +3928,6 @@ void BinaryBooleanExpr::traverse(TraversalPayload& payload, std::vector<ASTNode*
 	{
 		checkSubstituteVariable(a, payload);
 		checkSubstituteVariable(b, payload);
-	}
-	else if(payload.operation == TraversalPayload::BindVariables)
-	{
-		convertOverloadedOperators(a, payload, stack);
-		convertOverloadedOperators(b, payload, stack);
 	}
 	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
@@ -4284,7 +4158,19 @@ void UnaryMinusExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 	}
 	else if(payload.operation == TraversalPayload::BindVariables)
 	{
-		convertOverloadedOperators(expr, payload, stack);
+		if(expr->type().nonNull() && expr->type()->getType() == Type::StructureTypeType)
+		{
+			ASTNodeRef new_expr = new FunctionExpression(srcLocation(), "op_unary_minus", expr);
+			payload.tree_changed = true;
+
+			payload.garbarge.push_back(this); // Store a ref in payload so this node won't get deleted while we are still executing this function.
+			assert(stack.back() == this);
+			stack[stack.size() - 2]->updateChild(this, new_expr);
+
+			// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
+			// This is needed now because we need to know the type of op_X, which is only available once bound.
+			new_expr->traverse(payload, stack);
+		}
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
@@ -4467,10 +4353,6 @@ void LogicalNegationExpr::traverse(TraversalPayload& payload, std::vector<ASTNod
 
 		if(this_type->getType() != Type::BoolType)
 			throw BaseException("Type '" + this->type()->toString() + "' does not define logical negation operator '!'." + errorContext(*this, payload));
-	}
-	else if(payload.operation == TraversalPayload::BindVariables)
-	{
-		convertOverloadedOperators(expr, payload, stack);
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
@@ -4724,8 +4606,64 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 	}
 	else if(payload.operation == TraversalPayload::BindVariables)
 	{
-		convertOverloadedOperators(a, payload, stack);
-		convertOverloadedOperators(b, payload, stack);
+		const TypeRef a_type = a->type();
+		const TypeRef b_type = b->type();
+		if(a_type.nonNull() && b_type.nonNull())
+		{
+			ASTNodeRef new_expr;
+			if(a_type->getType() == Type::StructureTypeType || b_type->getType() == Type::StructureTypeType)
+			{
+				// == and != are not overloadable, but are instead built-in
+				if(token->getType() == DOUBLE_EQUALS_TOKEN)
+				{
+					// If op_eq for this structure has been defined, use it instead of the built-in __compare_equal.
+					if(payload.linker->findMatchingFunctionSimple(
+						FunctionSignature(getOverloadedFuncName(), typePair(TypeVRef(a_type), TypeVRef(b_type)))).isNull())
+					{
+						new_expr = new FunctionExpression(srcLocation(), "__compare_equal", a, b);
+					}
+				}
+				else if(token->getType() == NOT_EQUALS_TOKEN)
+				{
+					// If op_eq for this structure has been defined, use it instead of the built-in __compare_equal.
+					if(payload.linker->findMatchingFunctionSimple(
+						FunctionSignature(getOverloadedFuncName(), typePair(TypeVRef(a_type), TypeVRef(b_type)))).isNull())
+					{
+						new_expr = new FunctionExpression(srcLocation(), "__compare_not_equal", a, b);
+					}
+				}
+
+				if(new_expr.isNull())
+					new_expr = new FunctionExpression(srcLocation(), getOverloadedFuncName(), a, b);
+			}
+
+			if(new_expr.isNull() && a_type->requiresCompareEqualFunction())
+			{
+				// == and != are not overloadable, but are instead built-in
+				if(token->getType() == DOUBLE_EQUALS_TOKEN)
+				{
+					new_expr = new FunctionExpression(srcLocation(), "__compare_equal", a, b);
+				}
+				else if(token->getType() == NOT_EQUALS_TOKEN)
+				{
+					new_expr = new FunctionExpression(srcLocation(), "__compare_not_equal", a, b);
+				}
+			}
+
+			// If we changed the operator to a function call:
+			if(new_expr.nonNull())
+			{
+				payload.tree_changed = true;
+
+				payload.garbarge.push_back(this); // Store a ref in payload so this node won't get deleted while we are still executing this function.
+				assert(stack.back() == this);
+				stack[stack.size() - 2]->updateChild(this, new_expr);
+
+				// Do a bind traversal of the new subtree now, in order to bind the new op_X function.
+				// This is needed now because we need to know the type of op_X, which is only available once bound.
+				new_expr->traverse(payload, stack);
+			}
+		}
 	}
 	else if(payload.operation == TraversalPayload::TypeCoercion)
 	{
@@ -4926,7 +4864,6 @@ const std::string ComparisonExpression::getOverloadedFuncName() const // returns
 }
 
 
-
 size_t ComparisonExpression::getTimeBound(GetTimeBoundParams& params) const
 {
 	return a->getTimeBound(params) + b->getTimeBound(params) + 1;
@@ -5003,13 +4940,6 @@ void ArraySubscript::traverse(TraversalPayload& payload, std::vector<ASTNode*>& 
 	else if(payload.operation == TraversalPayload::SubstituteVariables)
 	{
 		checkSubstituteVariable(subscript_expr, payload);
-	}
-	// Convert overloaded operators before we pop this node off the stack.
-	// This node needs to be on the node stack if an operator overloading substitution is made,
-	// as the new op_X function will need to have a bind variables pass run on it.
-	else if(payload.operation == TraversalPayload::BindVariables)
-	{
-		convertOverloadedOperators(subscript_expr, payload, stack);
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
@@ -5173,14 +5103,7 @@ void NamedConstant::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	{
 		checkSubstituteVariable(value_expr, payload);
 	}
-	// Convert overloaded operators before we pop this node off the stack.
-	// This node needs to be on the node stack if an operator overloading substitution is made,
-	// as the new op_X function will need to have a bind variables pass run on it.
-	else if(payload.operation == TraversalPayload::BindVariables)
-	{
-		convertOverloadedOperators(value_expr, payload, stack);
-	}
-	if(payload.operation == TraversalPayload::TypeCoercion)
+	else if(payload.operation == TraversalPayload::TypeCoercion)
 	{
 		if(declared_type.nonNull() && declared_type->getType() == Type::FloatType && 
 			value_expr.nonNull() && value_expr->nodeType() == ASTNode::IntLiteralType)
