@@ -274,11 +274,7 @@ void LetBlock::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 
 	//payload.let_block_stack.pop_back();
 
-	if(payload.operation == TraversalPayload::InlineFunctionCalls)
-	{
-		checkInlineExpression(expr, payload, stack);
-	}
-	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
+	if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
 		/*this->can_constant_fold = true;
 		for(unsigned int i=0; i<lets.size(); ++i)

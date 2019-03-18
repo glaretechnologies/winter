@@ -326,226 +326,6 @@ bool checkFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
 }
 
 
-/*
-If node 'e' is a function expression, inline the target function by replacing e with the target function body.
-*/
-void checkInlineExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector<ASTNode*>& stack)
-{
-	if(e->nodeType() == ASTNode::FunctionExpressionType)
-	{
-		FunctionExpressionRef func_expr = e.downcast<FunctionExpression>();
-
-		FunctionDefinition* target_func = NULL;
-		bool is_beta_reduction = false; // Is this a lambda being applied directly, e.g. an expression like "(\\(float y) : y*y) (x)" ?
-		if(func_expr->static_target_function)
-		{
-			target_func = func_expr->static_target_function;
-		}
-		else if(func_expr->get_func_expr.nonNull())
-		{
-			if(func_expr->get_func_expr->nodeType() == ASTNode::FunctionDefinitionType)
-			{
-				target_func = func_expr->get_func_expr.downcastToPtr<FunctionDefinition>();
-				is_beta_reduction = true;
-			}
-			else
-			{
-				// Walk up the tree until we get to a node that is not a variable bound to a let node:
-				ASTNode* cur = func_expr->get_func_expr.getPointer();
-				while((cur->nodeType() == ASTNode::VariableASTNodeType) && (((Variable*)cur)->binding_type == Variable::BindingType_Let))
-					cur = ((Variable*)cur)->bound_let_node->expr.getPointer();
-
-				if(cur->nodeType() == ASTNode::FunctionDefinitionType)
-					target_func = (FunctionDefinition*)cur;
-				else if(cur->nodeType() == ASTNode::VariableASTNodeType && ((Variable*)cur)->binding_type == Variable::BindingType_GlobalDef)
-					target_func = ((Variable*)cur)->bound_function;
-			}
-			/*else if(func_expr->get_func_expr->isConstant())
-			{
-				//if(func_expr->get_func_expr.isType<Variable>())
-				//{
-				//	const Variable* var = func_expr->get_func_expr
-				try
-				{
-					VMState vmstate;
-					vmstate.capture_vars = false;
-					vmstate.func_args_start.push_back(0);
-					ValueRef base_target_function_val = func_expr->get_func_expr->exec(vmstate);
-					const FunctionValue* target_func_val = checkedCast<FunctionValue>(base_target_function_val);
-					target_func = target_func_val->func_def;
-				}
-				catch(BaseException&)
-				{
-				}
-			}*/
-		}
-
-
-		if(target_func && !target_func->noinline && !target_func->isExternalFunction() && target_func->body.nonNull()) // If is potentially inlinable:
-		{
-			const bool verbose = false;
-			if(verbose) conPrint("\n=================== Considering inlining function call =====================\n");
-			if(verbose) conPrint("target func: " + target_func->sig.toString());
-
-			const int call_count = payload.calls_to_func_count[target_func];
-			
-			if(verbose) conPrint("target complexity: " + toString(target_func->getSubtreeCodeComplexity()));
-			const bool target_func_simple = target_func->getSubtreeCodeComplexity() < 20;
-
-			// Work out if the argument expressions are 'expensive' to evaluate.
-			// If they are, don't inline this function expression if the expensive argument expression is duplicated.
-			// e.g. def f(float x) : x + x + x + x, 
-			// main(float x) : f(sin(x))    would get inlined to      main(float x) : sin(x) + sin(x) + sin(x) + sin(x)
-			//
-			// NOTE: Instead of not inlining the function body directly, we could inline to a let expression, e.g. to
-			//
-			// let f_arg0 = sin(x) in f(f_arg0)
-
-			bool expensive_arg_expr_duplicated = false;
-			for(size_t i=0; i<func_expr->argument_expressions.size(); ++i)
-			{
-				bool arg_expr_is_expensive = false;
-				if(func_expr->argument_expressions[i]->nodeType() == ASTNode::FunctionExpressionType)
-				{
-					// Consider function calls expensive, with some exceptions, such as:
-					//	* Call to getfield built-in function (field access)
-					bool func_call_is_expensive = true;
-					const FunctionDefinition* arg_target_func = func_expr->argument_expressions[i].downcastToPtr<FunctionExpression>()->static_target_function;
-					if(arg_target_func->built_in_func_impl.nonNull())
-						func_call_is_expensive = arg_target_func->built_in_func_impl->callIsExpensive();
-					
-					if(func_call_is_expensive)
-						arg_expr_is_expensive = true;
-				}
-				else
-				{
-					// Some literal expressions are sufficiently simple that it doesn't matter if they are duplicated.
-					if(!(func_expr->argument_expressions[i]->nodeType() == ASTNode::VariableASTNodeType || func_expr->argument_expressions[i]->nodeType() == ASTNode::IntLiteralType ||
-						func_expr->argument_expressions[i]->nodeType() == ASTNode::FloatLiteralType || func_expr->argument_expressions[i]->nodeType() == ASTNode::DoubleLiteralType ||
-						func_expr->argument_expressions[i]->nodeType() == ASTNode::BoolLiteralType || func_expr->argument_expressions[i]->nodeType() == ASTNode::CharLiteralType))
-					{
-						// This argument expression is expensive to evaluate.
-						arg_expr_is_expensive = true;
-					}
-				}
-
-				if(verbose) conPrint("arg " + toString(i) + " expensive: " + boolToString(arg_expr_is_expensive));
-				if(arg_expr_is_expensive)
-				{
-					// See if the arg is duplicated
-					if(target_func->args[i].ref_count > 1)
-					{
-						expensive_arg_expr_duplicated = true;
-						if(verbose) conPrint("Expensive arg " + toString(i) + " is duplicated (refs=" + toString(target_func->args[i].ref_count) + ") in target function.  Not inlining.");
-					}
-				}
-			}
-
-			if(verbose) conPrint("target: " + target_func->sig.toString() + ", call_count=" + toString(call_count) + ", beta reduction=" + boolToString(is_beta_reduction) +
-				", target_func_simple: " + boolToString(target_func_simple) + ", expensive_arg_expr_duplicated: " + boolToString(expensive_arg_expr_duplicated) + "\n");
-
-
-			const bool should_inline = (is_beta_reduction || (call_count <= 1) || target_func_simple) && !expensive_arg_expr_duplicated;
-			if(should_inline)
-			{
-				if(verbose) conPrint("------------original expr----------: ");
-				if(verbose) e->print(0, std::cout);
-
-				if(verbose) conPrint("------------original target function body-----------: ");
-				if(verbose) target_func->body->print(0, std::cout);
-
-				// Replace e with a copy of the target function body.
-				ASTNodeRef cloned_body = cloneASTNodeSubtree(target_func->body);
-				e = cloned_body;
-
-				if(verbose) conPrint("------------new expr: (cloned function body)-----------: ");
-				if(verbose) e->print(0, std::cout);
-
-
-				// Now replace all variables in the target function body with the argument values from func_expr
-				TraversalPayload sub_payload(TraversalPayload::SubstituteVariables);
-				sub_payload.used_names = payload.used_names;
-				sub_payload.func_args_to_sub = target_func;
-				sub_payload.variable_substitutes.resize(func_expr->argument_expressions.size());
-				
-				// Work out effective call site position.
-				int effective_callsite_order_num = 1000000000;
-				if(payload.current_named_constant)
-					effective_callsite_order_num = payload.current_named_constant->order_num;
-				for(size_t z=0; z<payload.func_def_stack.size(); ++z)
-					effective_callsite_order_num = myMin(effective_callsite_order_num, payload.func_def_stack[z]->order_num);
-
-				sub_payload.new_order_num = effective_callsite_order_num;
-
-				for(size_t i=0; i<func_expr->argument_expressions.size(); ++i)
-				{
-					sub_payload.variable_substitutes[i] = func_expr->argument_expressions[i]; // NOTE: Don't clone now, will clone the expressions when they are pulled out of argument_expressions.
-
-					//std::cout << "------------sub_payload.variable_substitutes[i]: " << std::endl;
-					//sub_payload.variable_substitutes[i]->print(0, std::cout);
-				}
-				e->traverse(sub_payload, stack);
-
-				checkSubstituteVariable(e, sub_payload); // e itself might be a variable that needs substituting.
-
-				if(verbose) conPrint("------------Substituted expression-----------: ");
-				if(verbose) e->print(0, std::cout);
-
-
-				// NEW: SubstituteVariables pass has set all variables in e to unbound.  Rebind all variables in e.
-				{
-					TraversalPayload temp_payload(TraversalPayload::UnbindVariables);
-					temp_payload.linker = payload.linker;
-					temp_payload.func_def_stack = payload.func_def_stack;
-					e->traverse(temp_payload, stack);
-				}
-
-				
-				if(!payload.func_def_stack.empty())
-				{
-					if(verbose) conPrint("------------Full function-----------: ");
-					if(verbose) payload.func_def_stack[0]->print(0, std::cout);
-				}
-				else if(payload.current_named_constant)
-				{
-					if(verbose) conPrint("------------Full named constant-----------: ");
-					if(verbose) payload.current_named_constant->print(0, std::cout);
-				}
-				else
-				{
-					assert(0);
-				}
-
-				{
-					TraversalPayload temp_payload(TraversalPayload::BindVariables);
-					temp_payload.linker = payload.linker;
-					temp_payload.func_def_stack = payload.func_def_stack;
-					e->traverse(temp_payload, stack);
-				}
-				// Do a CountArgumentRefs pass as the ref counts may have changed.  This will count the number of references to each function argument in the body of each function.
-				if(!payload.func_def_stack.empty())
-				{
-					// Run on this entire function, so we zero out the counts when traverse the FunctionDef.
-					TraversalPayload temp_payload(TraversalPayload::CountArgumentRefs);
-					temp_payload.linker = payload.linker;
-					temp_payload.func_def_stack = payload.func_def_stack;
-					payload.func_def_stack[0]->traverse(temp_payload, stack);
-				}
-
-				if(verbose) conPrint("------------Rebound expression-----------: ");
-				if(verbose) e->print(0, std::cout);
-
-				payload.tree_changed = true;
-			}
-			else
-			{
-				if(verbose) conPrint("not inlining.\n");
-			}
-		}
-	}
-}
-
-
 void checkSubstituteVariable(ASTNodeRef& e, TraversalPayload& payload)
 {
 	if(e->nodeType() == ASTNode::VariableASTNodeType)
@@ -2018,11 +1798,6 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 			}
 
 	}
-	else if(payload.operation == TraversalPayload::InlineFunctionCalls)
-	{
-		checkInlineExpression(a, payload, stack);
-		checkInlineExpression(b, payload, stack);
-	}
 	else if(payload.operation == TraversalPayload::SubstituteVariables)
 	{
 		checkSubstituteVariable(a, payload);
@@ -2307,12 +2082,7 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 	b->traverse(payload, stack);
 	
 
-	if(payload.operation == TraversalPayload::InlineFunctionCalls)
-	{
-		checkInlineExpression(a, payload, stack);
-		checkInlineExpression(b, payload, stack);
-	}
-	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	if(payload.operation == TraversalPayload::SubstituteVariables)
 	{
 		checkSubstituteVariable(a, payload);
 		checkSubstituteVariable(b, payload);
@@ -2600,11 +2370,6 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 			// This is needed now because we need to know the type of op_X, which is only available once bound.
 			new_expr->traverse(payload, stack);
 		}
-	}
-	else if(payload.operation == TraversalPayload::InlineFunctionCalls)
-	{
-		checkInlineExpression(a, payload, stack);
-		checkInlineExpression(b, payload, stack);
 	}
 	else if(payload.operation == TraversalPayload::SubstituteVariables)
 	{
@@ -3087,12 +2852,7 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	b->traverse(payload, stack);
 	
 
-	if(payload.operation == TraversalPayload::InlineFunctionCalls)
-	{
-		checkInlineExpression(a, payload, stack);
-		checkInlineExpression(b, payload, stack);
-	}
-	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	if(payload.operation == TraversalPayload::SubstituteVariables)
 	{
 		checkSubstituteVariable(a, payload);
 		checkSubstituteVariable(b, payload);
@@ -3723,12 +3483,7 @@ void BinaryBitwiseExpression::traverse(TraversalPayload& payload, std::vector<AS
 	b->traverse(payload, stack);
 	
 
-	if(payload.operation == TraversalPayload::InlineFunctionCalls)
-	{
-		checkInlineExpression(a, payload, stack);
-		checkInlineExpression(b, payload, stack);
-	}
-	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	if(payload.operation == TraversalPayload::SubstituteVariables)
 	{
 		checkSubstituteVariable(a, payload);
 		checkSubstituteVariable(b, payload);
@@ -3919,12 +3674,7 @@ void BinaryBooleanExpr::traverse(TraversalPayload& payload, std::vector<ASTNode*
 	b->traverse(payload, stack);
 	
 
-	if(payload.operation == TraversalPayload::InlineFunctionCalls)
-	{
-		checkInlineExpression(a, payload, stack);
-		checkInlineExpression(b, payload, stack);
-	}
-	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	if(payload.operation == TraversalPayload::SubstituteVariables)
 	{
 		checkSubstituteVariable(a, payload);
 		checkSubstituteVariable(b, payload);
@@ -4128,11 +3878,7 @@ void UnaryMinusExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 	expr->traverse(payload, stack);
 	
 
-	if(payload.operation == TraversalPayload::InlineFunctionCalls)
-	{
-		checkInlineExpression(expr, payload, stack);
-	}
-	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	if(payload.operation == TraversalPayload::SubstituteVariables)
 	{
 		checkSubstituteVariable(expr, payload);
 	}
@@ -4337,11 +4083,7 @@ void LogicalNegationExpr::traverse(TraversalPayload& payload, std::vector<ASTNod
 	expr->traverse(payload, stack);
 	
 
-	if(payload.operation == TraversalPayload::InlineFunctionCalls)
-	{
-		checkInlineExpression(expr, payload, stack);
-	}
-	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	if(payload.operation == TraversalPayload::SubstituteVariables)
 	{
 		checkSubstituteVariable(expr, payload);
 	}
@@ -4594,12 +4336,7 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 	b->traverse(payload, stack);
 
 
-	if(payload.operation == TraversalPayload::InlineFunctionCalls)
-	{
-		checkInlineExpression(a, payload, stack);
-		checkInlineExpression(b, payload, stack);
-	}
-	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	if(payload.operation == TraversalPayload::SubstituteVariables)
 	{
 		checkSubstituteVariable(a, payload);
 		checkSubstituteVariable(b, payload);
@@ -4933,11 +4670,7 @@ void ArraySubscript::traverse(TraversalPayload& payload, std::vector<ASTNode*>& 
 	subscript_expr->traverse(payload, stack);
 
 	
-	if(payload.operation == TraversalPayload::InlineFunctionCalls)
-	{
-		checkInlineExpression(subscript_expr, payload, stack);
-	}
-	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	if(payload.operation == TraversalPayload::SubstituteVariables)
 	{
 		checkSubstituteVariable(subscript_expr, payload);
 	}
@@ -5095,11 +4828,7 @@ void NamedConstant::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 
 	value_expr->traverse(payload, stack);
 
-	if(payload.operation == TraversalPayload::InlineFunctionCalls)
-	{
-		checkInlineExpression(value_expr, payload, stack);
-	}
-	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	if(payload.operation == TraversalPayload::SubstituteVariables)
 	{
 		checkSubstituteVariable(value_expr, payload);
 	}

@@ -311,12 +311,7 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 
 	//payload.capture_variables = old_use_captured_vars;
 
-	if(payload.operation == TraversalPayload::InlineFunctionCalls)
-	{
-		if(body.nonNull())
-			checkInlineExpression(body, payload, stack);
-	}
-	else if(payload.operation == TraversalPayload::UpdateUpRefs)
+	if(payload.operation == TraversalPayload::UpdateUpRefs)
 	{
 	}
 	else if(payload.operation == TraversalPayload::SubstituteVariables)

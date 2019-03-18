@@ -84,11 +84,7 @@ void LetASTNode::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 	expr->traverse(payload, stack);
 
 
-	if(payload.operation == TraversalPayload::InlineFunctionCalls)
-	{
-		checkInlineExpression(expr, payload, stack);
-	}
-	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	if(payload.operation == TraversalPayload::SubstituteVariables)
 	{
 		checkSubstituteVariable(expr, payload);
 	}

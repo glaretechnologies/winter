@@ -451,6 +451,8 @@ static void testFunctionInlining()
 	results = testMainFloatArg("def f(float x) : x + 1.0							\n\
 		def main(float x) float : f(sin(x))", 1, sin(1.f) + 1.0f);
 	testAssert(results.maindef->body->nodeType() == ASTNode::AdditionExpressionType);
+
+	testMainFloatArgAllowUnsafe("def f(varray<float> v) varray<float> : v      def main(float x) float : elem(f([99.0]va), 0)", 1.f, 99.0f, INVALID_OPENCL);
 }
 
 

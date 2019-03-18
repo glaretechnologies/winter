@@ -91,6 +91,7 @@ private:
 	void bindFunction(Linker& linker, TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	void tryCoerceIntArgsToDoubles(Linker& linker, const std::vector<TypeVRef>& argtypes, int effective_callsite_order_num);
 	void tryCoerceIntArgsToFloats(Linker& linker, const std::vector<TypeVRef>& argtypes, int effective_callsite_order_num);
+	void checkInlineExpression(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 public:
 
 	ASTNodeRef get_func_expr; // Expression that returns the function being called.

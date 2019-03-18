@@ -105,13 +105,7 @@ void IfExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 	else_expr->traverse(payload, stack);
 
 	
-	if(payload.operation == TraversalPayload::InlineFunctionCalls)
-	{
-		checkInlineExpression(condition, payload, stack);
-		checkInlineExpression(then_expr, payload, stack);
-		checkInlineExpression(else_expr, payload, stack);
-	}
-	else if(payload.operation == TraversalPayload::SubstituteVariables)
+	if(payload.operation == TraversalPayload::SubstituteVariables)
 	{
 		checkSubstituteVariable(condition, payload);
 		checkSubstituteVariable(then_expr, payload);

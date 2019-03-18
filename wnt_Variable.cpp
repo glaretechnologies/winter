@@ -504,7 +504,7 @@ void Variable::print(int depth, std::ostream& s) const
 {
 	printMargin(depth, s);
 
-	s << "Var '" << this->name << "' (" + toHexString((uint64)this) + "), free: " << boolToString(this->enclosing_lambda != NULL) << " ";
+	s << "Var '" << this->name << "' (" + toHexString((uint64)this) + "), free: " << boolToString(this->enclosing_lambda != NULL) << ", ";
 
 	switch(binding_type)
 	{
