@@ -152,7 +152,7 @@ public:
 	// GetAllNamesInScope, InlineFunctionCalls:
 	std::unordered_set<std::string>* used_names;
 
-	SmallVector<Reference<ASTNode>, 4> garbarge; // For Storing a ref to a node so it won't get deleted (due to ref count going to zero) while a function on it is still being executed.
+	SmallVector<Reference<ASTNode>, 4> garbage; // For Storing a ref to a node so it won't get deleted (due to ref count going to zero) while a function on it is still being executed.
 };
 
 

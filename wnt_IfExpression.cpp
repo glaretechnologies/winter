@@ -138,7 +138,7 @@ void IfExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 			const bool val = condition.downcast<BoolLiteral>()->value;
 			ASTNodeRef replacement = val ? then_expr : else_expr;
 
-			payload.garbarge.push_back(this); // Store a ref in payload so this node won't get deleted while we are still executing this function.
+			payload.garbage.push_back(this); // Store a ref in payload so this node won't get deleted while we are still executing this function.
 			assert(stack.back() == this);
 			stack[stack.size() - 2]->updateChild(this, replacement);
 			payload.tree_changed = true;

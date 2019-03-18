@@ -298,7 +298,7 @@ void LetBlock::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 			ASTNodeRef new_expr = this->expr;
 
 			payload.tree_changed = true;
-			payload.garbarge.push_back(this); // Store a ref in payload so this node won't get deleted while we are still executing this function.
+			payload.garbage.push_back(this); // Store a ref in payload so this node won't get deleted while we are still executing this function.
 			assert(stack.back() == this);
 			stack[stack.size() - 2]->updateChild(this, new_expr); // Tell the parent of this node to set the new expression as the relevant child.
 		}

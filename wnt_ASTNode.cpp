@@ -1751,7 +1751,7 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 				ASTNodeRef new_expr = new FunctionExpression(srcLocation(), "op_add", a, b);
 				payload.tree_changed = true;
 
-				payload.garbarge.push_back(this); // Store a ref in payload so this node won't get deleted while we are still executing this function.
+				payload.garbage.push_back(this); // Store a ref in payload so this node won't get deleted while we are still executing this function.
 				assert(stack.back() == this);
 				stack[stack.size() - 2]->updateChild(this, new_expr);
 
@@ -2047,7 +2047,7 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 			ASTNodeRef new_expr = new FunctionExpression(srcLocation(), "op_sub", a, b);
 			payload.tree_changed = true;
 
-			payload.garbarge.push_back(this); // Store a ref in payload so this node won't get deleted while we are still executing this function.
+			payload.garbage.push_back(this); // Store a ref in payload so this node won't get deleted while we are still executing this function.
 			assert(stack.back() == this);
 			stack[stack.size() - 2]->updateChild(this, new_expr);
 
@@ -2305,7 +2305,7 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 			ASTNodeRef new_expr = new FunctionExpression(srcLocation(), "op_mul", a, b);
 			payload.tree_changed = true;
 
-			payload.garbarge.push_back(this); // Store a ref in payload so this node won't get deleted while we are still executing this function.
+			payload.garbage.push_back(this); // Store a ref in payload so this node won't get deleted while we are still executing this function.
 			assert(stack.back() == this);
 			stack[stack.size() - 2]->updateChild(this, new_expr);
 
@@ -2797,7 +2797,7 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 			ASTNodeRef new_expr = new FunctionExpression(srcLocation(), "op_div", a, b);
 			payload.tree_changed = true;
 
-			payload.garbarge.push_back(this); // Store a ref in payload so this node won't get deleted while we are still executing this function.
+			payload.garbage.push_back(this); // Store a ref in payload so this node won't get deleted while we are still executing this function.
 			assert(stack.back() == this);
 			stack[stack.size() - 2]->updateChild(this, new_expr);
 
@@ -3808,7 +3808,7 @@ void UnaryMinusExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 			ASTNodeRef new_expr = new FunctionExpression(srcLocation(), "op_unary_minus", expr);
 			payload.tree_changed = true;
 
-			payload.garbarge.push_back(this); // Store a ref in payload so this node won't get deleted while we are still executing this function.
+			payload.garbage.push_back(this); // Store a ref in payload so this node won't get deleted while we are still executing this function.
 			assert(stack.back() == this);
 			stack[stack.size() - 2]->updateChild(this, new_expr);
 
@@ -4278,7 +4278,7 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 			{
 				payload.tree_changed = true;
 
-				payload.garbarge.push_back(this); // Store a ref in payload so this node won't get deleted while we are still executing this function.
+				payload.garbage.push_back(this); // Store a ref in payload so this node won't get deleted while we are still executing this function.
 				assert(stack.back() == this);
 				stack[stack.size() - 2]->updateChild(this, new_expr);
 

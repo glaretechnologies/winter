@@ -1031,7 +1031,7 @@ void FunctionExpression::checkInlineExpression(TraversalPayload& payload, std::v
 			ASTNodeRef cloned_body = cloneASTNodeSubtree(target_func->body);
 			ASTNodeRef new_expr = cloned_body;
 
-			payload.garbarge.push_back(this); // Store a ref in payload so this node won't get deleted while we are still executing this function.
+			payload.garbage.push_back(this); // Store a ref in payload so this node won't get deleted while we are still executing this function.
 			assert(stack.back() == this);
 			stack[stack.size() - 2]->updateChild(this, new_expr); // Tell the parent of this node to set the new expression as the relevant child.
 
