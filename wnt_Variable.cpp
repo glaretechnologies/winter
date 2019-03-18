@@ -535,6 +535,9 @@ std::string Variable::sourceString() const
 
 std::string Variable::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
+	if(this->enclosing_lambda) // If this is a free var:
+		return "cap_var_struct->captured_var_" + toString(this->enclosing_lambda->getFreeIndexForVar(this));
+
 	return mapOpenCLCVarName(params.opencl_c_keywords, this->name);
 }
 

@@ -110,6 +110,11 @@ public:
 	// Get index of this variable (which must be in the set of free variables for this lambda) in the list of free variables.
 	int getFreeIndexForVar(const Variable* var);
 
+	// Depending on the argument type, will return something like
+	// const SomeStruct* const arg_name
+	// or
+	// const int arg_name
+	static std::string openCLCArgumentCode(EmitOpenCLCodeParams& params, const TypeVRef& arg_type, const std::string& arg_name);
 
 
 	std::vector<FunctionArg> args;

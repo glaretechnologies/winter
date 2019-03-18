@@ -579,6 +579,19 @@ std::string FunctionDefinition::sourceString() const
 }
 
 
+// Depending on the argument type, will return something like
+// const SomeStruct* const arg_name
+// or
+// const int arg_name
+std::string FunctionDefinition::openCLCArgumentCode(EmitOpenCLCodeParams& params, const TypeVRef& arg_type, const std::string& arg_name)
+{
+	if(arg_type->OpenCLPassByPointer())
+		return "const " + arg_type->address_space + " " + arg_type->OpenCLCType() + "* const " + mapOpenCLCVarName(params.opencl_c_keywords, arg_name);
+	else
+		return "const " + arg_type->OpenCLCType() + " " + mapOpenCLCVarName(params.opencl_c_keywords, arg_name);
+}
+
+
 std::string FunctionDefinition::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
 	assert(returnType().nonNull());
@@ -589,14 +602,18 @@ std::string FunctionDefinition::emitOpenCLC(EmitOpenCLCodeParams& params) const
 	opencl_sig += sig.typeMangledName() + "(";
 	for(unsigned int i=0; i<args.size(); ++i)
 	{
-		if(args[i].type->OpenCLPassByPointer())
-			opencl_sig += "const " + args[i].type->address_space + " " + args[i].type->OpenCLCType() + "* const " + mapOpenCLCVarName(params.opencl_c_keywords, args[i].name);
-		else
-			opencl_sig += "const " + args[i].type->OpenCLCType() + " " + mapOpenCLCVarName(params.opencl_c_keywords, args[i].name);
+		opencl_sig += openCLCArgumentCode(params, args[i].type, args[i].name);
 			
 		if(i + 1 < args.size())
 			opencl_sig += ", ";
 	}
+
+	if(is_anon_func)
+	{
+		if(args.size() >= 1) opencl_sig += ", ";
+		opencl_sig += openCLCArgumentCode(params, getCapturedVariablesStructType(), "cap_var_struct");
+	}
+
 	opencl_sig += ")";
 
 	params.file_scope_code += opencl_sig + ";\n";

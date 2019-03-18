@@ -1950,6 +1950,12 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 			constructor_code += struct_type->getOpenCLCConstructor(params, vm_args.comments_in_opencl_output);
 		}
 
+	// Add definitions of captured var structures
+	for(size_t i=0; i<linker.anon_functions_to_codegen.size(); ++i)
+	{
+		struct_def_code += linker.anon_functions_to_codegen[i]->getCapturedVariablesStructType()->getOpenCLCDefinition(params, vm_args.comments_in_opencl_output);
+	}
+
 	// Spit out any remaining tuple definitions
 	for(auto i = params.tuple_types_used.begin(); i != params.tuple_types_used.end(); ++i)
 		if(!ContainerUtils::contains(emitted_tuples, *i)) // If not emitted yet:

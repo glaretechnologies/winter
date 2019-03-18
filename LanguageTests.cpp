@@ -1691,7 +1691,6 @@ static void testIterate()
 
 
 	// Test where the lambda captures a variable.
-	// Doesn't work in OpenCL currently since closures aren't supported in OpenCL emission.
 	testMainIntegerArg("																	\n\
 		def main(int x) int :																\n\
 		let																					\n\
@@ -1705,7 +1704,7 @@ static void testIterate()
 						[current_state + z, true]t											\n\
 				,																			\n\
 				0																			\n\
-			)", 17, 200, INVALID_OPENCL);
+			)", 17, 200);
 	
 
 	testMainDoubleArg("																	\n\

@@ -1805,31 +1805,7 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 		std::string s = use_func_name + "(";
 		for(unsigned int i=0; i<argument_expressions.size(); ++i)
 		{
-			if(!argument_expressions[i]->type()->OpenCLPassByPointer())
-				s += argument_expressions[i]->emitOpenCLC(params);
-			else
-			{
-				// Emit something like
-				// "SomeStruct arg_xx = g();"
-
-				// If the argument expression is itself an argument to the current function, then it is already a pointer, so just use as-is.
-				if(argument_expressions[i]->nodeType() == ASTNode::VariableASTNodeType && argument_expressions[i].downcastToPtr<Variable>()->binding_type == Variable::BindingType_Argument)
-				{
-					s += argument_expressions[i]->emitOpenCLC(params);
-				}
-				else if(argument_expressions[i]->nodeType() == ASTNode::VariableASTNodeType && argument_expressions[i].downcastToPtr<Variable>()->binding_type == Variable::BindingType_Let)
-				{
-					// If the variable is bound to a let variable, then it is on the stack of the C function.  So it is not a pointer
-					s += "&" + argument_expressions[i]->emitOpenCLC(params);
-				}
-				else
-				{
-					const std::string arg_name = this->static_target_function->args[i].name + "_arg_" + toString(params.uid++);
-					arg_eval_s += argument_expressions[i]->type()->OpenCLCType() + " " + arg_name + " = " + argument_expressions[i]->emitOpenCLC(params) + ";\n";
-
-					s += "&" + arg_name;
-				}
-			}
+			s += emitCodeForFuncArg(params, argument_expressions[i], this->static_target_function, /*arg name=*/this->static_target_function->args[i].name);
 
 			if(i + 1 < argument_expressions.size())
 				s += ", ";
@@ -1843,6 +1819,44 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 		}
 
 		return s + ")";
+	}
+}
+
+
+// Emit code for the function argument in a function call expression.
+// May be as simple as "x", or a temporary may need to be allocated on the stack, so its address can be taken, for example
+// SomeStruct f_arg_0 = someExpr();
+// f_arg_0
+std::string FunctionExpression::emitCodeForFuncArg(EmitOpenCLCodeParams& params, const ASTNodeRef& arg_expression, const FunctionDefinition* target_func, const std::string& func_arg_name)
+{
+	if(!arg_expression->type()->OpenCLPassByPointer())
+		return arg_expression->emitOpenCLC(params);
+	else
+	{
+		if(arg_expression->nodeType() == ASTNode::VariableASTNodeType && arg_expression.downcastToPtr<Variable>()->binding_type == Variable::BindingType_Argument)
+		{
+			// If the argument expression is itself an argument to the current function, then it is already a pointer, so just use as-is.
+			return arg_expression->emitOpenCLC(params);
+		}
+		else if(arg_expression->nodeType() == ASTNode::VariableASTNodeType && arg_expression.downcastToPtr<Variable>()->binding_type == Variable::BindingType_Let)
+		{
+			// If the variable is bound to a let variable, then it is on the stack of the C function.  So it is not a pointer.
+			return "&" + arg_expression->emitOpenCLC(params);
+		}
+		else
+		{
+			// Emit something like
+			// "SomeStruct f_arg_xx = g();"
+
+			const std::string arg_name = func_arg_name + "_arg_" + toString(params.uid++);
+			const std::string arg_eval_s = arg_expression->type()->OpenCLCType() + " " + arg_name + " = " + arg_expression->emitOpenCLC(params) + ";\n";
+
+			if(params.emit_comments)
+				params.blocks.back() += "// arg for " + target_func->sig.toString() + ":\n";
+			params.blocks.back() += arg_eval_s;
+
+			return "&" + arg_name;
+		}
 	}
 }
 

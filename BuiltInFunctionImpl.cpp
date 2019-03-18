@@ -2459,27 +2459,69 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 
 /*
-iterate(function<State, int, LoopInvariantData0, LoopInvariantData1, ..., LoopInvariantDataN, tuple<State, bool>> f, State initial_state, LoopInvariantData0, LoopInvariantData1, ..., LoopInvariantDataN) State
+Emit something like, at file scope:
 
-
-State state = initial_state;
-Store initial_state in state_alloca
-
-iteration = 0;
-while(1)
+--------------------------------------
+State iterate_0(State initial_state, LoopInvariantData0)
 {
-	//res = f(state, iteration);
-	f(tuple_alloca, state_alloca, iteration)
+	State state = initial_state;
 
-	if(tuple_alloca->second == false)
-		copy tuple_alloca->first to result
-		return
+	int iteration = 0;
+	while(1)
+	{
+		tuple_State_bool res = f(state, iteration, LoopInvariantData0);
 
-	iteration++;
-	
-	// state = res.first;
-	copy tuple_alloca->first to state_alloca
+		if(res.field1 == false)
+			return res.field0;
+
+		iteration++;
+		state = res.field_0;
+	}
 }
+--------------------------------------
+and then
+
+--------------------------------------
+iterate_0(initial_state_expr)
+--------------------------------------
+
+directly.
+
+
+
+And in the case where f is a lambda expression:
+
+--------------------------------------
+State iterate_0(State initial_state, LoopInvariantData0Type LoopInvariantData0, CapturedVarStruct* captured_vars)
+{
+	State state = initial_state;
+
+	int iteration = 0;
+	while(1)
+	{
+		tuple_State_bool res = f(state, iteration, LoopInvariantData0, captured_vars);
+
+		if(res.field1 == false)
+			return res.field0;
+
+		iteration++;
+		state = res.field_0;
+	}
+}
+--------------------------------------
+
+and then
+
+--------------------------------------
+CapturedVarStruct captured_vars_0;
+captured_vars_0.captured_var_0 = ...
+captured_vars_0.captured_var_1 = ...
+
+iterate_0(initial_state_expr, &captured_vars_0)
+--------------------------------------
+
+directly.
+
 */
 const std::string IterateBuiltInFunc::emitOpenCLForFunctionArg(EmitOpenCLCodeParams& params,
 		const FunctionDefinition* f, // arg 0
@@ -2489,34 +2531,39 @@ const std::string IterateBuiltInFunc::emitOpenCLForFunctionArg(EmitOpenCLCodePar
 	assert(*this->state_type == *argument_expressions[1]->type());
 	const std::string state_typename = state_type->OpenCLCType();
 	const std::string tuple_typename = f->returnType()->OpenCLCType();
+	const VRef<StructureType> captured_var_struct_type = f->getCapturedVariablesStructType();
 
 	std::string s;
-	// Emit
-	s = state_typename + " iterate_" + toString(params.uid++) + "(" + state_typename + " initial_state";
+	// Emit return type, function name and arguments
+	const int use_uid = params.uid++;
+	s = state_typename + " iterate_" + toString(use_uid) + "(" + FunctionDefinition::openCLCArgumentCode(params, state_type, "initial_state");
 
 	// Add invariant data args
 	for(size_t i = 0; i<invariant_data_types.size(); ++i)
-		s += ", " + invariant_data_types[i]->OpenCLCType() + " LoopInvariantData" + toString(i);
+		s += ", " + FunctionDefinition::openCLCArgumentCode(params, invariant_data_types[i], "LoopInvariantData" + toString(i));
+
+	// Add cap_var_struct arg if needed
+	if(f->is_anon_func)
+		s += ", " + FunctionDefinition::openCLCArgumentCode(params, captured_var_struct_type, "cap_var_struct");
 
 	s += ")\n";
 	s += "{\n";
-	s += "\t" + state_typename + " state = initial_state;\n";
+	s += "\t" + state_typename + " state = " + (state_type->OpenCLPassByPointer() ? "*" : "") + "initial_state;\n";
 	s += "\tint iteration = 0;\n";
 	s += "\twhile(1)\n";
 	s += "\t{\n";
 
-	// Emit "tuple<State, bool> res = f(state, iteration, LoopInvariantData0, LoopInvariantData1, ..., LoopInvariantDataN)"
+	// Emit something like "tuple_State_bool res = f(state, iteration, LoopInvariantData0, captured_vars);"
 	s += "\t\t" + tuple_typename + " res = " + f->sig.typeMangledName() + "(";
 	if(state_type->OpenCLPassByPointer())
 		s += "&";
 	s += "state, iteration";
 	for(size_t i = 0; i<invariant_data_types.size(); ++i)
 	{
-		s += ", ";
-		if(invariant_data_types[i]->OpenCLPassByPointer())
-			s += "&";
-		s += "LoopInvariantData" + toString(i);
+		s += ", LoopInvariantData" + toString(i);
 	}
+	if(f->is_anon_func)
+		s += ", cap_var_struct";
 	s += ");\n";
 
 	// Emit "if(tuple_alloca->second == false)"
@@ -2528,10 +2575,31 @@ const std::string IterateBuiltInFunc::emitOpenCLForFunctionArg(EmitOpenCLCodePar
 	s += "}\n";
 	params.file_scope_func_defs += s;
 
-	// Return a call to the function
-	std::string call_code = "iterate_" + toString(params.uid - 1) + "(" + argument_expressions[1]->emitOpenCLC(params);
+	// Return a call to the iterate function:
+
+	if(f->is_anon_func)
+	{
+		// Emit code to capture variables:
+		std::string cap_code;
+		cap_code += captured_var_struct_type->OpenCLCType() + " captured_vars_" + toString(use_uid) + ";\n";
+		size_t i=0;
+		for(auto z = f->free_variables.begin(); z != f->free_variables.end(); ++z, ++i)
+		{
+			cap_code += "captured_vars_" + toString(use_uid) + ".captured_var_" + toString(i) + " = " + mapOpenCLCVarName(params.opencl_c_keywords, (*z)->name) + ";\n";
+		}
+		cap_code += "\n";
+		params.blocks.back() += cap_code;
+	}
+
+	std::string call_code;
+	call_code += "iterate_" + toString(use_uid) + "(" + FunctionExpression::emitCodeForFuncArg(params, argument_expressions[1], f, f->args[1].name);
+
 	for(size_t i = 0; i<invariant_data_types.size(); ++i)
-		call_code += ", " + argument_expressions[2 + i]->emitOpenCLC(params);
+		call_code += ", " + FunctionExpression::emitCodeForFuncArg(params, argument_expressions[2 + i], f, f->args[2 + i].name);
+
+	if(f->is_anon_func)
+		call_code += ", &captured_vars_" + toString(use_uid);
+
 	call_code += ")";
 	return call_code;
 }

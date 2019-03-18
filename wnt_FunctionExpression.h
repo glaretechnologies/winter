@@ -80,6 +80,12 @@ public:
 
 	bool isBoundToGlobalDef() const; // Is this function bound to a single global definition.  This should be the case for most normal function expressions like f(x)
 
+	// Emit code for the given function argument in a function call expression.
+	// May be as simple as "x", or a temporary may need to be allocated on the stack, so its address can be taken, for example
+	// SomeStruct f_arg_0 = someExpr();
+	// f_arg_0
+	static std::string emitCodeForFuncArg(EmitOpenCLCodeParams& params, const ASTNodeRef& arg_expression, const FunctionDefinition* target_func, const std::string& func_arg_name);
+
 private:
 	void checkInDomain(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	void bindFunction(Linker& linker, TraversalPayload& payload, std::vector<ASTNode*>& stack);
