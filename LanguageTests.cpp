@@ -324,6 +324,10 @@ static void testFunctionInlining()
 	// ===================================================================
 	Winter::TestResults results;
 
+	// Start with something simple, test that f is inlined.
+	results = testMainIntegerArg("def f(int y) : y    def main(int x) int : f(x)", 1, 1); // f should be inlined.
+	testAssert(results.maindef->body->nodeType() == ASTNode::VariableASTNodeType);
+
 	/*
 	Check that clamp is not inlined, since it duplicates an expensive arg.
 	max gets inlined into clmap, so we have
@@ -3482,6 +3486,10 @@ static void testLambdaExpressionsAndClosures()
 					def main() float :           \n\
 					let f = makeLambda()  in   \n\
 				  f(2.0)", 4.0f);*/
+
+	testMainFloat("def g(function<float, float> f, float x) : f(x)			\n\
+					def main() float :										\n\
+					g(\\(float x) : x, 2.0f)", 2.0f);
 
 	// Test Lambda passed as a function arg
 	testMainFloat("def g(function<float, float> f, float x) : f(x)			\n\

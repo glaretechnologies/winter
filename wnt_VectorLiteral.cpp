@@ -240,12 +240,7 @@ void VectorLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	stack.pop_back();
 
 
-	if(payload.operation == TraversalPayload::SubstituteVariables)
-	{
-		for(size_t i=0; i<elements.size(); ++i)
-			checkSubstituteVariable(elements[i], payload);
-	}
-	else if(payload.operation == TraversalPayload::TypeCheck)
+	if(payload.operation == TraversalPayload::TypeCheck)
 	{
 		// Check all the element expression types match the computed element type.
 		const TypeRef this_type = this->type();

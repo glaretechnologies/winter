@@ -612,14 +612,6 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 	{
 		checkInlineExpression(payload, stack);
 	}
-	else if(payload.operation == TraversalPayload::SubstituteVariables)
-	{
-		if(get_func_expr.nonNull())
-			checkSubstituteVariable(get_func_expr, payload);
-
-		for(size_t i=0; i<argument_expressions.size(); ++i)
-			checkSubstituteVariable(argument_expressions[i], payload);
-	}
 	else if(payload.operation == TraversalPayload::BindVariables) // LinkFunctions)
 	{
 		// If this is a generic function, we can't try and bind function expressions yet,
@@ -1073,20 +1065,11 @@ void FunctionExpression::checkInlineExpression(TraversalPayload& payload, std::v
 				//std::cout << "------------sub_payload.variable_substitutes[i]: " << std::endl;
 				//sub_payload.variable_substitutes[i]->print(0, std::cout);
 			}
+
 			new_expr->traverse(sub_payload, stack);
 
-			ASTNodeRef subbed_new_expr = new_expr;
-			checkSubstituteVariable(subbed_new_expr, sub_payload); // new_expr itself might be a variable that needs substituting.
-			if(subbed_new_expr.ptr() != new_expr.ptr())
-			{
-				stack[stack.size() - 2]->updateChild(new_expr.ptr(), subbed_new_expr); // Tell the parent of this node to set the new expression as the relevant child.
-
-				// Since we have replaced new_expr with subbed_new_expr, we need to update the stack as well, for the traversals below.
-				stack.pop_back();
-				stack.push_back(subbed_new_expr.ptr());
-
-				new_expr = subbed_new_expr;
-			}
+			// new_expr itself may have been substituted by a new expression (see Variable::traverse SubstituteVariables case), in which case the back of the stack will be updated. 
+			new_expr = stack.back();
 
 			if(verbose) conPrint("------------Substituted expression-----------: ");
 			if(verbose) new_expr->print(0, std::cout);
@@ -1147,6 +1130,12 @@ void FunctionExpression::checkInlineExpression(TraversalPayload& payload, std::v
 
 void FunctionExpression::updateChild(const ASTNode* old_val, ASTNodeRef& new_val)
 {
+	if(get_func_expr.ptr() == old_val)
+	{
+		get_func_expr = new_val;
+		return;
+	}
+
 	for(size_t i=0; i<argument_expressions.size(); ++i)
 		if(argument_expressions[i].ptr() == old_val)
 		{

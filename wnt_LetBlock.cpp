@@ -260,8 +260,6 @@ void LetBlock::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 					payload.new_let_var_name_map[std::make_pair(lets[i].getPointer(), (int)z)] = new_name;
 				}
 			}
-
-		checkSubstituteVariable(expr, payload);
 	}
 
 

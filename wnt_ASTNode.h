@@ -160,7 +160,6 @@ void printMargin(int depth, std::ostream& s);
 bool isIntExactlyRepresentableAsFloat(int64 x);
 bool isIntExactlyRepresentableAsDouble(int64 x);
 bool checkFoldExpression(Reference<ASTNode>& e, TraversalPayload& payload); // Returns true if folding took place or e is already a literal.
-void checkSubstituteVariable(Reference<ASTNode>& e, TraversalPayload& payload);
 void doImplicitIntToFloatTypeCoercionForFloatReturn(Reference<ASTNode>& expr, TraversalPayload& payload);
 void doImplicitIntToDoubleTypeCoercionForDoubleReturn(Reference<ASTNode>& expr, TraversalPayload& payload);
 const std::string errorContext(const ASTNode* n);

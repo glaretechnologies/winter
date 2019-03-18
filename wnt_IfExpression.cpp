@@ -105,13 +105,7 @@ void IfExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 	else_expr->traverse(payload, stack);
 
 	
-	if(payload.operation == TraversalPayload::SubstituteVariables)
-	{
-		checkSubstituteVariable(condition, payload);
-		checkSubstituteVariable(then_expr, payload);
-		checkSubstituteVariable(else_expr, payload);
-	}
-	else if(payload.operation == TraversalPayload::CheckInDomain)
+	if(payload.operation == TraversalPayload::CheckInDomain)
 	{
 		checkInDomain(payload, stack);
 		//this->proven_defined = true;

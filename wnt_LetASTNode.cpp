@@ -84,11 +84,7 @@ void LetASTNode::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 	expr->traverse(payload, stack);
 
 
-	if(payload.operation == TraversalPayload::SubstituteVariables)
-	{
-		checkSubstituteVariable(expr, payload);
-	}
-	else if(payload.operation == TraversalPayload::TypeCheck)
+	if(payload.operation == TraversalPayload::TypeCheck)
 	{
 		if(vars.size() == 1)
 		{

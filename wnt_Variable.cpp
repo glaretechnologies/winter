@@ -367,6 +367,24 @@ void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 	}
 	else if(payload.operation == TraversalPayload::SubstituteVariables)
 	{
+		if(this->binding_type == Variable::BindingType_Argument && this->bound_function == payload.func_args_to_sub)
+		{
+			// Replace the variable with the argument value.	
+			if(this->arg_index >= (int)payload.variable_substitutes.size())
+				return; // May be out of bounds for invalid programs.
+			ASTNodeRef new_expr = cloneASTNodeSubtree(payload.variable_substitutes[this->arg_index]);
+
+			payload.tree_changed = true;
+			payload.garbarge.push_back(this); // Store a ref in payload so this node won't get deleted while we are still executing this function.
+			if(stack[stack.size() - 1] == this)
+			{
+				stack[stack.size() - 2]->updateChild(this, new_expr); // Tell the parent of this node to set the new expression as the relevant child.
+				stack[stack.size() - 1] = new_expr.ptr();
+			}
+			else
+				stack[stack.size() - 1]->updateChild(this, new_expr); // Tell the parent of this node to set the new expression as the relevant child.
+		}
+
 		if(binding_type == BindingType_Let)
 		{
 			// Handle renaming of let variables in the cloned sub-tree.

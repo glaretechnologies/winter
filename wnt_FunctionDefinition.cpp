@@ -316,9 +316,6 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 	}
 	else if(payload.operation == TraversalPayload::SubstituteVariables)
 	{
-		if(body.nonNull())
-			checkSubstituteVariable(body, payload);
-
 		this->order_num = payload.new_order_num;
 	}
 	else if(payload.operation == TraversalPayload::TypeCheck)

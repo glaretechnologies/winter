@@ -186,12 +186,7 @@ void TupleLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 	stack.pop_back();
 
 
-	if(payload.operation == TraversalPayload::SubstituteVariables)
-	{
-		for(size_t i=0; i<elements.size(); ++i)
-			checkSubstituteVariable(elements[i], payload);
-	}
-	else if(payload.operation == TraversalPayload::TypeCheck)
+	if(payload.operation == TraversalPayload::TypeCheck)
 	{
 		// Nothing in particular to do here
 	}

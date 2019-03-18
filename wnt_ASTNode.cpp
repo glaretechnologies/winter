@@ -326,25 +326,6 @@ bool checkFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
 }
 
 
-void checkSubstituteVariable(ASTNodeRef& e, TraversalPayload& payload)
-{
-	if(e->nodeType() == ASTNode::VariableASTNodeType)
-	{
-		Reference<Variable> var = e.downcast<Variable>();
-
-		if(var->binding_type == Variable::BindingType_Argument && var->bound_function == payload.func_args_to_sub)
-		{
-			// Replace the variable with the argument value.	
-			if(var->arg_index >= (int)payload.variable_substitutes.size())
-				return; // May be out of bounds for invalid programs.
-			e = cloneASTNodeSubtree(payload.variable_substitutes[var->arg_index]);
-
-			payload.tree_changed = true;
-		}
-	}
-}
-
-
 const std::string mapOpenCLCVarName(const std::unordered_set<std::string>& opencl_c_keywords, const std::string& s)
 {
 	if(opencl_c_keywords.count(s))
@@ -1780,11 +1761,6 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 			}
 
 	}
-	else if(payload.operation == TraversalPayload::SubstituteVariables)
-	{
-		checkSubstituteVariable(a, payload);
-		checkSubstituteVariable(b, payload);
-	}
 	else if(payload.operation == TraversalPayload::TypeCoercion)
 	{
 		doImplicitIntToFloatTypeCoercion(a, b, payload);
@@ -2059,12 +2035,7 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 	b->traverse(payload, stack);
 	
 
-	if(payload.operation == TraversalPayload::SubstituteVariables)
-	{
-		checkSubstituteVariable(a, payload);
-		checkSubstituteVariable(b, payload);
-	}
-	else if(payload.operation == TraversalPayload::BindVariables)
+	if(payload.operation == TraversalPayload::BindVariables)
 	{
 		// Convert overloaded operator - replace "+" with "op_add" as needed.
 		const TypeRef a_type = a->type();
@@ -2342,11 +2313,6 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 			// This is needed now because we need to know the type of op_X, which is only available once bound.
 			new_expr->traverse(payload, stack);
 		}
-	}
-	else if(payload.operation == TraversalPayload::SubstituteVariables)
-	{
-		checkSubstituteVariable(a, payload);
-		checkSubstituteVariable(b, payload);
 	}
 	else if(payload.operation == TraversalPayload::TypeCoercion)
 	{
@@ -2819,12 +2785,7 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	b->traverse(payload, stack);
 	
 
-	if(payload.operation == TraversalPayload::SubstituteVariables)
-	{
-		checkSubstituteVariable(a, payload);
-		checkSubstituteVariable(b, payload);
-	}
-	else if(payload.operation == TraversalPayload::BindVariables)
+	if(payload.operation == TraversalPayload::BindVariables)
 	{
 		// Convert overloaded operator - replace "+" with "op_add" as needed.
 		const TypeRef a_type = a->type();
@@ -3445,12 +3406,7 @@ void BinaryBitwiseExpression::traverse(TraversalPayload& payload, std::vector<AS
 	b->traverse(payload, stack);
 	
 
-	if(payload.operation == TraversalPayload::SubstituteVariables)
-	{
-		checkSubstituteVariable(a, payload);
-		checkSubstituteVariable(b, payload);
-	}
-	else if(payload.operation == TraversalPayload::TypeCoercion)
+	if(payload.operation == TraversalPayload::TypeCoercion)
 	{
 	}
 	else if(payload.operation == TraversalPayload::TypeCheck)
@@ -3631,12 +3587,7 @@ void BinaryBooleanExpr::traverse(TraversalPayload& payload, std::vector<ASTNode*
 	b->traverse(payload, stack);
 	
 
-	if(payload.operation == TraversalPayload::SubstituteVariables)
-	{
-		checkSubstituteVariable(a, payload);
-		checkSubstituteVariable(b, payload);
-	}
-	else if(payload.operation == TraversalPayload::TypeCheck)
+	if(payload.operation == TraversalPayload::TypeCheck)
 	{
 		const TypeRef& a_type = this->a->type();
 		if(a_type.isNull())
@@ -3830,11 +3781,7 @@ void UnaryMinusExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 	expr->traverse(payload, stack);
 	
 
-	if(payload.operation == TraversalPayload::SubstituteVariables)
-	{
-		checkSubstituteVariable(expr, payload);
-	}
-	else if(payload.operation == TraversalPayload::TypeCheck)
+	if(payload.operation == TraversalPayload::TypeCheck)
 	{
 		const TypeRef& this_type = this->type();
 		if(this_type.isNull())
@@ -4031,11 +3978,7 @@ void LogicalNegationExpr::traverse(TraversalPayload& payload, std::vector<ASTNod
 	expr->traverse(payload, stack);
 	
 
-	if(payload.operation == TraversalPayload::SubstituteVariables)
-	{
-		checkSubstituteVariable(expr, payload);
-	}
-	else if(payload.operation == TraversalPayload::TypeCheck)
+	if(payload.operation == TraversalPayload::TypeCheck)
 	{
 		const TypeRef& this_type = this->type();
 		if(this_type.isNull())
@@ -4284,12 +4227,7 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 	b->traverse(payload, stack);
 
 
-	if(payload.operation == TraversalPayload::SubstituteVariables)
-	{
-		checkSubstituteVariable(a, payload);
-		checkSubstituteVariable(b, payload);
-	}
-	else if(payload.operation == TraversalPayload::BindVariables)
+	if(payload.operation == TraversalPayload::BindVariables)
 	{
 		const TypeRef a_type = a->type();
 		const TypeRef b_type = b->type();
@@ -4613,11 +4551,7 @@ void ArraySubscript::traverse(TraversalPayload& payload, std::vector<ASTNode*>& 
 	subscript_expr->traverse(payload, stack);
 
 	
-	if(payload.operation == TraversalPayload::SubstituteVariables)
-	{
-		checkSubstituteVariable(subscript_expr, payload);
-	}
-	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
+	if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
 		//this->can_constant_fold = subscript_expr->can_constant_fold && expressionIsWellTyped(*this, payload);
 		const bool is_literal = checkFoldExpression(subscript_expr, payload);
@@ -4767,11 +4701,7 @@ void NamedConstant::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 
 	value_expr->traverse(payload, stack);
 
-	if(payload.operation == TraversalPayload::SubstituteVariables)
-	{
-		checkSubstituteVariable(value_expr, payload);
-	}
-	else if(payload.operation == TraversalPayload::TypeCoercion)
+	if(payload.operation == TraversalPayload::TypeCoercion)
 	{
 		if(declared_type.nonNull() && declared_type->getType() == Type::FloatType && 
 			value_expr.nonNull() && value_expr->nodeType() == ASTNode::IntLiteralType)

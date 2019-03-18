@@ -223,12 +223,7 @@ void ArrayLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 	stack.pop_back();
 
 
-	if(payload.operation == TraversalPayload::SubstituteVariables)
-	{
-		for(size_t i=0; i<elements.size(); ++i)
-			checkSubstituteVariable(elements[i], payload);
-	}
-	else if(payload.operation == TraversalPayload::TypeCheck)
+	if(payload.operation == TraversalPayload::TypeCheck)
 	{
 		// Check all the element expression types match the computed element type.
 		const TypeRef elem_type = this->elements[0]->type();
