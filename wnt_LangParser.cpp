@@ -1600,52 +1600,53 @@ ASTNodeRef LangParser::parseArrayOrVectorOrTupleLiteral(ParseInfo& p)
 		return func_expr;
 	}*/
 
-	if(hasPrefix(suffix, "a"))
+	// Parse suffix
+	Parser temp_p(suffix.c_str(), suffix.length());
+	if(temp_p.currentIsChar('a'))
 	{
 		int int_suffix = 0;
 		bool has_int_suffix = false;
-		Parser temp_p(suffix.c_str(), (int)suffix.size());
-		temp_p.advance(); // Advance past 'a'
+		temp_p.consume('a');
 		if(!temp_p.eof())
 		{
 			has_int_suffix = true;
 			if(!temp_p.parseInt(int_suffix))
-				throw LangParserExcep("Invalid square bracket literal suffix '" + suffix + "'.");
+				throw LangParserExcep("Invalid array literal suffix '" + suffix + "'.");
 		}
-		return ASTNodeRef(new ArrayLiteral(elems, loc, has_int_suffix, int_suffix));
+		return new ArrayLiteral(elems, loc, has_int_suffix, int_suffix);
 	}
-	else if(hasPrefix(suffix, "va"))
+	else if(temp_p.currentIsChar('t'))
 	{
-		int int_suffix = 0;
-		bool has_int_suffix = false;
-		Parser temp_p(suffix.c_str(), (int)suffix.size());
-		temp_p.advance(); // Advance past 'v'
-		temp_p.advance(); // Advance past 'a'
-		if(!temp_p.eof())
+		return new TupleLiteral(elems, loc);
+	}
+	else if(temp_p.currentIsChar('v'))
+	{
+		temp_p.consume('v');
+		if(temp_p.currentIsChar('a'))
 		{
-			has_int_suffix = true;
-			if(!temp_p.parseInt(int_suffix))
-				throw LangParserExcep("Invalid square bracket literal suffix '" + suffix + "'.");
+			int int_suffix = 0;
+			bool has_int_suffix = false;
+			temp_p.consume('a');
+			if(!temp_p.eof())
+			{
+				has_int_suffix = true;
+				if(!temp_p.parseInt(int_suffix))
+					throw LangParserExcep("Invalid varray literal suffix '" + suffix + "'.");
+			}
+			return new VArrayLiteral(elems, loc, has_int_suffix, int_suffix);
 		}
-		return new VArrayLiteral(elems, loc, has_int_suffix, int_suffix);
-	}
-	else if(hasPrefix(suffix, "v"))
-	{
-		int int_suffix = 0;
-		bool has_int_suffix = false;
-		Parser temp_p(suffix.c_str(), (int)suffix.size());
-		temp_p.advance(); // Advance past 'v'
-		if(!temp_p.eof())
+		else
 		{
-			has_int_suffix = true;
-			if(!temp_p.parseInt(int_suffix))
-				throw LangParserExcep("Invalid square bracket literal suffix '" + suffix + "'.");
+			int int_suffix = 0;
+			bool has_int_suffix = false;
+			if(!temp_p.eof())
+			{
+				has_int_suffix = true;
+				if(!temp_p.parseInt(int_suffix))
+					throw LangParserExcep("Invalid vector literal suffix '" + suffix + "'.");
+			}
+			return new VectorLiteral(elems, loc, has_int_suffix, int_suffix);
 		}
-		return ASTNodeRef(new VectorLiteral(elems, loc, has_int_suffix, int_suffix));
-	}
-	if(hasPrefix(suffix, "t"))
-	{
-		return ASTNodeRef(new TupleLiteral(elems, loc));
 	}
 	else
 	{
