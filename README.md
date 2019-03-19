@@ -445,6 +445,23 @@ pair[0] # returns a
 ```
 The expression in the square brackets must be computable at compile time.
 
+## Destructuring assignment
+
+Destructuring assignment allows the elements of a tuple to be assigned to more than one variable in one line of code.
+For example
+
+```
+a, b = (3, 4)  # Assigns 3 to a and 4 to b.
+```
+
+Destructing assignment can be used with tuples returned from functions, for example:
+
+```
+def f(float x) tuple<float, float> : (x + 1.0f, x + 2.0f)
+
+let a, b = f(x)  # Assigns x + 1.0f to a, x + 2.0f to b.
+```
+
 ## Named constants
 
 Named constants can be used to define constant values in a program.
