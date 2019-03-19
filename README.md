@@ -217,7 +217,14 @@ An array literal is written using square brackets, with an ```a``` suffix.
 ```
 [1, 2, 3]a
 ```
-NOTE: Syntax for this may change.
+Array literals can also be written with one element, and an integer N at the end of the suffix.  In this case an array
+of N elements, all copies of the first element is created.  For example:
+
+```
+[1.0]a100 # Creates an array of 100 elements, each with the value 1.0
+```
+
+NOTE: Syntax for array literals may change.
 
 ## VArray Literal
 
@@ -226,7 +233,15 @@ A varray (variable-length array) literal is written using square brackets, with 
 ```
 [1, 2, 3]va
 ```
-NOTE: Syntax for this may change.
+
+Varray literals can also be written with one element, and an integer N at the end of the suffix.  In this case a varray
+of N elements, all copies of the first element is created.  For example:
+
+```
+[1.0]va100 # Creates a varray of 100 elements, each with the value 1.0
+```
+
+NOTE: Syntax for varray literals may change.
 
 ## Vector Literal
 
@@ -235,7 +250,15 @@ A vector literal is written using square brackets, with a ```v``` suffix.
 ```
 [1, 2, 3]v
 ```
-NOTE: Syntax for this may change.
+
+Vector literals can also be written with one element, and an integer N at the end of the suffix.  In this case a vector
+of N elements, all copies of the first element is created.  For example:
+
+```
+[1.0]v8 # Creates a vector of 8 elements, each with the value 1.0
+```
+
+NOTE: Syntax for vector literals may change.
 
 ## Tuple Literal
 
