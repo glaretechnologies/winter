@@ -1,7 +1,7 @@
 /*=====================================================================
 ASTNode.h
 ---------
-Copyright Glare Technologies Limited 2015 -
+Copyright Glare Technologies Limited 2019 -
 File created by ClassTemplate on Wed Jun 11 03:55:25 2008
 =====================================================================*/
 #pragma once
@@ -324,17 +324,14 @@ inline GetSpaceBoundResults operator + (const GetSpaceBoundResults& a, const Get
 class SrcLocation
 {
 public:
-	SrcLocation(size_t char_index_, /*uint32 line_, uint32 column_, */const SourceBuffer* buf) :
-	  char_index(char_index_), /*line(line_), column(column_),*/ source_buffer(buf) {}
-	//uint32 line;
-	//uint32 column;
+	SrcLocation(size_t char_index_, const SourceBuffer* buf) :
+		char_index(char_index_), source_buffer(buf) {}
 
 	static const SrcLocation invalidLocation() { return SrcLocation(4000000000u, NULL); }
 
 	bool isValid() const { return char_index != 4000000000u; }
 
 	size_t char_index;
-	//const std::string* text_buffer;
 	const SourceBuffer* source_buffer;
 };
 
@@ -465,8 +462,6 @@ public:
 	BufferRoot(const SrcLocation& loc) : ASTNode(BufferRootType, loc) 
 	{}
 	
-	//std::vector<Reference<FunctionDefinition> > func_defs;
-	//std::vector<Reference<NamedConstant> > named_constants;
 	std::vector<ASTNodeRef> top_level_defs; // Either function definitions or named constants.
 
 	virtual ValueRef exec(VMState& vmstate){ return ValueRef(); }
@@ -531,10 +526,7 @@ class IntLiteral : public ASTNode
 {
 public:
 	IntLiteral(int64 v, int num_bits_, bool is_signed_, const SrcLocation& loc) : ASTNode(IntLiteralType, loc), value(v), num_bits(num_bits_), is_signed(is_signed_) { assert(num_bits == 16 || num_bits == 32 || num_bits == 64); this->can_maybe_constant_fold = true; }
-	int64 value;
-	int num_bits;
-	bool is_signed;
-
+	
 	virtual ValueRef exec(VMState& vmstate);
 	virtual TypeRef type() const { return TypeRef(new Int(num_bits, is_signed)); }
 	virtual void print(int depth, std::ostream& s) const;
@@ -546,6 +538,10 @@ public:
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const { return 1; }
 	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 	virtual size_t getSubtreeCodeComplexity() const { return 1; }
+
+	int64 value;
+	int num_bits;
+	bool is_signed;
 };
 
 
@@ -659,8 +655,6 @@ public:
 	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 	virtual size_t getSubtreeCodeComplexity() const;
 
-	bool typeCheck(TraversalPayload& payload) const;
-
 	ASTNodeRef a;
 	ASTNodeRef b;
 
@@ -686,8 +680,6 @@ public:
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 	virtual size_t getSubtreeCodeComplexity() const;
-
-	bool typeCheck(TraversalPayload& payload) const;
 
 	ASTNodeRef a;
 	ASTNodeRef b;
@@ -715,8 +707,6 @@ public:
 	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 	virtual size_t getSubtreeCodeComplexity() const;
 
-	bool typeCheck(TraversalPayload& payload) const;
-
 	ASTNodeRef a;
 	ASTNodeRef b;
 
@@ -743,8 +733,6 @@ public:
 	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
 	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 	virtual size_t getSubtreeCodeComplexity() const;
-
-	bool typeCheck(TraversalPayload& payload) const;
 
 private:
 	void checkNoOverflow(TraversalPayload& payload, std::vector<ASTNode*>& stack);
@@ -905,8 +893,7 @@ class ArraySubscript : public ASTNode
 public:
 	ArraySubscript(const ASTNodeRef& subscript_expr_, const SrcLocation& loc) : 
 	  ASTNode(ArraySubscriptType, loc), subscript_expr(subscript_expr_)
-	{
-	}
+	{}
 
 	virtual ValueRef exec(VMState& vmstate);
 	virtual TypeRef type() const { return subscript_expr->type(); }
@@ -931,8 +918,7 @@ class NamedConstant : public ASTNode
 public:
 	NamedConstant(const TypeRef& declared_type_, const std::string& name_, const ASTNodeRef& value_expr_, const SrcLocation& loc, int order_num_) : 
 	  ASTNode(NamedConstantType, loc), declared_type(declared_type_), name(name_), value_expr(value_expr_), order_num(order_num_), llvm_value(NULL)
-	{
-	}
+	{}
 
 	virtual ValueRef exec(VMState& vmstate);
 	virtual TypeRef type() const;

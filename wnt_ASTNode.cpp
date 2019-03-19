@@ -1,7 +1,7 @@
 /*=====================================================================
 ASTNode.cpp
 -----------
-Copyright Glare Technologies Limited 2015 -
+Copyright Glare Technologies Limited 2019 -
 File created by ClassTemplate on Wed Jun 11 03:55:25 2008
 =====================================================================*/
 #include "wnt_ASTNode.h"
@@ -64,22 +64,6 @@ using std::string;
 
 namespace Winter
 {
-
-
-/*
-	decrementStringRefCount(stringRep* s):
-		r = load s->refcount
-		if r == 1
-			call freeString(s)
-		else
-			r' = r - 1
-			store r' in s->refcount
-		
-*/
-
-
-
-
 
 
 void printMargin(int depth, std::ostream& s)
@@ -433,7 +417,6 @@ static void doImplicitIntTypeCoercion(ASTNodeRef& a, ASTNodeRef& b, TraversalPay
 }
 
 
-
 static bool canDoImplicitIntToFloatTypeCoercion(const ASTNodeRef& a, const ASTNodeRef& b)
 {
 	// Type may be null if 'a' is a variable node that has not been bound yet.
@@ -602,7 +585,7 @@ bool mayEscapeCurrentlyBuildingFunction(EmitLLVMCodeParams& params, const TypeRe
 		{
 			const TypeRef captured_var_type = *i;
 
-			if(isEqualToOrContains(*captured_var_type, *type)) // (*captured_var_type == *type) || captured_var_type->containsType(*this_type))
+			if(isEqualToOrContains(*captured_var_type, *type))
 				return true;
 		}
 	}
@@ -635,27 +618,6 @@ Reference<ASTNode> cloneASTNodeSubtree(Reference<ASTNode>& n)
 	return cloned;
 }
 
-//----------------------------------------------------------------------------------
-
-
-//void ASTNode::emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* val) const
-//{
-//	assert(0);
-//}
-
-
-/*
-ASTNode::ASTNode()
-{
-	
-}
-
-
-ASTNode::~ASTNode()
-{
-	
-}*/
-
 
 //----------------------------------------------------------------------------------
 
@@ -664,9 +626,6 @@ void BufferRoot::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 {
 	stack.resize(0);
 	stack.push_back(this);
-
-	//for(unsigned int i=0; i<func_defs.size(); ++i)
-	//	func_defs[i]->traverse(payload, stack);
 
 	for(unsigned int i=0; i<top_level_defs.size(); ++i)
 		top_level_defs[i]->traverse(payload, stack);
@@ -785,15 +744,6 @@ const std::string errorContext(const ASTNode* n)
 
 const std::string errorContext(const ASTNode& n)
 {
-	//if(!payload.func_def_stack.empty())
-	//	return "In function " + payload.func_def_stack[payload.func_def_stack.size() - 1]->sig.toString();
-	//return "";
-
-	/*for(int i=(int)payload.func_def_stack.size() - 1; i >= 0; --i)
-	{
-	s +=  "In function " + payload.func_def_stack[i]->sig.toString();
-	}*/
-
 	return errorContext(n.srcLocation());
 }
 
@@ -828,18 +778,6 @@ bool isTargetDefinedBeforeAllInStack(const std::vector<FunctionDefinition*>& fun
 
 
 //------------------------------------------------------------------------------------
-
-
-/*static const std::string floatValueString(float x)
-{
-	const std::string s = toString(x);
-
-	// OpenCL seems fussy about types so make sure we have a 'f' suffix on our float literals.
-	if(StringUtils::containsChar(s, '.'))
-		return s + "f"; // e.g '2.3' -> '2.3f'
-	else
-		return s + ".f"; // e.g. '2'  ->  '2.f'
-}*/
 
 
 ValueRef FloatLiteral::exec(VMState& vmstate)
@@ -1376,7 +1314,7 @@ GetSpaceBoundResults StringLiteral::getSpaceBound(GetSpaceBoundParams& params) c
 {
 	// Currently strings may be allocated either on the stack or the heap.
 	// If the string is allocated on the heap, then we have to bound the stack space that allocateString will take.
-	return GetSpaceBoundResults(llvm_allocated_on_heap ? 1024 : 0, /*heap_space=*/llvm_allocated_on_heap ? (sizeof(StringRep) + value.size()) : 0);
+	return GetSpaceBoundResults(/*stack_space=*/llvm_allocated_on_heap ? 1024 : 0, /*heap_space=*/llvm_allocated_on_heap ? (sizeof(StringRep) + value.size()) : 0);
 }
 
 
@@ -1765,29 +1703,6 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 	{
 		doImplicitIntToFloatTypeCoercion(a, b, payload);
 		doImplicitIntToDoubleTypeCoercion(a, b, payload);
-
-		// implicit conversion from int to float in addition operation:
-		// 3.0 + 4
-		/*if(a->nodeType() == ASTNode::FloatLiteralType && b->nodeType() == ASTNode::IntLiteralType)
-		{
-			IntLiteral* b_lit = static_cast<IntLiteral*>(b.getPointer());
-			if(isIntExactlyRepresentableAsFloat(b_lit->value))
-			{
-				b = ASTNodeRef(new FloatLiteral((float)b_lit->value, b->srcLocation()));
-				payload.tree_changed = true;
-			}
-		}
-
-		// 3 + 4.0
-		if(b->nodeType() == ASTNode::FloatLiteralType && a->nodeType() == ASTNode::IntLiteralType)
-		{
-			IntLiteral* a_lit = static_cast<IntLiteral*>(a.getPointer());
-			if(isIntExactlyRepresentableAsFloat(a_lit->value))
-			{
-				a = ASTNodeRef(new FloatLiteral((float)a_lit->value, a->srcLocation()));
-				payload.tree_changed = true;
-			}
-		}*/
 	}
 	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
@@ -1821,27 +1736,10 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
-		//this->can_constant_fold = a->can_constant_fold && b->can_constant_fold; // && expressionIsWellTyped(*this, payload);
-		/*if(this->can_constant_fold)
-		{
-			try
-			{
-				typeCheck(payload);
-			}
-			catch(BaseException&)
-			{
-				this->can_constant_fold = false;
-			}
-		}*/
-		//if(this->can_constant_fold)
-		//{
-		//a->print(0, std::cout);
-		//b->print(0, std::cout);
 		const bool a_is_literal = checkFoldExpression(a, payload);
 		const bool b_is_literal = checkFoldExpression(b, payload);
 			
 		this->can_maybe_constant_fold = a_is_literal && b_is_literal;
-		//}
 	}
 
 	stack.pop_back();
@@ -1859,39 +1757,6 @@ void AdditionExpression::updateChild(const ASTNode* old_val, ASTNodeRef& new_val
 		assert(0);
 	}
 }
-
-
-//bool AdditionExpression::typeCheck(TraversalPayload& payload) const
-//{
-//	const TypeRef& this_type = this->type();
-//	if(this_type.isNull())
-//		throw BaseException("Unknown operand type." + errorContext(*this, payload));
-//
-//	const TypeRef a_type = a->type();
-//	const TypeRef b_type = b->type();
-//
-//	if(a_type.isNull() || b_type.isNull())
-//		throw BaseException("AdditionExpression: Binary operator '+' not defined for Unknown types." + errorContext(*this, payload));
-//
-//	if(this_type->getType() == Type::GenericTypeType || this_type->getType() == Type::IntType || this_type->getType() == Type::FloatType)
-//	{
-//		if(*a_type != *b_type)
-//			throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
-//	}
-//	else if(a_type->getType() == Type::VectorTypeType && b_type->getType() == Type::VectorTypeType) // Vector + vector addition.
-//	{
-//		if(*a_type != *b_type)
-//			throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
-//
-//		// Check element type is int or float
-//		if(!(a_type.downcast<VectorType>()->elem_type->getType() == Type::IntType || a_type.downcast<VectorType>()->elem_type->getType() == Type::FloatType))
-//			throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
-//	}
-//	else
-//	{
-//		throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'." + errorContext(*this, payload));
-//	}
-//}
 
 
 llvm::Value* AdditionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
@@ -2060,29 +1925,6 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 	{
 		doImplicitIntToFloatTypeCoercion(a, b, payload);
 		doImplicitIntToDoubleTypeCoercion(a, b, payload);
-
-		// implicit conversion from int to float
-		// 3.0 - 4
-		/*if(a->nodeType() == ASTNode::FloatLiteralType && b->nodeType() == ASTNode::IntLiteralType)
-		{
-			IntLiteral* b_lit = static_cast<IntLiteral*>(b.getPointer());
-			if(isIntExactlyRepresentableAsFloat(b_lit->value))
-			{
-				b = ASTNodeRef(new FloatLiteral((float)b_lit->value, b->srcLocation()));
-				payload.tree_changed = true;
-			}
-		}
-
-		// 3 - 4.0
-		if(b->nodeType() == ASTNode::FloatLiteralType && a->nodeType() == ASTNode::IntLiteralType)
-		{
-			IntLiteral* a_lit = static_cast<IntLiteral*>(a.getPointer());
-			if(isIntExactlyRepresentableAsFloat(a_lit->value))
-			{
-				a = ASTNodeRef(new FloatLiteral((float)a_lit->value, a->srcLocation()));
-				payload.tree_changed = true;
-			}
-		}*/
 	}
 
 	if(payload.operation == TraversalPayload::TypeCheck)
@@ -2117,18 +1959,6 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
-		//this->can_constant_fold = a->can_constant_fold && b->can_constant_fold;// && expressionIsWellTyped(*this, payload);
-		//if(this->can_constant_fold)
-		//{
-		//	try
-		//	{
-		//		typeCheck(payload);
-		//	}
-		//	catch(BaseException&)
-		//	{
-		//		this->can_constant_fold = false;
-		//	}
-		//}
 		const bool a_is_literal = checkFoldExpression(a, payload);
 		const bool b_is_literal = checkFoldExpression(b, payload);
 			
@@ -2150,38 +1980,6 @@ void SubtractionExpression::updateChild(const ASTNode* old_val, ASTNodeRef& new_
 		assert(0);
 	}
 }
-
-
-//bool SubtractionExpression::typeCheck(TraversalPayload& payload) const
-//{
-//	const TypeRef& this_type = this->type();
-//	if(this_type.isNull())
-//		throw BaseException("Unknown operand type." + errorContext(*this, payload));
-//
-//	const TypeRef a_type = a->type();
-//	const TypeRef b_type = b->type();
-//	if(a_type.isNull() || b_type.isNull())
-//		throw BaseException("SubtractionExpression: Binary operator '-' not defined for Unknown types." + errorContext(*this, payload));
-//
-//	if(this_type->getType() == Type::GenericTypeType || this_type->getType() == Type::IntType || this_type->getType() == Type::FloatType)
-//	{
-//		if(*a->type() != *b->type())
-//			throw BaseException("SubtractionExpression: Binary operator '-' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
-//	}
-//	else if(a->type()->getType() == Type::VectorTypeType && b->type()->getType() == Type::VectorTypeType) // Vector + vector addition.
-//	{
-//		if(*a->type() != *b->type())
-//			throw BaseException("SubtractionExpression: Binary operator '-' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
-//
-//		// Check element type is int or float
-//		if(!(a->type().downcast<VectorType>()->elem_type->getType() == Type::IntType || a->type().downcast<VectorType>()->elem_type->getType() == Type::FloatType))
-//			throw BaseException("SubtractionExpression: Binary operator '-' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
-//	}
-//	else
-//	{
-//		throw BaseException("SubtractionExpression: Binary operator '-' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
-//	}
-//}
 
 
 llvm::Value* SubtractionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
@@ -2318,29 +2116,6 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	{
 		doImplicitIntToFloatTypeCoercion(a, b, payload);
 		doImplicitIntToDoubleTypeCoercion(a, b, payload);
-
-		// implicit conversion from int to float
-		// 3.0 * 4
-		/*if(a->nodeType() == ASTNode::FloatLiteralType && b->nodeType() == ASTNode::IntLiteralType)
-		{
-			IntLiteral* b_lit = static_cast<IntLiteral*>(b.getPointer());
-			if(isIntExactlyRepresentableAsFloat(b_lit->value))
-			{
-				b = ASTNodeRef(new FloatLiteral((float)b_lit->value, b->srcLocation()));
-				payload.tree_changed = true;
-			}
-		}
-
-		// 3 * 4.0
-		if(b->nodeType() == ASTNode::FloatLiteralType && a->nodeType() == ASTNode::IntLiteralType)
-		{
-			IntLiteral* a_lit = static_cast<IntLiteral*>(a.getPointer());
-			if(isIntExactlyRepresentableAsFloat(a_lit->value))
-			{
-				a = ASTNodeRef(new FloatLiteral((float)a_lit->value, a->srcLocation()));
-				payload.tree_changed = true;
-			}
-		}*/
 	}
 	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
@@ -2390,18 +2165,6 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
-		//this->can_constant_fold = a->can_constant_fold && b->can_constant_fold;// && expressionIsWellTyped(*this, payload);
-		//if(this->can_constant_fold)
-		//{
-		//	try
-		//	{
-		//		typeCheck(payload);
-		//	}
-		//	catch(BaseException&)
-		//	{
-		//		this->can_constant_fold = false;
-		//	}
-		//}
 		const bool a_is_literal = checkFoldExpression(a, payload);
 		const bool b_is_literal = checkFoldExpression(b, payload);
 			
@@ -2423,55 +2186,6 @@ void MulExpression::updateChild(const ASTNode* old_val, ASTNodeRef& new_val)
 		assert(0);
 	}
 }
-
-
-//bool MulExpression::typeCheck(TraversalPayload& payload) const
-//{
-//	const TypeRef& this_type = this->type();
-//	if(this_type.isNull())
-//		throw BaseException("Unknown operand type." + errorContext(*this, payload));
-//
-//	const TypeRef a_type = a->type();
-//	const TypeRef b_type = b->type();
-//	if(a_type.isNull() || b_type.isNull())
-//		throw BaseException("MulExpression: Binary operator '*' not defined for Unknown types." + errorContext(*this, payload));
-//
-//
-//		if(this_type->getType() == Type::GenericTypeType || this_type->getType() == Type::IntType || this_type->getType() == Type::FloatType)
-//		{
-//			if(*a->type() != *b->type())
-//				throw BaseException("MulExpression: Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
-//		}
-//		else if(a->type()->getType() == Type::VectorTypeType && b->type()->getType() == Type::VectorTypeType) // Vector + vector addition.
-//		{
-//			if(*a->type() != *b->type())
-//				throw BaseException("MulExpression: Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
-//
-//			// Check element type is int or float
-//			if(!(a->type().downcast<VectorType>()->elem_type->getType() == Type::IntType || a->type().downcast<VectorType>()->elem_type->getType() == Type::FloatType))
-//				throw BaseException("MulExpression: Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
-//		}
-//		else if(a->type()->getType() == Type::VectorTypeType && *b->type() == *a->type().downcast<VectorType>()->elem_type)
-//		{
-//			// A is a vector<T>, and B is of type T
-//
-//			// Check element type is int or float
-//			if(!(a->type().downcast<VectorType>()->elem_type->getType() == Type::IntType || a->type().downcast<VectorType>()->elem_type->getType() == Type::FloatType))
-//				throw BaseException("MulExpression: Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
-//		}
-//		else if(b->type()->getType() == Type::VectorTypeType && *a->type() == *b->type().downcast<VectorType>()->elem_type)
-//		{
-//			// B is a vector<T>, and A is of type T
-//
-//			// Check element type is int or float
-//			if(!(b->type().downcast<VectorType>()->elem_type->getType() == Type::IntType || b->type().downcast<VectorType>()->elem_type->getType() == Type::FloatType))
-//				throw BaseException("MulExpression: Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'" + errorContext(*this, payload));
-//		}
-//		else
-//		{
-//			throw BaseException("MulExpression: Binary operator '*' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
-//		}
-//}
 
 
 void MulExpression::print(int depth, std::ostream& s) const
@@ -2496,13 +2210,6 @@ std::string MulExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 	return "(" + a_res + " * " + b_res + ")";
 }
-
-
-/*void MulExpression::linkFunctions(Linker& linker)
-{
-	a->linkFunctions(linker);
-	b->linkFunctions(linker);
-}*/
 
 
 llvm::Value* MulExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
@@ -2738,26 +2445,6 @@ TypeRef DivExpression::type() const
 {
 	// See if we can do type coercion
 
-	// Type may be null if 'a' is a variable node that has not been bound yet.
-	/*const TypeRef a_type = a->type(); 
-	const TypeRef b_type = b->type();
-
-	if(a_type.nonNull() && a_type->getType() == Type::FloatType && b->nodeType() == ASTNode::IntLiteralType)
-	{
-		IntLiteral* b_lit = static_cast<IntLiteral*>(b.getPointer());
-		if(isIntExactlyRepresentableAsFloat(b_lit->value) && (b_lit->value != 0))
-			return new Float();
-	}
-
-	// 3 / 4.0 => 3.0 / 4.0
-	if(b_type.nonNull() && b_type->getType() == Type::FloatType && a->nodeType() == ASTNode::IntLiteralType)
-	{
-		IntLiteral* a_lit = static_cast<IntLiteral*>(a.getPointer());
-		if(isIntExactlyRepresentableAsFloat(a_lit->value))
-			return new Float();
-	}
-
-	return a->type();*/
 	if(expr_type.isNull())
 	{
 		if(canDoImplicitIntToFloatTypeCoercion(a, b))
@@ -2915,18 +2602,6 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
-		//this->can_constant_fold = a->can_constant_fold && b->can_constant_fold;// && expressionIsWellTyped(*this, payload);
-		//if(this->can_constant_fold)
-		//{
-		//	try
-		//	{
-		//		typeCheck(payload);
-		//	}
-		//	catch(BaseException&)
-		//	{
-		//		this->can_constant_fold = false;
-		//	}
-		//}
 		const bool a_is_literal = checkFoldExpression(a, payload);
 		const bool b_is_literal = checkFoldExpression(b, payload);
 			
@@ -2948,37 +2623,6 @@ void DivExpression::updateChild(const ASTNode* old_val, ASTNodeRef& new_val)
 		assert(0);
 	}
 }
-
-
-//bool DivExpression::typeCheck(TraversalPayload& payload) const
-//{
-//	const TypeRef& this_type = this->type();
-//	if(this_type.isNull())
-//		throw BaseException("Unknown operand type." + errorContext(*this, payload));
-//
-//	const TypeRef a_type = a->type();
-//	const TypeRef b_type = b->type();
-//	if(a_type.isNull() || b_type.isNull())
-//		throw BaseException("DivExpression: Binary operator '/' not defined for Unknown types." + errorContext(*this, payload));
-//
-//
-//		if(this_type->getType() == Type::GenericTypeType || *this_type == Int() || *this_type == Float())
-//		{
-//			// Make sure both operands have the same type
-//			if(*a->type() != *b->type())
-//				throw BaseException("Binary operator '/' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
-//		}
-//		/*else if(a->type()->getType() == Type::VectorTypeType && b->type()->getType() == Type::VectorTypeType)
-//		{
-//			// this is alright.
-//			// NOTE: need to do more checking tho.
-//			// Need to check number of elements is same in both vectors, and field types are the same.
-//		}*/
-//		else
-//		{
-//			throw BaseException("Binary operator '/' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
-//		}
-//}
 
 
 bool DivExpression::provenDefined() const
@@ -3604,7 +3248,6 @@ void BinaryBooleanExpr::traverse(TraversalPayload& payload, std::vector<ASTNode*
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
-		//this->can_constant_fold = a->can_constant_fold && b->can_constant_fold && expressionIsWellTyped(*this, payload);
 		const bool a_is_literal = checkFoldExpression(a, payload);
 		const bool b_is_literal = checkFoldExpression(b, payload);
 			
@@ -3819,7 +3462,6 @@ void UnaryMinusExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
-		//this->can_constant_fold = expr->can_constant_fold && expressionIsWellTyped(*this, payload);
 		const bool is_literal = checkFoldExpression(expr, payload);
 		this->can_maybe_constant_fold = is_literal;
 	}
@@ -3919,7 +3561,6 @@ llvm::Value* UnaryMinusExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm
 
 	assert(!"UnaryMinusExpression type invalid!");
 	throw BaseException("UnaryMinusExpression type invalid!");
-	
 }
 
 
@@ -3989,7 +3630,6 @@ void LogicalNegationExpr::traverse(TraversalPayload& payload, std::vector<ASTNod
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
-		//this->can_constant_fold = expr->can_constant_fold && expressionIsWellTyped(*this, payload);
 		const bool is_literal = checkFoldExpression(expr, payload);
 		this->can_maybe_constant_fold = is_literal;
 	}
@@ -4294,34 +3934,6 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 		doImplicitIntToDoubleTypeCoercion(a, b, payload);
 
 		doImplicitIntTypeCoercion(a, b, payload);
-
-		// implicit conversion from int to float
-		// 3.0 > 4      =>       3.0 > 4.0
-
-		// Type may be null if 'a' is a variable node that has not been bound yet.
-		/*const TypeRef a_type = a->type(); 
-		const TypeRef b_type = b->type();
-
-		if(a_type.nonNull() && a_type->getType() == Type::FloatType && b->nodeType() == ASTNode::IntLiteralType)
-		{
-			IntLiteral* b_lit = static_cast<IntLiteral*>(b.getPointer());
-			if(isIntExactlyRepresentableAsFloat(b_lit->value))
-			{
-				b = ASTNodeRef(new FloatLiteral((float)b_lit->value, b->srcLocation()));
-				payload.tree_changed = true;
-			}
-		}
-
-		// 3 > 4.0      =>        3.0 > 4.0
-		if(b_type.nonNull() && b_type->getType() == Type::FloatType && a->nodeType() == ASTNode::IntLiteralType)
-		{
-			IntLiteral* a_lit = static_cast<IntLiteral*>(a.getPointer());
-			if(isIntExactlyRepresentableAsFloat(a_lit->value))
-			{
-				a = ASTNodeRef(new FloatLiteral((float)a_lit->value, a->srcLocation()));
-				payload.tree_changed = true;
-			}
-		}*/
 	}
 	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
@@ -4348,7 +3960,6 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
-		//this->can_constant_fold = a->can_constant_fold && b->can_constant_fold && expressionIsWellTyped(*this, payload);
 		const bool a_is_literal = checkFoldExpression(a, payload);
 		const bool b_is_literal = checkFoldExpression(b, payload);
 			
@@ -4553,7 +4164,6 @@ void ArraySubscript::traverse(TraversalPayload& payload, std::vector<ASTNode*>& 
 	
 	if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
-		//this->can_constant_fold = subscript_expr->can_constant_fold && expressionIsWellTyped(*this, payload);
 		const bool is_literal = checkFoldExpression(subscript_expr, payload);
 		this->can_maybe_constant_fold = is_literal;
 	}
@@ -4779,14 +4389,6 @@ void NamedConstant::updateChild(const ASTNode* old_val, ASTNodeRef& new_val)
 
 llvm::Value* NamedConstant::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
-	/*if(isLiteral(*this->value_expr))
-	{
-		if(!llvm_value)
-			llvm_value = value_expr->emitLLVMCode(params, ret_space_ptr);
-		return llvm_value;
-	}
-	else
-		return value_expr->emitLLVMCode(params, ret_space_ptr);*/
 	return value_expr->emitLLVMCode(params, ret_space_ptr);
 }
 

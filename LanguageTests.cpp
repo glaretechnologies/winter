@@ -4266,7 +4266,7 @@ static void testVectors()
 					 let v = [x, x, x, x]v in\
 					 dot(v, v)", 2.0f, 16.0f);
 
-	// OpenCl dot not supported for > 4 elems in vector
+	// OpenCL dot not supported for > 4 elems in vector
 	testMainFloatArg("	def main(float x) float : \
 					 let v = [x, x, x, x, x, x, x, x]v in\
 					 dot(v, v)", 4.0f, 128.0f, INVALID_OPENCL);
