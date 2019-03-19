@@ -56,8 +56,7 @@ Variable::Variable(const std::string& name_, const SrcLocation& loc)
 	bound_let_node(NULL),
 	bound_named_constant(NULL),
 	arg_index(-1),
-	let_var_index(-1),
-	enclosing_lambda(NULL)
+	let_var_index(-1)
 {
 	this->can_maybe_constant_fold = false;
 }
@@ -98,18 +97,17 @@ inline static const std::string varType(Variable::BindingType t)
 // Results of walking up the node tree to try and bind the variable.
 struct BindInfo
 {
-	BindInfo() : root_bound_node(NULL), bound_function(NULL), bound_let_node(NULL), enclosing_lambda(NULL), free_index(-1) {}
+	BindInfo() : root_bound_node(NULL), bound_function(NULL), bound_let_node(NULL) {}
 
 	Variable::BindingType vartype;
 
 	ASTNode* root_bound_node; // Node furthest up the node stack that we are bound to, if the variable is bound through one or more captured vars.
 	FunctionDefinition* bound_function; // Function for which the variable is an argument of,
 	LetASTNode* bound_let_node;
-	FunctionDefinition* enclosing_lambda;
+	std::vector<FunctionDefinition*> enclosing_lambdas; // Most tightly enclosing lambda at rightmost index (back())
 
 	int arg_index;
 	int let_var_index; // Index of the let variable bound to, for destructing assignment case may be > 0.
-	int free_index;
 };
 
 
@@ -137,7 +135,7 @@ static BindInfo doBind(const std::vector<ASTNode*>& stack, int s, const std::str
 					return bindinfo;
 				}
 
-			if(s >= 1)
+			if(s >= 1) // If this function is not at the top of the stack, it must be an anonymous function definition (lambda expression)
 			{
 				assert(def->is_anon_func);
 
@@ -154,7 +152,7 @@ static BindInfo doBind(const std::vector<ASTNode*>& stack, int s, const std::str
 				def->free_variables.insert(var); // Add this variable to the list of free vars for this lambda expression
 				var->lambdas.insert(def);
 				
-				bindinfo.enclosing_lambda = def;
+				bindinfo.enclosing_lambdas.push_back(def);
 				return bindinfo;
 			}
 		}
@@ -231,7 +229,7 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 			this->let_var_index = bindinfo.let_var_index;
 			this->bound_function = bindinfo.bound_function;
 			this->bound_let_node = bindinfo.bound_let_node;
-			this->enclosing_lambda = bindinfo.enclosing_lambda;
+			this->enclosing_lambdas = bindinfo.enclosing_lambdas;
 			return;
 		}
 	}
@@ -407,7 +405,7 @@ void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 		{
 			// Set the vartype to unbound so that it can be rebound
 			this->binding_type = BindingType_Unbound;
-			this->enclosing_lambda = NULL;
+			this->enclosing_lambdas.clear();
 			// UnboundVariable pass should clear enclosing_lambda->free_variables set also so no need to remove here.
 		}
 	}
@@ -428,7 +426,7 @@ void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 
 ValueRef Variable::exec(VMState& vmstate)
 {
-	if(this->enclosing_lambda)
+	if(!this->enclosing_lambdas.empty())
 	{
 		// Get from closure
 
@@ -438,7 +436,7 @@ ValueRef Variable::exec(VMState& vmstate)
 		ValueRef captured_struct = vmstate.argument_stack.back();
 		const StructureValue* s = checkedCast<StructureValue>(captured_struct.getPointer());
 
-		const int free_index = enclosing_lambda->getFreeIndexForVar(this);
+		const int free_index = enclosing_lambdas.back()->getFreeIndexForVar(this);
 
 		return s->fields[free_index];
 	}
@@ -522,7 +520,7 @@ void Variable::print(int depth, std::ostream& s) const
 {
 	printMargin(depth, s);
 
-	s << "Var '" << this->name << "' (" + toHexString((uint64)this) + "), free: " << boolToString(this->enclosing_lambda != NULL) << ", ";
+	s << "Var '" << this->name << "' (" + toHexString((uint64)this) + "), free: " << boolToString(!this->enclosing_lambdas.empty()) << ", ";
 
 	switch(binding_type)
 	{
@@ -553,8 +551,8 @@ std::string Variable::sourceString() const
 
 std::string Variable::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
-	if(this->enclosing_lambda) // If this is a free var:
-		return "cap_var_struct->captured_var_" + toString(this->enclosing_lambda->getFreeIndexForVar(this));
+	if(!this->enclosing_lambdas.empty()) // If this is a free var:
+		return "cap_var_struct->captured_var_" + toString(this->enclosing_lambdas.back()->getFreeIndexForVar(this));
 
 	return mapOpenCLCVarName(params.opencl_c_keywords, this->name);
 }
@@ -562,7 +560,7 @@ std::string Variable::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
-	if(enclosing_lambda) // If this variable is free inside a lambda:
+	if(!this->enclosing_lambdas.empty()) // If this variable is free inside a lambda:
 	{
 		// Get pointer to captured variables. structure.
 		// This pointer will be passed after the normal arguments to the function.
@@ -583,7 +581,7 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 		);
 
 		// Load the value from the correct field.
-		const int free_index = enclosing_lambda->getFreeIndexForVar(this);
+		const int free_index = enclosing_lambdas.back()->getFreeIndexForVar(this);
 
 		llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, cap_var_structure, free_index);
 
@@ -680,7 +678,7 @@ Reference<ASTNode> Variable::clone(CloneMapType& clone_map)
 	v->bound_let_node = bound_let_node;
 	v->bound_named_constant = bound_named_constant;
 	v->arg_index = arg_index;
-	v->enclosing_lambda = enclosing_lambda;
+	v->enclosing_lambdas = enclosing_lambdas;
 	v->let_var_index = let_var_index;
 
 	clone_map.insert(std::make_pair(this, v));

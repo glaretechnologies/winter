@@ -124,34 +124,51 @@ ValueRef FunctionDefinition::exec(VMState& vmstate)
 	{
 		for(auto it = free_variables.begin(); it != free_variables.end(); ++it)
 		{
-			Variable* var = *it;
+			Variable* free_var = *it;
 
-			// TODO: need to handle this free variable being bound to another free variable?
-			/*if()
+			// If this free variable is free in more than one lambda, we will need to get the captured value from the captured-val struct of the outer lambda.
+			const FunctionDefinition* free_in_looser_lambda = NULL;
+			bool found_this_lambda = false;
+			for(int q=(int)free_var->enclosing_lambdas.size()-1; q >= 0; --q) // From inner to outer lambda:
+			{
+				const FunctionDefinition* func = free_var->enclosing_lambdas[q];
+				if(func == this)
+					found_this_lambda = true;
+				else if(found_this_lambda)
+				{
+					if(func->free_variables.count(free_var) > 0)
+					{
+						free_in_looser_lambda = func;
+						break;
+					}
+				}
+			}
+
+			if(free_in_looser_lambda)
 			{
 				// Get ref to capturedVars structure of values, will be passed in as last arg to function
 				ValueRef captured_struct = vmstate.argument_stack.back();
 				const StructureValue* s = checkedCast<StructureValue>(captured_struct.getPointer());
 
-				const int free_index = this->getFreeIndexForVar(var);
+				const int free_index = free_in_looser_lambda->getFreeIndexForVar(free_var);
 				ValueRef val = s->fields[free_index];
 
 				vals.push_back(val);
 			}
-			else */if(var->binding_type == Variable::BindingType_Argument)
+			else if(free_var->binding_type == Variable::BindingType_Argument)
 			{
-				vals.push_back(vmstate.argument_stack[vmstate.func_args_start.back() + var->arg_index]);
+				vals.push_back(vmstate.argument_stack[vmstate.func_args_start.back() + free_var->arg_index]);
 			}
-			else if(var->binding_type == Variable::BindingType_Let)
+			else if(free_var->binding_type == Variable::BindingType_Let)
 			{
-				LetASTNode* bound_let_node = var->bound_let_node;
-				ValueRef val = var->bound_let_node->exec(vmstate);
+				LetASTNode* bound_let_node = free_var->bound_let_node;
+				ValueRef val = free_var->bound_let_node->exec(vmstate);
 
 				if(bound_let_node->vars.size() != 1)
 				{
 					// Destructuring assignment, return the particular element from the tuple.
 					const TupleValue* t = checkedCast<TupleValue>(val.getPointer());
-					val = t->e[var->let_var_index];
+					val = t->e[free_var->let_var_index];
 				}
 
 				vals.push_back(val);
@@ -785,19 +802,36 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 	params.stats->num_free_vars += free_variables.size();
 
-	// for each captured var
 	size_t free_var_index = 0;
-	for(auto z = free_variables.begin(); z != free_variables.end(); ++z)
+	for(auto z = free_variables.begin(); z != free_variables.end(); ++z) // for each captured var
 	{
 		Variable* free_var = *z;
 	
 		llvm::Value* val = NULL;
-		// TODO: need to handle this free variable being bound to another free variable?
-		/*if()
+
+		// If this free variable is free in more than one lambda, we will need to get the captured value from the captured-val struct of the outer lambda.
+		// We want the next-most tightly enclosing lambda as the current lambda.
+		const FunctionDefinition* free_in_looser_lambda = NULL;
+		bool found_this_lambda = false;
+		for(int q=(int)free_var->enclosing_lambdas.size()-1; q >= 0; --q) // From inner to outer lambda:
+		{
+			const FunctionDefinition* func = free_var->enclosing_lambdas[q];
+			if(func == this)
+				found_this_lambda = true;
+			else if(found_this_lambda)
+			{
+				if(func->free_variables.count(free_var) > 0)
+				{
+					free_in_looser_lambda = func;
+					break;
+				}
+			}
+		}
+
+		if(free_in_looser_lambda)
 		{
 			// This captured var is bound to a captured var itself.
 			// The target captured var is in the captured var struct for the function, which is passed as the last arg to the function body.
-			//FunctionDefinition* def = this->captured_vars[i].bound_function;
 			llvm::Value* base_current_func_captured_var_struct = LLVMUtils::getLastArg(params.currently_building_func);
 
 			// Now we need to downcast it to the correct type.
@@ -805,11 +839,12 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 			llvm::Value* current_func_captured_var_struct = params.builder->CreateBitCast(base_current_func_captured_var_struct, LLVMTypeUtils::pointerType(actual_cap_var_struct_type), "actual_cap_var_struct_type");
 
-			llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, current_func_captured_var_struct, this->captured_vars[i].free_index);
+			const int free_index = free_in_looser_lambda->getFreeIndexForVar(free_var);
+			llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, current_func_captured_var_struct, free_index);
 
 			val = params.builder->CreateLoad(field_ptr);
 		}
-		else */if(free_var->binding_type == Variable::BindingType_Argument)
+		else if(free_var->binding_type == Variable::BindingType_Argument)
 		{
 			// Load arg
 			val = LLVMUtils::getNthArg(
@@ -1615,7 +1650,7 @@ int FunctionDefinition::getCapturedVarStructLLVMArgIndex()
 }
 
 
-int FunctionDefinition::getFreeIndexForVar(const Variable* var)
+int FunctionDefinition::getFreeIndexForVar(const Variable* var) const
 {
 	int i=0;
 	for(auto it = free_variables.begin(); it != free_variables.end(); ++it, ++i)

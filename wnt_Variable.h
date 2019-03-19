@@ -8,6 +8,7 @@ Copyright Glare Technologies Limited 2015 -
 
 #include "wnt_ASTNode.h"
 #include <set>
+#include <vector>
 namespace llvm { class Value; };
 
 
@@ -64,10 +65,11 @@ public:
 	int arg_index; // index in function argument list, or index of captured var.
 	int let_var_index; // Index of the let variable bound to, for destructing assignment case may be > 0.  Used in binding_type == LetVariable case.
 
-	FunctionDefinition* enclosing_lambda; // Most tightly-enclosing Lambda expression in which this variable exists, 
-	// if this variable is free (not bound to anything in the lambda expression).
+	std::vector<FunctionDefinition*> enclosing_lambdas; // Enclosing lambda expressions (anonymous functions) for which this variable is free
+	// (not bound to anything in the lambda expression).
+	// Lambda at rightmost index (back()) is the most lexically tightly enclosing.
 
-	std::set<FunctionDefinition*> lambdas; // Lambdas for which this variable is in the lambda's free_variables set.
+	std::set<FunctionDefinition*> lambdas; // Lambdas for which this variable is in the lambda's free_variables set.  Used for reference management.
 };
 
 

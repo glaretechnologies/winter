@@ -108,7 +108,7 @@ public:
 	int getCapturedVarStructLLVMArgIndex();
 
 	// Get index of this variable (which must be in the set of free variables for this lambda) in the list of free variables.
-	int getFreeIndexForVar(const Variable* var);
+	int getFreeIndexForVar(const Variable* var) const;
 
 	// Depending on the argument type, will return something like
 	// const SomeStruct* const arg_name

@@ -226,7 +226,6 @@ public:
 	llvm::LLVMContext* context;
 	const llvm::DataLayout/*TargetData*/* target_data;
 	
-	std::vector<ASTNode*> node_stack;
 	std::vector<LetBlock*> let_block_stack; // Pointers to all the let blocks that are parents of the current node
 
 	std::map<const LetASTNode*, llvm::Value* > let_values;

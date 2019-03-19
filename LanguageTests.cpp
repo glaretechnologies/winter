@@ -3859,20 +3859,45 @@ static void testLambdaExpressionsAndClosures()
 								in f()						\n\
 								", 4.0f);
 
+	testMainFloatArg("def main(float x) float :								\n\
+						let 												\n\
+							a = x											\n\
+							f = \\() !noinline : a		# captures 'a'		\n\
+						in													\n\
+							f()												\n\
+								", 10.f, 10.f, INVALID_OPENCL | ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);
+
+	testMainFloatArg("def main(float x) float :								\n\
+						let 												\n\
+							a = x											\n\
+							b = x + 1.0f									\n\
+							f = \\() !noinline : a + b		# captures 'a'	\n\
+						in													\n\
+							f()												\n\
+								", 10.f, 21.f, INVALID_OPENCL | ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);
+	
+
 	// ===================================================================
 	// Test capturing vars with nested lambdas
+	// In this case 'a' in the inner lambda is lexically bound to the a let node
+	// in main.  'a' is free in the inner lambda.  'a' is also free in the outer lambda.
+	// When the outer lambda is capturing values (at runtime), it will capture the value of 'a', which it can get from
+	// the let node.
+	// When the inner lambda is capturing values (at runtime), it will need to capture the value of 'a' from the captured-vars struct
+	// of the outer lambda!
 	// ===================================================================
-	testMainFloatArg("def main(float x) float :							\n\
-								let 									\n\
-									a = x								\n\
-									f = \\() : 		# captures 'a'		\n\
-										let 							\n\
-											g = \\() : a	# captures 'a' as well	\n\
-										in								\n\
-											g()							\n\
-								in										\n\
-									f()									\n\
-								", 10.f, 10.f, INVALID_OPENCL);
+	testMainFloatArg("def main(float x) float :													\n\
+								let 															\n\
+									a = x														\n\
+									f = \\() !noinline : 				# captures 'a'			\n\
+										let 													\n\
+											g = \\() !noinline : a		# captures 'a' as well	\n\
+										in														\n\
+											g()													\n\
+								in																\n\
+									f()															\n\
+								", 10.f, 10.f, INVALID_OPENCL | ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);
+
 
 
 	// transforms to:
