@@ -773,7 +773,7 @@ For example:
 
 ```codePoint('a') # returns 0x61 (Ascii and Unicode code point for 'a')```
 
-```codePoint('\\u{393}') # returns 0x393 ```
+```codePoint('\u{393}') # returns 0x393 ```
 
 ### toString
 
