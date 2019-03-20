@@ -121,11 +121,10 @@ inline static const std::string varType(Variable::BindingType t)
 // Results of walking up the node tree to try and bind the variable.
 struct BindInfo
 {
-	BindInfo() : root_bound_node(NULL), bound_function(NULL), bound_let_node(NULL) {}
+	BindInfo() : bound_function(NULL), bound_let_node(NULL), arg_index(-1), let_var_index(-1) {}
 
 	Variable::BindingType vartype;
 
-	ASTNode* root_bound_node; // Node furthest up the node stack that we are bound to, if the variable is bound through one or more captured vars.
 	FunctionDefinition* bound_function; // Function for which the variable is an argument of,
 	LetASTNode* bound_let_node;
 	std::vector<FunctionDefinition*> enclosing_lambdas; // Most tightly enclosing lambda at rightmost index (back())
@@ -154,7 +153,6 @@ static BindInfo doBind(const std::vector<ASTNode*>& stack, int s, const std::str
 					bindinfo.vartype = Variable::BindingType_Argument;
 					bindinfo.arg_index = i;
 					bindinfo.bound_function = def;
-					bindinfo.root_bound_node = def;
 					//std::cout << "Bound '" + name + "' to function arg, bound_index = " << bindinfo.bound_index << ", def = " << def->sig.toString() << std::endl;
 					return bindinfo;
 				}
