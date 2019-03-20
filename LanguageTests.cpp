@@ -3721,7 +3721,7 @@ static void testLambdaExpressionsAndClosures()
 			in																				\n\
 				f(\\() -> z)																\n\
 		", 17, 2, INVALID_OPENCL);
-	testAssert(results.stats.num_free_vars == 1); // z is free and should be captured from lexical env.
+	testAssert(results.stats.num_free_vars_stored == 1); // z is free and should be captured from lexical env.
 
 	testMainIntegerArg("																	\n\
 		def f(function<int> arg_func) !noinline : arg_func()								\n\
@@ -3886,7 +3886,7 @@ static void testLambdaExpressionsAndClosures()
 	// When the inner lambda is capturing values (at runtime), it will need to capture the value of 'a' from the captured-vars struct
 	// of the outer lambda!
 	// ===================================================================
-	testMainFloatArg("def main(float x) float :													\n\
+	results = testMainFloatArg("def main(float x) float :													\n\
 								let 															\n\
 									a = x														\n\
 									f = \\() !noinline : 				# captures 'a'			\n\
@@ -3897,7 +3897,70 @@ static void testLambdaExpressionsAndClosures()
 								in																\n\
 									f()															\n\
 								", 10.f, 10.f, INVALID_OPENCL | ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);
+	testAssert(results.stats.num_closure_allocations == 2);
+	testAssert(results.stats.num_free_vars_stored == 2);
 
+	// Test nested lambdas with multiple variable capture
+	results = testMainFloatArg("def main(float x) float :													\n\
+								let 															\n\
+									a = x														\n\
+									b = x + 1.0f												\n\
+									f = \\() !noinline :										\n\
+										let 													\n\
+											g = \\() !noinline : a + b							\n\
+										in														\n\
+											g()													\n\
+								in																\n\
+									f()															\n\
+								", 
+		10.f, 21.f, INVALID_OPENCL | ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);
+	testAssert(results.stats.num_closure_allocations == 2);
+	testAssert(results.stats.num_free_vars_stored == 4);
+
+	// Test nested lambdas with multiple variable capture - in this case only the inner lambda needs to 
+	// capture 2 variables, the outer lambda only needs to capture 1.
+	results = testMainFloatArg("def main(float x) float :													\n\
+								let 															\n\
+									a = x														\n\
+									f = \\() !noinline :										\n\
+										let 													\n\
+											b = a + 1.0f										\n\
+											g = \\() !noinline : a + b							\n\
+										in														\n\
+											g()													\n\
+								in																\n\
+									f()															\n\
+								",
+		10.f, 21.f, INVALID_OPENCL | ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);
+	testAssert(results.stats.num_closure_allocations == 2);
+	testAssert(results.stats.num_free_vars_stored == 3);
+
+
+	// Test a free variable that is used multiple times.
+	// This should be captured just once, and the captured var referenced multiple times.
+	results = testMainFloatArg("def main(float x) float :										\n\
+								let 															\n\
+									f = \\() !noinline :										\n\
+										x + x + x												\n\
+								in																\n\
+									f()															\n\
+								",
+		10.f, 30.f, INVALID_OPENCL | ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);
+	testAssert(results.stats.num_closure_allocations == 1);
+	testAssert(results.stats.num_free_vars_stored == 1);
+
+	// Test multiple free variables that are used multiple times.
+	results = testMainFloatArg("def main(float x) float :										\n\
+								let 															\n\
+									y = x + 1.0f												\n\
+									f = \\() !noinline :										\n\
+										x + x + x + y + y + y + y								\n\
+								in																\n\
+									f()															\n\
+								",
+		10.f, 74.f, INVALID_OPENCL | ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE);
+	testAssert(results.stats.num_closure_allocations == 1);
+	testAssert(results.stats.num_free_vars_stored == 2);
 
 
 	// transforms to:

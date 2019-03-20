@@ -50,6 +50,8 @@ public:
 	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
 	virtual size_t getSubtreeCodeComplexity() const;
 
+	// Are the variables 'a' and 'b' bound to the same AST node?
+	static bool boundToSameNode(const Variable& a, const Variable& b);
 private:
 	void bindVariables(TraversalPayload& payload, const std::vector<ASTNode*>& stack);
 public:
@@ -58,12 +60,12 @@ public:
 
 	BindingType binding_type; // one of BindingType above.
 
-	FunctionDefinition* bound_function; // Function for which the variable is an argument of.  Used in binding_type == ArgumentVariable case.
-	LetASTNode* bound_let_node; // Used in binding_type == LetVariable case.
-	NamedConstant* bound_named_constant; // Used in binding_type == BoundToNamedConstant case.
+	FunctionDefinition* bound_function; // Function for which the variable is an argument of.  Used in BindingType_Argument and BindingType_GlobalDef cases.
+	LetASTNode* bound_let_node; // Used in binding_type == BindingType_Let case.
+	NamedConstant* bound_named_constant; // Used in binding_type == BindingType_NamedConstant case.
 
-	int arg_index; // index in function argument list, or index of captured var.
-	int let_var_index; // Index of the let variable bound to, for destructing assignment case may be > 0.  Used in binding_type == LetVariable case.
+	int arg_index; // index in function argument list, or index of captured var.  Used in binding_type == BindingType_Argument case.
+	int let_var_index; // Index of the let variable bound to, for destructing assignment case may be > 0.  Used in binding_type == BindingType_Let case.
 
 	std::vector<FunctionDefinition*> enclosing_lambdas; // Enclosing lambda expressions (anonymous functions) for which this variable is free
 	// (not bound to anything in the lambda expression).

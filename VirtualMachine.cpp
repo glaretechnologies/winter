@@ -617,7 +617,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 
 	stats.num_heap_allocation_calls = 0;
 	stats.num_closure_allocations = 0;
-	stats.num_free_vars = 0;
+	stats.num_free_vars_stored = 0;
 	
 	/*if(!winter_global_task_manager)
 	{

@@ -2583,7 +2583,8 @@ const std::string IterateBuiltInFunc::emitOpenCLForFunctionArg(EmitOpenCLCodePar
 		std::string cap_code;
 		cap_code += captured_var_struct_type->OpenCLCType() + " captured_vars_" + toString(use_uid) + ";\n";
 		size_t i=0;
-		for(auto z = f->free_variables.begin(); z != f->free_variables.end(); ++z, ++i)
+		const auto unique_free_vars = f->getUniqueFreeVarList();
+		for(auto z = unique_free_vars.begin(); z != unique_free_vars.end(); ++z, ++i)
 		{
 			cap_code += "captured_vars_" + toString(use_uid) + ".captured_var_" + toString(i) + " = " + mapOpenCLCVarName(params.opencl_c_keywords, (*z)->name) + ";\n";
 		}

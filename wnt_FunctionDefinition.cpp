@@ -122,7 +122,9 @@ ValueRef FunctionDefinition::exec(VMState& vmstate)
 	vector<ValueRef> vals;
 	if(vmstate.capture_vars)
 	{
-		for(auto it = free_variables.begin(); it != free_variables.end(); ++it)
+		const auto unique_free_vars = this->getUniqueFreeVarList();
+
+		for(auto it = unique_free_vars.begin(); it != unique_free_vars.end(); ++it)
 		{
 			Variable* free_var = *it;
 
@@ -150,7 +152,7 @@ ValueRef FunctionDefinition::exec(VMState& vmstate)
 				ValueRef captured_struct = vmstate.argument_stack.back();
 				const StructureValue* s = checkedCast<StructureValue>(captured_struct.getPointer());
 
-				const int free_index = free_in_looser_lambda->getFreeIndexForVar(free_var);
+				const size_t free_index = free_in_looser_lambda->getFreeIndexForVar(free_var);
 				ValueRef val = s->fields[free_index];
 
 				vals.push_back(val);
@@ -800,10 +802,12 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 	
 	llvm::Value* captured_var_struct_ptr = LLVMUtils::createStructGEP(params.builder, closure_pointer, Function::capturedVarStructIndex(), "captured_var_struct_ptr");
 
-	params.stats->num_free_vars += free_variables.size();
+	const auto unique_free_vars = this->getUniqueFreeVarList();
+
+	params.stats->num_free_vars_stored += unique_free_vars.size();
 
 	size_t free_var_index = 0;
-	for(auto z = free_variables.begin(); z != free_variables.end(); ++z) // for each captured var
+	for(auto z = unique_free_vars.begin(); z != unique_free_vars.end(); ++z) // for each captured var
 	{
 		Variable* free_var = *z;
 	
@@ -839,8 +843,8 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 			llvm::Value* current_func_captured_var_struct = params.builder->CreateBitCast(base_current_func_captured_var_struct, LLVMTypeUtils::pointerType(actual_cap_var_struct_type), "actual_cap_var_struct_type");
 
-			const int free_index = free_in_looser_lambda->getFreeIndexForVar(free_var);
-			llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, current_func_captured_var_struct, free_index);
+			const size_t free_index = free_in_looser_lambda->getFreeIndexForVar(free_var);
+			llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, current_func_captured_var_struct, (unsigned int)free_index);
 
 			val = params.builder->CreateLoad(field_ptr);
 		}
@@ -1609,7 +1613,8 @@ StructureTypeVRef FunctionDefinition::getCapturedVariablesStructType() const
 	vector<string> field_names;
 
 	size_t free_var_index = 0;
-	for(auto z = free_variables.begin(); z != free_variables.end(); ++z)
+	const auto unique_free_vars = this->getUniqueFreeVarList();
+	for(auto z = unique_free_vars.begin(); z != unique_free_vars.end(); ++z)
 	{
 		// Get the type of the captured variable.
 		const TypeRef field_type = (*z)->type();
@@ -1650,19 +1655,44 @@ int FunctionDefinition::getCapturedVarStructLLVMArgIndex()
 }
 
 
-int FunctionDefinition::getFreeIndexForVar(const Variable* var) const
+// Computes a list of free variables, but discards variables that are bound to the same AST node.
+// This is used so we only need to capture a variable once, even if it is referenced multiple times in a closure.
+static void computeUniqueFreeVarList(const std::set<Variable*>& free_variables, 
+	SmallVector<Variable*, 8>& unique_vars_out)
 {
-	int i=0;
-	for(auto it = free_variables.begin(); it != free_variables.end(); ++it, ++i)
+	for(auto it = free_variables.begin(); it != free_variables.end(); ++it)
 	{
-		if(*it == var)
-			return i;
+		Variable* free_var = *it;
+		for(int z=0; z<unique_vars_out.size(); ++z)
+			if(Variable::boundToSameNode(*unique_vars_out[z], *free_var)) // If this var is already in the unique list:
+				goto continue_main_loop;
+
+		unique_vars_out.push_back(free_var); // Not in unique list already, add it.
+continue_main_loop:;
 	}
+}
+
+
+SmallVector<Variable*, 8> FunctionDefinition::getUniqueFreeVarList() const
+{
+	SmallVector<Variable*, 8> unique_vars;
+	computeUniqueFreeVarList(this->free_variables, unique_vars);
+	return unique_vars;
+}
+
+
+size_t FunctionDefinition::getFreeIndexForVar(const Variable* var) const
+{
+	SmallVector<Variable*, 8> unique_vars;
+	computeUniqueFreeVarList(this->free_variables, unique_vars);
+
+	for(size_t z=0; z<unique_vars.size(); ++z)
+		if(Variable::boundToSameNode(*unique_vars[z], *var))
+			return z;
 
 	assert(0);
 	return 0;
 }
-
 
 
 const std::string makeSafeStringForFunctionName(const std::string& s)

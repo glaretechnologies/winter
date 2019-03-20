@@ -72,6 +72,30 @@ Variable::~Variable()
 }
 
 
+// Are the variables 'a' and 'b' bound to the same AST node?
+bool Variable::boundToSameNode(const Variable& a, const Variable& b)
+{
+	if(a.binding_type != b.binding_type)
+		return false;
+
+	switch(a.binding_type)
+	{
+	case BindingType_Unbound:
+		return false;
+	case BindingType_Let:
+		return a.bound_let_node == b.bound_let_node && a.let_var_index == b.let_var_index;
+	case BindingType_Argument:
+		return a.bound_function == b.bound_function && a.arg_index == b.arg_index;
+	case BindingType_GlobalDef:
+		return a.bound_function == b.bound_function;
+	case BindingType_NamedConstant:
+		return a.bound_named_constant == b.bound_named_constant;
+	};
+	assert(0);
+	return false;
+}
+
+
 /*
 inline static const std::string varType(Variable::BindingType t)
 {
@@ -436,7 +460,7 @@ ValueRef Variable::exec(VMState& vmstate)
 		ValueRef captured_struct = vmstate.argument_stack.back();
 		const StructureValue* s = checkedCast<StructureValue>(captured_struct.getPointer());
 
-		const int free_index = enclosing_lambdas.back()->getFreeIndexForVar(this);
+		const size_t free_index = enclosing_lambdas.back()->getFreeIndexForVar(this);
 
 		return s->fields[free_index];
 	}
@@ -552,7 +576,7 @@ std::string Variable::sourceString() const
 std::string Variable::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
 	if(!this->enclosing_lambdas.empty()) // If this is a free var:
-		return "cap_var_struct->captured_var_" + toString(this->enclosing_lambdas.back()->getFreeIndexForVar(this));
+		return "cap_var_struct->captured_var_" + toString((uint32)this->enclosing_lambdas.back()->getFreeIndexForVar(this));
 
 	return mapOpenCLCVarName(params.opencl_c_keywords, this->name);
 }
@@ -581,9 +605,9 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 		);
 
 		// Load the value from the correct field.
-		const int free_index = enclosing_lambdas.back()->getFreeIndexForVar(this);
+		const size_t free_index = enclosing_lambdas.back()->getFreeIndexForVar(this);
 
-		llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, cap_var_structure, free_index);
+		llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, cap_var_structure, (unsigned int)free_index);
 
 		llvm::Value* field = params.builder->CreateLoad(field_ptr);
 
