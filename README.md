@@ -501,7 +501,7 @@ Returns a if cond is true, otherwise b.
 
 ## Arithmetic and other operaters
 
-These operators are generally defined in the same was as for C++.
+These operators are generally defined in the same way as for C++.
 
 The following operators are supported:
 
