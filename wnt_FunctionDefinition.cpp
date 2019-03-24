@@ -450,7 +450,7 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
-		const bool body_is_literal = checkFoldExpression(body, payload);
+		const bool body_is_literal = checkFoldExpression(body, payload, stack);
 			
 		this->can_maybe_constant_fold = body_is_literal;
 	}
@@ -1033,8 +1033,10 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 	if(this->noinline)
 		function_attr_builder.addAttribute(llvm::Attribute::NoInline);
 	
+	// Try and mark the function as readonly or readnone.
 	// We can only mark a function as readonly (or readnone) if the return type is pass by value, otherwise this function will need to write through the SRET argument.
-	/*if(this->returnType()->passByValue())
+	// See https://bugs.llvm.org/show_bug.cgi?id=22853
+	if(this->returnType()->passByValue()) // If no need to use SRET pointer arg:
 	{
 		bool has_ptr_arg = false;
 		for(unsigned int i=0; i<arg_types.size(); ++i)
@@ -1045,7 +1047,9 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 			has_ptr_arg = true;
 
 		if(external_function.nonNull() && external_function->has_side_effects)
-		{}
+		{
+			// Functions like freeString write to the implicit environment state, so can't be marked readonly or readnone.
+		}
 		else
 		{
 			if(has_ptr_arg)
@@ -1053,9 +1057,9 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 			else
 				function_attr_builder.addAttribute(llvm::Attribute::ReadNone); // Function computes its result based strictly on its arguments, without dereferencing any pointer arguments etc..
 
-			//NOTE: can't have readnone when we're doing heap allocs, like having a varray in function body.  Fix this stuff up?
+			// Is there an issue with marking a function as readnone when it allocates stuff on the heap, for example a function that returns a varray?
 		}
-	}*/
+	}
 
 	std::string use_name = this->sig.typeMangledName();
 	if(use_cap_var_struct_ptr)

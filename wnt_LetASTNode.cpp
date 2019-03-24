@@ -146,7 +146,7 @@ void LetASTNode::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
 		//this->can_constant_fold = expr->can_constant_fold && expressionIsWellTyped(*this, payload);
-		const bool is_literal = checkFoldExpression(expr, payload);
+		const bool is_literal = checkFoldExpression(expr, payload, stack);
 		this->can_maybe_constant_fold = is_literal;
 	}
 	else if(payload.operation == TraversalPayload::GetAllNamesInScope)

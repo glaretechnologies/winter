@@ -203,7 +203,7 @@ void TupleLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 		this->can_maybe_constant_fold = true;
 		for(size_t i=0; i<elements.size(); ++i)
 		{
-			const bool elem_is_literal = checkFoldExpression(elements[i], payload);
+			const bool elem_is_literal = checkFoldExpression(elements[i], payload, stack);
 			this->can_maybe_constant_fold = this->can_maybe_constant_fold && elem_is_literal;
 		}
 	}

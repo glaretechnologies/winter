@@ -280,11 +280,11 @@ void LetBlock::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 		this->can_constant_fold = this->can_constant_fold && expr->can_constant_fold;
 		this->can_constant_fold = this->can_constant_fold && expressionIsWellTyped(*this, payload);*/
 
-		this->can_maybe_constant_fold = checkFoldExpression(expr, payload);
+		this->can_maybe_constant_fold = checkFoldExpression(expr, payload, stack);
 
 		for(size_t i=0; i<lets.size(); ++i)
 		{
-			const bool let_is_literal = checkFoldExpression(lets[i]->expr, payload); // NOTE: this correct?
+			const bool let_is_literal = checkFoldExpression(lets[i]->expr, payload, stack); // NOTE: this correct?
 			this->can_maybe_constant_fold = this->can_maybe_constant_fold && let_is_literal;
 		}
 	}

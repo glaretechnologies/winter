@@ -615,6 +615,8 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 {
 	assert(closure_count == 0);
 
+	stats.initial_num_llvm_function_calls = 0;
+	stats.final_num_llvm_function_calls = 0;
 	stats.num_heap_allocation_calls = 0;
 	stats.num_closure_allocations = 0;
 	stats.num_free_vars_stored = 0;
@@ -1129,6 +1131,7 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		{
 			std::vector<ASTNode*> stack;
 			TraversalPayload payload(TraversalPayload::ComputeCanConstantFold);
+			payload.linker = &linker;
 			for(size_t i=0; i<linker.top_level_defs.size(); ++i)
 				linker.top_level_defs[i]->traverse(payload, stack);
 			
@@ -1759,6 +1762,28 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 			auto res = stack_sizes.find(i->second->built_llvm_function);
 			if(res != stack_sizes.end())
 				i->second->llvm_reported_stack_size = (int64)res->second;
+		}
+	}
+
+	// Collect some stats - count number of function calls in optimised LLVM code.
+	//llvm::raw_os_ostream stream(std::cout);
+	for(llvm::Module::iterator mod_it = this->llvm_module->begin(); mod_it != this->llvm_module->end(); ++mod_it)
+	{
+		llvm::Function& func = *mod_it;
+		// conPrint(std::string(func.getName()));
+
+		for(llvm::Function::iterator bb_it = func.begin(); bb_it != func.end(); ++bb_it)
+		{
+			llvm::BasicBlock& bb = *bb_it;
+
+			for(llvm::BasicBlock::iterator it = bb.begin(); it != bb.end(); ++it)
+			{
+				llvm::Instruction& instr = *it;
+				// instr.print(stream); stream << "\n";
+
+				if(instr.getOpcode() == llvm::Instruction::Call)
+					stats.final_num_llvm_function_calls++;
+			}
 		}
 	}
 }

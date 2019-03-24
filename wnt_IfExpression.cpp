@@ -125,9 +125,9 @@ void IfExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 	{
 		//this->can_constant_fold = condition->can_constant_fold && then_expr->can_constant_fold && else_expr->can_constant_fold && expressionIsWellTyped(*this, payload);
 
-		const bool a_is_literal = checkFoldExpression(condition, payload);
-		const bool b_is_literal = checkFoldExpression(then_expr, payload);
-		const bool c_is_literal = checkFoldExpression(else_expr, payload);
+		const bool a_is_literal = checkFoldExpression(condition, payload, stack);
+		const bool b_is_literal = checkFoldExpression(then_expr, payload, stack);
+		const bool c_is_literal = checkFoldExpression(else_expr, payload, stack);
 			
 		this->can_maybe_constant_fold = a_is_literal && b_is_literal && c_is_literal;
 	}

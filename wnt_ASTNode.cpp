@@ -140,7 +140,7 @@ static bool isReferenceToArray(const ASTNodeRef& e)
 }*/
 
 
-bool shouldFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
+static bool shouldFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
 {
 	assert(e.nonNull());
 
@@ -149,38 +149,29 @@ bool shouldFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
 		// Do type check of subtree.
 		// We need to do this otherwise constant folding could allow otherwise mistyped programs to compile, e.g. elem([1, true]v, 0)
 		const bool expr_is_well_typed = expressionIsWellTyped(*e, payload);
+
+		// Return true if e is not already a literal for its type.
 		const TypeRef e_type = e->type();
-		return expr_is_well_typed && e_type.nonNull() && 
-			(	(e_type->getType() == Type::FloatType && (e->nodeType() != ASTNode::FloatLiteralType)) ||
-				(e_type->getType() == Type::DoubleType && (e->nodeType() != ASTNode::DoubleLiteralType)) ||
-				(e_type->getType() == Type::BoolType &&	(e->nodeType() != ASTNode::BoolLiteralType)) ||
-				(e_type->getType() == Type::IntType && (e->nodeType() != ASTNode::IntLiteralType)) ||
-				(e_type->getType() == Type::VectorTypeType && (e->nodeType() != ASTNode::VectorLiteralType)) ||
-				(e_type->getType() == Type::ArrayTypeType && (e->nodeType() != ASTNode::ArrayLiteralType && e->nodeType() != ASTNode::VariableASTNodeType)) ||
-				(e_type->getType() == Type::TupleTypeType && (e->nodeType() != ASTNode::TupleLiteralType))
+		return expr_is_well_typed && e_type.nonNull() &&
+			((e_type->getType() == Type::FloatType && (e->nodeType() != ASTNode::FloatLiteralType)) ||
+			(e_type->getType() == Type::DoubleType && (e->nodeType() != ASTNode::DoubleLiteralType)) ||
+			(e_type->getType() == Type::BoolType &&	(e->nodeType() != ASTNode::BoolLiteralType)) ||
+			(e_type->getType() == Type::IntType && (e->nodeType() != ASTNode::IntLiteralType)) ||
+			(e_type->getType() == Type::VectorTypeType && (e->nodeType() != ASTNode::VectorLiteralType)) ||
+			(e_type->getType() == Type::ArrayTypeType && (e->nodeType() != ASTNode::ArrayLiteralType && e->nodeType() != ASTNode::VariableASTNodeType)) ||
+			(e_type->getType() == Type::TupleTypeType && (e->nodeType() != ASTNode::TupleLiteralType)) ||
+
+			// Type is structure type and e is not already a call to the constructor:
+			(e_type->getType() == Type::StructureTypeType && (e->nodeType() != ASTNode::FunctionExpressionType || e.downcastToPtr<FunctionExpression>()->static_function_name != e_type.downcastToPtr<StructureType>()->name))
 			);
 	}
 
 	return false;
-	/*if(e.nonNull() && e->isConstant())
-	{
-		const TypeRef e_type = e->type();
-		return e_type.nonNull() && 
-			(	(e_type->getType() == Type::FloatType &&		
-				(e->nodeType() != ASTNode::FloatLiteralType)) ||
-				(e_type->getType() == Type::BoolType &&		
-				(e->nodeType() != ASTNode::BoolLiteralType)) ||
-				(e_type->getType() == Type::IntType &&
-				(e->nodeType() != ASTNode::IntLiteralType))
-			) &&
-			expressionIsWellTyped(*e, payload);
-	}
-	else
-		return false;*/
 }
 
 
-static ASTNodeRef makeLiteralASTNodeFromValue(const ValueRef& value, const SrcLocation& src_location, const TypeVRef& type)
+static ASTNodeRef makeLiteralASTNodeFromValue(const ValueRef& value, const SrcLocation& src_location, const TypeVRef& type, TraversalPayload& payload, 
+	std::vector<ASTNode*>& stack)
 {
 	switch(value->valueType())
 	{
@@ -220,7 +211,7 @@ static ASTNodeRef makeLiteralASTNodeFromValue(const ValueRef& value, const SrcLo
 		const ArrayValue* array_val = value.downcastToPtr<ArrayValue>();
 		vector<ASTNodeRef> elem_literals(array_val->e.size());
 		for(size_t i=0; i<array_val->e.size(); ++i)
-			elem_literals[i] = makeLiteralASTNodeFromValue(array_val->e[i], src_location, type.downcastToPtr<ArrayType>()->elem_type);
+			elem_literals[i] = makeLiteralASTNodeFromValue(array_val->e[i], src_location, type.downcastToPtr<ArrayType>()->elem_type, payload, stack);
 
 		// TODO: preserve int suffix, useful for large arrays etc..
 		return new ArrayLiteral(elem_literals, src_location,
@@ -236,13 +227,38 @@ static ASTNodeRef makeLiteralASTNodeFromValue(const ValueRef& value, const SrcLo
 		const VectorValue* vector_val = value.downcastToPtr<VectorValue>();
 		vector<ASTNodeRef> elem_literals(vector_val->e.size());
 		for(size_t i=0; i<vector_val->e.size(); ++i)
-			elem_literals[i] = makeLiteralASTNodeFromValue(vector_val->e[i], src_location, type.downcastToPtr<VectorType>()->elem_type);
+			elem_literals[i] = makeLiteralASTNodeFromValue(vector_val->e[i], src_location, type.downcastToPtr<VectorType>()->elem_type, payload, stack);
 
 		// TODO: preserve int suffix, useful for large vectors etc..
 		return new VectorLiteral(elem_literals, src_location,
 			false, // has int suffix
 			0 // int suffix
 		);
+	}
+	case Value::ValueType_Structure:
+	{
+		if(type->getType() != Type::StructureTypeType)
+			throw BaseException("invalid type");
+
+		// Make a constructor call for the structure
+		const StructureValue* struct_val = value.downcastToPtr<StructureValue>();
+		vector<ASTNodeRef> elem_literals(struct_val->fields.size());
+		for(size_t i=0; i<struct_val->fields.size(); ++i)
+			elem_literals[i] = makeLiteralASTNodeFromValue(struct_val->fields[i], src_location, type.downcastToPtr<StructureType>()->component_types[i], payload, stack);
+
+		FunctionExpressionRef func_expr = new FunctionExpression(src_location);
+		func_expr->static_function_name = type.downcastToPtr<StructureType>()->name;
+		func_expr->argument_expressions = elem_literals;
+
+		// Bind function
+		{
+			TraversalPayload temp_payload(TraversalPayload::BindVariables);
+			temp_payload.linker = payload.linker;
+			temp_payload.func_def_stack = payload.func_def_stack;
+			func_expr->traverse(temp_payload, stack);
+		}
+
+		return func_expr;
 	}
 	default:
 	{
@@ -253,7 +269,7 @@ static ASTNodeRef makeLiteralASTNodeFromValue(const ValueRef& value, const SrcLo
 	
 
 // Replace an expression with a constant (literal AST node)
-ASTNodeRef foldExpression(ASTNodeRef& e, TraversalPayload& payload)
+static ASTNodeRef foldExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
 	// Compute value of expression
 	VMState vmstate;
@@ -268,13 +284,13 @@ ASTNodeRef foldExpression(ASTNodeRef& e, TraversalPayload& payload)
 	if(e_type.isNull())
 		throw BaseException("Internal error: Expression type was null during constant folding.");
 
-	const ASTNodeRef literal_node = makeLiteralASTNodeFromValue(retval, e->srcLocation(), TypeVRef(e_type));
+	const ASTNodeRef literal_node = makeLiteralASTNodeFromValue(retval, e->srcLocation(), TypeVRef(e_type), payload, stack);
 	return literal_node;
 }
 
 
 // Returns true if folding took place or e is already a literal. (Or could be folded to a literal if needed, such as a let var referring to an array)
-bool checkFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
+bool checkFoldExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
 	if(e.isNull())
 		return false;
@@ -283,7 +299,7 @@ bool checkFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
 	{
 		try
 		{
-			e = foldExpression(e, payload);
+			e = foldExpression(e, payload, stack);
 			payload.tree_changed = true;
 			return true;
 		}
@@ -304,7 +320,10 @@ bool checkFoldExpression(ASTNodeRef& e, TraversalPayload& payload)
 			(e_type->getType() == Type::IntType && (e->nodeType() == ASTNode::IntLiteralType)) ||
 			(e_type->getType() == Type::VectorTypeType && (e->nodeType() == ASTNode::VectorLiteralType)) ||
 			(e_type->getType() == Type::ArrayTypeType && (e->nodeType() == ASTNode::ArrayLiteralType || e->nodeType() == ASTNode::VariableASTNodeType)) ||
-			(e_type->getType() == Type::TupleTypeType && (e->nodeType() == ASTNode::TupleLiteralType))
+			(e_type->getType() == Type::TupleTypeType && (e->nodeType() == ASTNode::TupleLiteralType)) ||
+
+			// Type is structure type and e is a call to the constructor:
+			(e_type->getType() == Type::StructureTypeType && (e->nodeType() == ASTNode::FunctionExpressionType && e.downcastToPtr<FunctionExpression>()->static_function_name == e_type.downcastToPtr<StructureType>()->name))
 		);
 	return e_is_literal && e->can_maybe_constant_fold;
 }
@@ -1736,8 +1755,8 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
-		const bool a_is_literal = checkFoldExpression(a, payload);
-		const bool b_is_literal = checkFoldExpression(b, payload);
+		const bool a_is_literal = checkFoldExpression(a, payload, stack);
+		const bool b_is_literal = checkFoldExpression(b, payload, stack);
 			
 		this->can_maybe_constant_fold = a_is_literal && b_is_literal;
 	}
@@ -1959,8 +1978,8 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
-		const bool a_is_literal = checkFoldExpression(a, payload);
-		const bool b_is_literal = checkFoldExpression(b, payload);
+		const bool a_is_literal = checkFoldExpression(a, payload, stack);
+		const bool b_is_literal = checkFoldExpression(b, payload, stack);
 			
 		this->can_maybe_constant_fold = a_is_literal && b_is_literal;
 	}
@@ -2165,8 +2184,8 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
-		const bool a_is_literal = checkFoldExpression(a, payload);
-		const bool b_is_literal = checkFoldExpression(b, payload);
+		const bool a_is_literal = checkFoldExpression(a, payload, stack);
+		const bool b_is_literal = checkFoldExpression(b, payload, stack);
 			
 		this->can_maybe_constant_fold = a_is_literal && b_is_literal;
 	}
@@ -2602,8 +2621,8 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
-		const bool a_is_literal = checkFoldExpression(a, payload);
-		const bool b_is_literal = checkFoldExpression(b, payload);
+		const bool a_is_literal = checkFoldExpression(a, payload, stack);
+		const bool b_is_literal = checkFoldExpression(b, payload, stack);
 			
 		this->can_maybe_constant_fold = a_is_literal && b_is_literal;
 	}
@@ -3096,8 +3115,8 @@ void BinaryBitwiseExpression::traverse(TraversalPayload& payload, std::vector<AS
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
-		const bool a_is_literal = checkFoldExpression(a, payload);
-		const bool b_is_literal = checkFoldExpression(b, payload);
+		const bool a_is_literal = checkFoldExpression(a, payload, stack);
+		const bool b_is_literal = checkFoldExpression(b, payload, stack);
 			
 		this->can_maybe_constant_fold = a_is_literal && b_is_literal;
 	}
@@ -3248,8 +3267,8 @@ void BinaryBooleanExpr::traverse(TraversalPayload& payload, std::vector<ASTNode*
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
-		const bool a_is_literal = checkFoldExpression(a, payload);
-		const bool b_is_literal = checkFoldExpression(b, payload);
+		const bool a_is_literal = checkFoldExpression(a, payload, stack);
+		const bool b_is_literal = checkFoldExpression(b, payload, stack);
 			
 		this->can_maybe_constant_fold = a_is_literal && b_is_literal;
 	}
@@ -3462,7 +3481,7 @@ void UnaryMinusExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
-		const bool is_literal = checkFoldExpression(expr, payload);
+		const bool is_literal = checkFoldExpression(expr, payload, stack);
 		this->can_maybe_constant_fold = is_literal;
 	}
 	
@@ -3630,7 +3649,7 @@ void LogicalNegationExpr::traverse(TraversalPayload& payload, std::vector<ASTNod
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
-		const bool is_literal = checkFoldExpression(expr, payload);
+		const bool is_literal = checkFoldExpression(expr, payload, stack);
 		this->can_maybe_constant_fold = is_literal;
 	}
 
@@ -3960,8 +3979,8 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
-		const bool a_is_literal = checkFoldExpression(a, payload);
-		const bool b_is_literal = checkFoldExpression(b, payload);
+		const bool a_is_literal = checkFoldExpression(a, payload, stack);
+		const bool b_is_literal = checkFoldExpression(b, payload, stack);
 			
 		this->can_maybe_constant_fold = a_is_literal && b_is_literal;
 	}
@@ -4164,7 +4183,7 @@ void ArraySubscript::traverse(TraversalPayload& payload, std::vector<ASTNode*>& 
 	
 	if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
-		const bool is_literal = checkFoldExpression(subscript_expr, payload);
+		const bool is_literal = checkFoldExpression(subscript_expr, payload, stack);
 		this->can_maybe_constant_fold = is_literal;
 	}
 	
@@ -4350,7 +4369,7 @@ void NamedConstant::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	{
 		//this->can_constant_fold = value_expr->can_constant_fold && expressionIsWellTyped(*this, payload);
 		
-		const bool is_literal = checkFoldExpression(value_expr, payload);
+		const bool is_literal = checkFoldExpression(value_expr, payload, stack);
 		this->can_maybe_constant_fold = is_literal;
 
 	/*	if(!this->isConstant())

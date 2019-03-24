@@ -24,6 +24,7 @@
 #include <FileUtils.h>
 #include <StringUtils.h>
 #include <FileUtils.h>
+#include <ContainerUtils.h>
 #include <Timer.h>
 #include <cassert>
 #include <fstream>
@@ -151,24 +152,6 @@ struct TestEnv
 };
 
 
-static float testExternalFunc(float x)
-{
-	return x * x;
-}
-
-
-static ValueRef testExternalFuncInterpreted(const std::vector<ValueRef>& arg_values)
-{
-	assert(arg_values.size() == 1);
-	assert(arg_values[0]->valueType() == Value::ValueType_Float);
-
-	// Cast argument 0 to type FloatValue
-	const FloatValue* float_val = static_cast<const FloatValue*>(arg_values[0].getPointer());
-
-	return new FloatValue(testExternalFunc(float_val->value));
-}
-
-
 static void testPrint(const std::string& s)
 {
 	// Actually printing out stuff makes the tests dramatically slower to run (like 1.7s -> 6s)
@@ -282,7 +265,7 @@ void testMainFloatArgInvalidProgram(const std::string& src)
 
 
 static TestResults doTestMainFloatArg(const std::string& src, float argument, float target_return_val, 
-	bool check_constant_folded_to_literal, uint32 test_flags)
+	bool check_constant_folded_to_literal, uint32 test_flags, const std::vector<ExternalFunctionRef>* external_funcs)
 {
 	testPrint("===================== Winter testMainFloatArg() =====================");
 	try
@@ -313,18 +296,9 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 		if(test_flags & INCLUDE_EXTERNAL_MATHS_FUNCS)
 			MathsFuncs::appendExternalMathsFuncs(vm_args.external_functions);
 
-		{
-			ExternalFunctionRef f = new ExternalFunction(
-				(void*)testExternalFunc,
-				testExternalFuncInterpreted,
-				FunctionSignature("testExternalFunc", std::vector<TypeVRef>(1, new Float())),
-				new Float(), // ret type
-				256, // time bound
-				256, // stack size bound
-				0 // heap size bound
-			);
-			vm_args.external_functions.push_back(f);
-		}
+		if(external_funcs)
+			ContainerUtils::append(vm_args.external_functions, *external_funcs);
+
 		const FunctionSignature mainsig("main", std::vector<TypeVRef>(1, new Float()));
 
 		vm_args.entry_point_sigs.push_back(mainsig);
@@ -831,11 +805,12 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 }
 
 
-TestResults testMainFloatArg(const std::string& src, float argument, float target_return_val, uint32 test_flags)
+TestResults testMainFloatArg(const std::string& src, float argument, float target_return_val, uint32 test_flags, const std::vector<ExternalFunctionRef>* external_funcs)
 {
 	return doTestMainFloatArg(src, argument, target_return_val,
 		false, // check constant-folded to literal
-		test_flags
+		test_flags,
+		external_funcs
 	);
 }
 
@@ -853,16 +828,19 @@ TestResults testMainFloatArgAllowUnsafe(const std::string& src, float argument, 
 {
 	return doTestMainFloatArg(src, argument, target_return_val,
 		false, // check constant-folded to literal
-		test_flags | ALLOW_UNSAFE
+		test_flags | ALLOW_UNSAFE,
+		NULL // external funcs
 	);
 }
 
 
-void testMainFloatArgCheckConstantFolded(const std::string& src, float argument, float target_return_val, uint32 test_flags)
+TestResults testMainFloatArgCheckConstantFolded(const std::string& src, float argument, float target_return_val, uint32 test_flags, 
+	const std::vector<ExternalFunctionRef>* external_funcs)
 {
-	doTestMainFloatArg(src, argument, target_return_val,
+	return doTestMainFloatArg(src, argument, target_return_val,
 		true, // check constant-folded to literal
-		test_flags
+		test_flags,
+		external_funcs
 	);
 }
 

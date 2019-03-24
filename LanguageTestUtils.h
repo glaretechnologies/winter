@@ -147,10 +147,10 @@ size_t getTimeBoundForMainFloatArg(const std::string& src, uint32 test_flags = 0
 void testTimeBoundInvalidForMainFloatArg(const std::string& src, uint32 test_flags = 0);
 TestResults testMainFloat(const std::string& src, float target_return_val);
 void testMainFloatArgInvalidProgram(const std::string& src);
-TestResults testMainFloatArg(const std::string& src, float argument, float target_return_val, uint32 test_flags = 0);
+TestResults testMainFloatArg(const std::string& src, float argument, float target_return_val, uint32 test_flags = 0, const std::vector<ExternalFunctionRef>* external_funcs = NULL);
 TestResults testMainDoubleArg(const std::string& src, double argument, double target_return_val, uint32 test_flags = 0);
 TestResults testMainFloatArgAllowUnsafe(const std::string& src, float argument, float target_return_val, uint32 test_flags = 0);
-void testMainFloatArgCheckConstantFolded(const std::string& src, float argument, float target_return_val, uint32 test_flags = 0);
+TestResults testMainFloatArgCheckConstantFolded(const std::string& src, float argument, float target_return_val, uint32 test_flags = 0, const std::vector<ExternalFunctionRef>* external_funcs = NULL);
 void testMainInteger(const std::string& src, int target_return_val);
 void testMainStringArg(const std::string& src, const std::string& arg, const std::string& target_return_val, uint32 test_flags = 0);
 TestResults testMainIntegerArg(const std::string& src, int x, int target_return_val, uint32 test_flags = 0);

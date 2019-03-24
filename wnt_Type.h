@@ -64,6 +64,10 @@ public:
 	virtual llvm::Type* LLVMType(llvm::Module& module) const = 0;
 	virtual const std::string OpenCLCType() const = 0;
 	virtual bool OpenCLPassByPointer() const { return false; }
+
+	// If passByValue() is true, arguments of this type are passed directly as arguments.  If false, their address is taken and the pointer is passed instead.
+	// Similarly for function return values, non pass-by-value types are returned via the first SRET pointer argument.
+	// Structures are not pass-by-value, however some heap-allocated types are, such as the string type.
 	virtual bool passByValue() const { return true; }
 	virtual Reference<Value> getInvalidValue() const; // For array out-of-bounds
 	virtual llvm::Value* getInvalidLLVMValue(llvm::Module& module) const; // For array out-of-bounds

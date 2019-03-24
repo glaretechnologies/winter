@@ -321,13 +321,13 @@ void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 	{
 		if(this->binding_type == BindingType_Let)
 		{
-			const bool let_val_is_literal = checkFoldExpression(this->bound_let_node->expr, payload);
+			const bool let_val_is_literal = checkFoldExpression(this->bound_let_node->expr, payload, stack);
 			
 			this->can_maybe_constant_fold = let_val_is_literal;
 		}
 		else if(this->binding_type == BindingType_NamedConstant)
 		{
-			const bool let_val_is_literal = checkFoldExpression(this->bound_named_constant->value_expr, payload);
+			const bool let_val_is_literal = checkFoldExpression(this->bound_named_constant->value_expr, payload, stack);
 			this->can_maybe_constant_fold = let_val_is_literal;
 		}
 	}

@@ -16,6 +16,7 @@ Generated at 2011-04-30 18:53:38 +0100
 #include "wnt_Variable.h"
 #include "wnt_LetASTNode.h"
 #include "wnt_LetBlock.h"
+#include "VirtualMachine.h"
 #include "VMState.h"
 #include "Value.h"
 #include "CompiledValue.h"
@@ -864,7 +865,7 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 			this->can_maybe_constant_fold = true;
 			for(size_t i=0; i<argument_expressions.size(); ++i)
 			{
-				const bool arg_is_literal = checkFoldExpression(argument_expressions[i], payload);
+				const bool arg_is_literal = checkFoldExpression(argument_expressions[i], payload, stack);
 				this->can_maybe_constant_fold = this->can_maybe_constant_fold && arg_is_literal;
 			}
 		}
@@ -2095,6 +2096,8 @@ TypeRef FunctionExpression::type() const
 
 llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const
 {
+	params.stats->initial_num_llvm_function_calls++;
+
 	llvm::Value* target_llvm_func = NULL;
 	TypeRef target_ret_type = this->type();
 

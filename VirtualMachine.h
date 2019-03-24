@@ -100,6 +100,8 @@ public:
 
 struct ProgramStats
 {
+	uint64 initial_num_llvm_function_calls; // pre-LLVM optimisation
+	uint64 final_num_llvm_function_calls; // post-LLVM optimisation
 	uint64 num_heap_allocation_calls;
 	uint64 num_closure_allocations; // Num closures allocated, either on stack or on the heap.
 	uint64 num_free_vars_stored; // Num free variables stored during closure allocation.

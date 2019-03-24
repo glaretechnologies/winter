@@ -673,6 +673,9 @@ static void testVArrays()
 
 	// Return a varray from a function
 	testMainFloatArg("def f() varray<int> : [3]va      def main(float x) float : let v = f() in x", 1.f, 1.0f, INVALID_OPENCL);
+
+	testMainFloatArg("def f(float x) !noinline varray<float> : [x, x, x, x]va      def main(float x) float : (f(x))[2]", 1.f, 1.0f, INVALID_OPENCL | ALLOW_UNSAFE);
+	testMainFloatArg("def f(float x)           varray<float> : [x, x, x, x]va      def main(float x) float : (f(x))[2]", 1.f, 1.0f, INVALID_OPENCL | ALLOW_UNSAFE);
 	
 	// Test a varray with access
 	//testMainFloatArgAllowUnsafe("def main(float x) float : [x + 1.0, x + 2.0, x + 3.0]va[1]", 1.f, 3.0f);
@@ -4822,6 +4825,162 @@ static void testTimeBounds()
 }
 
 
+static float testExternalFunc(float x)
+{
+	return x * x;
+}
+
+
+static ValueRef testExternalFuncInterpreted(const std::vector<ValueRef>& arg_values)
+{
+	testAssert(arg_values.size() == 1);
+	testAssert(arg_values[0]->valueType() == Value::ValueType_Float);
+
+	// Cast argument 0 to type FloatValue
+	const FloatValue* float_val = static_cast<const FloatValue*>(arg_values[0].getPointer());
+
+	return new FloatValue(testExternalFunc(float_val->value));
+}
+
+
+static void testExternalFuncVec2(float* ret, float x)
+{
+	ret[0] = x;
+	ret[1] = x*x;
+}
+
+
+static ValueRef testExternalFuncVec2Interpreted(const std::vector<ValueRef>& arg_values)
+{
+	testAssert(arg_values.size() == 1);
+	testAssert(arg_values[0]->valueType() == Value::ValueType_Float);
+
+	// Cast argument 0 to type FloatValue
+	const FloatValue* float_val = static_cast<const FloatValue*>(arg_values[0].getPointer());
+
+	std::vector<ValueRef> elem_vals;
+	elem_vals.push_back(new FloatValue(float_val->value));
+	elem_vals.push_back(new FloatValue(float_val->value * float_val->value));
+	return new StructureValue(std::vector<ValueRef>(1, new VectorValue(elem_vals)));
+}
+
+
+static void testExternalFuncs()
+{
+	TestResults results;
+
+	// Test with testExternalFunc
+	{
+		ExternalFunctionRef f = new ExternalFunction(
+			(void*)testExternalFunc,
+			testExternalFuncInterpreted,
+			FunctionSignature("testExternalFunc", std::vector<TypeVRef>(1, new Float())),
+			new Float(), // ret type
+			256, // time bound
+			256, // stack size bound
+			0 // heap size bound
+		);
+		const std::vector<ExternalFunctionRef> external_functions(1, f);
+
+
+		// Test call to external function
+		results = testMainFloatArg("def main(float x) float : testExternalFunc(x)", 5.0f, 25.0f, INVALID_OPENCL, &external_functions);
+		testAssert(results.stats.final_num_llvm_function_calls == 1);
+
+		// Check that we can do constant folding even with an external expression
+		results = testMainFloatArgCheckConstantFolded("def main(float x) float : testExternalFunc(3.0)", 5.0f, 9.0f, INVALID_OPENCL, &external_functions);
+		testAssert(results.stats.final_num_llvm_function_calls == 0);
+
+		// Check that only a single testExternalFunc(x) call is made.
+		// NOTE that because testExternalFunc does not have a SRET arg, the calls can be combined.
+		results = testMainFloatArg("def main(float x) float : testExternalFunc(x) + testExternalFunc(x)", 5.0f, 50.0f, INVALID_OPENCL, &external_functions);
+		testAssert(results.stats.final_num_llvm_function_calls == 1);
+	}
+
+
+	// Test with testExternalFuncVec2
+	{
+		const std::vector<std::string> vec_elem_names(1, "v");
+		const StructureTypeVRef vec2_struct_type = new StructureType("vec2", std::vector<TypeVRef>(1, new VectorType(new Float(), 2)), vec_elem_names);
+
+		ExternalFunctionRef f = new ExternalFunction(
+			(void*)testExternalFuncVec2,
+			testExternalFuncVec2Interpreted,
+			FunctionSignature("testExternalFuncVec2", std::vector<TypeVRef>(1, new Float())),
+			vec2_struct_type, // ret type
+			256, // time bound
+			256, // stack size bound
+			0 // heap size bound
+		);
+		const std::vector<ExternalFunctionRef> external_functions(1, f);
+
+		
+		// Test call to external function
+		//results = testMainFloatArg("struct vec2 { vector<float, 2> v }   def main(float x) float : testExternalFuncVec2(x).v[0]", 5.0f, 5.0f, INVALID_OPENCL, &external_functions);
+		//testAssert(results.stats.num_llvm_function_calls == 1);
+		//
+		//results = testMainFloatArg("struct vec2 { vector<float, 2> v }   def main(float x) float : testExternalFuncVec2(x).v[1]", 5.0f, 25.0f, INVALID_OPENCL, &external_functions);
+
+		// Check that we can do constant folding even with an external expression
+		results = testMainFloatArg("struct vec2 { vector<float, 2> v }   def main(float x) float : testExternalFuncVec2(3.0f).v[1]", 5.0f, 9.0f, INVALID_OPENCL, &external_functions);
+		testAssert(results.stats.final_num_llvm_function_calls == 0);
+
+		// Test with the same call expression twice.
+		results = testMainFloatArg("struct vec2 { vector<float, 2> v }   def main(float x) float : testExternalFuncVec2(x).v[0] + testExternalFuncVec2(x).v[0]", 5.0f, 10.0f, INVALID_OPENCL, &external_functions);
+		
+		// NOTE: Ideally this would only emit 1 call.  Due to the SRET arg of testExternalFuncVec2, they can't be combined currently.
+		testAssert(results.stats.final_num_llvm_function_calls == 2);
+
+	}
+}
+
+
+static void testConstantFolding()
+{
+	TestResults results;
+
+	// Test constant folding of a function that returns a struct, to a struct constructor
+	testMainFloatArgCheckConstantFolded(
+		"struct S { float y }										\n\
+		def f(float x) !noinline S : S(x + 1.0f)					\n\
+		def main(float x) float : y(f(1.0f))", 1.f, 2.f);
+
+	// Test constant folding of an expression that has as a child a struct constructor
+	testMainFloatArgCheckConstantFolded(
+		"struct S { float y }										\n\
+		def main(float x) float : y(S(1.0f))", 1.f, 1.f);
+
+	// Check basic constant folding, 1.0 + 2.0 should be replaced with 3.0.
+	testMainFloatArgCheckConstantFolded("def main(float x) float : 1.0 + 2.0", 1.f, 3.f);
+
+	// Test constant folding with a vector literal that is not well typed (has boolean element).
+	// Make sure that constant folding doesn't allow it.
+	testMainFloatArgInvalidProgram("def main(float x) float : elem(  [2.0, false]v   , 0)");
+
+	// Check constant folding with elem() and collections
+	testMainFloatArgCheckConstantFolded("def main(float x) float : elem([1.0, 2.0]v, 1)", 1.f, 2.f);
+	testMainFloatArgCheckConstantFolded("def main(float x) float : elem([1.0, 2.0]t, 1)", 1.f, 2.f);
+	testMainFloatArgCheckConstantFolded("def main(float x) float : elem([1.0, 2.0]a, 1)", 1.f, 2.f);
+
+	// Check constant folding with elem() and collections, and operations on collections
+	testMainFloatArgCheckConstantFolded("def main(float x) float : elem([1.0, 2.0]v + [3.0, 4.0]v, 1)", 1.f, 6.f);
+	testMainFloatArgCheckConstantFolded("def main(float x) float : elem([1.0, 2.0]v - [3.0, 4.0]v, 1)", 1.f, -2.f);
+	testMainFloatArgCheckConstantFolded("def main(float x) float : elem([1.0, 2.0]v * [3.0, 4.0]v, 1)", 1.f, 8.f);
+
+
+	// Check constant folding for expression involving a let variable
+	testMainFloatArgCheckConstantFolded("def main(float x) float :  let y = 2.0 in y", 1.f, 2.f);
+	testMainFloatArgCheckConstantFolded("def main(float x) float :  let y = 1.0 + 1.0 in y", 1.f, 2.f);
+	testMainFloatArgCheckConstantFolded("def main(float x) float :  let y = (1.0 + 1.0) in pow(y, 3.0)", 1.f, 8.f);
+
+
+	// Check constant folding of a pow function that is inside another function
+	testMainFloatArgCheckConstantFolded("def g(float x) float :  pow(2 + x, -(1.0 / 8.0))         def main(float x) float : g(0.5)", 1.f, std::pow(2.f + 0.5f, -(1.0f / 8.0f)));
+
+	testMainFloatArgCheckConstantFolded("def g(float x, float y) float : pow(x, y)         def main(float x) float : g(2.0, 3.0)", 1.f, 8.0f);
+}
+
+
 void LanguageTests::run()
 {
 	Timer timer;
@@ -4963,6 +5122,10 @@ void LanguageTests::run()
 
 	--------------------------------------------------
 	*/
+
+	testConstantFolding();
+
+	testExternalFuncs();
 
 	testIfSimplification();
 
@@ -5282,26 +5445,12 @@ void LanguageTests::run()
 
 
 
-	// Test constant folding with a vector literal that is not well typed (has boolean element).
-	// Make sure that constant folding doesn't allow it.
-	testMainFloatArgInvalidProgram("def main(float x) float : elem(  [2.0, false]v   , 0)");
-
-	// Check constant folding with elem() and collections
-	testMainFloatArgCheckConstantFolded("def main(float x) float : elem([1.0, 2.0]v, 1)", 1.f, 2.f);
-	testMainFloatArgCheckConstantFolded("def main(float x) float : elem([1.0, 2.0]t, 1)", 1.f, 2.f);
-	testMainFloatArgCheckConstantFolded("def main(float x) float : elem([1.0, 2.0]a, 1)", 1.f, 2.f);
-
-	// Check constant folding with elem() and collections, and operations on collections
-	testMainFloatArgCheckConstantFolded("def main(float x) float : elem([1.0, 2.0]v + [3.0, 4.0]v, 1)", 1.f, 6.f);
-	testMainFloatArgCheckConstantFolded("def main(float x) float : elem([1.0, 2.0]v - [3.0, 4.0]v, 1)", 1.f, -2.f);
-	testMainFloatArgCheckConstantFolded("def main(float x) float : elem([1.0, 2.0]v * [3.0, 4.0]v, 1)", 1.f, 8.f);
-
 
 
 	testMainFloatArg("def main(float x) float : elem([x, 2.0]v, 1)", 1.f, 2.f);
 
 
-	testMainFloatArgCheckConstantFolded("def main(float x) float : 1.0 + 2.0", 1.f, 3.f);
+	
 
 	
 
@@ -5537,16 +5686,7 @@ void LanguageTests::run()
 	// Check constant folding for a let variable
 	//testMainFloatArg("def main(float x) float :  let y = pow(2.0, 3.0) in y", 1.f, 8.f);
 
-	// Check constant folding for expression involving a let variable
-	testMainFloatArgCheckConstantFolded("def main(float x) float :  let y = 2.0 in y", 1.f, 2.f);
-	testMainFloatArgCheckConstantFolded("def main(float x) float :  let y = 1.0 + 1.0 in y", 1.f, 2.f);
-	testMainFloatArgCheckConstantFolded("def main(float x) float :  let y = (1.0 + 1.0) in pow(y, 3.0)", 1.f, 8.f);
-	
 
-	// Check constant folding of a pow function that is inside another function
-	testMainFloatArgCheckConstantFolded("def g(float x) float :  pow(2 + x, -(1.0 / 8.0))         def main(float x) float : g(0.5)", 1.f, std::pow(2.f + 0.5f, -(1.0f / 8.0f)));
-	
-	testMainFloatArgCheckConstantFolded("def g(float x, float y) float : pow(x, y)         def main(float x) float : g(2.0, 3.0)", 1.f, 8.0f);
 
 	// Test promotion to match function return type:  
 	// Test in if statement
@@ -6221,12 +6361,6 @@ TEMP OPENCL
 		10.0f);
 
 
-	// Test call to external function
-	testMainFloatArg("def main(float x) float : testExternalFunc(x)", 5.0f, 25.0f, INVALID_OPENCL);
-
-	// Check that we can do constant folding even with an external expression
-	testMainFloatArgCheckConstantFolded("def main(float x) float : testExternalFunc(3.0)", 5.0f, 9.0f, INVALID_OPENCL);
-	
 	// Simple test
 	testMainFloat("def main() float : 1.0", 1.0);
 

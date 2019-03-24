@@ -66,7 +66,7 @@ public:
 	FunctionSignature sig;
 	TypeVRef return_type;
 
-	bool has_side_effects; // Such as the function freeString()
+	bool has_side_effects; // Such as the function freeString().  Tells the optimiser not to combine/optimise away function calls to this function.
 	bool is_allocation_function;
 
 	size_t time_bound, stack_size_bound, heap_size_bound;
