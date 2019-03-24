@@ -209,7 +209,7 @@ ValueRef FunctionDefinition::invoke(VMState& vmstate)
 	}
 
 	// Check the types of the arguments that we have received
-	for(size_t i=0; i<this->args.size(); ++i)
+	/*for(size_t i=0; i<this->args.size(); ++i)
 	{
 		ValueRef arg_val = vmstate.argument_stack[vmstate.func_args_start.back() + i];
 
@@ -217,7 +217,7 @@ ValueRef FunctionDefinition::invoke(VMState& vmstate)
 		{
 			//*vmstate.ostream << "Arg " << i << ": " << arg_val->toString() << std::endl;
 		}
-	}
+	}*/
 
 
 	if(this->built_in_func_impl.nonNull())

@@ -79,9 +79,7 @@ Reference<BufferRoot> LangParser::parseBuffer(const std::vector<Reference<TokenB
 {
 	Reference<BufferRoot> root = new BufferRoot(SrcLocation(0, source_buffer.getPointer()));
 
-	unsigned int i = 0;
-
-	ParseInfo parseinfo(i, tokens, named_types, root->top_level_defs, order_num);
+	ParseInfo parseinfo(tokens, named_types, root->top_level_defs, order_num);
 	parseinfo.text_buffer = source_buffer.getPointer();
 
 	// NEW: go through buffer and see if there is a 'else' token
@@ -92,15 +90,15 @@ Reference<BufferRoot> LangParser::parseBuffer(const std::vector<Reference<TokenB
 			break;
 		}*/
 
-	while(i < tokens.size())
+	while(parseinfo.i < tokens.size())
 	{
-		if(tokens[i]->isIdentifier() && tokens[i]->getIdentifierValue() == "def")
+		if(tokens[parseinfo.i]->isIdentifier() && tokens[parseinfo.i]->getIdentifierValue() == "def")
 		{
 			root->top_level_defs.push_back(parseFunctionDefinition(parseinfo));
 			parseinfo.generic_type_params.clear();
 			parseinfo.order_num++;
 		}
-		else if(tokens[i]->isIdentifier() && tokens[i]->getIdentifierValue() == "struct")
+		else if(tokens[parseinfo.i]->isIdentifier() && tokens[parseinfo.i]->getIdentifierValue() == "struct")
 		{
 			const unsigned int struct_position = parseinfo.i;
 			VRef<StructureType> t = parseStructType(parseinfo);
@@ -134,7 +132,7 @@ Reference<BufferRoot> LangParser::parseBuffer(const std::vector<Reference<TokenB
 
 			for(unsigned int z=0; z<t->component_types.size(); ++z)
 			{
-				FunctionDefinitionRef def(new FunctionDefinition(
+				FunctionDefinitionRef def = new FunctionDefinition(
 					SrcLocation::invalidLocation(),
 					parseinfo.order_num, // order number
 					t->component_names[z], // name
@@ -142,21 +140,21 @@ Reference<BufferRoot> LangParser::parseBuffer(const std::vector<Reference<TokenB
 					ASTNodeRef(), // body expr
 					t->component_types[z], // return type
 					new GetField(t, z) // impl
-				));
+				);
 
 				root->top_level_defs.push_back(def);
 			}
 
 			parseinfo.order_num++;
 		}
-		else if(tokens[i]->isIdentifier())
+		else if(tokens[parseinfo.i]->isIdentifier())
 		{
 			// Parse named constant, e.g. "DOZEN = 12"
 			root->top_level_defs.push_back(parseNamedConstant(parseinfo));
 			parseinfo.order_num++;
 		}
 		else
-			throw LangParserExcep("Expected 'def'." + errorPosition(*source_buffer, tokens[i]->char_index));
+			throw LangParserExcep("Expected 'def'." + errorPosition(*source_buffer, tokens[parseinfo.i]->char_index));
 	}
 
 	// Update order_num
@@ -227,22 +225,15 @@ void LangParser::parseToken(unsigned int token_type, ParseInfo& p)
 	p.i++;
 }
 
-
-void LangParser::skipExpectedToken(unsigned int token_type, ParseInfo& p)
-{
-	assert(isTokenCurrent(token_type, p));
-	p.i++;
-}
-
-
-bool LangParser::isTokenCurrent(unsigned int token_type, ParseInfo& p)
+static inline bool isTokenCurrent(unsigned int token_type, ParseInfo& p)
 {
 	return p.i < p.tokens.size() && p.tokens[p.i]->getType() == token_type;
 }
 
 
-void LangParser::advance(ParseInfo& p)
+static inline void skipExpectedToken(unsigned int token_type, ParseInfo& p)
 {
+	assert(isTokenCurrent(token_type, p));
 	p.i++;
 }
 
@@ -369,7 +360,7 @@ ASTNodeRef LangParser::parseIfExpression(ParseInfo& p)
 		if(p.tokens[p.i]->getType() == COMMA_TOKEN)
 		{
 			// We are parsing the old form of if.
-			p.i++; // Advance past ','.
+			skipExpectedToken(COMMA_TOKEN, p);
 
 			// Parse then expression
 			ASTNodeRef then_expr = parseExpression(p);
@@ -806,7 +797,7 @@ ASTNodeRef LangParser::parseBasicExpression(ParseInfo& p)
 	if(isTokenCurrent(OPEN_PARENTHESIS_TOKEN, p))
 	{
 		// Parse parenthesised expression
-		p.i++; // Comsume open paren
+		skipExpectedToken(OPEN_PARENTHESIS_TOKEN, p);
 
 		if(isTokenCurrent(CLOSE_PARENTHESIS_TOKEN, p))
 		{
@@ -818,7 +809,7 @@ ASTNodeRef LangParser::parseBasicExpression(ParseInfo& p)
 
 		if(isTokenCurrent(COMMA_TOKEN, p)) // If there is a comma here, we are parsing a tuple, e.g. "(1, 2)"
 		{
-			p.i++; // Consume comma
+			skipExpectedToken(COMMA_TOKEN, p);
 
 			vector<ASTNodeRef> tuple_elems(1, e);
 			while(1)
@@ -828,12 +819,12 @@ ASTNodeRef LangParser::parseBasicExpression(ParseInfo& p)
 				if(isTokenCurrent(CLOSE_PARENTHESIS_TOKEN, p))
 				{
 					// done.
-					p.i++;
+					skipExpectedToken(CLOSE_PARENTHESIS_TOKEN, p);
 					return new TupleLiteral(tuple_elems, loc);
 				}
 				else if(isTokenCurrent(COMMA_TOKEN, p))
 				{
-					p.i++;
+					skipExpectedToken(COMMA_TOKEN, p);
 				}
 				else
 					throw LangParserExcep("Unexpected token while parsing tuple." + errorPosition(p));
@@ -1426,7 +1417,7 @@ ASTNodeRef LangParser::parseHighPrecedenceExpression(ParseInfo& p)
 		if(isTokenCurrent(OPEN_PARENTHESIS_TOKEN, p))
 		{
 			// Parse function call
-			p.i++; // Skip OPEN_PARENTHESIS_TOKEN
+			skipExpectedToken(OPEN_PARENTHESIS_TOKEN, p);
 
 			// Parse parameter list
 			if(p.i == p.tokens.size())
@@ -1490,7 +1481,7 @@ ASTNodeRef LangParser::parseHighPrecedenceExpression(ParseInfo& p)
 		}
 		else if(isTokenCurrent(DOT_TOKEN, p))
 		{
-			p.i++; // Skip DOT_TOKEN
+			skipExpectedToken(DOT_TOKEN, p);
 
 			const std::string field_name = parseIdentifier("field name", p);
 
@@ -1754,7 +1745,7 @@ Reference<LetASTNode> LangParser::parseLet(ParseInfo& p)
 		vars.push_back(v);
 
 		if(isTokenCurrent(COMMA_TOKEN, p))
-			p.i++; // Consume comma then loop
+			skipExpectedToken(COMMA_TOKEN, p);  // Consume comma then loop
 		else if(isTokenCurrent(EQUALS_TOKEN, p))
 			break;
 		else
@@ -1841,7 +1832,7 @@ void LangParser::parseParameterList(ParseInfo& p, std::vector<FunctionDefinition
 			throw LangParserExcep("End of buffer before end of parameter list.");
 		else if(p.tokens[p.i]->getType() == CLOSE_PARENTHESIS_TOKEN)
 		{
-			p.i++;
+			skipExpectedToken(CLOSE_PARENTHESIS_TOKEN, p);
 			break;
 		}
 
@@ -1856,12 +1847,12 @@ void LangParser::parseParameterList(ParseInfo& p, std::vector<FunctionDefinition
 		}
 		else if(p.tokens[p.i]->getType() == CLOSE_PARENTHESIS_TOKEN)
 		{
-			p.i++;
+			skipExpectedToken(CLOSE_PARENTHESIS_TOKEN, p);
 			break;
 		}
 		else if(p.tokens[p.i]->getType() == COMMA_TOKEN)
 		{
-			p.i++;
+			skipExpectedToken(COMMA_TOKEN, p);
 		}
 		else
 		{

@@ -33,15 +33,13 @@ public:
 class ParseInfo
 {
 public:
-	ParseInfo(unsigned int& i_, const std::vector<Reference<TokenBase> >& t, std::map<std::string, TypeVRef>& named_types_,
+	ParseInfo(const std::vector<Reference<TokenBase> >& tokens_, std::map<std::string, TypeVRef>& named_types_,
 		std::vector<ASTNodeRef>& top_level_defs_,
 		int order_num_) 
-		: i(i_), tokens(t), named_types(named_types_), top_level_defs(top_level_defs_), order_num(order_num_)/*, else_token_present(false)*/ {}
+		: i(0), tokens(tokens_), named_types(named_types_), top_level_defs(top_level_defs_), order_num(order_num_)/*, else_token_present(false)*/ {}
 	const std::vector<Reference<TokenBase> >& tokens;
-	//const char* text_buffer;
-	//const std::string* text_buffer;
 	const SourceBuffer* text_buffer;
-	unsigned int& i;
+	unsigned int i;
 	std::map<std::string, TypeVRef>& named_types;
 	std::vector<ASTNodeRef>& top_level_defs; // Either function definitions or named constants.
 	//bool else_token_present;
@@ -89,11 +87,7 @@ private:
 
 	//Reference<ASTNode> parseFunctionExpression(ParseInfo& parseinfo);
 
-	//void parseToken(const std::vector<Reference<TokenBase> >& tokens, const char* text_buffer, unsigned int token_type, const std::string& type_name, unsigned int& i);
 	void parseToken(unsigned int token_type, ParseInfo& parseinfo);
-	inline void skipExpectedToken(unsigned int token_type, ParseInfo& parseinfo);
-	bool isTokenCurrent(unsigned int token_type, ParseInfo& parseinfo);
-	void advance(ParseInfo& parseinfo);
 
 	//ASTNodeRef parseFieldExpression(ParseInfo& parseinfo);
 	ASTNodeRef parseVariableExpression(ParseInfo& parseinfo);
