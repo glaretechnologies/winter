@@ -336,7 +336,17 @@ for example
 ```
 if x < 1 then y + 2 else z * 2
 ```
+The `then` keyword may be omitted in some cases, 
+however its omission may result in syntatic ambiguities in some cases, in which case it is required.
 
+An example without it:
+
+```
+if some_bool 
+    y + 2 
+else 
+    z * 2
+```
 
 ## Let blocks
 
@@ -487,6 +497,47 @@ This behaves much like the ternary conditional operator in C++:
 ```cond ? a : b```
 
 Returns a if cond is true, otherwise b.
+
+
+## Arithmetic and other operaters
+
+These operators are generally defined in the same was as for C++.
+
+The following operators are supported:
+
+`+`: addition
+
+`*`: multiplication
+
+`-`: (binary, e.g. two operand) subtraction
+
+`/`: division
+
+`-`: unary minus
+
+`==`: equality comparison
+
+`!=`: inequality comparison
+
+`<`: less than
+
+`>`: greater than
+
+`<=`: less than or equal to
+
+`>=`: greater than or equal to
+
+`!`: logical negation
+
+`|`: bitwise OR
+
+`&`: bitwise AND
+
+`^`: bitwise XOR
+
+`<<`: bitwise left-shift
+
+`>>`: bitwise right-shift
 
 
 ## Operator overloading
