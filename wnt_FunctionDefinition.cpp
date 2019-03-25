@@ -20,6 +20,7 @@ Generated at 2011-04-25 19:15:40 +0100
 #include "LLVMUtils.h"
 #include "LLVMTypeUtils.h"
 #include "utils/StringUtils.h"
+#include "utils/ConPrint.h"
 #ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
 #endif
@@ -215,7 +216,7 @@ ValueRef FunctionDefinition::invoke(VMState& vmstate)
 
 		if(vmstate.trace)
 		{
-			//*vmstate.ostream << "Arg " << i << ": " << arg_val->toString() << std::endl;
+			*vmstate.ostream << "Arg " << i << ": " << arg_val->toString() << std::endl;
 		}
 	}*/
 
@@ -1667,7 +1668,7 @@ static void computeUniqueFreeVarList(const std::set<Variable*>& free_variables,
 	for(auto it = free_variables.begin(); it != free_variables.end(); ++it)
 	{
 		Variable* free_var = *it;
-		for(int z=0; z<unique_vars_out.size(); ++z)
+		for(size_t z=0; z<unique_vars_out.size(); ++z)
 			if(Variable::boundToSameNode(*unique_vars_out[z], *free_var)) // If this var is already in the unique list:
 				goto continue_main_loop;
 
