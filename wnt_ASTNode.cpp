@@ -3859,7 +3859,7 @@ static const std::string tokenString(unsigned int token_type)
 		return " >= ";
 	default:
 		assert(!"Unknown comparison token type.");
-		return NULL;
+		return "";
 	}
 }
 
