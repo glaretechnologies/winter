@@ -40,10 +40,11 @@ static const bool PRINT_MEM_BOUNDS_AND_USAGE = false;
 
 
 // Checking stack size usage doesn't seem to be working properly on macOS yet.
-#if defined(OSX)
-static const bool CHECK_STACK_USAGE = false;
-#else
+// And on Linux there seems to be a bug with LLVM where LLVM doesn't report stack sizes correctly: https://bugs.llvm.org/show_bug.cgi?id=41193
+#if defined(_WIN32)
 static const bool CHECK_STACK_USAGE = true;
+#else
+static const bool CHECK_STACK_USAGE = false;
 #endif
 
 
