@@ -451,7 +451,7 @@ llvm::Value* UpdateElementBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) 
 //		params.builder->CreateStore(collection_val, return_ptr);
 	
 		llvm::Value* size = llvm::ConstantInt::get(*params.context, llvm::APInt(32, sizeof(int) * collection_type.downcast<ArrayType>()->num_elems, true)); // TEMP HACK
-		params.builder->CreateMemCpy(return_ptr, struct_ptr, size, 4);
+		LLVMUtils::createMemCpy(params.builder, return_ptr, struct_ptr, size, 4);
 
 		// Update element with new val
 		llvm::Value* indices[] = {
@@ -999,7 +999,7 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 			if(state_type->getType() == Type::ArrayTypeType)
 			{
 				llvm::Value* size = llvm::ConstantInt::get(*params.context, llvm::APInt(32, sizeof(int) * state_type.downcast<ArrayType>()->num_elems, true)); // TEMP HACK
-				params.builder->CreateMemCpy(running_state_alloca, initial_state_ptr_or_value, size, 4);
+				LLVMUtils::createMemCpy(params.builder, running_state_alloca, initial_state_ptr_or_value, size, 4);
 			}
 			else
 			{
@@ -1104,7 +1104,7 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 			if(state_type->getType() == Type::ArrayTypeType)
 			{
 				llvm::Value* size = llvm::ConstantInt::get(*params.context, llvm::APInt(32, sizeof(int) * state_type.downcast<ArrayType>()->num_elems, true)); // TEMP HACK
-				params.builder->CreateMemCpy(return_ptr, running_state_alloca, size, 4);
+				LLVMUtils::createMemCpy(params.builder, return_ptr, running_state_alloca, size, 4);
 				return return_ptr;
 			}
 			else
@@ -1145,7 +1145,7 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 			{
 				llvm::Value* size = llvm::ConstantInt::get(*params.context, llvm::APInt(32, sizeof(int) * state_type.downcast<ArrayType>()->num_elems, true)); // TEMP HACK
 				//params.builder->CreateMemCpy(running_state_alloca, initial_state_ptr_or_value, size, 4);
-				params.builder->CreateMemCpy(new_state_alloca, initial_state_ptr_or_value, size, 4);
+				LLVMUtils::createMemCpy(params.builder, new_state_alloca, initial_state_ptr_or_value, size, 4);
 			}
 			else
 			{
@@ -1203,7 +1203,7 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 	if(state_type->getType() == Type::ArrayTypeType)
 	{
 		llvm::Value* size = llvm::ConstantInt::get(*params.context, llvm::APInt(32, sizeof(int) * state_type.downcast<ArrayType>()->num_elems, true)); // TEMP HACK
-		params.builder->CreateMemCpy(running_state_alloca, new_state_alloca, size, 4);
+		LLVMUtils::createMemCpy(params.builder, running_state_alloca, new_state_alloca, size, 4);
 	}
 	else
 	{
@@ -1288,7 +1288,7 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 		if(state_type->getType() == Type::ArrayTypeType)
 		{
 			llvm::Value* size = llvm::ConstantInt::get(*params.context, llvm::APInt(32, sizeof(int) * state_type.downcast<ArrayType>()->num_elems, true)); // TEMP HACK
-			params.builder->CreateMemCpy(return_ptr, new_state_alloca/*running_state_alloca*/, size, 4);
+			LLVMUtils::createMemCpy(params.builder, return_ptr, new_state_alloca/*running_state_alloca*/, size, 4);
 			return return_ptr;
 		}
 		else

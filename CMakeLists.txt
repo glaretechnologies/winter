@@ -57,7 +57,7 @@ MESSAGE("Indigo trunk dir: ${INDIGO_TRUNK_DIR}")
 
 
 
-# Supported versions: 3.4, 3.6, 6.0.0.
+# Supported versions: 3.4, 3.6, 6.0.0, 8.0.0.
 set(LLVM_VERSION "6.0.0")
 
 MESSAGE("Target LLVM version: ${LLVM_VERSION}")
@@ -421,14 +421,16 @@ endif()
 
 
 # Set TARGET_LLVM_VERSION
-if(LLVM_VERSION STREQUAL "6.0.0")
+if(LLVM_VERSION STREQUAL "8.0.0")
+	add_definitions("-DTARGET_LLVM_VERSION=80")
+elseif(LLVM_VERSION STREQUAL "6.0.0")
 	add_definitions("-DTARGET_LLVM_VERSION=60")
 elseif(LLVM_VERSION STREQUAL "3.6")
 	add_definitions("-DTARGET_LLVM_VERSION=36")
 elseif(LLVM_VERSION STREQUAL "3.4")
 	add_definitions("-DTARGET_LLVM_VERSION=34")
 else()
-	MESSAGE("Unsupported LLVM version ${LLVM_VERSION}")
+	MESSAGE(FATAL_ERROR "Unsupported LLVM version ${LLVM_VERSION}")
 endif()
 
 
@@ -462,7 +464,155 @@ if(WIN32)
 	SET(CMAKE_MODULE_LINKER_FLAGS_DEBUG				"${CMAKE_MODULE_LINKER_FLAGS_DEBUG} ${LLVM_LINK_FLAGS_DEBUG}")
 	SET(CMAKE_MODULE_LINKER_FLAGS_SDKDEBUG			"${CMAKE_MODULE_LINKER_FLAGS_SDKDEBUG} ${LLVM_LINK_FLAGS_SDKDEBUG}")
 	
-	if(LLVM_VERSION STREQUAL "6.0.0")
+	if(LLVM_VERSION STREQUAL "8.0.0")
+		SET(LLVM_LIBS
+			LLVMAArch64AsmParser.lib
+			LLVMAArch64AsmPrinter.lib
+			LLVMAArch64CodeGen.lib
+			LLVMAArch64Desc.lib
+			LLVMAArch64Disassembler.lib
+			LLVMAArch64Info.lib
+			LLVMAArch64Utils.lib
+			LLVMAggressiveInstCombine.lib
+			LLVMAMDGPUAsmParser.lib
+			LLVMAMDGPUAsmPrinter.lib
+			LLVMAMDGPUCodeGen.lib
+			LLVMAMDGPUDesc.lib
+			LLVMAMDGPUDisassembler.lib
+			LLVMAMDGPUInfo.lib
+			LLVMAMDGPUUtils.lib
+			LLVMAnalysis.lib
+			LLVMARMAsmParser.lib
+			LLVMARMAsmPrinter.lib
+			LLVMARMCodeGen.lib
+			LLVMARMDesc.lib
+			LLVMARMDisassembler.lib
+			LLVMARMInfo.lib
+			LLVMARMUtils.lib
+			LLVMAsmParser.lib
+			LLVMAsmPrinter.lib
+			LLVMBinaryFormat.lib
+			LLVMBitReader.lib
+			LLVMBitWriter.lib
+			LLVMBPFAsmParser.lib
+			LLVMBPFAsmPrinter.lib
+			LLVMBPFCodeGen.lib
+			LLVMBPFDesc.lib
+			LLVMBPFDisassembler.lib
+			LLVMBPFInfo.lib
+			LLVMCodeGen.lib
+			LLVMCore.lib
+			LLVMCoroutines.lib
+			LLVMCoverage.lib
+			LLVMDebugInfoCodeView.lib
+			LLVMDebugInfoDWARF.lib
+			LLVMDebugInfoMSF.lib
+			LLVMDebugInfoPDB.lib
+			LLVMDemangle.lib
+			LLVMDlltoolDriver.lib
+			LLVMExecutionEngine.lib
+			LLVMFuzzMutate.lib
+			LLVMGlobalISel.lib
+			LLVMHexagonAsmParser.lib
+			LLVMHexagonCodeGen.lib
+			LLVMHexagonDesc.lib
+			LLVMHexagonDisassembler.lib
+			LLVMHexagonInfo.lib
+			LLVMInstCombine.lib
+			LLVMInstrumentation.lib
+			LLVMInterpreter.lib
+			LLVMipo.lib
+			LLVMIRReader.lib
+			LLVMLanaiAsmParser.lib
+			LLVMLanaiAsmPrinter.lib
+			LLVMLanaiCodeGen.lib
+			LLVMLanaiDesc.lib
+			LLVMLanaiDisassembler.lib
+			LLVMLanaiInfo.lib
+			LLVMLibDriver.lib
+			LLVMLineEditor.lib
+			LLVMLinker.lib
+			LLVMLTO.lib
+			LLVMMC.lib
+			LLVMMCA.lib
+			LLVMMCDisassembler.lib
+			LLVMMCJIT.lib
+			LLVMMCParser.lib
+			LLVMMipsAsmParser.lib
+			LLVMMipsAsmPrinter.lib
+			LLVMMipsCodeGen.lib
+			LLVMMipsDesc.lib
+			LLVMMipsDisassembler.lib
+			LLVMMipsInfo.lib
+			LLVMMIRParser.lib
+			LLVMMSP430AsmParser.lib
+			LLVMMSP430AsmPrinter.lib
+			LLVMMSP430CodeGen.lib
+			LLVMMSP430Desc.lib
+			LLVMMSP430Disassembler.lib
+			LLVMMSP430Info.lib
+			LLVMNVPTXAsmPrinter.lib
+			LLVMNVPTXCodeGen.lib
+			LLVMNVPTXDesc.lib
+			LLVMNVPTXInfo.lib
+			LLVMObjCARCOpts.lib
+			LLVMObject.lib
+			LLVMObjectYAML.lib
+			LLVMOption.lib
+			LLVMOptRemarks.lib
+			LLVMOrcJIT.lib
+			LLVMPasses.lib
+			LLVMPowerPCAsmParser.lib
+			LLVMPowerPCAsmPrinter.lib
+			LLVMPowerPCCodeGen.lib
+			LLVMPowerPCDesc.lib
+			LLVMPowerPCDisassembler.lib
+			LLVMPowerPCInfo.lib
+			LLVMProfileData.lib
+			LLVMRuntimeDyld.lib
+			LLVMScalarOpts.lib
+			LLVMSelectionDAG.lib
+			LLVMSparcAsmParser.lib
+			LLVMSparcAsmPrinter.lib
+			LLVMSparcCodeGen.lib
+			LLVMSparcDesc.lib
+			LLVMSparcDisassembler.lib
+			LLVMSparcInfo.lib
+			LLVMSupport.lib
+			LLVMSymbolize.lib
+			LLVMSystemZAsmParser.lib
+			LLVMSystemZAsmPrinter.lib
+			LLVMSystemZCodeGen.lib
+			LLVMSystemZDesc.lib
+			LLVMSystemZDisassembler.lib
+			LLVMSystemZInfo.lib
+			LLVMTableGen.lib
+			LLVMTarget.lib
+			LLVMTextAPI.lib
+			LLVMTransformUtils.lib
+			LLVMVectorize.lib
+			LLVMWebAssemblyAsmParser.lib
+			LLVMWebAssemblyAsmPrinter.lib
+			LLVMWebAssemblyCodeGen.lib
+			LLVMWebAssemblyDesc.lib
+			LLVMWebAssemblyDisassembler.lib
+			LLVMWebAssemblyInfo.lib
+			LLVMWindowsManifest.lib
+			LLVMX86AsmParser.lib
+			LLVMX86AsmPrinter.lib
+			LLVMX86CodeGen.lib
+			LLVMX86Desc.lib
+			LLVMX86Disassembler.lib
+			LLVMX86Info.lib
+			LLVMX86Utils.lib
+			LLVMXCoreAsmPrinter.lib
+			LLVMXCoreCodeGen.lib
+			LLVMXCoreDesc.lib
+			LLVMXCoreDisassembler.lib
+			LLVMXCoreInfo.lib
+			LLVMXRay.lib
+		)
+	elseif(LLVM_VERSION STREQUAL "6.0.0")
 		SET(LLVM_LIBS
 			LLVMAArch64AsmParser.lib
 			LLVMAArch64AsmPrinter.lib

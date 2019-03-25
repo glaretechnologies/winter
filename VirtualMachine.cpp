@@ -2211,6 +2211,9 @@ void VirtualMachine::compileToNativeAssembly(llvm::Module* mod, const std::strin
 	if (this->target_machine->addPassesToEmitFile(
 		pm, 
 		raw_out,
+#if TARGET_LLVM_VERSION >= 80
+		NULL,
+#endif
 		llvm::TargetMachine::CGFT_AssemblyFile
 	))
 		throw Winter::BaseException("Unable to emit assembly file!");

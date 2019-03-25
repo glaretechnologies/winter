@@ -1,10 +1,9 @@
 /*=====================================================================
-LLVMTypeUtils.cpp
--------------------
-Copyright Glare Technologies Limited 2010 -
-Generated at Wed Oct 20 15:22:37 +1300 2010
+LLVMUtils.cpp
+-------------
+Copyright Glare Technologies Limited 2019 -
 =====================================================================*/
-#include "LLVMTypeUtils.h"
+#include "LLVMUtils.h"
 
 
 #include "wnt_ASTNode.h"
@@ -93,9 +92,7 @@ void createCollectionCopy(const TypeVRef& collection_type, llvm::Value* dest_ptr
 		llvm::Type* llvm_type = collection_type->LLVMType(*params.module);
 		const uint64_t size_B = params.target_data->getTypeAllocSize(llvm_type);
 		llvm::Value* size = llvm::ConstantInt::get(*params.context, llvm::APInt(64, size_B, /*signed=*/false));
-		params.builder->CreateMemCpy(dest_ptr, src_ptr, size,
-			type_alignment // align
-		);
+		createMemCpy(params.builder, dest_ptr, src_ptr, size, /*align=*/type_alignment);
 	}
 	else
 	{

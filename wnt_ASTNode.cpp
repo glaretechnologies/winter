@@ -1281,7 +1281,11 @@ llvm::Value* StringLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 		// Emit a memcpy from the global data to the string value
 		llvm::Value* data_ptr = LLVMUtils::createStructGEP(params.builder, string_value, 3, "string_literal_data_ptr");
 
+#if TARGET_LLVM_VERSION >= 80
+		params.builder->CreateMemCpy(/*dst=*/data_ptr, /*dst align=*/1, /*src=*/elem_0, /*src align=*/1, /*size=*/value.size());
+#else
 		params.builder->CreateMemCpy(data_ptr, elem_0, value.size(), /*align=*/1);
+#endif
 
 		initial_flags = 0; // flag = 0 = not heap allocated
 	}

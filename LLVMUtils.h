@@ -1,7 +1,7 @@
 /*=====================================================================
 LLVMUtils.h
 -----------
-Copyright Glare Technologies Limited 2018 -
+Copyright Glare Technologies Limited 2019 -
 =====================================================================*/
 #pragma once
 
@@ -51,6 +51,16 @@ llvm::Value* createStructGEP(llvm::IRBuilder<true, llvm::ConstantFolder, llvm::I
 
 
 void createCollectionCopy(const TypeVRef& collection_type, llvm::Value* dest_ptr, llvm::Value* src_ptr, EmitLLVMCodeParams& params);
+
+template <class Builder>
+inline void createMemCpy(Builder* builder, llvm::Value* dest_ptr, llvm::Value* src_ptr, llvm::Value* size, unsigned int alignment)
+{
+#if TARGET_LLVM_VERSION >= 80
+	builder->CreateMemCpy(dest_ptr, /*dst align=*/alignment, /*src=*/src_ptr, /*src align=*/alignment, /*size=*/size);
+#else
+	builder->CreateMemCpy(dest_ptr, src_ptr, size, /*align=*/alignment);
+#endif
+}
 
 
 }; // end namespace LLVMUtils
