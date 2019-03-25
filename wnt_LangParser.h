@@ -37,6 +37,7 @@ public:
 		std::vector<ASTNodeRef>& top_level_defs_,
 		int order_num_) 
 		: i(0), tokens(tokens_), named_types(named_types_), top_level_defs(top_level_defs_), order_num(order_num_)/*, else_token_present(false)*/ {}
+	
 	const std::vector<Reference<TokenBase> >& tokens;
 	const SourceBuffer* text_buffer;
 	unsigned int i;

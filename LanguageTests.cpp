@@ -1004,7 +1004,7 @@ static void testStringFunctions()
 
 
 	// ===================================================================
-	// Test Escaped characters in char literals
+	// Test escaped characters in char literals
 	// ===================================================================
 	testMainStringArg("def main(string s) string : toString('" + NEWLINE + "')", "hello", "\n"); // \n
 	testMainStringArg("def main(string s) string : toString('" + CRG_RTN + "')", "hello", "\r"); // \r
@@ -4260,8 +4260,7 @@ static void testStructs()
 
 
 static void testVectors()
-{
-	
+{	
 	// Test vector
 	testMainFloat("	def main() float : \
 					let x = [1.0, 2.0, 3.0, 4.0]v in\
@@ -5535,7 +5534,7 @@ void LanguageTests::run()
 	testMainFloatArgInvalidProgram("def f(array<int, 4> a, int i) int : if inBounds(a, i) elem(a, i) else 0       def main(int i) int : f([1, 2, 3]a, i)");
 
 
-	// This function has special static global variabl-creating mem-leaking powers.
+	// This function has special static global variable-creating mem-leaking powers.
 	testMainFloatArg(
 		"def expensiveA(float x) float : cos(x * 0.456 + cos(x))			\n\
 		def expensiveB(float x) float : sin(x * 0.345 + sin(x))			\n\
