@@ -1538,9 +1538,21 @@ GetSpaceBoundResults FunctionDefinition::getSpaceBound(GetSpaceBoundParams& para
 
 	use_stack_size += sizeof(void*);// The call instruction pushes the return address onto the stack.
 	// Consider this space part of the stack used by functions.
+
+#if defined(__linux__)
+	// On Linux, leaf functions may use the 128 byte region below RSP, called the 'red zone'.
+	// See https://bugs.llvm.org/show_bug.cgi?id=41193 and https://en.wikipedia.org/wiki/Red_zone_(computing)
+	// This extra space is not reported by LLVM currently (as of LLVM 8.0.0), so we need to add it manually.
+	// Since this only applies to the leaf function, only add this extra 128 bytes once.
+	if(params.is_root_function)
+		use_stack_size += 128;
+#endif // defined(__linux__)
+
 #else
 	const size_t use_stack_size = 512;
 #endif
+
+	params.is_root_function = false;
 
 	if(built_in_func_impl.nonNull())
 	{

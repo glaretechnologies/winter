@@ -294,13 +294,16 @@ struct GetTimeBoundParams
 
 struct GetSpaceBoundParams
 {
-	GetSpaceBoundParams() : max_bound_computation_steps(1 << 22), steps(0) {}
+	GetSpaceBoundParams() : max_bound_computation_steps(1 << 22), steps(0), is_root_function(true) {}
 
 	// Maximum number of 'steps' (function call expressions encountered currently) to allow when computing the bound,
 	// before the computation is terminated and an exception thrown.
 	size_t max_bound_computation_steps;
 
 	size_t steps;
+
+	bool is_root_function; // Is this the first function for which getSpaceBound() is called on?
+	// (or has getSpaceBound() been called on a function def via a function expression)
 };
 
 
