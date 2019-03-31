@@ -2719,39 +2719,39 @@ static void testMathsFunctions()
 
 	// Test floatNaN
 	{
-		testMainFloatArg("def main(float x) float : isNAN((x != 0.f) ? floatNaN() : x) ? 1.0f : 2.0f",
+		testMainFloatArg("def main(float x) float : isNaN((x != 0.f) ? floatNaN() : x) ? 1.0f : 2.0f",
 			3.0f, 1.0f, INCLUDE_EXTERNAL_MATHS_FUNCS);
 
 		// Test with DISABLE_CONSTANT_FOLDING, otherwise the call to floatNaN() will be removed.
-		testMainFloatArg("def main(float x) float : isNAN((x != 0.f) ? floatNaN() : x) ? 1.0f : 2.0f",
+		testMainFloatArg("def main(float x) float : isNaN((x != 0.f) ? floatNaN() : x) ? 1.0f : 2.0f",
 			3.0f, 1.0f, INCLUDE_EXTERNAL_MATHS_FUNCS | DISABLE_CONSTANT_FOLDING);
 
 		testMainFloatArg("def f(float x) !noinline float : (x != 0.f) ? floatNaN() : x           \n"
-			"def main(float x) float : isNAN(f(x)) ? 1.0f : 2.0f",
+			"def main(float x) float : isNaN(f(x)) ? 1.0f : 2.0f",
 			3.0f, 1.0f, INCLUDE_EXTERNAL_MATHS_FUNCS);
 	}
 
 	// Test doubleNaN
 	{
-		testMainDoubleArg("def main(double x) double : isNAN((x != 0.0) ? doubleNaN() : x) ? 1.0 : 2.0",
+		testMainDoubleArg("def main(double x) double : isNaN((x != 0.0) ? doubleNaN() : x) ? 1.0 : 2.0",
 			3.0, 1.0, INCLUDE_EXTERNAL_MATHS_FUNCS);
 
-		testMainDoubleArg("def main(double x) double : isNAN((x != 0.0) ? doubleNaN() : x) ? 1.0 : 2.0",
+		testMainDoubleArg("def main(double x) double : isNaN((x != 0.0) ? doubleNaN() : x) ? 1.0 : 2.0",
 			3.0, 1.0, INCLUDE_EXTERNAL_MATHS_FUNCS | DISABLE_CONSTANT_FOLDING);
 	}
 
 	// Test realNaN
 	{
-		testMainFloatArg("def main(real x) real : isNAN((x != 0.0) ? realNaN() : x) ? 1.0 : 2.0",
+		testMainFloatArg("def main(real x) real : isNaN((x != 0.0) ? realNaN() : x) ? 1.0 : 2.0",
 			3.0f, 1.0f, INCLUDE_EXTERNAL_MATHS_FUNCS);
 
-		testMainFloatArg("def main(real x) real : isNAN((x != 0.0) ? realNaN() : x) ? 1.0 : 2.0",
+		testMainFloatArg("def main(real x) real : isNaN((x != 0.0) ? realNaN() : x) ? 1.0 : 2.0",
 			3.0f, 1.0f, INCLUDE_EXTERNAL_MATHS_FUNCS | DISABLE_CONSTANT_FOLDING);
 
-		testMainDoubleArg("def main(real x) real : isNAN((x != 0.0) ? realNaN() : x) ? 1.0 : 2.0",
+		testMainDoubleArg("def main(real x) real : isNaN((x != 0.0) ? realNaN() : x) ? 1.0 : 2.0",
 			3.0, 1.0, INCLUDE_EXTERNAL_MATHS_FUNCS);
 
-		testMainDoubleArg("def main(real x) real : isNAN((x != 0.0) ? realNaN() : x) ? 1.0 : 2.0",
+		testMainDoubleArg("def main(real x) real : isNaN((x != 0.0) ? realNaN() : x) ? 1.0 : 2.0",
 			3.0, 1.0, INCLUDE_EXTERNAL_MATHS_FUNCS | DISABLE_CONSTANT_FOLDING);
 	}
 }
@@ -2837,7 +2837,15 @@ static void testExternalMathsFunctions()
 	testMainFloatArg("def main(float x) float : isFinite(x) ? 1.0 : 0.0", std::numeric_limits<float>::quiet_NaN(), 0.0f, INCLUDE_EXTERNAL_MATHS_FUNCS);
 	testMainDoubleArg("def main(double x) double : isFinite(x) ? 1.0 : 0.0", std::numeric_limits<double>::quiet_NaN(), 0.0, INCLUDE_EXTERNAL_MATHS_FUNCS);
 
-	// isNAN
+	// isNaN (old spelling)
+	testMainFloatArg("def main(float x) float : isNaN(x) ? 1.0 : 0.0", 10.f, 0.0f, INCLUDE_EXTERNAL_MATHS_FUNCS);
+	testMainDoubleArg("def main(double x) double : isNaN(x) ? 1.0 : 0.0", 10, 0.0, INCLUDE_EXTERNAL_MATHS_FUNCS);
+	testMainFloatArg("def main(float x) float : isNaN(x) ? 1.0 : 0.0", std::numeric_limits<float>::infinity(), 0.0f, INCLUDE_EXTERNAL_MATHS_FUNCS);
+	testMainFloatArg("def main(float x) float : isNaN(x) ? 1.0 : 0.0", -std::numeric_limits<float>::infinity(), 0.0f, INCLUDE_EXTERNAL_MATHS_FUNCS);
+	testMainFloatArg("def main(float x) float : isNaN(x) ? 1.0 : 0.0", std::numeric_limits<float>::quiet_NaN(), 1.0f, INCLUDE_EXTERNAL_MATHS_FUNCS);
+	testMainDoubleArg("def main(double x) double : isNaN(x) ? 1.0 : 0.0", std::numeric_limits<double>::quiet_NaN(), 1.0, INCLUDE_EXTERNAL_MATHS_FUNCS);
+
+	// isNAN (old spelling)
 	testMainFloatArg("def main(float x) float : isNAN(x) ? 1.0 : 0.0", 10.f, 0.0f, INCLUDE_EXTERNAL_MATHS_FUNCS);
 	testMainDoubleArg("def main(double x) double : isNAN(x) ? 1.0 : 0.0", 10, 0.0, INCLUDE_EXTERNAL_MATHS_FUNCS);
 	testMainFloatArg("def main(float x) float : isNAN(x) ? 1.0 : 0.0", std::numeric_limits<float>::infinity(), 0.0f, INCLUDE_EXTERNAL_MATHS_FUNCS);

@@ -326,10 +326,31 @@ void MathsFuncs::appendExternalMathsFuncs(std::vector<Winter::ExternalFunctionRe
 		0 // heap size bound
 	));
 
+	// The old function name was isNAN, but isNaN is better.  Keep the old one around for now though.
+	external_functions.push_back(new ExternalFunction(
+		(void*)(bool(*)(float))::isNAN,
+		NULL,
+		FunctionSignature("isNaN", vector<TypeVRef>(1, float_type)),
+		bool_type, // return type
+		10, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
+	));
+
 	external_functions.push_back(new ExternalFunction(
 		(void*)(bool(*)(float))::isNAN,
 		NULL,
 		FunctionSignature("isNAN", vector<TypeVRef>(1, float_type)),
+		bool_type, // return type
+		10, // time_bound
+		MATHS_FUNC_STACK_BOUND, // stack size bound
+		0 // heap size bound
+	));
+
+	external_functions.push_back(new ExternalFunction(
+		(void*)(bool(*)(double))::isNAN,
+		NULL,
+		FunctionSignature("isNaN", vector<TypeVRef>(1, double_type)),
 		bool_type, // return type
 		10, // time_bound
 		MATHS_FUNC_STACK_BOUND, // stack size bound
