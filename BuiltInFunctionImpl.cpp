@@ -4918,6 +4918,8 @@ ValueRef NaNBuiltInFunc::invoke(VMState& vmstate)
 	{
 		return new DoubleValue(std::numeric_limits<double>::quiet_NaN());
 	}
+	else
+		throw BaseException("invalid type.");
 }
 
 
@@ -4927,16 +4929,31 @@ llvm::Value* NaNBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	{
 		return llvm::ConstantFP::get(
 			*params.context,
-			llvm::APFloat::getNaN(llvm::APFloat::IEEEsingle())
+			llvm::APFloat::getNaN(
+#if LLVM_VERSION >= 60
+				llvm::APFloat::IEEEsingle()
+#else
+				llvm::APFloat::IEEEsingle
+#endif
+			)
 		);
 	}
 	else if(type->getType() == Type::DoubleType)
 	{
 		return llvm::ConstantFP::get(
 			*params.context,
-			llvm::APFloat::getNaN(llvm::APFloat::IEEEdouble())
+			llvm::APFloat::getNaN(
+#if LLVM_VERSION >= 60
+				llvm::APFloat::IEEEdouble()
+#else
+				llvm::APFloat::IEEEdouble
+#endif
+			)
+
 		);
 	}
+	else
+		throw BaseException("invalid type.");
 }
 
 

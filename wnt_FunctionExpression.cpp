@@ -173,6 +173,7 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 			}
 		}
 
+		// Else call the interpreted function.
 		vector<ValueRef> args;
 		for(unsigned int i=0; i<this->argument_expressions.size(); ++i)
 			args.push_back(this->argument_expressions[i]->exec(vmstate));
