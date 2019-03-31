@@ -59,7 +59,7 @@ class VMConstructionArgs
 public:
 	VMConstructionArgs() : allow_unsafe_operations(false), emit_trace_code(false), build_llvm_code(true), floating_point_literals_default_to_double(true), 
 		try_coerce_int_to_double_first(true), real_is_double(true), opencl_double_support(true), comments_in_opencl_output(true), emit_in_bound_asserts(false), emit_opencl_printf_calls(true),
-		small_code_model(false) {}
+		small_code_model(false), do_constant_folding(true) {}
 
 	std::vector<ExternalFunctionRef> external_functions;
 	std::vector<SourceBufferRef> source_buffers;
@@ -95,6 +95,8 @@ public:
 
 	// If true, the small code model for code generation is used.
 	bool small_code_model; // False by default.
+
+	bool do_constant_folding; // A compiler optimisation.  True by default.  Can be disabled for testing purposed.
 };
 
 

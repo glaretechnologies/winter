@@ -4902,6 +4902,60 @@ GetSpaceBoundResults CompareEqualBuiltInFunc::getSpaceBound(GetSpaceBoundParams&
 //----------------------------------------------------------------------------------------------
 
 
+NaNBuiltInFunc::NaNBuiltInFunc(const TypeVRef& type_)
+:	BuiltInFunctionImpl(BuiltInType_NaNBuiltInFunc),
+	type(type_)
+{}
+
+
+ValueRef NaNBuiltInFunc::invoke(VMState& vmstate)
+{
+	if(type->getType() == Type::FloatType)
+	{
+		return new FloatValue(std::numeric_limits<float>::quiet_NaN());
+	}
+	else if(type->getType() == Type::DoubleType)
+	{
+		return new DoubleValue(std::numeric_limits<double>::quiet_NaN());
+	}
+}
+
+
+llvm::Value* NaNBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
+{
+	if(type->getType() == Type::FloatType)
+	{
+		return llvm::ConstantFP::get(
+			*params.context,
+			llvm::APFloat::getNaN(llvm::APFloat::IEEEsingle())
+		);
+	}
+	else if(type->getType() == Type::DoubleType)
+	{
+		return llvm::ConstantFP::get(
+			*params.context,
+			llvm::APFloat::getNaN(llvm::APFloat::IEEEdouble())
+		);
+	}
+}
+
+
+size_t NaNBuiltInFunc::getTimeBound(GetTimeBoundParams& params) const
+{
+	return 1;
+}
+
+
+GetSpaceBoundResults NaNBuiltInFunc::getSpaceBound(GetSpaceBoundParams& params) const
+{
+	return GetSpaceBoundResults(0, 0);
+}
+
+
+//----------------------------------------------------------------------------------------------
+
+
+
 //ValueRef AllocateRefCountedStructure::invoke(VMState& vmstate)
 //{
 //	assert(0);

@@ -19,6 +19,7 @@ const uint32 ALLOW_UNSAFE					= 2;
 const uint32 ALLOW_TIME_BOUND_FAILURE		= 4;
 const uint32 ALLOW_SPACE_BOUND_FAILURE		= 8;
 const uint32 INCLUDE_EXTERNAL_MATHS_FUNCS	= 32;
+const uint32 DISABLE_CONSTANT_FOLDING		= 64;
 
 
 struct TestResults

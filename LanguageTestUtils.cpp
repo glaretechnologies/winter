@@ -292,6 +292,8 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 		vm_args.try_coerce_int_to_double_first = false;
 		vm_args.real_is_double = false;
 		vm_args.opencl_double_support = false; // This will allow this test to run on an OpenCL device without double fp support.
+		if(test_flags & DISABLE_CONSTANT_FOLDING)
+			vm_args.do_constant_folding = false;
 
 		if(test_flags & INCLUDE_EXTERNAL_MATHS_FUNCS)
 			MathsFuncs::appendExternalMathsFuncs(vm_args.external_functions);
@@ -536,7 +538,8 @@ size_t getTimeBoundForMainFloatArg(const std::string& src, uint32 test_flags)
 		vm_args.floating_point_literals_default_to_double = false;
 		vm_args.try_coerce_int_to_double_first = false;
 		vm_args.real_is_double = false;
-
+		if(test_flags & DISABLE_CONSTANT_FOLDING)
+			vm_args.do_constant_folding = false;
 		if(test_flags & INCLUDE_EXTERNAL_MATHS_FUNCS)
 			MathsFuncs::appendExternalMathsFuncs(vm_args.external_functions);
 
@@ -578,6 +581,8 @@ void testTimeBoundInvalidForMainFloatArg(const std::string& src, uint32 test_fla
 		vm_args.floating_point_literals_default_to_double = false;
 		vm_args.try_coerce_int_to_double_first = false;
 		vm_args.real_is_double = false;
+		if(test_flags & DISABLE_CONSTANT_FOLDING)
+			vm_args.do_constant_folding = false;
 
 		if(test_flags & INCLUDE_EXTERNAL_MATHS_FUNCS)
 			MathsFuncs::appendExternalMathsFuncs(vm_args.external_functions);
@@ -627,6 +632,8 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 		vm_args.floating_point_literals_default_to_double = true;
 		vm_args.real_is_double = true;
 		vm_args.opencl_double_support = true;
+		if(test_flags & DISABLE_CONSTANT_FOLDING)
+			vm_args.do_constant_folding = false;
 
 		if(test_flags & INCLUDE_EXTERNAL_MATHS_FUNCS)
 			MathsFuncs::appendExternalMathsFuncs(vm_args.external_functions);
@@ -903,6 +910,8 @@ void testMainStringArg(const std::string& src, const std::string& arg, const std
 		VMConstructionArgs vm_args;
 		vm_args.allow_unsafe_operations = (test_flags & ALLOW_UNSAFE) != 0;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
+		if(test_flags & DISABLE_CONSTANT_FOLDING)
+			vm_args.do_constant_folding = false;
 
 		const FunctionSignature mainsig("main", std::vector<TypeVRef>(1, new String()));
 
@@ -1026,6 +1035,8 @@ TestResults testMainIntegerArg(const std::string& src, int x, int target_return_
 		vm_args.allow_unsafe_operations = (test_flags & ALLOW_UNSAFE) != 0;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
 		vm_args.opencl_double_support = false; // This will allow this test to run on an OpenCL device without double fp support.
+		if(test_flags & DISABLE_CONSTANT_FOLDING)
+			vm_args.do_constant_folding = false;
 
 		if(test_flags & INCLUDE_EXTERNAL_MATHS_FUNCS)
 			MathsFuncs::appendExternalMathsFuncs(vm_args.external_functions);
@@ -1170,6 +1181,8 @@ void testMainInt64Arg(const std::string& src, int64 x, int64 target_return_val, 
 		VMConstructionArgs vm_args;
 		vm_args.allow_unsafe_operations = (test_flags & ALLOW_UNSAFE) != 0;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
+		if(test_flags & DISABLE_CONSTANT_FOLDING)
+			vm_args.do_constant_folding = false;
 
 		const FunctionSignature mainsig("main", std::vector<TypeVRef>(1, new Int(64)));
 
@@ -1277,6 +1290,8 @@ void testMainInt16Arg(const std::string& src, int16 x, int16 target_return_val, 
 		VMConstructionArgs vm_args;
 		vm_args.allow_unsafe_operations = (test_flags & ALLOW_UNSAFE) != 0;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
+		if(test_flags & DISABLE_CONSTANT_FOLDING)
+			vm_args.do_constant_folding = false;
 
 		const FunctionSignature mainsig("main", std::vector<TypeVRef>(1, new Int(16)));
 
@@ -1331,6 +1346,8 @@ void testMainUInt32Arg(const std::string& src, uint32 x, uint32 target_return_va
 		VMConstructionArgs vm_args;
 		vm_args.allow_unsafe_operations = (test_flags & ALLOW_UNSAFE) != 0;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
+		if(test_flags & DISABLE_CONSTANT_FOLDING)
+			vm_args.do_constant_folding = false;
 
 		const FunctionSignature mainsig("main", std::vector<TypeVRef>(1, new Int(32, false)));
 
@@ -1385,6 +1402,9 @@ void testMainBoolArg(const std::string& src, bool x, bool target_return_val, uin
 		VMConstructionArgs vm_args;
 		vm_args.allow_unsafe_operations = (test_flags & ALLOW_UNSAFE) != 0;
 		vm_args.source_buffers.push_back(new SourceBuffer("buffer", src));
+		if(test_flags & DISABLE_CONSTANT_FOLDING)
+			vm_args.do_constant_folding = false;
+
 		const FunctionSignature mainsig("main", std::vector<TypeVRef>(1, new Bool()));
 		vm_args.entry_point_sigs.push_back(mainsig);
 		VirtualMachine vm(vm_args);
@@ -1994,6 +2014,8 @@ void testIntArray(const std::string& src, const int* a, const int* b, const int*
 		VMConstructionArgs vm_args;
 		vm_args.allow_unsafe_operations = (test_flags & ALLOW_UNSAFE) != 0;
 		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer("buffer", src)));
+		if(test_flags & DISABLE_CONSTANT_FOLDING)
+			vm_args.do_constant_folding = false;
 
 		// Get main function
 		const FunctionSignature mainsig(

@@ -64,7 +64,8 @@ public:
 		BuiltInType_ToInt32BuiltInFunc,
 		BuiltInType_VoidPtrToInt64BuiltInFunc,
 		BuiltInType_LengthBuiltInFunc,
-		BuiltInType_CompareEqualBuiltInFunc
+		BuiltInType_CompareEqualBuiltInFunc,
+		BuiltInType_NaNBuiltInFunc
 	};
 
 	BuiltInFunctionImpl(BuiltInFunctionImplType builtin_type_) : builtin_type(builtin_type_) {}
@@ -760,6 +761,20 @@ public:
 
 	TypeVRef arg_type;
 	bool is_compare_not_equal;
+};
+
+
+class NaNBuiltInFunc : public BuiltInFunctionImpl
+{
+public:
+	NaNBuiltInFunc(const TypeVRef& type_);
+
+	virtual ValueRef invoke(VMState& vmstate);
+	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params) const;
+	virtual size_t getTimeBound(GetTimeBoundParams& params) const;
+	virtual GetSpaceBoundResults getSpaceBound(GetSpaceBoundParams& params) const;
+
+	TypeVRef type;
 };
 
 

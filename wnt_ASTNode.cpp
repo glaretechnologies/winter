@@ -820,7 +820,10 @@ std::string FloatLiteral::sourceString() const
 
 std::string FloatLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
-	return floatLiteralString(this->value);
+	if(isNAN(this->value))
+		return "nan((uint)0)";
+	else
+		return floatLiteralString(this->value);
 }
 
 
@@ -865,7 +868,10 @@ std::string DoubleLiteral::sourceString() const
 
 std::string DoubleLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
-	return doubleLiteralString(this->value);
+	if(isNAN(this->value))
+		return "nan((ulong)0)";
+	else
+		return doubleLiteralString(this->value);
 }
 
 

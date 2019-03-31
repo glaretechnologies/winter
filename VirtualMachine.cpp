@@ -1122,12 +1122,13 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		append(func_defs, linker.concrete_funcs);
 		linker.concrete_funcs.resize(0);
 	}*/
-	
+
 	while(true)
 	{
 		bool tree_changed = false;
 		
 		// Do Constant Folding
+		if(args.do_constant_folding)
 		{
 			std::vector<ASTNode*> stack;
 			TraversalPayload payload(TraversalPayload::ComputeCanConstantFold);
@@ -1999,7 +2000,7 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 		}
 
 	// Add some Winter built-in functions.  TODO: move this stuff some place better?
-	std::string built_in_func_code = 
+	std::string built_in_func_code =
 		"// Winter built-in functions \n"
 		"float toFloat_int_(int x) { return (float)x; } \n"
 		"float toFloat_uint_(uint x) { return (float)x; } \n"
@@ -2013,6 +2014,7 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 		"float mod_float__float_(float x, float y) { if(x < 0) { const float z = y - fmod(-x, y); return z == y ? 0.f : z; } else return fmod(x, y); }     \n"
 		"int mod_int__int_(int x, int y) { return (unsigned int)x % y; }        \n"
 		"float _frem__float__float_(float x, float y) { return fmod(x, y); }        \n"
+		"float floatNaN__() { return nan((uint)0); }		\n"
 		"float dot1_vector_float__2___vector_float__2__(float2 a, float2 b) { return a.x * b.x; } \n"
 		"float dot2_vector_float__2___vector_float__2__(float2 a, float2 b) { return a.x * b.x + a.y * b.y; } \n"
 		"float dot1_vector_float__4___vector_float__4__(float4 a, float4 b) { return a.x * b.x; } \n"
@@ -2054,6 +2056,7 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 			"double _frem__double__double_(double x, double y) { return fmod(x, y); }        \n"
 			"bool isFinite_double_(double x) { return isfinite(x); }		\n"
 			"bool isNAN_double_(double x) { return isnan(x); }		\n"
+			"float doubleNaN__() { return nan((ulong)0); }		\n"
 			"double dot1_vector_double__2___vector_double__2__(double2 a, double2 b) { return a.x * b.x; } \n"
 			"double dot2_vector_double__2___vector_double__2__(double2 a, double2 b) { return a.x * b.x + a.y * b.y; } \n"
 			"double dot1_vector_double__4___vector_double__4__(double4 a, double4 b) { return a.x * b.x; } \n"
@@ -2105,10 +2108,14 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 	if(vm_args.real_is_double)
 	{
 		if(vm_args.opencl_double_support)
-			built_in_func_code += "double toReal_int_(int x) { return (double)x; } \n";
+			built_in_func_code += 
+				"double toReal_int_(int x) { return (double)x; }	\n"
+				"double realNaN__() { return nan((ulong)0); }		\n";
 	}
 	else
-		built_in_func_code += "float toReal_int_(int x) { return (float)x; } \n";
+		built_in_func_code += 
+			"float toReal_int_(int x) { return (float)x; }	\n"
+			"float realNaN__() { return nan((uint)0); }		\n";
 
 	built_in_func_code += "// End Winter built-in functions\n";
 

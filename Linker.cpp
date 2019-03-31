@@ -285,7 +285,69 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 	}
 
 	
-	if(sig.param_types.size() == 1)
+	if(sig.param_types.size() == 0)
+	{
+		if(sig.name == "floatNaN")
+		{
+			FunctionDefinitionRef def = new FunctionDefinition(
+				SrcLocation::invalidLocation(),
+				-1, // order number
+				sig.name, // name
+				std::vector<FunctionDefinition::FunctionArg>(), // args
+				NULL, // body expr
+				new Float(), // return type
+				new NaNBuiltInFunc(new Float()) // built in impl.
+			);
+			this->sig_to_function_map.insert(std::make_pair(sig, def));
+			return def;
+		}
+		if(sig.name == "doubleNaN")
+		{
+			FunctionDefinitionRef def = new FunctionDefinition(
+				SrcLocation::invalidLocation(),
+				-1, // order number
+				sig.name, // name
+				std::vector<FunctionDefinition::FunctionArg>(), // args
+				NULL, // body expr
+				new Double(), // return type
+				new NaNBuiltInFunc(new Double()) // built in impl.
+			);
+			this->sig_to_function_map.insert(std::make_pair(sig, def));
+			return def;
+		}
+		if(sig.name == "realNaN")
+		{
+			if(real_is_double)
+			{
+				FunctionDefinitionRef def = new FunctionDefinition(
+					SrcLocation::invalidLocation(),
+					-1, // order number
+					sig.name, // name
+					std::vector<FunctionDefinition::FunctionArg>(), // args
+					NULL, // body expr
+					new Double(), // return type
+					new NaNBuiltInFunc(new Double()) // built in impl.
+				);
+				this->sig_to_function_map.insert(std::make_pair(sig, def));
+				return def;
+			}
+			else
+			{
+				FunctionDefinitionRef def = new FunctionDefinition(
+					SrcLocation::invalidLocation(),
+					-1, // order number
+					sig.name, // name
+					std::vector<FunctionDefinition::FunctionArg>(), // args
+					NULL, // body expr
+					new Float(), // return type
+					new NaNBuiltInFunc(new Float()) // built in impl.
+				);
+				this->sig_to_function_map.insert(std::make_pair(sig, def));
+				return def;
+			}
+		}
+	}
+	else if(sig.param_types.size() == 1)
 	{
 		// Handle float->float, or vector<float, N> -> vector<float, N> functions
 		if(sig.param_types[0]->getType() == Type::FloatType || sig.param_types[0]->getType() == Type::DoubleType || // if float or double

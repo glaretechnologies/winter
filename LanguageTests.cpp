@@ -2716,6 +2716,44 @@ static void testMathsFunctions()
 			a, b, target_result
 		);
 	}
+
+	// Test floatNaN
+	{
+		testMainFloatArg("def main(float x) float : isNAN((x != 0.f) ? floatNaN() : x) ? 1.0f : 2.0f",
+			3.0f, 1.0f, INCLUDE_EXTERNAL_MATHS_FUNCS);
+
+		// Test with DISABLE_CONSTANT_FOLDING, otherwise the call to floatNaN() will be removed.
+		testMainFloatArg("def main(float x) float : isNAN((x != 0.f) ? floatNaN() : x) ? 1.0f : 2.0f",
+			3.0f, 1.0f, INCLUDE_EXTERNAL_MATHS_FUNCS | DISABLE_CONSTANT_FOLDING);
+
+		testMainFloatArg("def f(float x) !noinline float : (x != 0.f) ? floatNaN() : x           \n"
+			"def main(float x) float : isNAN(f(x)) ? 1.0f : 2.0f",
+			3.0f, 1.0f, INCLUDE_EXTERNAL_MATHS_FUNCS);
+	}
+
+	// Test doubleNaN
+	{
+		testMainDoubleArg("def main(double x) double : isNAN((x != 0.0) ? doubleNaN() : x) ? 1.0 : 2.0",
+			3.0, 1.0, INCLUDE_EXTERNAL_MATHS_FUNCS);
+
+		testMainDoubleArg("def main(double x) double : isNAN((x != 0.0) ? doubleNaN() : x) ? 1.0 : 2.0",
+			3.0, 1.0, INCLUDE_EXTERNAL_MATHS_FUNCS | DISABLE_CONSTANT_FOLDING);
+	}
+
+	// Test realNaN
+	{
+		testMainFloatArg("def main(real x) real : isNAN((x != 0.0) ? realNaN() : x) ? 1.0 : 2.0",
+			3.0f, 1.0f, INCLUDE_EXTERNAL_MATHS_FUNCS);
+
+		testMainFloatArg("def main(real x) real : isNAN((x != 0.0) ? realNaN() : x) ? 1.0 : 2.0",
+			3.0f, 1.0f, INCLUDE_EXTERNAL_MATHS_FUNCS | DISABLE_CONSTANT_FOLDING);
+
+		testMainDoubleArg("def main(real x) real : isNAN((x != 0.0) ? realNaN() : x) ? 1.0 : 2.0",
+			3.0, 1.0, INCLUDE_EXTERNAL_MATHS_FUNCS);
+
+		testMainDoubleArg("def main(real x) real : isNAN((x != 0.0) ? realNaN() : x) ? 1.0 : 2.0",
+			3.0, 1.0, INCLUDE_EXTERNAL_MATHS_FUNCS | DISABLE_CONSTANT_FOLDING);
+	}
 }
 
 
