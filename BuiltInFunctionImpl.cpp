@@ -4930,7 +4930,7 @@ llvm::Value* NaNBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 		return llvm::ConstantFP::get(
 			*params.context,
 			llvm::APFloat::getNaN(
-#if LLVM_VERSION >= 60
+#if TARGET_LLVM_VERSION >= 60
 				llvm::APFloat::IEEEsingle()
 #else
 				llvm::APFloat::IEEEsingle
@@ -4943,7 +4943,7 @@ llvm::Value* NaNBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 		return llvm::ConstantFP::get(
 			*params.context,
 			llvm::APFloat::getNaN(
-#if LLVM_VERSION >= 60
+#if TARGET_LLVM_VERSION >= 60
 				llvm::APFloat::IEEEdouble()
 #else
 				llvm::APFloat::IEEEdouble
