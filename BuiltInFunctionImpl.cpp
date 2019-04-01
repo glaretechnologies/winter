@@ -4949,7 +4949,6 @@ llvm::Value* NaNBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 				llvm::APFloat::IEEEdouble
 #endif
 			)
-
 		);
 	}
 	else
