@@ -35,8 +35,9 @@
 
 #if !defined(OSX) // Current Mac builder has a defective GPU, skip tests that may run on GPU.
 #define WINTER_OPENCL_TESTS 1
-#endif
 static const bool DUMP_OPENCL_C_SOURCE = false; // Dumps to opencl_source.c
+#endif
+
 static const bool PRINT_MEM_BOUNDS_AND_USAGE = false;
 
 
