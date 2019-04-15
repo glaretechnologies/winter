@@ -146,7 +146,8 @@ public:
 	int64 llvm_reported_stack_size; // -1 if this information is not returned by LLVM
 
 	// For lambda expressions (anon functions), this is the set of variables defined in the anon function that are free, e.g. bound to a node outside the anon function.
-	std::set<Variable*> free_variables;
+	typedef std::set<Variable*> FreeVariableSet;
+	FreeVariableSet free_variables;
 
 	// Types that are captured by any lambda expressions in this function definition, e.g. types of any free variables.
 	std::set<TypeRef> captured_var_types;

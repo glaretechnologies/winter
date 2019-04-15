@@ -1611,7 +1611,7 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 #endif
 		this->llvm_module->print(f, NULL);
 
-		conPrint("Dumped unoptimised module IR to 'unoptimised_module_IR.txt'.");
+		conPrint("Dumped unoptimised module IR to '" + PlatformUtils::getCurrentWorkingDirPath() + "/unoptimised_module_IR.txt'.");
 	}
 
 	verifyModule(this->llvm_module);

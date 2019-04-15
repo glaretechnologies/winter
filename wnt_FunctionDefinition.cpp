@@ -1674,10 +1674,35 @@ int FunctionDefinition::getCapturedVarStructLLVMArgIndex()
 
 // Computes a list of free variables, but discards variables that are bound to the same AST node.
 // This is used so we only need to capture a variable once, even if it is referenced multiple times in a closure.
-static void computeUniqueFreeVarList(const std::set<Variable*>& free_variables, 
+static void computeUniqueFreeVarList(const FunctionDefinition::FreeVariableSet& free_variables,
 	SmallVector<Variable*, 8>& unique_vars_out)
 {
-	for(auto it = free_variables.begin(); it != free_variables.end(); ++it)
+	// We define our own comparison function that uses source location for sorting.
+	// This is slightly dodgy, as is assuming both variables are defined in the same source buffer.
+	// The reason for using a custom comparison function is that just using memory addresses results in semi-random order of the free variables,
+	// and hence semi-random ordering/layout of the captured var struct.  This was leading to a bug where the layout of the captured var struct
+	// was different during different times in the LLVM code emission.
+	struct VariableComparator
+	{
+		inline bool operator() (Variable* a, Variable* b) const
+		{
+			assert(a->srcLocation().isValid() && b->srcLocation().isValid());
+			assert(a->srcLocation().source_buffer == b->srcLocation().source_buffer);
+			return a->srcLocation().char_index < b->srcLocation().char_index;
+		}
+	};
+
+	// Construct free variable vector from free variable set, and sort it based on source location.
+	// NOTE: Should use a range constructor here when have one for SmallVector.
+	SmallVector<Variable*, 8> free_variables_vec(free_variables.size());
+	size_t i = 0;
+	for(auto it = free_variables.begin(); it != free_variables.end(); ++i, ++it)
+	{
+		free_variables_vec[i] = *it;
+	}
+	std::sort(free_variables_vec.begin(), free_variables_vec.end(), VariableComparator());
+
+	for(auto it = free_variables_vec.begin(); it != free_variables_vec.end(); ++it)
 	{
 		Variable* free_var = *it;
 		for(size_t z=0; z<unique_vars_out.size(); ++z)

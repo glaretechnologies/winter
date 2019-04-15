@@ -4157,6 +4157,23 @@ static void testLambdaExpressionsAndClosures()
 								in f()						\n\
 								", 3.f);
 
+	// Test capturing of multiple variables in a lambda that is used more than once.
+	// Note that this doesn't quite test what I wanted to test, which is the lambda being compiled twice
+	// and the captured var struct coming out different due to std::set usage.
+	testMainFloatArg("def func1(float x) !noinline float :		\n\
+		let 										\n\
+			float a = x								\n\
+			int b = truncateToInt(x) + 1			\n\
+		in 											\n\
+			let 									\n\
+				f = \\() !noinline : a + toFloat(b)			\n\
+			in 										\n\
+				f()									\n\
+													\n\
+		def g1(float x) !noinline : func1(x)					\n\
+		def g2(float x) !noinline : func1(x)					\n\
+		def main(float x) float : g1(x) + g2(x)			",
+		1.0f, 6.0f, DISABLE_CONSTANT_FOLDING | ALLOW_SPACE_BOUND_FAILURE | ALLOW_TIME_BOUND_FAILURE | INVALID_OPENCL);
 }
 
 
