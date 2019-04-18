@@ -3724,6 +3724,35 @@ static void testLambdaExpressionsAndClosures()
 	testAssert(results.stats.num_heap_allocation_calls <= 2); // Should be one alloc call for the string, and one for the closure returned from makeFunc()
 
 
+	// Test capturing a struct value (pass-by-pointer but stored in the captured var struct)
+	results = testMainIntegerArg("struct S { int s }						\n\
+					def makeFunc() !noinline function<int, int> :			\n\
+						let													\n\
+							a = S(10)										\n\
+						in													\n\
+							\\(int x) int : x + a.s							\n\
+																			\n\
+					def main(int x) int :									\n\
+						let													\n\
+							f = makeFunc()									\n\
+						in													\n\
+							f(x)", 1, 11, ALLOW_UNSAFE | INVALID_OPENCL);
+
+	// Test capturing an array value (pass-by-pointer but stored in the captured var struct)
+	results = testMainIntegerArg("											\n\
+					def makeFunc() !noinline function<int, int> :			\n\
+						let													\n\
+							ar = [1, 2, 3]a									\n\
+						in													\n\
+							\\(int x) int : x + ar[1]						\n\
+																			\n\
+					def main(int x) int :									\n\
+						let													\n\
+							f = makeFunc()									\n\
+						in													\n\
+							f(x)", 1, 3, ALLOW_UNSAFE | INVALID_OPENCL);
+
+
 
 	// Test escape analyis allowing a closure to be stack-allocated.
 	results = testMainIntegerArg("def main(int x) int :			\n\

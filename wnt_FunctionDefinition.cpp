@@ -811,6 +811,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 	for(auto z = unique_free_vars.begin(); z != unique_free_vars.end(); ++z) // for each captured var
 	{
 		Variable* free_var = *z;
+		TypeVRef cap_var_type_win(free_var->type());
 	
 		llvm::Value* val = NULL;
 
@@ -866,7 +867,6 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			val = params.let_values[let_node];
 
 			// NOTE: This code is duplicated from Variable.  de-duplicate.
-			TypeRef cap_var_type_win = free_var->type();
 
 			if(let_node->vars.size() > 1)
 			{
@@ -892,9 +892,17 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		
 		// store in captured var structure field
 		llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, captured_var_struct_ptr, (unsigned int)free_var_index, "captured_var_" + toString(free_var_index) + "_field_ptr");
-		llvm::StoreInst* store_inst_ = params.builder->CreateStore(val, field_ptr);
 
-		addMetaDataCommentToInstruction(params, store_inst_, "Store captured var " + toString(free_var_index) + " in closure");
+		if(cap_var_type_win->passByValue())
+		{
+			llvm::StoreInst* store_inst_ = params.builder->CreateStore(val, field_ptr);
+			addMetaDataCommentToInstruction(params, store_inst_, "Store captured var " + toString(free_var_index) + " in closure");
+		}
+		else
+		{
+			// For pass-by-pointer types (structures for example), val is just a pointer, and we need to load the structure and then store it in the closure.
+			LLVMUtils::createCollectionCopy(cap_var_type_win, /*dest ptr=*/field_ptr, /*src ptr=*/val, params);
+		}
 
 		// If the captured var is a ref-counted type, we need to increment its reference count, since the struct now holds a reference to it. 
 		captured_var_struct_type->component_types[free_var_index]->emitIncrRefCount(params, val, "Capture var ref count increment");

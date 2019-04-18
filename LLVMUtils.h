@@ -50,15 +50,16 @@ llvm::Value* createStructGEP(llvm::IRBuilder<true, llvm::ConstantFolder, llvm::I
 //llvm::Value* createFieldLoad(llvm::Value* structure_ptr, int field_index, llvm::IRBuilder<>* builder, const llvm::Twine& name);
 
 
-void createCollectionCopy(const TypeVRef& collection_type, llvm::Value* dest_ptr, llvm::Value* src_ptr, EmitLLVMCodeParams& params);
+// Returns store instruction or memcpy
+llvm::Value* createCollectionCopy(const TypeVRef& collection_type, llvm::Value* dest_ptr, llvm::Value* src_ptr, EmitLLVMCodeParams& params);
 
 template <class Builder>
-inline void createMemCpy(Builder* builder, llvm::Value* dest_ptr, llvm::Value* src_ptr, llvm::Value* size, unsigned int alignment)
+inline llvm::Value* createMemCpy(Builder* builder, llvm::Value* dest_ptr, llvm::Value* src_ptr, llvm::Value* size, unsigned int alignment)
 {
 #if TARGET_LLVM_VERSION >= 80
-	builder->CreateMemCpy(dest_ptr, /*dst align=*/alignment, /*src=*/src_ptr, /*src align=*/alignment, /*size=*/size);
+	return builder->CreateMemCpy(dest_ptr, /*dst align=*/alignment, /*src=*/src_ptr, /*src align=*/alignment, /*size=*/size);
 #else
-	builder->CreateMemCpy(dest_ptr, src_ptr, size, /*align=*/alignment);
+	return builder->CreateMemCpy(dest_ptr, src_ptr, size, /*align=*/alignment);
 #endif
 }
 

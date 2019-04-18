@@ -607,7 +607,11 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 
 		llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, cap_var_structure, (unsigned int)free_index);
 
-		llvm::Value* field = params.builder->CreateLoad(field_ptr);
+		// For pass-by-pointer types like struct, all we need is the pointer to the value (which is stored in the captured var struct),
+		// so the GEP pointer is sufficient.
+		llvm::Value* field = this->type()->passByValue() ?
+			params.builder->CreateLoad(field_ptr) :
+			field_ptr;
 
 		// Increment reference count
 		if(params.emit_refcounting_code && shouldRefCount(params, *this))

@@ -73,7 +73,7 @@ llvm::Value* createStructGEP(llvm::IRBuilder<true, llvm::ConstantFolder, llvm::I
 //}
 
 
-void createCollectionCopy(const TypeVRef& collection_type, llvm::Value* dest_ptr, llvm::Value* src_ptr, EmitLLVMCodeParams& params)
+llvm::Value* createCollectionCopy(const TypeVRef& collection_type, llvm::Value* dest_ptr, llvm::Value* src_ptr, EmitLLVMCodeParams& params)
 {
 	//if(collection_type->getType() == Type::ArrayTypeType)
 	//{
@@ -92,11 +92,11 @@ void createCollectionCopy(const TypeVRef& collection_type, llvm::Value* dest_ptr
 		llvm::Type* llvm_type = collection_type->LLVMType(*params.module);
 		const uint64_t size_B = params.target_data->getTypeAllocSize(llvm_type);
 		llvm::Value* size = llvm::ConstantInt::get(*params.context, llvm::APInt(64, size_B, /*signed=*/false));
-		createMemCpy(params.builder, dest_ptr, src_ptr, size, /*align=*/type_alignment);
+		return createMemCpy(params.builder, dest_ptr, src_ptr, size, /*align=*/type_alignment);
 	}
 	else
 	{
-		params.builder->CreateStore(
+		return params.builder->CreateStore(
 			params.builder->CreateLoad(src_ptr),
 			dest_ptr
 		);
