@@ -2586,7 +2586,11 @@ const std::string IterateBuiltInFunc::emitOpenCLForFunctionArg(EmitOpenCLCodePar
 		const auto unique_free_vars = f->getUniqueFreeVarList();
 		for(auto z = unique_free_vars.begin(); z != unique_free_vars.end(); ++z, ++i)
 		{
-			cap_code += "captured_vars_" + toString(use_uid) + ".captured_var_" + toString(i) + " = " + mapOpenCLCVarName(params.opencl_c_keywords, (*z)->name) + ";\n";
+			Variable* var = *z;
+			const bool need_deref = (var->nodeType() == ASTNode::VariableASTNodeType) && (var->binding_type == Variable::BindingType_Argument) && var->type()->OpenCLPassByPointer();
+
+			cap_code += "captured_vars_" + toString(use_uid) + ".captured_var_" + toString(i) + " = " + 
+				(need_deref ? "*" : "") + mapOpenCLCVarName(params.opencl_c_keywords, var->name) + ";\n";
 		}
 		cap_code += "\n";
 		params.blocks.back() += cap_code;

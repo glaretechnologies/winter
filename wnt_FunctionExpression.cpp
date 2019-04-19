@@ -1872,7 +1872,9 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 			throw BaseException("Error while emitting OpenCL C: get field function with != 1 args.");
 
 		//if(argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType && argument_expressions[0].downcastToPtr<Variable>()->vartype == Variable::BindingType_Let)
-		if(argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType && argument_expressions[0].downcastToPtr<Variable>()->binding_type == Variable::BindingType_Argument)
+
+		// If arg 0 is a variable that is bound to an argument, and is not free:
+		if(argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType && (argument_expressions[0].downcastToPtr<Variable>()->binding_type == Variable::BindingType_Argument && argument_expressions[0].downcastToPtr<Variable>()->enclosing_lambdas.empty()))
 			return argument_expressions[0]->emitOpenCLC(params) + "->" + static_function_name;
 		else
 			return argument_expressions[0]->emitOpenCLC(params) + "." + static_function_name;

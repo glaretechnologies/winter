@@ -1714,6 +1714,37 @@ static void testIterate()
 				,																			\n\
 				0																			\n\
 			)", 17, 200);
+
+	// Test where the lambda captures a struct variable.
+	testMainIntegerArg("struct S { int s }													\n\
+		def main(int x) int :																\n\
+		let																					\n\
+			s = S(2)																		\n\
+		in																					\n\
+			iterate(																		\n\
+				\\(int current_state, int iteration) ->										\n\
+					if iteration >= 100														\n\
+						[current_state, false]t # break										\n\
+					else																	\n\
+						[current_state + s.s, true]t										\n\
+				,																			\n\
+				0																			\n\
+			)", 17, 200);
+
+	// Test where the lambda captures a struct variable that is passed in as an arg.
+	testMainIntegerArg("struct S { int s }													\n\
+		def f(int x, S s) !noinline int :																\n\
+			iterate(																		\n\
+				\\(int current_state, int iteration) ->										\n\
+					if iteration >= 100														\n\
+						[current_state, false]t # break										\n\
+					else																	\n\
+						[current_state + s.s, true]t										\n\
+				,																			\n\
+				0																			\n\
+			)																				\n\
+		def main(int x) int : f(x, S(2))													\n\
+		", 17, 200);
 	
 
 	testMainDoubleArg("																	\n\

@@ -9,6 +9,7 @@ Copyright Glare Technologies Limited 2015 -
 #include "wnt_ASTNode.h"
 #include "wnt_SourceBuffer.h"
 #include "wnt_RefCounting.h"
+#include "wnt_Variable.h"
 #include "VMState.h"
 #include "Value.h"
 #include "Linker.h"
@@ -160,7 +161,10 @@ std::string TupleLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 			StringUtils::appendTabbed(s, params.blocks.back(), 1);
 			params.blocks.pop_back();
 
-			s += struct_var_name + ".field_" + toString(i) + " = " + elem_expression + ";\n";
+			const bool need_deref = (this->elements[i]->nodeType() == ASTNode::VariableASTNodeType) && 
+				(this->elements[i].downcastToPtr<Variable>()->binding_type == Variable::BindingType_Argument) && this->elements[i]->type()->OpenCLPassByPointer();
+
+			s += struct_var_name + ".field_" + toString(i) + " = " + (need_deref ? "*" : "") + elem_expression + ";\n";
 		}
 		params.blocks.back() += s;
 
