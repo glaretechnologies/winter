@@ -53,12 +53,12 @@ ArrayLiteral::ArrayLiteral(const std::vector<ASTNodeRef>& elems, const SrcLocati
 	int_suffix(int_suffix_)
 {
 	if(has_int_suffix && int_suffix <= 0)
-		throw BaseException("Array literal int suffix must be > 0." + errorContext(*this));
+		throw ExceptionWithPosition("Array literal int suffix must be > 0.", errorContext(*this));
 	if(has_int_suffix && elems.size() != 1)
-		throw BaseException("Array literal with int suffix must have only one explicit elem." + errorContext(*this));
+		throw ExceptionWithPosition("Array literal with int suffix must have only one explicit elem.", errorContext(*this));
 
 	if(elems.empty())
-		throw BaseException("Array literal can't be empty." + errorContext(*this));
+		throw ExceptionWithPosition("Array literal can't be empty.", errorContext(*this));
 }
 
 
@@ -155,7 +155,7 @@ std::string ArrayLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 	else if(array_type->elem_type->getType() == Type::IntType)
 		s += "int ";
 	else
-		throw BaseException("Array literal must be of int or float type for OpenCL emission currently.");
+		throw ExceptionWithPosition("Array literal must be of int or float type for OpenCL emission currently.", errorContext(this));
 	
 
 	const std::string name = "array_literal_" + toString(params.uid++);
@@ -188,7 +188,7 @@ std::string ArrayLiteral::getFileScopeOpenCLC(EmitOpenCLCodeParams& params, cons
 	else if(array_type->elem_type->getType() == Type::IntType)
 		s += "int ";
 	else
-		throw BaseException("Array literal must be of int or float type for OpenCL emission currently.");
+		throw ExceptionWithPosition("Array literal must be of int or float type for OpenCL emission currently.", errorContext(this));
 	
 
 	const std::string name = varname;
@@ -229,7 +229,7 @@ void ArrayLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 		const TypeRef elem_type = this->elements[0]->type();
 		for(unsigned int i=0; i<this->elements.size(); ++i)
 			if(*elem_type != *this->elements[i]->type())
-				throw BaseException("Array element " + ::toString(i) + " did not have required type " + elem_type->toString() + "." + 
+				throw ExceptionWithPosition("Array element " + ::toString(i) + " did not have required type " + elem_type->toString() + ".",
 				errorContext(*this, payload));
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
@@ -302,7 +302,7 @@ llvm::Value* ArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 		{
 			llvm::Value* element_0_value = this->elements[0]->emitLLVMCode(params);
 			if(!llvm::isa<llvm::Constant>(element_0_value))
-				throw BaseException("Internal error: expected constant.");
+				throw ExceptionWithPosition("Internal error: expected constant.", errorContext(this));
 
 			array_llvm_values.resize(int_suffix);
 			for(int i=0; i<int_suffix; ++i)
@@ -316,7 +316,7 @@ llvm::Value* ArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 			{
 				llvm::Value* element_value = this->elements[i]->emitLLVMCode(params);
 				if(!llvm::isa<llvm::Constant>(element_value))
-					throw BaseException("Internal error: expected constant.");
+					throw ExceptionWithPosition("Internal error: expected constant.", errorContext(this));
 
 				array_llvm_values[i] = static_cast<llvm::Constant*>(element_value);
 			}

@@ -23,10 +23,10 @@ namespace Winter
 {
 
 
-class LangParserExcep : public BaseException
+class LangParserExcep : public ExceptionWithPosition
 {
 public:
-	LangParserExcep(const std::string& text_) : BaseException(text_) {}
+	LangParserExcep(const std::string& text_, const BufferPosition& pos) : ExceptionWithPosition(text_, pos) {}
 };
 
 
@@ -72,9 +72,9 @@ public:
 	static void test();
 
 private:
-	const std::string errorPosition(const SourceBuffer& buffer, size_t pos);
-	const std::string errorPosition(const ParseInfo& parseinfo);
-	const std::string errorPositionPrevToken(ParseInfo& parseinfo);
+	BufferPosition errorPosition(const SourceBuffer& buffer, size_t pos);
+	BufferPosition errorPosition(const ParseInfo& parseinfo);
+	BufferPosition errorPositionPrevToken(ParseInfo& parseinfo);
 
 	const std::string parseIdentifier(const std::string& id_type, ParseInfo& parseinfo);
 	void parseAndCheckIdentifier(const std::string& target_id, ParseInfo& parseinfo);

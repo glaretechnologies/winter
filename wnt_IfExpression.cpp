@@ -113,13 +113,13 @@ void IfExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& st
 	else if(payload.operation == TraversalPayload::TypeCheck)
 	{
 		if(this->condition->type().isNull() || this->then_expr->type().isNull() || this->else_expr->type().isNull())
-			throw BaseException("Unknown type." + errorContext(*this->condition));
+			throw ExceptionWithPosition("Unknown type.", errorContext(*this->condition));
 
 		if(this->condition->type()->getType() != Type::BoolType)
-			throw BaseException("First argument to if expression must have bool type." + errorContext(*this->condition));
+			throw ExceptionWithPosition("First argument to if expression must have bool type.", errorContext(*this->condition));
 
 		if(*this->then_expr->type() != *this->else_expr->type())
-			throw BaseException("Second and third arguments to if expression must have same type." + errorContext(*this->then_expr));
+			throw ExceptionWithPosition("Second and third arguments to if expression must have same type.", errorContext(*this->then_expr));
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{

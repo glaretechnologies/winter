@@ -3065,7 +3065,7 @@ llvm::Value* ShuffleBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 		for(size_t i=0; i<shuffle_mask.size(); ++i)
 		{
 			if(shuffle_mask[i] < 0 || shuffle_mask[i] >= (int)vector_type->num)
-				throw BaseException("Shuffle mask index " + toString(shuffle_mask[i]) + " out of bounds: " + errorContext(params.currently_building_func_def));
+				throw ExceptionWithPosition("Shuffle mask index " + toString(shuffle_mask[i]) + " out of bounds: ", errorContext(params.currently_building_func_def));
 
 			elems[(unsigned int)i] = llvm::ConstantInt::get(
 				*params.context, 

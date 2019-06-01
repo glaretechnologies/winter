@@ -52,12 +52,12 @@ VectorLiteral::VectorLiteral(const std::vector<ASTNodeRef>& elems, const SrcLoca
 	int_suffix(int_suffix_)
 {
 	if(has_int_suffix && int_suffix <= 0)
-		throw BaseException("Vector literal int suffix must be > 0." + errorContext(*this));
+		throw ExceptionWithPosition("Vector literal int suffix must be > 0.", errorContext(*this));
 	if(has_int_suffix && elems.size() != 1)
-		throw BaseException("Vector literal with int suffix must have only one explicit elem." + errorContext(*this));
+		throw ExceptionWithPosition("Vector literal with int suffix must have only one explicit elem.", errorContext(*this));
 
 	if(elems.empty())
-		throw BaseException("Vector literal can't be empty." + errorContext(*this));
+		throw ExceptionWithPosition("Vector literal can't be empty.", errorContext(*this));
 }
 
 
@@ -152,7 +152,7 @@ std::string VectorLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 	// TODO: check vector width is valid for OpenCL C.
 
 	if(!(this->elements[0]->type()->getType() == Type::FloatType || this->elements[0]->type()->getType() == Type::DoubleType || (this->elements[0]->type()->getType() == Type::IntType && this->elements[0]->type().downcastToPtr<Int>()->numBits() == 32)))
-		throw BaseException("Only vectors of float or int32 supported for OpenCL currently.");
+		throw ExceptionWithPosition("Only vectors of float or int32 supported for OpenCL currently.", errorContext(this));
 
 	const std::string elem_typename = this->elements[0]->type()->OpenCLCType();
 	if(has_int_suffix)
@@ -245,16 +245,16 @@ void VectorLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 		// Check all the element expression types match the computed element type.
 		const TypeRef this_type = this->type();
 		if(this_type.isNull() || this_type->getType() != Type::VectorTypeType)
-			throw BaseException("Vector type error." + errorContext(*this, payload));
+			throw ExceptionWithPosition("Vector type error.", errorContext(*this, payload));
 
 		const Type* elem_type = this_type.downcastToPtr<VectorType>()->elem_type.getPointer();
 
 		for(size_t i=0; i<this->elements.size(); ++i)
 			if(*elem_type != *this->elements[i]->type())
-				throw BaseException("Vector element did not have required type " + elem_type->toString() + "." + errorContext(*this->elements[i], payload));
+				throw ExceptionWithPosition("Vector element did not have required type " + elem_type->toString() + ".", errorContext(*this->elements[i], payload));
 
 		if(!(elem_type->getType() == Type::IntType || elem_type->getType() == Type::FloatType || elem_type->getType() == Type::DoubleType))
-			throw BaseException("Vector types can only contain float, double or int elements." + errorContext(*this, payload));
+			throw ExceptionWithPosition("Vector types can only contain float, double or int elements.", errorContext(*this, payload));
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{

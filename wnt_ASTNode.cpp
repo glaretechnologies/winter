@@ -282,7 +282,7 @@ static ASTNodeRef foldExpression(ASTNodeRef& e, TraversalPayload& payload, std::
 	const TypeRef e_type = e->type();
 	assert(e_type.nonNull()); // This should have been checked in checkFoldExpression() etc..
 	if(e_type.isNull())
-		throw BaseException("Internal error: Expression type was null during constant folding.");
+		throw ExceptionWithPosition("Internal error: Expression type was null during constant folding.", errorContext(*e));
 
 	const ASTNodeRef literal_node = makeLiteralASTNodeFromValue(retval, e->srcLocation(), TypeVRef(e_type), payload, stack);
 	return literal_node;
@@ -755,29 +755,47 @@ size_t BufferRoot::getSubtreeCodeComplexity() const
 //----------------------------------------------------------------------------------
 
 
-const std::string errorContext(const ASTNode* n)
+BufferPosition errorContext(const ASTNode* n)
 {
 	return errorContext(*n);
 }
 
 
-const std::string errorContext(const ASTNode& n)
+std::string errorContextString(const ASTNode* n)
 {
-	return errorContext(n.srcLocation());
+	return errorContextString(*n);
 }
 
 
-const std::string errorContext(const SrcLocation& src_location)
+BufferPosition errorContext(const ASTNode& n)
+{
+	return BufferPosition(n.srcLocation().source_buffer, n.srcLocation().char_index, n.srcLocation().len);
+}
+
+
+std::string errorContextString(const ASTNode& n)
+{
+	return Diagnostics::positionString(BufferPosition(n.srcLocation().source_buffer, n.srcLocation().char_index, n.srcLocation().len));
+}
+
+
+BufferPosition errorContext(const SrcLocation& src_location)
+{
+	return BufferPosition(src_location.source_buffer, src_location.char_index, src_location.len);
+}
+
+
+std::string errorContextString(const SrcLocation& src_location)
 {
 	const SourceBuffer* source_buffer = src_location.source_buffer;
 	if(source_buffer == NULL)
 		return "Invalid Location";
 
-	return Diagnostics::positionString(*source_buffer, src_location.char_index);
+	return Diagnostics::positionString(BufferPosition(source_buffer, src_location.char_index, src_location.len));
 }
 
 
-const std::string errorContext(const ASTNode& n, TraversalPayload& payload)
+BufferPosition errorContext(const ASTNode& n, TraversalPayload& payload)
 {
 	return errorContext(n);
 }
@@ -1456,7 +1474,7 @@ public:
 
 
 template <class Op>
-ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
+ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op, const SrcLocation& src_loc)
 {
 	const ValueRef aval = a->exec(vmstate);
 	const ValueRef bval = b->exec(vmstate);
@@ -1485,7 +1503,7 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 				));
 			}
 			else
-				throw BaseException("Invalid types to binary op.");
+				throw ExceptionWithPosition("Invalid types to binary op.", errorContext(src_loc));
 		}
 	case Type::DoubleType:
 		{
@@ -1509,7 +1527,7 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 				));
 			}
 			else
-				throw BaseException("Invalid types to binary op.");
+				throw ExceptionWithPosition("Invalid types to binary op.", errorContext(src_loc));
 		}
 	case Type::IntType:
 		{
@@ -1537,7 +1555,7 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 				);
 			}
 			else
-				throw BaseException("Invalid types to binary op.");
+				throw ExceptionWithPosition("Invalid types to binary op.", errorContext(src_loc));
 		}
 	case Type::VectorTypeType:
 		{
@@ -1555,7 +1573,7 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 					if(b->type()->getType() == Type::VectorTypeType) // Vector<float, N> * vector<float, N>
 					{
 						if(b->type().downcast<VectorType>()->num != vectype->num)
-							throw BaseException("Invalid types to binary op.");
+							throw ExceptionWithPosition("Invalid types to binary op.", errorContext(src_loc));
 
 						const VectorValue* bval_vec = checkedCast<VectorValue>(bval);
 						for(unsigned int i=0; i<elem_values.size(); ++i)
@@ -1574,7 +1592,7 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 					}
 					else
 					{
-						throw BaseException("Invalid types to binary op.");
+						throw ExceptionWithPosition("Invalid types to binary op.", errorContext(src_loc));
 					}
 					break;
 				}
@@ -1583,7 +1601,7 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 					if(b->type()->getType() == Type::VectorTypeType) // Vector<double, N> * vector<double, N>
 					{
 						if(b->type().downcast<VectorType>()->num != vectype->num)
-							throw BaseException("Invalid types to binary op.");
+							throw ExceptionWithPosition("Invalid types to binary op.", errorContext(src_loc));
 
 						const VectorValue* bval_vec = checkedCast<VectorValue>(bval);
 						for(unsigned int i=0; i<elem_values.size(); ++i)
@@ -1602,7 +1620,7 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 					}
 					else
 					{
-						throw BaseException("Invalid types to binary op.");
+						throw ExceptionWithPosition("Invalid types to binary op.", errorContext(src_loc));
 					}
 					break;
 				}
@@ -1613,7 +1631,7 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 						const VectorValue* bval_vec = checkedCast<VectorValue>(bval);
 
 						if(b->type().downcast<VectorType>()->num != vectype->num)
-							throw BaseException("Invalid types to binary op.");
+							throw ExceptionWithPosition("Invalid types to binary op.", errorContext(src_loc));
 
 						for(unsigned int i=0; i<elem_values.size(); ++i)
 							elem_values[i] = new IntValue(op(
@@ -1635,24 +1653,24 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op)
 					}
 					else
 					{
-						throw BaseException("Invalid types to binary op.");
+						throw ExceptionWithPosition("Invalid types to binary op.", errorContext(src_loc));
 					}
 					break;
 				}
 			default:
-				throw BaseException("expression vector field type invalid!");
+				throw ExceptionWithPosition("expression vector field type invalid!", errorContext(src_loc));
 			};
 			return new VectorValue(elem_values);
 		}
 	default:
-		throw BaseException("expression type invalid!");
+		throw ExceptionWithPosition("expression type invalid!", errorContext(src_loc));
 	}
 }
 
 
 ValueRef AdditionExpression::exec(VMState& vmstate)
 {
-	return execBinaryOp(vmstate, a, b, AddOp());
+	return execBinaryOp(vmstate, a, b, AddOp(), srcLocation());
 }
 
 
@@ -1737,30 +1755,30 @@ void AdditionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 	{
 		const TypeRef& this_type = this->type();
 		if(this_type.isNull())
-			throw BaseException("Unknown operand type." + errorContext(*this, payload));
+			throw ExceptionWithPosition("Unknown operand type.", errorContext(*this, payload));
 
 		const TypeRef a_type = a->type();
 		const TypeRef b_type = b->type();
 		if(a_type.isNull() || b_type.isNull())
-			throw BaseException("Unknown operand type." + errorContext(*this, payload));
+			throw ExceptionWithPosition("Unknown operand type.", errorContext(*this, payload));
 
 		if(this_type->getType() == Type::GenericTypeType || this_type->getType() == Type::IntType || this_type->getType() == Type::FloatType || this_type->getType() == Type::DoubleType)
 		{
 			if(*a_type != *b_type)
-				throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
+				throw ExceptionWithPosition("AdditionExpression: Binary operator '+' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'", errorContext(*this, payload));
 		}
 		else if(a_type->getType() == Type::VectorTypeType && b_type->getType() == Type::VectorTypeType) // Vector + vector addition.
 		{
 			if(*a_type != *b_type)
-				throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
+				throw ExceptionWithPosition("AdditionExpression: Binary operator '+' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'", errorContext(*this, payload));
 
 			// Check element type is int or float
 			if(!(a_type.downcast<VectorType>()->elem_type->getType() == Type::IntType || a_type.downcast<VectorType>()->elem_type->getType() == Type::FloatType || a_type.downcast<VectorType>()->elem_type->getType() == Type::DoubleType))
-				throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
+				throw ExceptionWithPosition("AdditionExpression: Binary operator '+' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'", errorContext(*this, payload));
 		}
 		else
 		{
-			throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'." + errorContext(*this, payload));
+			throw ExceptionWithPosition("AdditionExpression: Binary operator '+' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'.", errorContext(*this, payload));
 		}
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
@@ -1829,7 +1847,7 @@ llvm::Value* AdditionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 	}
 	else
 	{
-		throw BaseException("Unknown type for AdditionExpression code emission");
+		throw ExceptionWithPosition("Unknown type for AdditionExpression code emission", errorContext(this));
 	}
 }
 
@@ -1875,7 +1893,7 @@ size_t AdditionExpression::getSubtreeCodeComplexity() const
 
 ValueRef SubtractionExpression::exec(VMState& vmstate)
 {
-	return execBinaryOp(vmstate, a, b, SubOp());
+	return execBinaryOp(vmstate, a, b, SubOp(), srcLocation());
 }
 
 
@@ -1960,30 +1978,30 @@ void SubtractionExpression::traverse(TraversalPayload& payload, std::vector<ASTN
 	{
 		const TypeRef& this_type = this->type();
 		if(this_type.isNull())
-			throw BaseException("Unknown operand type." + errorContext(*this, payload));
+			throw ExceptionWithPosition("Unknown operand type.", errorContext(*this, payload));
 
 		const TypeRef a_type = a->type();
 		const TypeRef b_type = b->type();
 		if(a_type.isNull() || b_type.isNull())
-			throw BaseException("Unknown operand type." + errorContext(*this, payload));
+			throw ExceptionWithPosition("Unknown operand type.", errorContext(*this, payload));
 
 		if(this_type->getType() == Type::GenericTypeType || this_type->getType() == Type::IntType || this_type->getType() == Type::FloatType || this_type->getType() == Type::DoubleType)
 		{
 			if(*a_type != *b_type)
-				throw BaseException("AdditionExpression: Binary operator '-' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
+				throw ExceptionWithPosition("AdditionExpression: Binary operator '-' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'", errorContext(*this, payload));
 		}
 		else if(a_type->getType() == Type::VectorTypeType && b_type->getType() == Type::VectorTypeType) // Vector + vector addition.
 		{
 			if(*a_type != *b_type)
-				throw BaseException("AdditionExpression: Binary operator '-' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
+				throw ExceptionWithPosition("AdditionExpression: Binary operator '-' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'", errorContext(*this, payload));
 
 			// Check element type is int or float
 			if(!(a_type.downcast<VectorType>()->elem_type->getType() == Type::IntType || a_type.downcast<VectorType>()->elem_type->getType() == Type::FloatType || a_type.downcast<VectorType>()->elem_type->getType() == Type::DoubleType))
-				throw BaseException("AdditionExpression: Binary operator '-' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
+				throw ExceptionWithPosition("AdditionExpression: Binary operator '-' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'", errorContext(*this, payload));
 		}
 		else
 		{
-			throw BaseException("AdditionExpression: Binary operator '-' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'." + errorContext(*this, payload));
+			throw ExceptionWithPosition("AdditionExpression: Binary operator '-' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'.", errorContext(*this, payload));
 		}
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
@@ -2033,7 +2051,7 @@ llvm::Value* SubtractionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llv
 	}
 	else
 	{
-		throw BaseException("Unknown type for SubtractionExpression code emission");
+		throw ExceptionWithPosition("Unknown type for SubtractionExpression code emission", errorContext(this));
 	}
 }
 
@@ -2078,7 +2096,7 @@ size_t SubtractionExpression::getSubtreeCodeComplexity() const
 
 ValueRef MulExpression::exec(VMState& vmstate)
 {
-	return execBinaryOp(vmstate, a, b, MulOp());
+	return execBinaryOp(vmstate, a, b, MulOp(), srcLocation());
 }
 
 
@@ -2150,26 +2168,26 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	{
 		const TypeRef& this_type = this->type();
 		if(this_type.isNull())
-			throw BaseException("Unknown operand type." + errorContext(*this, payload));
+			throw ExceptionWithPosition("Unknown operand type.", errorContext(*this, payload));
 
 		const TypeRef a_type = a->type();
 		const TypeRef b_type = b->type();
 		if(a_type.isNull() || b_type.isNull())
-			throw BaseException("Unknown operand type." + errorContext(*this, payload));
+			throw ExceptionWithPosition("Unknown operand type.", errorContext(*this, payload));
 
 		if(this_type->getType() == Type::GenericTypeType || this_type->getType() == Type::IntType || this_type->getType() == Type::FloatType || this_type->getType() == Type::DoubleType)
 		{
 			if(*a_type != *b_type)
-				throw BaseException("AdditionExpression: Binary operator '*' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
+				throw ExceptionWithPosition("AdditionExpression: Binary operator '*' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'", errorContext(*this, payload));
 		}
 		else if(a_type->getType() == Type::VectorTypeType && b_type->getType() == Type::VectorTypeType) // Vector + vector addition.
 		{
 			if(*a_type != *b_type)
-				throw BaseException("AdditionExpression: Binary operator '*' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
+				throw ExceptionWithPosition("AdditionExpression: Binary operator '*' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'", errorContext(*this, payload));
 
 			// Check element type is int or float
 			if(!(a_type.downcast<VectorType>()->elem_type->getType() == Type::IntType || a_type.downcast<VectorType>()->elem_type->getType() == Type::FloatType || a_type.downcast<VectorType>()->elem_type->getType() == Type::DoubleType))
-				throw BaseException("AdditionExpression: Binary operator '*' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
+				throw ExceptionWithPosition("AdditionExpression: Binary operator '*' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'", errorContext(*this, payload));
 		}
 		else if(a_type->getType() == Type::VectorTypeType && *b_type == *a_type.downcast<VectorType>()->elem_type)
 		{
@@ -2177,7 +2195,7 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 
 			// Check element type is int or float
 			if(!(a_type.downcast<VectorType>()->elem_type->getType() == Type::IntType || a_type.downcast<VectorType>()->elem_type->getType() == Type::FloatType || a_type.downcast<VectorType>()->elem_type->getType() == Type::DoubleType))
-				throw BaseException("AdditionExpression: Binary operator '*' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
+				throw ExceptionWithPosition("AdditionExpression: Binary operator '*' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'", errorContext(*this, payload));
 		}
 		else if(b_type->getType() == Type::VectorTypeType && *a_type == *b_type.downcast<VectorType>()->elem_type)
 		{
@@ -2185,11 +2203,11 @@ void MulExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 
 			// Check element type is int or float
 			if(!(b_type.downcast<VectorType>()->elem_type->getType() == Type::IntType || b_type.downcast<VectorType>()->elem_type->getType() == Type::FloatType || b_type.downcast<VectorType>()->elem_type->getType() == Type::DoubleType))
-				throw BaseException("AdditionExpression: Binary operator '*' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
+				throw ExceptionWithPosition("AdditionExpression: Binary operator '*' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'", errorContext(*this, payload));
 		}
 		else
 		{
-			throw BaseException("AdditionExpression: Binary operator '*' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'." + errorContext(*this, payload));
+			throw ExceptionWithPosition("AdditionExpression: Binary operator '*' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'.", errorContext(*this, payload));
 		}
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
@@ -2356,7 +2374,7 @@ llvm::Value* MulExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 	}
 	else
 	{
-		throw BaseException("Unknown type for MulExpression code emission");
+		throw ExceptionWithPosition("Unknown type for MulExpression code emission", errorContext(this));
 	}
 }
 
@@ -2409,28 +2427,28 @@ ValueRef DivExpression::exec(VMState& vmstate)
 		if(a->type()->getType() == Type::FloatType && b->type()->getType() == Type::FloatType)
 			return new FloatValue(checkedCast<FloatValue>(aval)->value / checkedCast<FloatValue>(bval)->value);
 		else
-			throw BaseException("invalid types for div op.");
+			throw ExceptionWithPosition("invalid types for div op.", errorContext(this));
 	}
 	if(this->type()->getType() == Type::DoubleType)
 	{
 		if(a->type()->getType() == Type::DoubleType && b->type()->getType() == Type::DoubleType)
 			return new DoubleValue(checkedCast<DoubleValue>(aval)->value / checkedCast<DoubleValue>(bval)->value);
 		else
-			throw BaseException("invalid types for div op.");
+			throw ExceptionWithPosition("invalid types for div op.", errorContext(this));
 	}
 	else if(this->type()->getType() == Type::IntType)
 	{
 		if(!(a->type()->getType() == Type::IntType && b->type()->getType() == Type::IntType))
-			throw BaseException("invalid types for div op.");
+			throw ExceptionWithPosition("invalid types for div op.", errorContext(this));
 
 		const int64 a_int_val = checkedCast<IntValue>(aval)->value;
 		const int64 b_int_val = checkedCast<IntValue>(bval)->value;
 
 		if(b_int_val == 0)
-			throw BaseException("Divide by zero.");
+			throw ExceptionWithPosition("Divide by zero.", errorContext(this));
 
 		if(a_int_val == std::numeric_limits<int32>::min() && b_int_val == -1)
-			throw BaseException("Tried to compute -2147483648 / -1.");
+			throw ExceptionWithPosition("Tried to compute -2147483648 / -1.", errorContext(this));
 
 		// TODO: handle other bitness and signedness.
 
@@ -2461,11 +2479,11 @@ ValueRef DivExpression::exec(VMState& vmstate)
 			return new VectorValue(elem_values);
 		}
 		else
-			throw BaseException("invalid types for div op.");
+			throw ExceptionWithPosition("invalid types for div op.", errorContext(this));
 	}
 	else
 	{
-		throw BaseException("invalid types for div op.");
+		throw ExceptionWithPosition("invalid types for div op.", errorContext(this));
 	}
 }
 
@@ -2591,24 +2609,24 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	{
 		const TypeRef& this_type = this->type();
 		if(this_type.isNull())
-			throw BaseException("Unknown operand type." + errorContext(*this, payload));
+			throw ExceptionWithPosition("Unknown operand type.", errorContext(*this, payload));
 
 		const TypeRef a_type = a->type();
 		const TypeRef b_type = b->type();
 		if(a_type.isNull() || b_type.isNull())
-			throw BaseException("Unknown operand type." + errorContext(*this, payload));
+			throw ExceptionWithPosition("Unknown operand type.", errorContext(*this, payload));
 
 		if(this_type->getType() == Type::GenericTypeType || this_type->getType() == Type::IntType || this_type->getType() == Type::FloatType || this_type->getType() == Type::DoubleType)
 		{
 			// Make sure both operands have the same type
 			if(*a->type() != *b->type())
-				throw BaseException("Binary operator '/' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
+				throw ExceptionWithPosition("Binary operator '/' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'.", errorContext(*this, payload));
 		}
 		else if(this_type->getType() == Type::VectorTypeType &&
 			(this_type.downcast<VectorType>()->elem_type->getType() == Type::FloatType || this_type.downcast<VectorType>()->elem_type->getType() == Type::DoubleType))
 		{
 			if(*this_type.downcast<VectorType>()->elem_type != *b->type())
-				throw BaseException("Binary operator '/' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
+				throw ExceptionWithPosition("Binary operator '/' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'.", errorContext(*this, payload));
 		}
 		/*else if(a->type()->getType() == Type::VectorTypeType && b->type()->getType() == Type::VectorTypeType)
 		{
@@ -2618,7 +2636,7 @@ void DivExpression::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 		}*/
 		else
 		{
-			throw BaseException("Binary operator '/' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'." + errorContext(*this, payload));
+			throw ExceptionWithPosition("Binary operator '/' not defined for types '" +  a->type()->toString() + "' and '" +  b->type()->toString() + "'.", errorContext(*this, payload));
 		}
 	}
 	else if(payload.operation == TraversalPayload::CheckInDomain)
@@ -2777,7 +2795,7 @@ void DivExpression::checkNoOverflow(TraversalPayload& payload, std::vector<ASTNo
 			}
 		}*/
 
-		throw BaseException("Failed to prove division is not -2147483648 / -1.  (INT_MIN / -1)" + errorContext(*this));
+		throw ExceptionWithPosition("Failed to prove division is not -2147483648 / -1.  (INT_MIN / -1)", errorContext(*this));
 	}
 }
 
@@ -2801,7 +2819,7 @@ void DivExpression::checkNoZeroDivide(TraversalPayload& payload, std::vector<AST
 
 			if(divisor_val == 0)
 			{
-				throw BaseException("Integer division by zero." + errorContext(*this));
+				throw ExceptionWithPosition("Integer division by zero.", errorContext(*this));
 			}
 			else
 			{
@@ -2875,7 +2893,7 @@ void DivExpression::checkNoZeroDivide(TraversalPayload& payload, std::vector<AST
 			}*/
 		}
 
-		throw BaseException("Failed to prove divisor is != 0." + errorContext(*this));
+		throw ExceptionWithPosition("Failed to prove divisor is != 0.", errorContext(*this));
 	}
 }
 
@@ -3007,9 +3025,9 @@ ValueRef BinaryBitwiseExpression::exec(VMState& vmstate)
 			// TODO: handle a being negative, undefined?
 
 			if(bint->value < 0)
-				throw BaseException("left shift by negative value.");
+				throw ExceptionWithPosition("left shift by negative value.", errorContext(this));
 			if(bint->value >= a->type().downcastToPtr<Int>()->numBits())
-				throw BaseException("left shift by value >= bit width");
+				throw ExceptionWithPosition("left shift by value >= bit width", errorContext(this));
 
 			return new IntValue(aint->value << bint->value, aint->is_signed);
 		}
@@ -3018,14 +3036,14 @@ ValueRef BinaryBitwiseExpression::exec(VMState& vmstate)
 			// TODO: handle a being negative, undefined?
 
 			if(bint->value < 0)
-				throw BaseException("right shift by negative value.");
+				throw ExceptionWithPosition("right shift by negative value.", errorContext(this));
 			if(bint->value >= a->type().downcastToPtr<Int>()->numBits())
-				throw BaseException("right shift by value >= bit width");
+				throw ExceptionWithPosition("right shift by value >= bit width", errorContext(this));
 
 			return new IntValue(aint->value >> bint->value, aint->is_signed);
 		}
 	default:
-		throw BaseException("Internal error in BinaryBitwiseExpression::exec()");
+		throw ExceptionWithPosition("Internal error in BinaryBitwiseExpression::exec()", errorContext(this));
 	};
 }
 
@@ -3086,41 +3104,41 @@ void BinaryBitwiseExpression::traverse(TraversalPayload& payload, std::vector<AS
 	{
 		const TypeRef& this_type = this->type();
 		if(this_type.isNull())
-			throw BaseException("Unknown operand type." + errorContext(*this, payload));
+			throw ExceptionWithPosition("Unknown operand type.", errorContext(*this, payload));
 
 		const TypeRef a_type = a->type();
 		const TypeRef b_type = b->type();
 		if(a_type.isNull() || b_type.isNull())
-			throw BaseException("Unknown operand type." + errorContext(*this, payload));
+			throw ExceptionWithPosition("Unknown operand type.", errorContext(*this, payload));
 
 		if(this_type->getType() == Type::GenericTypeType)
 		{
 			if(*a_type != *b_type)
-				throw BaseException("Binary operator '" + opToken() + "' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
+				throw ExceptionWithPosition("Binary operator '" + opToken() + "' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'", errorContext(*this, payload));
 		}
 		else if(this_type->getType() == Type::IntType)
 		{
 			if(*a_type != *b_type)
-				throw BaseException("Binary operator '" + opToken() + "' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
+				throw ExceptionWithPosition("Binary operator '" + opToken() + "' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'", errorContext(*this, payload));
 
 			//const Int* a_int_type = a_type.downcastToPtr<Int>();
 			//const Int* b_int_type = b_type.downcastToPtr<Int>();
 
 			//if(a_int_type->num_bits != b_int_type->num_bits)
-			//	throw BaseException("AdditionExpression: Binary operator '" + opToken() + "' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
+			//	throw BaseException("AdditionExpression: Binary operator '" + opToken() + "' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'", errorContext(*this, payload));
 		}
 		//else if(a_type->getType() == Type::VectorTypeType && b_type->getType() == Type::VectorTypeType) // Vector + vector addition.
 		//{
 		//	if(*a_type != *b_type)
-		//		throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
+		//		throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'", errorContext(*this, payload));
 
 		//	// Check element type is int or float
 		//	if(!(a_type.downcast<VectorType>()->elem_type->getType() == Type::IntType || a_type.downcast<VectorType>()->elem_type->getType() == Type::FloatType || a_type.downcast<VectorType>()->elem_type->getType() == Type::DoubleType))
-		//		throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'" + errorContext(*this, payload));
+		//		throw BaseException("AdditionExpression: Binary operator '+' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'", errorContext(*this, payload));
 		//}
 		else
 		{
-			throw BaseException(" Binary operator '" + opToken() + "' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'." + errorContext(*this, payload));
+			throw ExceptionWithPosition(" Binary operator '" + opToken() + "' not defined for types '" +  a_type->toString() + "' and '" +  b_type->toString() + "'.", errorContext(*this, payload));
 		}
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
@@ -3264,16 +3282,16 @@ void BinaryBooleanExpr::traverse(TraversalPayload& payload, std::vector<ASTNode*
 	{
 		const TypeRef& a_type = this->a->type();
 		if(a_type.isNull())
-			throw BaseException("Unknown operand type." + errorContext(*this, payload));
+			throw ExceptionWithPosition("Unknown operand type.", errorContext(*this, payload));
 		const TypeRef& b_type = this->b->type();
 		if(b_type.isNull())
-			throw BaseException("Unknown operand type." + errorContext(*this, payload));
+			throw ExceptionWithPosition("Unknown operand type.", errorContext(*this, payload));
 
 		if(a_type->getType() != Winter::Type::BoolType)
-			throw BaseException("First child does not have boolean type." + errorContext(*this, payload));
+			throw ExceptionWithPosition("First child does not have boolean type.", errorContext(*this, payload));
 
 		if(b_type->getType() != Winter::Type::BoolType)
-			throw BaseException("Second child does not have boolean type." + errorContext(*this, payload));
+			throw ExceptionWithPosition("Second child does not have boolean type.", errorContext(*this, payload));
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
@@ -3429,14 +3447,14 @@ ValueRef UnaryMinusExpression::exec(VMState& vmstate)
 			}
 			default:
 			{
-				throw BaseException("UnaryMinusExpression type invalid!");
+				throw ExceptionWithPosition("UnaryMinusExpression type invalid!", errorContext(this));
 			}
 		}
 		return new VectorValue(elem_values);
 	}
 	else
 	{
-		throw BaseException("UnaryMinusExpression type invalid!");
+		throw ExceptionWithPosition("UnaryMinusExpression type invalid!", errorContext(this));
 	}
 }
 
@@ -3457,12 +3475,12 @@ void UnaryMinusExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 	{
 		const TypeRef& this_type = this->type();
 		if(this_type.isNull())
-			throw BaseException("Unknown operand type." + errorContext(*this, payload));
+			throw ExceptionWithPosition("Unknown operand type.", errorContext(*this, payload));
 
 		if(this_type->getType() == Type::GenericTypeType || this_type->getType() == Type::IntType || this_type->getType() == Type::FloatType || this_type->getType() == Type::DoubleType)
 		{
 			if(this_type->getType() == Type::IntType && !this_type.downcastToPtr<Int>()->is_signed)
-				throw BaseException("Unary minus not defined for unsigned type '" + this->type()->toString() + "'.");
+				throw ExceptionWithPosition("Unary minus not defined for unsigned type '" + this->type()->toString() + "'.", errorContext(this));
 		}
 		else if(this_type->getType() == Type::VectorTypeType && 
 			(static_cast<VectorType*>(this_type.getPointer())->elem_type->getType() == Type::FloatType || static_cast<VectorType*>(this_type.getPointer())->elem_type->getType() == Type::DoubleType || static_cast<VectorType*>(this_type.getPointer())->elem_type->getType() == Type::IntType))
@@ -3470,7 +3488,7 @@ void UnaryMinusExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 		}
 		else
 		{
-			throw BaseException("Type '" + this->type()->toString() + "' does not define unary operator '-'.");
+			throw ExceptionWithPosition("Type '" + this->type()->toString() + "' does not define unary operator '-'.", errorContext(this));
 		}
 	}
 	else if(payload.operation == TraversalPayload::BindVariables)
@@ -3589,7 +3607,7 @@ llvm::Value* UnaryMinusExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm
 	}
 
 	assert(!"UnaryMinusExpression type invalid!");
-	throw BaseException("UnaryMinusExpression type invalid!");
+	throw ExceptionWithPosition("UnaryMinusExpression type invalid!", errorContext(this));
 }
 
 
@@ -3652,10 +3670,10 @@ void LogicalNegationExpr::traverse(TraversalPayload& payload, std::vector<ASTNod
 	{
 		const TypeRef& this_type = this->type();
 		if(this_type.isNull())
-			throw BaseException("Unknown operand type." + errorContext(*this, payload));
+			throw ExceptionWithPosition("Unknown operand type.", errorContext(*this, payload));
 
 		if(this_type->getType() != Type::BoolType)
-			throw BaseException("Type '" + this->type()->toString() + "' does not define logical negation operator '!'." + errorContext(*this, payload));
+			throw ExceptionWithPosition("Type '" + this->type()->toString() + "' does not define logical negation operator '!'.", errorContext(*this, payload));
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
@@ -3708,7 +3726,7 @@ llvm::Value* LogicalNegationExpr::emitLLVMCode(EmitLLVMCodeParams& params, llvm:
 	}
 	else
 	{
-		throw BaseException("LogicalNegationExpr type invalid!");
+		throw ExceptionWithPosition("LogicalNegationExpr type invalid!", errorContext(this));
 	}
 }
 
@@ -3831,7 +3849,7 @@ ValueRef ComparisonExpression::exec(VMState& vmstate)
 		retval = compare<BoolValue>(this->token->getType(), aval.getPointer(), bval.getPointer());
 		break;
 	default:
-		throw BaseException("ComparisonExpression type invalid!");
+		throw ExceptionWithPosition("ComparisonExpression type invalid!", errorContext(this));
 	}
 
 	return retval;
@@ -3969,10 +3987,10 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 		const TypeRef a_type = a->type();
 		const TypeRef b_type = b->type();
 		if(a_type.isNull() || b_type.isNull())
-			throw BaseException("Unknown type");
+			throw ExceptionWithPosition("Unknown type", errorContext(this));
 
 		if(*a_type != *b_type)
-			throw BaseException("Comparison operand types must be the same.  Left operand type: " + a_type->toString() + ", right operand type: " + b_type->toString() + "." + errorContext(*this, payload));
+			throw ExceptionWithPosition("Comparison operand types must be the same.  Left operand type: " + a_type->toString() + ", right operand type: " + b_type->toString() + ".", errorContext(*this, payload));
 
 		if(a_type->getType() == Type::GenericTypeType || a_type->getType() == Type::IntType ||
 			a_type->getType() == Type::FloatType || a_type->getType() == Type::DoubleType ||
@@ -3984,7 +4002,7 @@ void ComparisonExpression::traverse(TraversalPayload& payload, std::vector<ASTNo
 		}
 		else
 		{
-			throw BaseException("Type '" + a_type->toString() + "' does not define comparison operators." + errorContext(*this, payload));
+			throw ExceptionWithPosition("Type '" + a_type->toString() + "' does not define comparison operators.", errorContext(*this, payload));
 		}
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
@@ -4030,7 +4048,7 @@ llvm::Value* ComparisonExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm
 			case NOT_EQUALS_TOKEN: return params.builder->CreateFCmpONE(a_code, b_code);
 			case LESS_EQUAL_TOKEN: return params.builder->CreateFCmpOLE(a_code, b_code);
 			case GREATER_EQUAL_TOKEN: return params.builder->CreateFCmpOGE(a_code, b_code);
-			default: assert(0); throw BaseException("Unsupported token type for comparison.");
+			default: assert(0); throw ExceptionWithPosition("Unsupported token type for comparison.", errorContext(this));
 			}
 		}
 		break;
@@ -4044,7 +4062,7 @@ llvm::Value* ComparisonExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm
 			case NOT_EQUALS_TOKEN: return params.builder->CreateICmpNE(a_code, b_code);
 			case LESS_EQUAL_TOKEN: return params.builder->CreateICmpSLE(a_code, b_code);
 			case GREATER_EQUAL_TOKEN: return params.builder->CreateICmpSGE(a_code, b_code);
-			default: assert(0); throw BaseException("Unsupported token type for comparison");
+			default: assert(0); throw ExceptionWithPosition("Unsupported token type for comparison", errorContext(this));
 			}
 		}
 		break;
@@ -4054,7 +4072,7 @@ llvm::Value* ComparisonExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm
 			{
 			case DOUBLE_EQUALS_TOKEN: return params.builder->CreateICmpEQ(a_code, b_code);
 			case NOT_EQUALS_TOKEN: return params.builder->CreateICmpNE(a_code, b_code);
-			default: assert(0); throw BaseException("Unsupported token type for comparison");
+			default: assert(0); throw ExceptionWithPosition("Unsupported token type for comparison", errorContext(this));
 			}
 		}
 		break;
@@ -4088,7 +4106,7 @@ llvm::Value* ComparisonExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm
 		}
 	default:
 		assert(!"ComparisonExpression type invalid!");
-		throw BaseException("ComparisonExpression type invalid");
+		throw ExceptionWithPosition("ComparisonExpression type invalid", errorContext(this));
 	}
 }
 
@@ -4117,7 +4135,7 @@ const std::string ComparisonExpression::getOverloadedFuncName() const // returns
 	case NOT_EQUALS_TOKEN: return "op_neq";
 	case LESS_EQUAL_TOKEN: return "op_lte";
 	case GREATER_EQUAL_TOKEN: return "op_gte";
-	default: assert(0); throw BaseException("Unsupported token type for comparison");
+	default: assert(0); throw ExceptionWithPosition("Unsupported token type for comparison", errorContext(this));
 	}
 }
 
@@ -4357,22 +4375,22 @@ void NamedConstant::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 	{
 		//TEMP:
 		//if(!isLiteral(*this->value_expr))
-		//	throw BaseException("Named constant was not reduced to a literal. " + errorContext(*this, payload));
+		//	throw BaseException("Named constant was not reduced to a literal. ", errorContext(*this, payload));
 
 		// Check that value_expr is constant now.  NOTE: not sure this is the best place/phase to do it.
 		if(!value_expr->isConstant())
-			throw BaseException("Named constant value was not constant. " + errorContext(*this, payload));
+			throw ExceptionWithPosition("Named constant value was not constant. ", errorContext(*this, payload));
 
 		const TypeRef expr_type = value_expr->type();
 		if(expr_type.isNull())
-			throw BaseException("Failed to compute type for named constant. " + errorContext(*this, payload));
+			throw ExceptionWithPosition("Failed to compute type for named constant. ", errorContext(*this, payload));
 
 		// Check that the type of the body expression is equal to the declared type.
 		if(this->declared_type.nonNull())
 		{
 			if(*expr_type != *this->declared_type)
-				throw BaseException("Type error for named constant '" + name + "': Computed return type '" + expr_type->toString() + 
-					"' is not equal to the declared return type '" + declared_type->toString() + "'." + errorContext(*this));
+				throw ExceptionWithPosition("Type error for named constant '" + name + "': Computed return type '" + expr_type->toString() +
+					"' is not equal to the declared return type '" + declared_type->toString() + "'.", errorContext(*this));
 		}
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
@@ -4383,7 +4401,7 @@ void NamedConstant::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 		this->can_maybe_constant_fold = is_literal;
 
 	/*	if(!this->isConstant())
-			throw BaseException("Named constant value expression was not constant." + errorContext(*this));
+			throw BaseException("Named constant value expression was not constant.", errorContext(*this));
 
 		VMState vmstate;
 		vmstate.func_args_start.push_back(0);

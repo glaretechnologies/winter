@@ -861,6 +861,16 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			jit_mem_blocks.insert(jit_mem_blocks.end(), mem_manager->blocks.begin(), mem_manager->blocks.end());
 		}
 	}
+	catch(ExceptionWithPosition& e)
+	{
+		// Since we threw an exception in the constructor, VirtualMachine destructor will not be run.
+		// So we need to delete these objects now.
+		delete this->llvm_exec_engine;
+
+		delete this->llvm_context;
+
+		throw e; // Re-throw exception
+	}
 	catch(BaseException& e)
 	{
 		// Since we threw an exception in the constructor, VirtualMachine destructor will not be run.

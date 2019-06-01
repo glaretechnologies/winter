@@ -18,22 +18,25 @@ namespace Diagnostics
 {
 
 
-const std::string positionString(const SourceBuffer& source_buffer, size_t char_index)
+const std::string positionString(const BufferPosition& pos)
 {
+	if(pos.buffer.isNull())
+		return "Unknown";
+
 	size_t line, col;
-	StringUtils::getPosition(source_buffer.source, char_index, line, col);
+	StringUtils::getPosition(pos.buffer->source, pos.pos, line, col);
 
 	// Get entire line
 	std::string linestr = StringUtils::getLineFromBuffer(
-		source_buffer.source, 
-		char_index - col
+		pos.buffer->source,
+		pos.pos - col
 	);
 
 	
 	std::string s = "\n";
 	// Print something like 'somefile.win, line 5:'
 	// Note that line is zero-based, so convert to 1-based line number 
-	s += source_buffer.name + ", line " + toString(line + 1) + ":\n";
+	s += pos.buffer->name + ", line " + toString(line + 1) + ":\n";
 	s += linestr + "\n";
 	col = col < (unsigned int)linestr.size() ? col : (unsigned int)linestr.size();
 	for(unsigned int i=0; i<col; ++i)

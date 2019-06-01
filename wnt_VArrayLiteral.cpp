@@ -57,13 +57,13 @@ VArrayLiteral::VArrayLiteral(const std::vector<ASTNodeRef>& elems, const SrcLoca
 	llvm_heap_allocated(false)
 {
 	if(has_int_suffix && int_suffix <= 0)
-		throw BaseException("VArray literal int suffix must be > 0." + errorContext(*this));
+		throw ExceptionWithPosition("VArray literal int suffix must be > 0.", errorContext(*this));
 	if(has_int_suffix && elems.size() != 1)
-		throw BaseException("VArray literal with int suffix must have only one explicit elem." + errorContext(*this));
+		throw ExceptionWithPosition("VArray literal with int suffix must have only one explicit elem.", errorContext(*this));
 
 	// Need to have at least one element, so we can determine the element type.
 	if(elems.empty())
-		throw BaseException("VArray literal can't be empty." + errorContext(*this));
+		throw ExceptionWithPosition("VArray literal can't be empty.", errorContext(*this));
 }
 
 
@@ -166,7 +166,7 @@ void VArrayLiteral::traverse(TraversalPayload& payload, std::vector<ASTNode*>& s
 		const TypeRef elem_type = this->elements[0]->type();
 		for(unsigned int i=0; i<this->elements.size(); ++i)
 			if(*elem_type != *this->elements[i]->type())
-				throw BaseException("VArray element " + ::toString(i) + " did not have required type " + elem_type->toString() + "." + 
+				throw ExceptionWithPosition("VArray element " + ::toString(i) + " did not have required type " + elem_type->toString() + ".",
 				errorContext(*this, payload));
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)

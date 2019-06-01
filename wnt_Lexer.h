@@ -20,10 +20,10 @@ namespace Winter
 {
 
 
-class LexerExcep : public BaseException
+class LexerExcep : public ExceptionWithPosition
 {
 public:
-	LexerExcep(const std::string& text_) : BaseException(text_) {}
+	LexerExcep(const std::string& text_, const BufferPosition& pos) : ExceptionWithPosition(text_, pos) {}
 };
 
 
@@ -40,7 +40,7 @@ public:
 	static void test();
 
 private:
-	static const std::string errorPosition(const SourceBufferRef& buffer, size_t pos);
+	static BufferPosition errorPosition(const SourceBufferRef& buffer, size_t pos);
 	static void parseStringLiteral(const SourceBufferRef& buffer, Parser& parser, std::vector<Reference<TokenBase> >& tokens_out);
 	static void parseCharLiteral(const SourceBufferRef& buffer, Parser& parser, std::vector<Reference<TokenBase> >& tokens_out);
 	static void parseNumericLiteral(const SourceBufferRef& buffer, Parser& parser, std::vector<Reference<TokenBase> >& tokens_out);

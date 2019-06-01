@@ -40,6 +40,24 @@ private:
 
 
 typedef Reference<SourceBuffer> SourceBufferRef;
+typedef Reference<const SourceBuffer> SourceBufferConstRef;
+
+
+class SrcLocation
+{
+public:
+	SrcLocation(size_t char_index_, size_t len_, const SourceBuffer* buf) :
+		char_index(char_index_), len(len_), source_buffer(buf) {}
+
+	static const SrcLocation invalidLocation() { return SrcLocation(4000000000u, 0, NULL); }
+
+	bool isValid() const { return char_index != 4000000000u; }
+
+	size_t char_index;
+	size_t len;
+	const SourceBuffer* source_buffer;
+};
+
 
 
 } // end namespace Winter

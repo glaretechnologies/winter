@@ -61,13 +61,13 @@ static const SrcLocation locationForParseInfo(ParseInfo& p)
 	if(p.i >= p.tokens.size())
 		return SrcLocation::invalidLocation();
 
-	return SrcLocation(p.tokens[p.i]->char_index, p.text_buffer);
+	return SrcLocation(p.tokens[p.i]->char_index, p.tokens[p.i]->num_chars, p.text_buffer);
 }
 
 
 static const SrcLocation prevTokenLoc(ParseInfo& p)
 {
-	return SrcLocation(p.tokens[p.i - 1]->char_index, p.text_buffer);
+	return SrcLocation(p.tokens[p.i - 1]->char_index, p.tokens[p.i - 1]->num_chars, p.text_buffer);
 }
 
 
@@ -77,7 +77,7 @@ Reference<BufferRoot> LangParser::parseBuffer(const std::vector<Reference<TokenB
 											std::vector<TypeVRef>& named_types_ordered_out,
 											int& order_num)
 {
-	Reference<BufferRoot> root = new BufferRoot(SrcLocation(0, source_buffer.getPointer()));
+	Reference<BufferRoot> root = new BufferRoot(SrcLocation(0, 0, source_buffer.getPointer()));
 
 	ParseInfo parseinfo(tokens, named_types, root->top_level_defs, order_num);
 	parseinfo.text_buffer = source_buffer.getPointer();
@@ -100,11 +100,11 @@ Reference<BufferRoot> LangParser::parseBuffer(const std::vector<Reference<TokenB
 		}
 		else if(tokens[parseinfo.i]->isIdentifier() && tokens[parseinfo.i]->getIdentifierValue() == "struct")
 		{
-			const unsigned int struct_position = parseinfo.i;
+			const size_t struct_char_position = tokens[parseinfo.i]->char_index;
 			VRef<StructureType> t = parseStructType(parseinfo);
 				
 			if(named_types.find(t->name) != named_types.end())
-				throw BaseException("struct with name '" + t->name + "' already defined: " + errorPosition(*parseinfo.text_buffer, struct_position));
+				throw LangParserExcep("struct with name '" + t->name + "' already defined: ", errorPosition(*parseinfo.text_buffer, struct_char_position));
 
 			named_types.insert(std::make_pair(t->name, t));
 			named_types_ordered_out.push_back(t);
@@ -154,7 +154,7 @@ Reference<BufferRoot> LangParser::parseBuffer(const std::vector<Reference<TokenB
 			parseinfo.order_num++;
 		}
 		else
-			throw LangParserExcep("Expected 'def'." + errorPosition(*source_buffer, tokens[parseinfo.i]->char_index));
+			throw LangParserExcep("Expected 'def'.", errorPosition(*source_buffer, tokens[parseinfo.i]->char_index));
 	}
 
 	// Update order_num
@@ -167,10 +167,10 @@ Reference<BufferRoot> LangParser::parseBuffer(const std::vector<Reference<TokenB
 const std::string LangParser::parseIdentifier(const std::string& id_type, ParseInfo& p)
 {
 	if(p.i >= p.tokens.size())
-		throw LangParserExcep("End of buffer before " + id_type + " identifier.");
+		throw LangParserExcep("End of buffer before " + id_type + " identifier.", errorPosition(p));
 
 	if(!p.tokens[p.i]->isIdentifier())
-		throw LangParserExcep("Expected " + id_type + " identifier." + errorPosition(p));
+		throw LangParserExcep("Expected " + id_type + " identifier.", errorPosition(p));
 
 	return p.tokens[p.i++]->getIdentifierValue();
 }
@@ -179,13 +179,13 @@ const std::string LangParser::parseIdentifier(const std::string& id_type, ParseI
 void LangParser::parseAndCheckIdentifier(const std::string& target_id, ParseInfo& p)
 {
 	if(p.i >= p.tokens.size())
-		throw LangParserExcep("End of buffer before " + target_id + " identifier.");
+		throw LangParserExcep("End of buffer before " + target_id + " identifier.", errorPosition(p));
 
 	if(!p.tokens[p.i]->isIdentifier())
-		throw LangParserExcep("Expected identifier '" + target_id + "'." + errorPosition(p));
+		throw LangParserExcep("Expected identifier '" + target_id + "'.", errorPosition(p));
 
 	if(p.tokens[p.i]->getIdentifierValue() != target_id)
-		throw LangParserExcep("Expected identifier '" + target_id + "'." + errorPosition(p));
+		throw LangParserExcep("Expected identifier '" + target_id + "'.", errorPosition(p));
 
 	p.i++;
 }
@@ -217,10 +217,10 @@ static const std::string tokenDescription(const Reference<TokenBase>& token)
 void LangParser::parseToken(unsigned int token_type, ParseInfo& p)
 {
 	if(p.i >= p.tokens.size())
-		throw LangParserExcep("End of buffer before " + tokenName(token_type) + " token.");
+		throw LangParserExcep("End of buffer before " + tokenName(token_type) + " token.", errorPosition(p));
 	
 	if(p.tokens[p.i]->getType() != token_type)
-		throw LangParserExcep("Expected " + tokenName(token_type) + ", found " + tokenDescription(p.tokens[p.i]) + "." + errorPosition(p));
+		throw LangParserExcep("Expected " + tokenName(token_type) + ", found " + tokenDescription(p.tokens[p.i]) + ".", errorPosition(p));
 
 	p.i++;
 }
@@ -340,7 +340,7 @@ ASTNodeRef LangParser::parseIfExpression(ParseInfo& p)
 
 
 	if(p.i >= p.tokens.size())
-		throw LangParserExcep("End of buffer while parsing if expression.");
+		throw LangParserExcep("End of buffer while parsing if expression.", errorPosition(p));
 
 	if(p.tokens[p.i]->getType() == OPEN_PARENTHESIS_TOKEN)
 	{
@@ -355,7 +355,7 @@ ASTNodeRef LangParser::parseIfExpression(ParseInfo& p)
 		ASTNodeRef condition = parseExpression(p);
 
 		if(p.i >= p.tokens.size())
-			throw LangParserExcep("End of buffer while parsing if expression.");
+			throw LangParserExcep("End of buffer while parsing if expression.", errorPosition(p));
 
 		if(p.tokens[p.i]->getType() == COMMA_TOKEN)
 		{
@@ -432,7 +432,7 @@ ASTNodeRef LangParser::parseVariableExpression(ParseInfo& p)
 
 	const std::string name = parseIdentifier("variable name", p);
 	if(isKeyword(name))
-		throw LangParserExcep("Cannot call a variable '" + name + "' - is a keyword.  " +  errorPositionPrevToken(p));
+		throw LangParserExcep("Cannot call a variable '" + name + "' - is a keyword.  ", errorPositionPrevToken(p));
 
 	return new Variable(name, loc);
 }
@@ -510,7 +510,7 @@ FunctionDefinitionRef LangParser::parseFunctionDefinitionGivenName(const std::st
 			{
 				noinline = true;
 			}
-			else throw LangParserExcep("Error occurred while parsing function '" + func_name + "': unknown attribute '" + attribute + "'" +  errorPosition(p));
+			else throw LangParserExcep("Error occurred while parsing function '" + func_name + "': unknown attribute '" + attribute + "'", errorPosition(p));
 		}
 
 
@@ -528,7 +528,7 @@ FunctionDefinitionRef LangParser::parseFunctionDefinitionGivenName(const std::st
 			else if(isTokenCurrent(RIGHT_ARROW_TOKEN, p))
 				skipExpectedToken(RIGHT_ARROW_TOKEN, p);
 			else
-				throw LangParserExcep("Error occurred while parsing anon function: expected ':' or '->'" + errorPosition(p));
+				throw LangParserExcep("Error occurred while parsing anon function: expected ':' or '->'", errorPosition(p));
 		}
 		else
 		{
@@ -557,7 +557,7 @@ FunctionDefinitionRef LangParser::parseFunctionDefinitionGivenName(const std::st
 	}
 	catch(LangParserExcep& e)
 	{
-		throw LangParserExcep("Error occurred while parsing function '" + func_name + "': " + e.what());
+		throw LangParserExcep("Error occurred while parsing function '" + func_name + "': " + e.what(), e.pos());
 	}
 }
 
@@ -679,7 +679,7 @@ ASTNodeRef LangParser::parseLiteral(ParseInfo& p)
 	SrcLocation loc = locationForParseInfo(p);
 
 	if(p.i >= p.tokens.size())
-		throw LangParserExcep("End of buffer while parsing literal." + errorPosition(p));
+		throw LangParserExcep("End of buffer while parsing literal.", errorPosition(p));
 
 	if(p.tokens[p.i]->getType() == INT_LITERAL_TOKEN)
 	{
@@ -717,7 +717,7 @@ ASTNodeRef LangParser::parseLiteral(ParseInfo& p)
 	}
 	else
 	{
-		throw LangParserExcep("token is not a literal" + errorPosition(p));
+		throw LangParserExcep("token is not a literal", errorPosition(p));
 	}
 }
 
@@ -727,7 +727,7 @@ Reference<IntLiteral> LangParser::parseIntLiteral(ParseInfo& p)
 	SrcLocation loc = locationForParseInfo(p);
 
 	if(p.i >= p.tokens.size())
-		throw LangParserExcep("End of buffer while parsing int literal." + errorPosition(p));
+		throw LangParserExcep("End of buffer while parsing int literal.", errorPosition(p));
 
 	if(p.tokens[p.i]->getType() == INT_LITERAL_TOKEN)
 	{
@@ -738,7 +738,7 @@ Reference<IntLiteral> LangParser::parseIntLiteral(ParseInfo& p)
 	}
 	else
 	{
-		throw LangParserExcep("token is not an integer literal." + errorPosition(p));
+		throw LangParserExcep("token is not an integer literal.", errorPosition(p));
 	}
 }
 
@@ -763,7 +763,7 @@ Reference<ASTNode> LangParser::parseLetBlock(ParseInfo& p)
 				for(size_t w=0; w<let->vars.size(); ++w)
 					for(size_t t=0; t<lets[z]->vars.size(); ++t)
 						if(lets[z]->vars[t].name == let->vars[w].name)
-							throw LangParserExcep("Let with this name already defined in let block." + errorPosition(*p.text_buffer, p.tokens[let_position]->char_index));
+							throw LangParserExcep("Let with this name already defined in let block.", errorPosition(*p.text_buffer, p.tokens[let_position]->char_index));
 
 			lets.push_back(let);
 		}
@@ -790,7 +790,7 @@ ASTNodeRef LangParser::parseExpression(ParseInfo& p)
 ASTNodeRef LangParser::parseBasicExpression(ParseInfo& p)
 {
 	if(p.i >= p.tokens.size())
-		throw LangParserExcep("End of buffer while parsing basic expression." + errorPosition(p));
+		throw LangParserExcep("End of buffer while parsing basic expression.", errorPosition(p));
 
 	SrcLocation loc = locationForParseInfo(p);
 
@@ -802,7 +802,7 @@ ASTNodeRef LangParser::parseBasicExpression(ParseInfo& p)
 		if(isTokenCurrent(CLOSE_PARENTHESIS_TOKEN, p))
 		{
 			// Then this is an empty tuple, which we won't allow
-			throw LangParserExcep("Empty tuples not allowed." + errorPosition(p));
+			throw LangParserExcep("Empty tuples not allowed.", errorPosition(p));
 		}
 
 		const ASTNodeRef e = parseExpression(p);
@@ -827,7 +827,7 @@ ASTNodeRef LangParser::parseBasicExpression(ParseInfo& p)
 					skipExpectedToken(COMMA_TOKEN, p);
 				}
 				else
-					throw LangParserExcep("Unexpected token while parsing tuple." + errorPosition(p));
+					throw LangParserExcep("Unexpected token while parsing tuple.", errorPosition(p));
 			}
 		}
 
@@ -860,7 +860,7 @@ ASTNodeRef LangParser::parseBasicExpression(ParseInfo& p)
 	}
 	else
 	{
-		throw LangParserExcep("Expected literal or identifier in expression." + errorPosition(p));
+		throw LangParserExcep("Expected literal or identifier in expression.", errorPosition(p));
 	}
 }
 
@@ -1107,7 +1107,7 @@ TypeVRef LangParser::parseVectorType(ParseInfo& p)
 	const int64 num = int_literal->value;
 
 	if(num <= 0 || num >= 128)
-		throw LangParserExcep("num must be > 0, < 128");
+		throw LangParserExcep("num must be > 0, < 128", errorPosition(p));
 
 	parseToken(RIGHT_ANGLE_BRACKET_TOKEN, p);
 
@@ -1410,7 +1410,8 @@ ASTNodeRef LangParser::parseHighPrecedenceExpression(ParseInfo& p)
 
 	while(1)
 	{
-		SrcLocation loc = locationForParseInfo(p);
+		const SrcLocation prev_loc = prevTokenLoc(p);
+		const SrcLocation loc = locationForParseInfo(p);
 
 		const unsigned int initial_pos = p.i;
 		
@@ -1421,11 +1422,11 @@ ASTNodeRef LangParser::parseHighPrecedenceExpression(ParseInfo& p)
 
 			// Parse parameter list
 			if(p.i == p.tokens.size())
-				throw LangParserExcep("Expected ')'");
+				throw LangParserExcep("Expected ')'", errorPosition(p));
 
 			vector<ASTNodeRef> arg_expressions;
 
-			FunctionExpressionRef func_expr = new FunctionExpression(loc);
+			FunctionExpressionRef func_expr = new FunctionExpression(prev_loc);
 
 			if(p.tokens[p.i]->getType() != CLOSE_PARENTHESIS_TOKEN)
 			{
@@ -1475,9 +1476,9 @@ ASTNodeRef LangParser::parseHighPrecedenceExpression(ParseInfo& p)
 				return left;
 			}
 			else if(p.i >= p.tokens.size())
-				throw LangParserExcep("End of buffer while parsing array subscript expression.");
+				throw LangParserExcep("End of buffer while parsing array subscript expression.", errorPosition(p));
 			else
-				throw LangParserExcep("Expected ']' or ','." + errorPosition(p));
+				throw LangParserExcep("Expected ']' or ','.", errorPosition(p));
 		}
 		else if(isTokenCurrent(DOT_TOKEN, p))
 		{
@@ -1574,7 +1575,7 @@ ASTNodeRef LangParser::parseArrayOrVectorOrTupleLiteral(ParseInfo& p)
 	}
 
 	if(!isTokenCurrent(CLOSE_SQUARE_BRACKET_TOKEN, p))
-		throw LangParserExcep("Expected " + tokenName(CLOSE_SQUARE_BRACKET_TOKEN) + ", found " + tokenDescription(p.tokens[p.i]) + "." + errorPosition(p));
+		throw LangParserExcep("Expected " + tokenName(CLOSE_SQUARE_BRACKET_TOKEN) + ", found " + tokenDescription(p.tokens[p.i]) + ".", errorPosition(p));
 
 	const std::string& suffix = p.tokens[p.i].downcastToPtr<CLOSE_SQUARE_BRACKET_Token>()->suffix;
 
@@ -1602,7 +1603,7 @@ ASTNodeRef LangParser::parseArrayOrVectorOrTupleLiteral(ParseInfo& p)
 		{
 			has_int_suffix = true;
 			if(!temp_p.parseInt(int_suffix))
-				throw LangParserExcep("Invalid array literal suffix '" + suffix + "'.");
+				throw LangParserExcep("Invalid array literal suffix '" + suffix + "'.", errorPosition(p));
 		}
 		return new ArrayLiteral(elems, loc, has_int_suffix, int_suffix);
 	}
@@ -1622,7 +1623,7 @@ ASTNodeRef LangParser::parseArrayOrVectorOrTupleLiteral(ParseInfo& p)
 			{
 				has_int_suffix = true;
 				if(!temp_p.parseInt(int_suffix))
-					throw LangParserExcep("Invalid varray literal suffix '" + suffix + "'.");
+					throw LangParserExcep("Invalid varray literal suffix '" + suffix + "'.", errorPosition(p));
 			}
 			return new VArrayLiteral(elems, loc, has_int_suffix, int_suffix);
 		}
@@ -1634,7 +1635,7 @@ ASTNodeRef LangParser::parseArrayOrVectorOrTupleLiteral(ParseInfo& p)
 			{
 				has_int_suffix = true;
 				if(!temp_p.parseInt(int_suffix))
-					throw LangParserExcep("Invalid vector literal suffix '" + suffix + "'.");
+					throw LangParserExcep("Invalid vector literal suffix '" + suffix + "'.", errorPosition(p));
 			}
 			return new VectorLiteral(elems, loc, has_int_suffix, int_suffix);
 		}
@@ -1644,7 +1645,7 @@ ASTNodeRef LangParser::parseArrayOrVectorOrTupleLiteral(ParseInfo& p)
 		//if(elems.size() > 1)
 		//{
 		//	// This is definitely a vector or array literal without the suffix.
-			throw LangParserExcep("Unknown square bracket literal suffix '" + suffix + "'.");
+			throw LangParserExcep("Unknown square bracket literal suffix '" + suffix + "'.", errorPosition(p));
 		/*}
 		else
 		{
@@ -1704,7 +1705,7 @@ ASTNodeRef LangParser::parseArrayOrVectorOrTupleLiteral(ParseInfo& p)
 		else if(p.i >= p.tokens.size())
 			throw LangParserExcep("End of buffer while parsing array subscript expression.");
 		else
-			throw LangParserExcep("Expected ']' or ','." + errorPosition(p));
+			throw LangParserExcep("Expected ']' or ','.", errorPosition(p));
 	}
 
 	return main_expr;
@@ -1749,7 +1750,7 @@ Reference<LetASTNode> LangParser::parseLet(ParseInfo& p)
 		else if(isTokenCurrent(EQUALS_TOKEN, p))
 			break;
 		else
-			throw LangParserExcep("Expected ',' or '=' while parsing let." + errorPosition(p));
+			throw LangParserExcep("Expected ',' or '=' while parsing let.", errorPosition(p));
 	}
 
 	parseToken(EQUALS_TOKEN, p);
@@ -1829,7 +1830,7 @@ void LangParser::parseParameterList(ParseInfo& p, std::vector<FunctionDefinition
 	while(1)
 	{
 		if(p.i >= p.tokens.size())
-			throw LangParserExcep("End of buffer before end of parameter list.");
+			throw LangParserExcep("End of buffer before end of parameter list.", errorPosition(p));
 		else if(p.tokens[p.i]->getType() == CLOSE_PARENTHESIS_TOKEN)
 		{
 			skipExpectedToken(CLOSE_PARENTHESIS_TOKEN, p);
@@ -1843,7 +1844,7 @@ void LangParser::parseParameterList(ParseInfo& p, std::vector<FunctionDefinition
 
 		if(p.i >= p.tokens.size())
 		{
-			throw LangParserExcep("End of buffer before end of parameter list.");
+			throw LangParserExcep("End of buffer before end of parameter list.", errorPosition(p));
 		}
 		else if(p.tokens[p.i]->getType() == CLOSE_PARENTHESIS_TOKEN)
 		{
@@ -1856,40 +1857,40 @@ void LangParser::parseParameterList(ParseInfo& p, std::vector<FunctionDefinition
 		}
 		else
 		{
-			throw LangParserExcep("Expected ',' or ')' while parsing parameter list of function. " + errorPosition(p));
+			throw LangParserExcep("Expected ',' or ')' while parsing parameter list of function. ", errorPosition(p));
 		}
 	}
 
 }
 
 
-const std::string LangParser::errorPosition(const SourceBuffer& buffer, size_t char_index)
+BufferPosition LangParser::errorPosition(const SourceBuffer& buffer, size_t char_index)
 {
-	return Diagnostics::positionString(buffer, char_index);
+	return BufferPosition(SourceBufferConstRef(&buffer), char_index, /*len=*/1);
 }
 
 
-const std::string LangParser::errorPosition(const ParseInfo& p)
+BufferPosition LangParser::errorPosition(const ParseInfo& p)
 {
 	if(p.i < (unsigned int)p.tokens.size())
-		return errorPosition(*p.text_buffer, p.tokens[p.i]->char_index);
+		return BufferPosition(p.text_buffer, p.tokens[p.i]->char_index, p.tokens[p.i]->num_chars);
 	else
 	{
 		// End of buffer.
-		if(p.tokens.empty())
-			return "end of buffer";
+		if(p.text_buffer->source.empty())
+			return BufferPosition(p.text_buffer, 0, 0);
 		else
-			return errorPosition(*p.text_buffer, (unsigned int)p.text_buffer->source.size() - 1);
+			return BufferPosition(p.text_buffer, p.text_buffer->source.size() - 1, /*len=*/1);
 	}
 }
 
 
-const std::string LangParser::errorPositionPrevToken(ParseInfo& p)
+BufferPosition LangParser::errorPositionPrevToken(ParseInfo& p)
 {
 	if(p.i >= 1 && p.i < p.tokens.size() + 1)
 		return errorPosition(*p.text_buffer, p.tokens[p.i - 1]->char_index);
 	else
-		return "Unknown";
+		return BufferPosition(p.text_buffer, 0, 0);
 }
 
 

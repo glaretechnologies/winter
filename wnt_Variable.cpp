@@ -204,7 +204,7 @@ static BindInfo doBind(const std::vector<ASTNode*>& stack, int s, const std::str
 					// It's an error to have code like "let x = x + 1"
 					for(size_t v=0; v<let_block->lets[i]->vars.size(); ++v)
 						if(let_block->lets[i]->vars[v].name == name)
-							throw BaseException("Variable '" + name + "' is in a let expression with the same name");
+							throw ExceptionWithPosition("Variable '" + name + "' is in a let expression with the same name", errorContext(var));
 
 					// Don't try and bind with let variables equal to or past this one.
 					break;
@@ -257,7 +257,7 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 	}
 	catch(BaseException& e)
 	{
-		throw BaseException(e.what() + errorContext(*this, payload));
+		throw ExceptionWithPosition(e.what(), errorContext(*this, payload));
 	}
 
 	// Try and bind to a top level function definition
@@ -269,7 +269,7 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 		assert(matching_functions.size() > 0);
 
 		if(matching_functions.size() > 1)
-			throw BaseException("Ambiguous binding for variable '" + this->name + "': multiple functions with name." + errorContext(*this, payload));
+			throw ExceptionWithPosition("Ambiguous binding for variable '" + this->name + "': multiple functions with name.", errorContext(*this, payload));
 
 		FunctionDefinition* target_func_def = matching_functions[0].getPointer();
 
@@ -302,8 +302,7 @@ void Variable::bindVariables(TraversalPayload& payload, const std::vector<ASTNod
 		}
 	}
 
-	throw BaseException("No such function, function argument, named constant or let definition '" + this->name + "'." + 
-		errorContext(*this, payload));
+	throw ExceptionWithPosition("No such function, function argument, named constant or let definition '" + this->name + "'.", errorContext(*this, payload));
 }
 
 
@@ -315,7 +314,7 @@ void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 	{
 		assert(this->binding_type != BindingType_Unbound);
 		if(this->binding_type == BindingType_Unbound)
-			BaseException("No such function, function argument, named constant or let definition '" + this->name + "'." + errorContext(*this, payload));
+			ExceptionWithPosition("No such function, function argument, named constant or let definition '" + this->name + "'.", errorContext(*this, payload));
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
@@ -454,7 +453,7 @@ ValueRef Variable::exec(VMState& vmstate)
 
 		// Get ref to capturedVars structure of values, will be passed in as last arg to function
 		if(vmstate.argument_stack.empty())
-			throw BaseException("out of bounds");
+			throw ExceptionWithPosition("out of bounds", errorContext(this));
 		ValueRef captured_struct = vmstate.argument_stack.back();
 		const StructureValue* s = checkedCast<StructureValue>(captured_struct.getPointer());
 
@@ -467,7 +466,7 @@ ValueRef Variable::exec(VMState& vmstate)
 	if(this->binding_type == BindingType_Argument)
 	{
 		if(vmstate.func_args_start.empty() || (vmstate.func_args_start.back() + arg_index >= vmstate.argument_stack.size()))
-			throw BaseException("out of bounds");
+			throw ExceptionWithPosition("out of bounds", errorContext(this));
 
 		return vmstate.argument_stack[vmstate.func_args_start.back() + arg_index];
 	}

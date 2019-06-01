@@ -8,6 +8,7 @@ Copyright Glare Technologies Limited 2018 -
 
 #include "LanguageTestUtils.h"
 #include "FuzzTests.h"
+#include "wnt_Lexer.h"
 #include "wnt_ArrayLiteral.h"
 #include "wnt_VectorLiteral.h"
 #include "wnt_TupleLiteral.h"
@@ -5107,6 +5108,8 @@ void LanguageTests::run()
 {
 	Timer timer;
 	TestResults results;
+
+	Lexer::test();
 
 	//useKnownReturnRefCountOptimsiation(3);
 

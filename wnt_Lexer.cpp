@@ -27,7 +27,7 @@ void Lexer::parseUnicodeEscapedChar(const SourceBufferRef& buffer, Parser& parse
 	parser.advance(); // Consume 'u'
 
 	if(parser.eof() || parser.current() != '{')
-		throw LexerExcep("Error while parsing character literal, was expecting a '{'." + errorPosition(buffer, parser.currentPos()));
+		throw LexerExcep("Error while parsing character literal, was expecting a '{'.", errorPosition(buffer, parser.currentPos()));
 
 	// Parse Unicode code point literal (like \u{7FFF})
 	parser.advance(); // Consume '{'
@@ -36,7 +36,7 @@ void Lexer::parseUnicodeEscapedChar(const SourceBufferRef& buffer, Parser& parse
 	while(1)
 	{
 		if(parser.eof())
-			throw LexerExcep("End of input while parsing char literal." + errorPosition(buffer, parser.currentPos()));
+			throw LexerExcep("End of input while parsing char literal.", errorPosition(buffer, parser.currentPos()));
 				
 		if(parser.current() == '}')
 		{
@@ -50,21 +50,21 @@ void Lexer::parseUnicodeEscapedChar(const SourceBufferRef& buffer, Parser& parse
 			parser.advance();
 		}
 		else
-			throw LexerExcep("Error while parsing escape sequence in character literal: invalid character '" + std::string(1, parser.current()) + "'." + errorPosition(buffer, parser.currentPos()));
+			throw LexerExcep("Error while parsing escape sequence in character literal: invalid character '" + std::string(1, parser.current()) + "'.", errorPosition(buffer, parser.currentPos()));
 	}
 
 	try
 	{
 		const uint32 code_point = hexStringToUInt32(code_point_s);
 		if(code_point > 0x10FFFF)
-			throw LexerExcep("Invalid code point '" + code_point_s + "'." + errorPosition(buffer, parser.currentPos()));
+			throw LexerExcep("Invalid code point '" + code_point_s + "'.", errorPosition(buffer, parser.currentPos()));
 
 		// Convert code point to UTF-8
 		s += UTF8Utils::encodeCodePoint(code_point);
 	}
 	catch(StringUtilsExcep& e)
 	{
-		throw LexerExcep("Error while parsing escape sequence: " + e.what() + " " + errorPosition(buffer, parser.currentPos()));
+		throw LexerExcep("Error while parsing escape sequence: " + e.what() + " ", errorPosition(buffer, parser.currentPos()));
 	}
 }
 
@@ -82,13 +82,13 @@ void Lexer::parseStringLiteral(const SourceBufferRef& buffer, Parser& parser, st
 	while(1)
 	{
 		if(parser.eof())
-			throw LexerExcep("End of input while parsing string literal." + errorPosition(buffer, parser.currentPos() - 1));
+			throw LexerExcep("End of input while parsing string literal.", errorPosition(buffer, parser.currentPos() - 1));
 
 		if(parser.current() == '\\') // If char is backslash, parse escape sequence:
 		{
 			parser.advance(); // Consume '\'
 			if(parser.eof())
-				throw LexerExcep("End of input while parsing string literal." + errorPosition(buffer, parser.currentPos()));
+				throw LexerExcep("End of input while parsing string literal.", errorPosition(buffer, parser.currentPos()));
 
 			if(parser.current() == '"')
 			{
@@ -120,7 +120,7 @@ void Lexer::parseStringLiteral(const SourceBufferRef& buffer, Parser& parser, st
 				parseUnicodeEscapedChar(buffer, parser, s);
 			}
 			else
-				throw LexerExcep("Invalid escape character." + errorPosition(buffer, parser.currentPos()));
+				throw LexerExcep("Invalid escape character.", errorPosition(buffer, parser.currentPos()));
 		}
 		else if(parser.current() == '"') // If got to end of string literal:
 		{
@@ -134,7 +134,7 @@ void Lexer::parseStringLiteral(const SourceBufferRef& buffer, Parser& parser, st
 		}
 	}
 
-	tokens_out.push_back(new StringLiteralToken(s, char_index));
+	tokens_out.push_back(new StringLiteralToken(s, char_index, parser.currentPos() - char_index));
 }
 
 
@@ -149,13 +149,13 @@ void Lexer::parseCharLiteral(const SourceBufferRef& buffer, Parser& parser, std:
 
 	std::string s;
 	if(parser.eof())
-		throw LexerExcep("End of input while parsing char literal." + errorPosition(buffer, parser.currentPos()));
+		throw LexerExcep("End of input while parsing char literal.", errorPosition(buffer, parser.currentPos()));
 
 	if(parser.current() == '\\') // If char is backslash, parse escape sequence:
 	{
 		parser.advance(); // Consume '\'
 		if(parser.eof())
-			throw LexerExcep("End of input while parsing char literal." + errorPosition(buffer, parser.currentPos()));
+			throw LexerExcep("End of input while parsing char literal.", errorPosition(buffer, parser.currentPos()));
 
 		if(parser.current() == '\'')
 		{
@@ -187,7 +187,7 @@ void Lexer::parseCharLiteral(const SourceBufferRef& buffer, Parser& parser, std:
 			parseUnicodeEscapedChar(buffer, parser, s);
 		}
 		else
-			throw LexerExcep("Invalid escape character." + errorPosition(buffer, parser.currentPos()));
+			throw LexerExcep("Invalid escape character.", errorPosition(buffer, parser.currentPos()));
 	}
 	else
 	{
@@ -197,10 +197,10 @@ void Lexer::parseCharLiteral(const SourceBufferRef& buffer, Parser& parser, std:
 
 	// Parse trailing single-quote
 	if(parser.eof() || (parser.current() != '\''))
-		throw LexerExcep("Error while parsing character literal, was expecting a single quote." + errorPosition(buffer, parser.currentPos()));
+		throw LexerExcep("Error while parsing character literal, was expecting a single quote.", errorPosition(buffer, parser.currentPos()));
 	parser.advance(); // Consume '
 
-	tokens_out.push_back(new CharLiteralToken(s, char_index));
+	tokens_out.push_back(new CharLiteralToken(s, char_index, parser.currentPos() - char_index));
 }
 
 
@@ -220,13 +220,13 @@ void Lexer::parseNumericLiteral(const SourceBufferRef& buffer, Parser& parser, s
 	{
 		double x;
 		if(!parser.parseDouble(x))
-			throw LexerExcep("Failed to parse real." + errorPosition(buffer, parser.currentPos()));
+			throw LexerExcep("Failed to parse real.", errorPosition(buffer, parser.currentPos()));
 
 		const char lastchar = parser.prev();
 		char suffix = 0;
 		if(lastchar == 'f' || lastchar == 'd')
 			suffix = lastchar;
-		tokens_out.push_back(new FloatLiteralToken(x, suffix, char_index));
+		tokens_out.push_back(new FloatLiteralToken(x, suffix, char_index, parser.currentPos() - char_index));
 	}
 	else
 	{
@@ -245,7 +245,7 @@ void Lexer::parseNumericLiteral(const SourceBufferRef& buffer, Parser& parser, s
 				parser.advance();
 			}
 			if(digits.size() == 2) // if still "0x":
-				throw LexerExcep("Failed to parse hexadecimal integer literal." + errorPosition(buffer, char_index));
+				throw LexerExcep("Failed to parse hexadecimal integer literal.", errorPosition(buffer, char_index));
 
 			uint64 val = hexStringTo64UInt(digits);
 			x = bitCast<int64>(val);
@@ -257,7 +257,7 @@ void Lexer::parseNumericLiteral(const SourceBufferRef& buffer, Parser& parser, s
 				const size_t pos = parser.currentPos();
 				string_view next_token;
 				parser.parseNonWSToken(next_token);
-				throw LexerExcep("Failed to parse int.  (Next chars '" + next_token.to_string() + "')" + errorPosition(buffer, pos));
+				throw LexerExcep("Failed to parse int.  (Next chars '" + next_token.to_string() + "')", errorPosition(buffer, pos));
 			}
 		}
 
@@ -274,7 +274,7 @@ void Lexer::parseNumericLiteral(const SourceBufferRef& buffer, Parser& parser, s
 				const size_t pos = parser.currentPos();
 				string_view next_token;
 				parser.parseNonWSToken(next_token);
-				throw LexerExcep("Failed to parse integer suffix after 'i':.  (Next chars '" + next_token.to_string() + "')" + errorPosition(buffer, pos));
+				throw LexerExcep("Failed to parse integer suffix after 'i':.  (Next chars '" + next_token.to_string() + "')", errorPosition(buffer, pos));
 			}
 		}
 		else if(parser.currentIsChar('u'))
@@ -289,15 +289,15 @@ void Lexer::parseNumericLiteral(const SourceBufferRef& buffer, Parser& parser, s
 					const size_t pos = parser.currentPos();
 					string_view next_token;
 					parser.parseNonWSToken(next_token);
-					throw LexerExcep("Failed to parse integer suffix after 'u':.  (Next chars '" + next_token.to_string() + "')" + errorPosition(buffer, pos));
+					throw LexerExcep("Failed to parse integer suffix after 'u':.  (Next chars '" + next_token.to_string() + "')", errorPosition(buffer, pos));
 				}
 			}
 		}
 
 		if(!(num_bits == 16 || num_bits == 32 || num_bits == 64))
-			throw LexerExcep("Integer must have 16, 32 or 64 bits." + errorPosition(buffer, suffix_pos));
+			throw LexerExcep("Integer must have 16, 32 or 64 bits.", errorPosition(buffer, suffix_pos));
 
-		tokens_out.push_back(new IntLiteralToken(x, num_bits, is_signed, char_index));
+		tokens_out.push_back(new IntLiteralToken(x, num_bits, is_signed, char_index, parser.currentPos() - char_index));
 	}
 }
 
@@ -317,11 +317,11 @@ void Lexer::parseIdentifier(const SourceBufferRef& buffer, Parser& parser, std::
 	}
 
 	if(s == "true")
-		tokens_out.push_back(new BoolLiteralToken(true, char_index));
+		tokens_out.push_back(new BoolLiteralToken(true, char_index, parser.currentPos() - char_index));
 	else if(s == "false")
-		tokens_out.push_back(new BoolLiteralToken(false, char_index));
+		tokens_out.push_back(new BoolLiteralToken(false, char_index, parser.currentPos() - char_index));
 	else
-		tokens_out.push_back(new IdentifierToken(s, char_index));
+		tokens_out.push_back(new IdentifierToken(s, char_index, parser.currentPos() - char_index));
 }
 
 
@@ -597,15 +597,15 @@ void Lexer::process(const SourceBufferRef& src, std::vector<Reference<TokenBase>
 		}
 		else
 		{
-			throw LexerExcep("Invalid character '" + std::string(1, parser.current()) + "'." + errorPosition(src, parser.currentPos()));
+			throw LexerExcep("Invalid character '" + std::string(1, parser.current()) + "'.", errorPosition(src, parser.currentPos()));
 		}
 	}
 }
 
 
-const std::string Lexer::errorPosition(const SourceBufferRef& buffer, size_t pos)
+BufferPosition Lexer::errorPosition(const SourceBufferRef& buffer, size_t pos)
 {
-	return Diagnostics::positionString(*buffer, myMin(pos, buffer->source.size() - 1));
+	return BufferPosition(buffer, pos, /*len=*/1);
 }
 
 
@@ -624,25 +624,41 @@ void Lexer::test()
 
 	testAssert(t[0]->getType() == FLOAT_LITERAL_TOKEN);
 	testAssert(::epsEqual(t[0]->getFloatLiteralValue(), -34.546e2));
+	testAssert(t[0]->char_index == 0);
+	testAssert(t[0]->num_chars == 9);
 
 	testAssert(t[1]->getType() == STRING_LITERAL_TOKEN);
 	testAssert(t[1]->getStringLiteralValue() == "hello");
+	testAssert(t[1]->char_index == 10);
+	testAssert(t[1]->num_chars == 7);
 
 	testAssert(t[2]->getType() == IDENTIFIER_TOKEN);
 	testAssert(t[2]->getIdentifierValue() == "whats_up123");
+	testAssert(t[2]->char_index == 18);
+	testAssert(t[2]->num_chars == 11);
 
 	testAssert(t[3]->getType() == STRING_LITERAL_TOKEN);
 	testAssert(t[3]->getStringLiteralValue() == "meh");
+	testAssert(t[3]->char_index == 32);
+	testAssert(t[3]->num_chars == 5);
 
 	testAssert(t[4]->getType() == INT_LITERAL_TOKEN);
 	testAssert(t[4]->getIntLiteralValue() == 123);
+	testAssert(t[4]->char_index == 37);
+	testAssert(t[4]->num_chars == 3);
 
 	testAssert(t[5]->getType() == COLON_TOKEN);
+	testAssert(t[5]->char_index == 40);
+	testAssert(t[5]->num_chars == 1);
 
 	testAssert(t[6]->getType() == OPEN_PARENTHESIS_TOKEN);
+	testAssert(t[6]->char_index == 41);
+	testAssert(t[6]->num_chars == 1);
 
 	testAssert(t[7]->getType() == BOOL_LITERAL_TOKEN);
 	testAssert(t[7]->getBoolLiteralValue() == false);
+	testAssert(t[7]->char_index == 42);
+	testAssert(t[7]->num_chars == 5);
 }
 
 

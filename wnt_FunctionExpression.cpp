@@ -105,7 +105,7 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 	if(VERBOSE_EXEC) conPrint(vmstate.indent() + "FunctionExpression, target_name=" + this->functionName() + "\n");
 
 	if(vmstate.func_args_start.size() > 1000)
-		throw BaseException("Function call level too deep, aborting.");
+		throw ExceptionWithPosition("Function call level too deep, aborting.", errorContext(this));
 
 
 	if(this->static_target_function != NULL && this->static_target_function->external_function.nonNull())
@@ -115,7 +115,7 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 		{
 			if(static_target_function->args.size() == 1 && (static_target_function->args[0].type->getType() == Type::FloatType))
 			{
-				if(this->argument_expressions.size() != 1) throw BaseException("Invalid num args.");
+				if(this->argument_expressions.size() != 1) throw ExceptionWithPosition("Invalid num args.", errorContext(this));
 				ValueRef arg0 = this->argument_expressions[0]->exec(vmstate);
 				FLOAT1_TO_FLOAT_TYPE f = (FLOAT1_TO_FLOAT_TYPE)this->static_target_function->external_function->func;
 				return new FloatValue(f(checkedCast<FloatValue>(arg0)->value));
@@ -124,7 +124,7 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 				(static_target_function->args[0].type->getType() == Type::FloatType) &&
 				(static_target_function->args[1].type->getType() == Type::FloatType))
 			{
-				if(this->argument_expressions.size() != 2) throw BaseException("Invalid num args.");
+				if(this->argument_expressions.size() != 2) throw ExceptionWithPosition("Invalid num args.", errorContext(this));
 				ValueRef arg0 = this->argument_expressions[0]->exec(vmstate);
 				ValueRef arg1 = this->argument_expressions[1]->exec(vmstate);
 				FLOAT2_TO_FLOAT_TYPE f = (FLOAT2_TO_FLOAT_TYPE)this->static_target_function->external_function->func;
@@ -136,7 +136,7 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 		{
 			if(static_target_function->args.size() == 1 && (static_target_function->args[0].type->getType() == Type::DoubleType))
 			{
-				if(this->argument_expressions.size() != 1) throw BaseException("Invalid num args.");
+				if(this->argument_expressions.size() != 1) throw ExceptionWithPosition("Invalid num args.", errorContext(this));
 				ValueRef arg0 = this->argument_expressions[0]->exec(vmstate);
 				DOUBLE1_TO_DOUBLE_TYPE f = (DOUBLE1_TO_DOUBLE_TYPE)this->static_target_function->external_function->func;
 				return new DoubleValue(f(checkedCast<DoubleValue>(arg0)->value));
@@ -145,7 +145,7 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 				(static_target_function->args[0].type->getType() == Type::DoubleType) &&
 				(static_target_function->args[1].type->getType() == Type::DoubleType))
 			{
-				if(this->argument_expressions.size() != 2) throw BaseException("Invalid num args.");
+				if(this->argument_expressions.size() != 2) throw ExceptionWithPosition("Invalid num args.", errorContext(this));
 				ValueRef arg0 = this->argument_expressions[0]->exec(vmstate);
 				ValueRef arg1 = this->argument_expressions[1]->exec(vmstate);
 				DOUBLE2_TO_DOUBLE_TYPE f = (DOUBLE2_TO_DOUBLE_TYPE)this->static_target_function->external_function->func;
@@ -158,7 +158,7 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 			if(static_target_function->args.size() == 1 && (static_target_function->args[0].type->getType() == Type::FloatType))
 			{
 				if(this->argument_expressions.size() != 1)
-					throw BaseException("Invalid num args.");
+					throw ExceptionWithPosition("Invalid num args.", errorContext(this));
 				ValueRef arg0 = this->argument_expressions[0]->exec(vmstate);
 				FLOAT1_TO_BOOL_TYPE f = (FLOAT1_TO_BOOL_TYPE)this->static_target_function->external_function->func;
 				return new BoolValue(f(checkedCast<FloatValue>(arg0)->value));
@@ -166,7 +166,7 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 			if(static_target_function->args.size() == 1 && (static_target_function->args[0].type->getType() == Type::DoubleType))
 			{
 				if(this->argument_expressions.size() != 1)
-					throw BaseException("Invalid num args.");
+					throw ExceptionWithPosition("Invalid num args.", errorContext(this));
 				ValueRef arg0 = this->argument_expressions[0]->exec(vmstate);
 				DOUBLE1_TO_BOOL_TYPE f = (DOUBLE1_TO_BOOL_TYPE)this->static_target_function->external_function->func;
 				return new BoolValue(f(checkedCast<DoubleValue>(arg0)->value));
@@ -194,7 +194,7 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 	else
 	{
 		if(this->get_func_expr.isNull())
-			throw BaseException("Function is not bound.");
+			throw ExceptionWithPosition("Function is not bound.", errorContext(this));
 
 		base_target_function_val = this->get_func_expr->exec(vmstate);
 		target_func_val = checkedCast<FunctionValue>(base_target_function_val);
@@ -464,7 +464,7 @@ void FunctionExpression::bindFunction(Linker& linker, TraversalPayload& payload,
 				string s = "Found more than one possible match for overloaded function: \n";
 				for(size_t z=0; z<possible_matches.size(); ++z)
 					s += possible_matches[z]->sig.toString() + "\n";
-				throw BaseException(s + "." + errorContext(*this));
+				throw BaseException(s + "." , errorContext(*this));
 			}*/
 		}
 
@@ -473,7 +473,7 @@ void FunctionExpression::bindFunction(Linker& linker, TraversalPayload& payload,
 
 		//TEMP: don't fail now, maybe we can bind later.
 		//if(this->binding_type == Unbound)
-		//	throw BaseException("Failed to find function '" + sig.toString() + "'." + errorContext(*this));
+		//	throw BaseException("Failed to find function '" + sig.toString() + "'." , errorContext(*this));
 	}
 }
 
@@ -628,7 +628,7 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 		{
 			assert(this->argument_expressions.size() == 2);
 			if(!this->argument_expressions[1]->isConstant())
-				throw BaseException("Second arg to shuffle must be constant");
+				throw ExceptionWithPosition("Second arg to shuffle must be constant", errorContext(this));
 
 			try
 			{
@@ -643,7 +643,7 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 				for(size_t i=0; i<mask.size(); ++i)
 				{
 					if(res_v->e[i]->valueType() != Value::ValueType_Int)
-						throw BaseException("Element in shuffle mask was not an integer.");
+						throw ExceptionWithPosition("Element in shuffle mask was not an integer.", errorContext(this));
 
 					const int64 index = static_cast<IntValue*>(res_v->e[i].getPointer())->value;
 					mask[i] = (int)index;
@@ -653,9 +653,9 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 				assert(this->static_target_function->built_in_func_impl->builtInType() == BuiltInFunctionImpl::BuiltInType_ShuffleBuiltInFunc);
 				static_cast<ShuffleBuiltInFunc*>(this->static_target_function->built_in_func_impl.getPointer())->setShuffleMask(mask);
 			}
-			catch(BaseException& e)
+			catch(ExceptionWithPosition& e)
 			{
-				throw BaseException("Failed to eval second arg of shuffle: " + e.what());
+				throw ExceptionWithPosition("Failed to eval second arg of shuffle: " + e.what(), errorContext(this));
 			}
 		}
 		// Set second arg now for elem(tuple, i)
@@ -663,7 +663,7 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 		{
 			assert(this->argument_expressions.size() == 2);
 			if(!this->argument_expressions[1]->isConstant())
-				throw BaseException("Second arg to elem(tuple, i) must be constant");
+				throw ExceptionWithPosition("Second arg to elem(tuple, i) must be constant", errorContext(this));
 
 			int64 index;
 			try
@@ -677,9 +677,9 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 
 				index = res_i->value;
 			}
-			catch(BaseException& e)
+			catch(ExceptionWithPosition& e)
 			{
-				throw BaseException("Failed to eval second arg of elem(tuple, i): " + e.what());
+				throw ExceptionWithPosition("Failed to eval second arg of elem(tuple, i): " + e.what(), errorContext(this));
 			}	
 
 			assert(this->static_target_function->built_in_func_impl.nonNull());
@@ -689,7 +689,7 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 
 			// bounds check index.
 			if(index < 0 || index >= (int64)tuple_elem_func->tuple_type->component_types.size())
-				throw BaseException("Second argument to tuple elem() function is out of range." + errorContext(*this));
+				throw ExceptionWithPosition("Second argument to tuple elem() function is out of range.", errorContext(*this));
 
 
 			tuple_elem_func->setIndex((int)index);//TODO: remove cast
@@ -718,9 +718,9 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 
 					fold_func->specialiseForFunctionArg(res_f->func_def);
 				}
-				catch(BaseException& e)
+				catch(ExceptionWithPosition& e)
 				{
-					throw BaseException("Failed to eval first arg of fold " + e.what());
+					throw ExceptionWithPosition("Failed to eval first arg of fold " + e.what(), errorContext(this));
 				}
 			//}
 		}
@@ -744,9 +744,9 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 
 					map_func->specialiseForFunctionArg(res_f->func_def);
 				}
-				catch(BaseException& e)
+				catch(ExceptionWithPosition& e)
 				{
-					throw BaseException("Failed to eval first arg of map " + e.what());
+					throw ExceptionWithPosition("Failed to eval first arg of map " + e.what(), errorContext(this));
 				}
 			//}
 		}
@@ -760,14 +760,14 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 			{
 				const TypeRef arg_expr_type = this->argument_expressions[i]->type(); // may be NULL
 				if(arg_expr_type.isNull())
-					throw BaseException("Failed to find function '" + this->static_function_name + "', argument " + toString(i + 1) + " had unknown type." + errorContext(*this));
+					throw ExceptionWithPosition("Failed to find function '" + this->static_function_name + "', argument " + toString(i + 1) + " had unknown type.", errorContext(*this));
 
 				argtypes.push_back(TypeVRef(arg_expr_type));
 			}
 
 			const FunctionSignature sig(this->static_function_name, argtypes);
 
-			std::string msg = "Failed to find function '" + sig.toString() + "'." + errorContext(*this);
+			std::string msg = "Failed to find function '" + sig.toString() + "'.";
 
 			// Print out signatures of other functions with the same name
 			std::vector<FunctionDefinitionRef> funcs_same_name;
@@ -779,7 +779,7 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 					msg += funcs_same_name[i]->sig.toString() + "\n";
 			}
 
-			throw BaseException(msg);
+			throw ExceptionWithPosition(msg, errorContext(this));
 		}
 	}
 	else if(payload.operation == TraversalPayload::CheckInDomain)
@@ -794,17 +794,17 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 		{
 			const TypeRef get_func_expr_type = this->get_func_expr->type();
 			if(get_func_expr_type->getType() != Type::FunctionType)
-				throw BaseException("expression did not have function type." + errorContext(*get_func_expr));
+				throw ExceptionWithPosition("expression did not have function type.", errorContext(*get_func_expr));
 
 			const Function* function_type = get_func_expr_type.downcastToPtr<Function>();
 
 			if(function_type->arg_types.size() != argument_expressions.size())
-				throw BaseException("Incorrect number of arguments for function." + errorContext(*get_func_expr));
+				throw ExceptionWithPosition("Incorrect number of arguments for function.", errorContext(*get_func_expr));
 
 			for(size_t i=0; i<function_type->arg_types.size(); ++i)
 			{
 				if(*argument_expressions[i]->type() != *function_type->arg_types[i])
-					throw BaseException("Invalid type for argument: argument type was " + argument_expressions[i]->type()->toString() + ", expected type " + function_type->arg_types[i]->toString() + "." + errorContext(*get_func_expr));
+					throw ExceptionWithPosition("Invalid type for argument: argument type was " + argument_expressions[i]->type()->toString() + ", expected type " + function_type->arg_types[i]->toString() + ".", errorContext(*get_func_expr));
 			}
 		}
 
@@ -1190,7 +1190,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 				}
 				else
 				{
-					throw BaseException("Constant index with value " + toString(index_val) + " was out of bounds of array type " + array_type->toString() + errorContext(*this));
+					throw ExceptionWithPosition("Constant index with value " + toString(index_val) + " was out of bounds of array type " + array_type->toString(), errorContext(*this));
 				}
 			}
 			else
@@ -1341,7 +1341,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 				}
 				else
 				{
-					throw BaseException("Constant index with value " + toString(index_val) + " was out of bounds of vector type " + vector_type->toString() + errorContext(*this));
+					throw ExceptionWithPosition("Constant index with value " + toString(index_val) + " was out of bounds of vector type " + vector_type->toString(), errorContext(*this));
 				}
 			}
 			else
@@ -1484,7 +1484,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 					if(index_val >= 0 && index_val < (int64)varray_literal->numElementsInValue())
 						return; // Array index is in-bounds!
 					else
-						throw BaseException("Constant index with value " + toString(index_val) + " was out of bounds of varray" + errorContext(*this));
+						throw ExceptionWithPosition("Constant index with value " + toString(index_val) + " was out of bounds of varray", errorContext(*this));
 				}
 				else
 				{
@@ -1501,7 +1501,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 			}
 		}
 
-		throw BaseException("Failed to prove elem() argument is in-bounds." + errorContext(*this));
+		throw ExceptionWithPosition("Failed to prove elem() argument is in-bounds.", errorContext(*this));
 	}
 	// truncateToInt
 	else if(this->static_target_function && this->static_target_function->sig.name == "truncateToInt" && this->argument_expressions.size() == 1)
@@ -1556,7 +1556,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 				}
 				else
 				{
-					throw BaseException("Constant index with value " + toString(index_val) + " was out of bounds of array type " + array_type->toString() + errorContext(*this));
+					throw ExceptionWithPosition("Constant index with value " + toString(index_val) + " was out of bounds of array type " + array_type->toString(), errorContext(*this));
 				}
 			}
 			else
@@ -1576,7 +1576,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 			}
 		}
 
-		throw BaseException("Failed to prove update() index argument is in-bounds." + errorContext(*this));
+		throw ExceptionWithPosition("Failed to prove update() index argument is in-bounds.", errorContext(*this));
 	}
 	else if(this->static_target_function && this->static_target_function->sig.name == "toInt32" && this->argument_expressions.size() == 1)
 	{
@@ -1593,7 +1593,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 			if(val >= -2147483648LL && val <= 2147483647LL)
 				return; // argument is in-bounds!
 			else
-				throw BaseException("Value " + toString(val) + " was out of domain of toInt32()." + errorContext(*this));
+				throw ExceptionWithPosition("Value " + toString(val) + " was out of domain of toInt32().", errorContext(*this));
 		}
 		else
 		{
@@ -1608,7 +1608,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 				return; // Argument is proven to be in-bounds.
 		}
 
-		throw BaseException("Failed to prove toInt32() argument is in-bounds." + errorContext(*this));
+		throw ExceptionWithPosition("Failed to prove toInt32() argument is in-bounds.", errorContext(*this));
 	}
 }
 
@@ -1722,7 +1722,7 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 	if(this->static_function_name == "elem")
 	{
 		if(argument_expressions.size() != 2)
-			throw BaseException("Error while emitting OpenCL C: elem() function with != 2 args.");
+			throw ExceptionWithPosition("Error while emitting OpenCL C: elem() function with != 2 args.", errorContext(this));
 
 		if(this->argument_expressions[0]->type()->getType() == Type::VectorTypeType)
 		{
@@ -1738,12 +1738,12 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 			*/
 
 			if(argument_expressions[1]->nodeType() != ASTNode::IntLiteralType)
-				throw BaseException("Error while emitting OpenCL C: elem() function with 2nd arg that is not an Int literal.");
+				throw ExceptionWithPosition("Error while emitting OpenCL C: elem() function with 2nd arg that is not an Int literal.", errorContext(this));
 
 			const int64 index = static_cast<const IntLiteral*>(argument_expressions[1].getPointer())->value;
 
 			if(index < 0 || index >= 16)
-				throw BaseException("Error while emitting OpenCL C: elem() function has invalid index: " + toString(index));
+				throw ExceptionWithPosition("Error while emitting OpenCL C: elem() function has invalid index: " + toString(index), errorContext(this));
 
 			return argument_expressions[0]->emitOpenCLC(params) + ".s" + ::intToHexChar((int)index);
 		}
@@ -1776,7 +1776,7 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 			*/
 
 			if(argument_expressions[1]->nodeType() != ASTNode::IntLiteralType)
-				throw BaseException("Error while emitting OpenCL C: elem(tuple, i) function with 2nd arg that is not an Int literal.");
+				throw ExceptionWithPosition("Error while emitting OpenCL C: elem(tuple, i) function with 2nd arg that is not an Int literal.", errorContext(this));
 
 			const int64 index = static_cast<const IntLiteral*>(argument_expressions[1].getPointer())->value;
 
@@ -1786,17 +1786,17 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 				return argument_expressions[0]->emitOpenCLC(params) + ".field_" + ::toString(index);
 		}
 		else
-			throw BaseException("Error while emitting OpenCL C: elem() function first arg has unsupported type " + argument_expressions[0]->type()->toString() );
+			throw ExceptionWithPosition("Error while emitting OpenCL C: elem() function first arg has unsupported type " + argument_expressions[0]->type()->toString(), errorContext(this));
 	}
 	else if(this->static_function_name == "shuffle")
 	{
 		try
 		{
 			if(argument_expressions.size() != 2)
-				throw BaseException("Error while emitting OpenCL C: shuffle() function with != 2 args.");
+				throw ExceptionWithPosition("Error while emitting OpenCL C: shuffle() function with != 2 args.", errorContext(this));
 
 			if(argument_expressions[1]->nodeType() != ASTNode::VectorLiteralType)
-				throw BaseException("Error while emitting OpenCL C: shuffle() function with 2nd arg that is not a Vector literal.");
+				throw ExceptionWithPosition("Error while emitting OpenCL C: shuffle() function with 2nd arg that is not a Vector literal.", errorContext(this));
 
 			const VectorLiteral* vec_literal = static_cast<const VectorLiteral*>(argument_expressions[1].getPointer());
 
@@ -1805,7 +1805,7 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 			for(size_t i=0; i<vec_literal->getElements().size(); ++i)
 			{
 				if(vec_literal->getElements()[i]->nodeType() != ASTNode::IntLiteralType)
-					throw BaseException("Error while emitting OpenCL C: shuffle() function with 2nd arg that does not have an int literal in the vector literal.");
+					throw ExceptionWithPosition("Error while emitting OpenCL C: shuffle() function with 2nd arg that does not have an int literal in the vector literal.", errorContext(this));
 
 				const int64 index = static_cast<const IntLiteral*>(vec_literal->getElements()[i].getPointer())->value;
 
@@ -1816,7 +1816,7 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 		}
 		catch(StringUtilsExcep& e)
 		{
-			throw BaseException("Error while emitting shuffle function: " + e.what());
+			throw ExceptionWithPosition("Error while emitting shuffle function: " + e.what(), errorContext(this));
 		}
 	}
 	else if(isENFunctionName(static_function_name) && 
@@ -1853,11 +1853,11 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 				return argument_expressions[0]->emitOpenCLC(params) + "[" + ::intToHexChar((int)index) + "]";
 			}
 			else
-				throw BaseException("Error while emitting OpenCL C: eN() function first arg not supported for type " + argument_expressions[0]->type()->toString());
+				throw ExceptionWithPosition("Error while emitting OpenCL C: eN() function first arg not supported for type " + argument_expressions[0]->type()->toString(), errorContext(this));
 		}
 		catch(StringUtilsExcep&)
 		{
-			throw BaseException("Error while emitting OpenCL C: invalid eN() function '" + static_function_name + "'.");
+			throw ExceptionWithPosition("Error while emitting OpenCL C: invalid eN() function '" + static_function_name + "'.", errorContext(this));
 		}
 	}
 	else if(static_target_function && static_target_function->built_in_func_impl.nonNull() && 
@@ -1869,7 +1869,7 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 		// x(s)			=>		s->x
 
 		if(argument_expressions.size() != 1)
-			throw BaseException("Error while emitting OpenCL C: get field function with != 1 args.");
+			throw ExceptionWithPosition("Error while emitting OpenCL C: get field function with != 1 args.", errorContext(this));
 
 		//if(argument_expressions[0]->nodeType() == ASTNode::VariableASTNodeType && argument_expressions[0].downcastToPtr<Variable>()->vartype == Variable::BindingType_Let)
 
@@ -1884,7 +1884,7 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 		// inBounds(a, i)			=>		i >= 0 && i < N
 
 		if(argument_expressions.size() != 2)
-			throw BaseException("Error while emitting OpenCL C: inBounds function with != 2 args.");
+			throw ExceptionWithPosition("Error while emitting OpenCL C: inBounds function with != 2 args.", errorContext(this));
 
 		size_t N;
 		if(this->argument_expressions[0]->type()->getType() == Type::VectorTypeType)
@@ -1896,7 +1896,7 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 			N = static_cast<ArrayType*>(this->argument_expressions[0]->type().getPointer())->num_elems;
 		}
 		else
-			throw BaseException("Error while emitting OpenCL C: inBounds arg 1 type must be vector array.");
+			throw ExceptionWithPosition("Error while emitting OpenCL C: inBounds arg 1 type must be vector array.", errorContext(this));
 
 		return "((" + argument_expressions[1]->emitOpenCLC(params) + " >= 0) && (" + argument_expressions[1]->emitOpenCLC(params) + " < " + toString(N) + "))";
 	}
@@ -1944,7 +1944,7 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 			);
 		}
 		else
-			throw BaseException("Error while emitting OpenCL C: First arg to iterate must be a constant reference to a globally defined function.");
+			throw ExceptionWithPosition("Error while emitting OpenCL C: First arg to iterate must be a constant reference to a globally defined function.", errorContext(this));
 
 
 		
@@ -2087,7 +2087,7 @@ TypeRef FunctionExpression::type() const
 			return get_func_expr_type.downcastToPtr<Function>()->return_type;
 		}
 		else
-			throw BaseException("expression does not have function type." + errorContext(*this));
+			throw ExceptionWithPosition("expression does not have function type.", errorContext(*this));
 	}
 	else
 	{
@@ -2353,7 +2353,7 @@ size_t FunctionExpression::getTimeBound(GetTimeBoundParams& params) const
 {
 	params.steps++;
 	if(params.steps > params.max_bound_computation_steps)
-		throw BaseException("Too many steps when computing time bound.");
+		throw ExceptionWithPosition("Too many steps when computing time bound.", errorContext(this));
 
 	size_t arg_eval_bound = 0;
 	for(size_t i=0; i<argument_expressions.size(); ++i)
@@ -2394,14 +2394,14 @@ size_t FunctionExpression::getTimeBound(GetTimeBoundParams& params) const
 		}
 		catch(BaseException& e)
 		{
-			throw BaseException(e.what() + errorContext(this->srcLocation()));
+			throw ExceptionWithPosition(e.what(), errorContext(this->srcLocation()));
 		}
 	}
 	else
 	{
 		// TODO: Compute a maximum over all functions that this expression may be calling.
 		//TEMP:
-		throw BaseException("Unable to bound time of function expression." + errorContext(this->srcLocation()));
+		throw ExceptionWithPosition("Unable to bound time of function expression.", errorContext(this->srcLocation()));
 	}
 }
 
@@ -2410,7 +2410,7 @@ GetSpaceBoundResults FunctionExpression::getSpaceBound(GetSpaceBoundParams& para
 {
 	params.steps++;
 	if(params.steps > params.max_bound_computation_steps)
-		throw BaseException("Too many steps when computing space bound.");
+		throw ExceptionWithPosition("Too many steps when computing space bound.", errorContext(this));
 
 	GetSpaceBoundResults arg_eval_bound(0, 0);
 	for(size_t i=0; i<argument_expressions.size(); ++i)
@@ -2453,14 +2453,14 @@ GetSpaceBoundResults FunctionExpression::getSpaceBound(GetSpaceBoundParams& para
 		}
 		catch(BaseException& e)
 		{
-			throw BaseException(e.what() + errorContext(this->srcLocation()));
+			throw ExceptionWithPosition(e.what(), errorContext(this->srcLocation()));
 		}
 	}
 	else
 	{
 		// TODO: Compute a maximum over all functions that this expression may be calling.
 		// TEMP:
-		throw BaseException("Unable to bound space of function expression." + errorContext(this->srcLocation()));
+		throw ExceptionWithPosition("Unable to bound space of function expression.", errorContext(this->srcLocation()));
 	}
 }
 

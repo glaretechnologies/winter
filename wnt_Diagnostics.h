@@ -16,6 +16,17 @@ namespace Winter
 {
 
 
+class BufferPosition
+{
+public:
+	BufferPosition(const SourceBufferConstRef& buffer_, size_t pos_, size_t len_) : buffer(buffer_), pos(pos_), len(len_) {}
+
+	SourceBufferConstRef buffer;
+	size_t pos;
+	size_t len;
+};
+
+
 /*=====================================================================
 Diagnostics
 -------------------
@@ -23,7 +34,7 @@ Diagnostics
 =====================================================================*/
 namespace Diagnostics
 {
-	const std::string positionString(const SourceBuffer& source_buffer, size_t char_index);
+	const std::string positionString(const BufferPosition& pos);
 
 };
 

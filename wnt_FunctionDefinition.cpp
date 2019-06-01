@@ -231,7 +231,7 @@ ValueRef FunctionDefinition::invoke(VMState& vmstate)
 	if(this->declared_return_type.nonNull() && (*body->type() != *this->declared_return_type))
 	{
 		// This may happen since type checking may not have been done yet.
-		throw BaseException("Returned object has invalid type.");
+		throw ExceptionWithPosition("Returned object has invalid type.", errorContext(this));
 	}
 
 	return ret;
@@ -265,7 +265,7 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 	//			// of this function.
 	//			if(*this->body->type() != *this->declared_return_type)
 	//				throw BaseException("Type error for function '" + this->sig.toString() + "': Computed return type '" + this->body->type()->toString() + 
-	//					"' is not equal to the declared return type '" + this->declared_return_type->toString() + "'." + errorContext(*this));
+	//					"' is not equal to the declared return type '" + this->declared_return_type->toString() + "'.", errorContext(*this));
 	//		}
 	//		else
 	//		{
@@ -346,13 +346,13 @@ void FunctionDefinition::traverse(TraversalPayload& payload, std::vector<ASTNode
 			{
 				const TypeRef body_type = this->body->type();
 				if(body_type.isNull()) // Will happen if body is a function expression bound to a newly concrete function that has not been type-checked yet.
-					throw BaseException("Type error for function '" + this->sig.toString() + "': Computed return type [Unknown] is not equal to the declared return type '" + this->declared_return_type->toString() + "'." + errorContext(*this));
+					throw ExceptionWithPosition("Type error for function '" + this->sig.toString() + "': Computed return type [Unknown] is not equal to the declared return type '" + this->declared_return_type->toString() + "'.", errorContext(*this));
 
 				// Check that the return type of the body expression is equal to the declared return type
 				// of this function.
 				if(*this->body->type() != *this->declared_return_type)
-					throw BaseException("Type error for function '" + this->sig.toString() + "': Computed return type '" + this->body->type()->toString() + 
-						"' is not equal to the declared return type '" + this->declared_return_type->toString() + "'." + errorContext(*this));
+					throw ExceptionWithPosition("Type error for function '" + this->sig.toString() + "': Computed return type '" + this->body->type()->toString() +
+						"' is not equal to the declared return type '" + this->declared_return_type->toString() + "'.", errorContext(*this));
 			}
 			else
 			{
@@ -1007,7 +1007,7 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 
 	TypeRef ret_type = returnType();
 	if(ret_type.isNull())
-		throw BaseException("Interal error: return type was NULL.");
+		throw ExceptionWithPosition("Interal error: return type was NULL.", errorContext(this));
 
 	llvm::FunctionType* functype = LLVMTypeUtils::llvmFunctionType(
 		arg_types, 
@@ -1085,7 +1085,7 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 		//std::cout << std::endl;
 		//llvm_func_constant->dump();
 		assert(0);
-		throw BaseException("Internal error while building function '" + sig.toString() + "', result was not a function.");
+		throw ExceptionWithPosition("Internal error while building function '" + sig.toString() + "', result was not a function.", errorContext(this));
 	}
 
 	llvm::Function* llvm_func = static_cast<llvm::Function*>(llvm_func_constant);
@@ -1313,7 +1313,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 					{
 						const TypeRef body_type = body->type();
 						if(body_type.isNull())
-							throw BaseException("Internal error: body type was null.");
+							throw ExceptionWithPosition("Internal error: body type was null.", errorContext(this));
 
 						// Load value
 						LLVMUtils::createCollectionCopy(
@@ -1519,7 +1519,7 @@ size_t FunctionDefinition::getTimeBound(GetTimeBoundParams& params) const
 	else if(external_function.nonNull())
 	{
 		if(external_function->time_bound == ExternalFunction::unknownTimeBound())
-			throw BaseException("Could not bound time for external function " + external_function->sig.toString());
+			throw ExceptionWithPosition("Could not bound time for external function " + external_function->sig.toString(), errorContext(this));
 
 		return external_function->time_bound;
 	}
@@ -1572,7 +1572,7 @@ GetSpaceBoundResults FunctionDefinition::getSpaceBound(GetSpaceBoundParams& para
 	{
 		if(external_function->stack_size_bound == ExternalFunction::unknownSpaceBound() ||
 			external_function->heap_size_bound == ExternalFunction::unknownSpaceBound())
-			throw BaseException("Could not bound space for external function " + external_function->sig.toString());
+			throw ExceptionWithPosition("Could not bound space for external function " + external_function->sig.toString(), errorContext(this));
 
 		return GetSpaceBoundResults(external_function->stack_size_bound, external_function->heap_size_bound);
 	}
@@ -1644,7 +1644,7 @@ StructureTypeVRef FunctionDefinition::getCapturedVariablesStructType() const
 		// Get the type of the captured variable.
 		const TypeRef field_type = (*z)->type();
 		if(field_type.isNull())
-			throw BaseException("Error: field type for captured var is null.");
+			throw ExceptionWithPosition("Error: field type for captured var is null.", errorContext(this));
 
 		field_types.push_back(TypeVRef(field_type));
 		field_names.push_back("captured_var_" + toString((uint64)free_var_index));

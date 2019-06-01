@@ -52,7 +52,7 @@ TupleLiteral::TupleLiteral(const std::vector<ASTNodeRef>& elems, const SrcLocati
 	elements(elems)
 {
 	if(elems.empty())
-		throw BaseException("Tuple literal can't be empty." + errorContext(*this));
+		throw ExceptionWithPosition("Tuple literal can't be empty.", errorContext(*this));
 }
 
 

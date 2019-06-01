@@ -92,19 +92,19 @@ void LetASTNode::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 			// of this function.
 			if(vars[0].declared_type.nonNull())
 				if(*expr->type() != *vars[0].declared_type)
-					throw BaseException("Type error for let '" + vars[0].name + "': Computed return type '" + this->expr->type()->toString() + 
-						"' is not equal to the declared return type '" + vars[0].declared_type->toString() + "'." + errorContext(*this));
+					throw ExceptionWithPosition("Type error for let '" + vars[0].name + "': Computed return type '" + this->expr->type()->toString() +
+						"' is not equal to the declared return type '" + vars[0].declared_type->toString() + "'.", errorContext(*this));
 		}
 		else
 		{
 			assert(vars.size() > 1);
 			if(expr->type()->getType() != Type::TupleTypeType)
-				throw BaseException("Type error for let with destructuring assignment.  Value expression must have tuple type." + errorContext(*this)); 
+				throw ExceptionWithPosition("Type error for let with destructuring assignment.  Value expression must have tuple type.", errorContext(*this));
 
 			const TupleTypeRef tuple_type = expr->type().downcast<TupleType>();
 
 			if(tuple_type->component_types.size() != vars.size())
-				throw BaseException("Number of let vars must equal num elements in tuple." + errorContext(*this)); 
+				throw ExceptionWithPosition("Number of let vars must equal num elements in tuple.", errorContext(*this));
 
 
 			for(size_t i=0; i<vars.size(); ++i)
@@ -112,8 +112,8 @@ void LetASTNode::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stac
 				if(vars[i].declared_type.nonNull())
 				{
 					if(*tuple_type->component_types[i] != *vars[i].declared_type)
-						throw BaseException("Type error for let '" + vars[i].name + "': Computed return type '" + tuple_type->component_types[i]->toString() + 
-							"' is not equal to the declared return type '" + vars[i].declared_type->toString() + "'." + errorContext(*this));
+						throw ExceptionWithPosition("Type error for let '" + vars[i].name + "': Computed return type '" + tuple_type->component_types[i]->toString() +
+							"' is not equal to the declared return type '" + vars[i].declared_type->toString() + "'.", errorContext(*this));
 				}
 			}
 		}

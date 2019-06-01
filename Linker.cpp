@@ -43,7 +43,7 @@ void Linker::addFunctions(const vector<FunctionDefinitionRef>& new_func_defs)
 void Linker::addFunction(const FunctionDefinitionRef& def)
 {
 	if(this->sig_to_function_map.find(def->sig) != this->sig_to_function_map.end())
-		throw BaseException("Function " + def->sig.toString() + " already defined: " + errorContext(def.getPointer()) + "\nalready defined here: " + 
+		throw ExceptionWithPosition("Function " + def->sig.toString() + " already defined: " + errorContextString(def.getPointer()) + "\nalready defined here: ",
 		errorContext(this->sig_to_function_map[def->sig].getPointer()));
 
 	this->name_to_functions_map[def->sig.name].push_back(def);
@@ -63,8 +63,8 @@ void Linker::addTopLevelDefs(const vector<ASTNodeRef>& defs)
 			const NamedConstantRef named_constant = defs[i].downcast<NamedConstant>();
 			
 			if(named_constant_map.find(named_constant->name) != named_constant_map.end())
-				throw BaseException("Named constant with name '" + named_constant->name + "' already defined." + errorContext(*named_constant) + 
-				"\nalready defined here: " + errorContext(named_constant_map[named_constant->name].getPointer()));
+				throw ExceptionWithPosition("Named constant with name '" + named_constant->name + "' already defined." + errorContextString(*named_constant) +
+				"\nalready defined here: ", errorContext(named_constant_map[named_constant->name].getPointer()));
 
 			named_constant_map[named_constant->name] = named_constant;
 
@@ -279,7 +279,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 	if(sig_lookup_res != sig_to_function_map.end())
 	{
 		if(sig_lookup_res->second->order_num >= effective_callsite_order_num && effective_callsite_order_num != -1)
-			throw BaseException("Tried to refer to a function defined later: " + sig.toString() + errorContext(call_src_location) + "\ntried to call function defined later: " + errorContext(*sig_lookup_res->second));
+			throw ExceptionWithPosition("Tried to refer to a function defined later: " + sig.toString() + errorContextString(call_src_location) + "\ntried to call function defined later: ", errorContext(*sig_lookup_res->second));
 		//if(sig_lookup_res->second->order_num < effective_callsite_order_num || effective_callsite_order_num == -1) //  !func_def_stack || isTargetDefinedBeforeAllInStack(*func_def_stack, sig_lookup_res->second->order_num))
 		return sig_lookup_res->second;
 	}
@@ -552,12 +552,12 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 			
 				// map(function<T, R>, array<T, N>) array<R, N>
 				if(func_type->arg_types.size() != 1)
-					throw BaseException("Function argument to map must take one argument.");
+					throw ExceptionWithPosition("Function argument to map must take one argument.", errorContext(call_src_location));
 
 				if(*func_type->arg_types[0] != *array_elem_type)
 				{
-					throw BaseException(std::string("Function argument to map must take same argument type as array element.\n") + 
-						"Function type: " + func_type->toString() + ",\n array_elem_type: " + array_elem_type->toString());
+					throw ExceptionWithPosition(std::string("Function argument to map must take same argument type as array element.\n") +
+						"Function type: " + func_type->toString() + ",\n array_elem_type: " + array_elem_type->toString(), errorContext(call_src_location));
 				}
 
 				const vector<FunctionDefinition::FunctionArg> args = makeFunctionArgPair("f", func_type, "array", array_type);
@@ -992,7 +992,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 		if(sig.name == "makeVArray" && sig.param_types[1]->getType() == Type::IntType)
 		{
 			if(sig.param_types[1].downcastToPtr<Int>()->numBits() != 64)
-				throw BaseException("second argument to makeVArray() must have type int64.");
+				throw ExceptionWithPosition("second argument to makeVArray() must have type int64.", errorContext(call_src_location));
 
 			const vector<FunctionDefinition::FunctionArg> args = makeFunctionArgPair("element", sig.param_types[0], "count", sig.param_types[1]);
 
@@ -1037,31 +1037,31 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 
 		// Check func_type
 		if(func_type->arg_types.size() != invariant_data_type.size() + 2)
-			throw BaseException("function argument to iterate must have 2 + 'num invariant data args' args.");
+			throw ExceptionWithPosition("function argument to iterate must have 2 + 'num invariant data args' args.", errorContext(call_src_location));
 		
 		if(*func_type->arg_types[0] != *state_type)
-			throw BaseException("First argument type to function argument to iterate must be same as initial_state type.");
+			throw ExceptionWithPosition("First argument type to function argument to iterate must be same as initial_state type.", errorContext(call_src_location));
 
 		if(func_type->arg_types[1]->getType() != Type::IntType)
-			throw BaseException("second argument type to function argument to iterate must be int.");
+			throw ExceptionWithPosition("second argument type to function argument to iterate must be int.", errorContext(call_src_location));
 
 		for(size_t i=0; i<invariant_data_type.size(); ++i)
 		{
 			if(*func_type->arg_types[2 + i] != *invariant_data_type[i])
-				throw BaseException("Argument type to function argument to iterate must be same as invariant_data type."); // TODO: improve error msg.
+				throw ExceptionWithPosition("Argument type to function argument to iterate must be same as invariant_data type.", errorContext(call_src_location)); // TODO: improve error msg.
 		}
 
 		if(func_type->return_type->getType() != Type::TupleTypeType)
-			throw BaseException("function argument to iterate must return tuple<State, bool>");
+			throw ExceptionWithPosition("function argument to iterate must return tuple<State, bool>", errorContext(call_src_location));
 
 		if(func_type->return_type.downcast<TupleType>()->component_types.size() != 2)
-			throw BaseException("function argument to iterate must return tuple<State, bool>");
+			throw ExceptionWithPosition("function argument to iterate must return tuple<State, bool>", errorContext(call_src_location));
 
 		if(*func_type->return_type.downcast<TupleType>()->component_types[0] != *state_type)
-			throw BaseException("function argument to iterate must return tuple<State, bool>");
+			throw ExceptionWithPosition("function argument to iterate must return tuple<State, bool>", errorContext(call_src_location));
 
 		if(func_type->return_type.downcast<TupleType>()->component_types[1]->getType() != Type::BoolType)
-			throw BaseException("function argument to iterate must return tuple<State, bool>");
+			throw ExceptionWithPosition("function argument to iterate must return tuple<State, bool>", errorContext(call_src_location));
 
 		vector<FunctionDefinition::FunctionArg> args = makeFunctionArgPair("f", func_type, "initial_state", state_type);
 		for(size_t i=0; i<invariant_data_type.size(); ++i)
@@ -1093,16 +1093,16 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 		// fold(function<State, T, State> f, array<T> array, State initial_state) State
 
 		if(func_type->arg_types.size() != 2)
-			throw BaseException("function argument to fold must have 2 args.");
+			throw ExceptionWithPosition("function argument to fold must have 2 args.", errorContext(call_src_location));
 
 		if(*func_type->arg_types[0] != *state_type)
-			throw BaseException("First argument type to function argument to fold must be same as initial_state type.");
+			throw ExceptionWithPosition("First argument type to function argument to fold must be same as initial_state type.", errorContext(call_src_location));
 
 		if(*func_type->arg_types[1] != *array_type->elem_type)
-			throw BaseException("Second argument type to function argument to fold must be same as array element type.");
+			throw ExceptionWithPosition("Second argument type to function argument to fold must be same as array element type.", errorContext(call_src_location));
 
 		if(*func_type->return_type != *state_type)
-			throw BaseException("Function argument to fold return type must be same as initial_state type.");
+			throw ExceptionWithPosition("Function argument to fold return type must be same as initial_state type.", errorContext(call_src_location));
 
 		vector<FunctionDefinition::FunctionArg> args;
 		args.reserve(3);
@@ -1141,10 +1141,10 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 		{
 			const ArrayType* array_type = collection_type.downcastToPtr<ArrayType>();
 			if(*array_type->elem_type != *value_type)
-				throw BaseException("Invalid argument types for update."); // TODO: add error context
+				throw ExceptionWithPosition("Invalid argument types for update.", errorContext(call_src_location)); // TODO: add error context
 		}
 		else
-			throw BaseException("Invalid first argument to update."); // TODO: add error context
+			throw ExceptionWithPosition("Invalid first argument to update.", errorContext(call_src_location)); // TODO: add error context
 
 		vector<FunctionDefinition::FunctionArg> args;
 		args.reserve(3);
@@ -1180,7 +1180,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 			const int index = ::stringToInt(::eatPrefix(sig.name, "e"));
 
 			if(sig.param_types.size() != 1)
-				throw BaseException("eN() functions must take one argument.  (While trying to find function " + sig.toString() + ")");
+				throw ExceptionWithPosition("eN() functions must take one argument.  (While trying to find function " + sig.toString() + ")", errorContext(call_src_location));
 
 			//if(sig.param_types[0]->getType() != Type::VectorTypeType)
 			//	throw BaseException("eN() functions must take a vector as their argument.  Call: " + sig.name + ", found arg type: " + sig.param_types[0]->toString());
@@ -1192,7 +1192,7 @@ Reference<FunctionDefinition> Linker::findMatchingFunction(const FunctionSignatu
 					);
 
 				if(index >= (int)vec_type->num)
-					throw BaseException("eN function has N >= vector size.");
+					throw ExceptionWithPosition("eN function has N >= vector size.", errorContext(call_src_location));
 
 
 				vector<FunctionDefinition::FunctionArg> args(1,

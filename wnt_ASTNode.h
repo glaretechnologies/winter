@@ -162,10 +162,13 @@ bool isIntExactlyRepresentableAsDouble(int64 x);
 bool checkFoldExpression(Reference<ASTNode>& e, TraversalPayload& payload, std::vector<ASTNode*>& stack); // Returns true if folding took place or e is already a literal.
 void doImplicitIntToFloatTypeCoercionForFloatReturn(Reference<ASTNode>& expr, TraversalPayload& payload);
 void doImplicitIntToDoubleTypeCoercionForDoubleReturn(Reference<ASTNode>& expr, TraversalPayload& payload);
-const std::string errorContext(const ASTNode* n);
-const std::string errorContext(const ASTNode& n);
-const std::string errorContext(const SrcLocation& src_location);
-const std::string errorContext(const ASTNode& n, TraversalPayload& payload);
+BufferPosition errorContext(const ASTNode* n);
+std::string errorContextString(const ASTNode* n);
+BufferPosition errorContext(const ASTNode& n);
+std::string errorContextString(const ASTNode& n);
+BufferPosition errorContext(const SrcLocation& src_location);
+std::string errorContextString(const SrcLocation& src_location);
+BufferPosition errorContext(const ASTNode& n, TraversalPayload& payload);
 bool isTargetDefinedBeforeAllInStack(const std::vector<FunctionDefinition*>& func_def_stack, int target_function_order_num);
 bool expressionIsWellTyped(ASTNode& e, TraversalPayload& payload_);
 bool shouldRefCount(EmitLLVMCodeParams& params, const Reference<ASTNode>& expr);
@@ -321,21 +324,6 @@ inline GetSpaceBoundResults operator + (const GetSpaceBoundResults& a, const Get
 {
 	return GetSpaceBoundResults(a.stack_space + b.stack_space, a.heap_space + b.heap_space);
 }
-
-
-class SrcLocation
-{
-public:
-	SrcLocation(size_t char_index_, const SourceBuffer* buf) :
-		char_index(char_index_), source_buffer(buf) {}
-
-	static const SrcLocation invalidLocation() { return SrcLocation(4000000000u, NULL); }
-
-	bool isValid() const { return char_index != 4000000000u; }
-
-	size_t char_index;
-	const SourceBuffer* source_buffer;
-};
 
 
 /*=====================================================================
