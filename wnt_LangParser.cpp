@@ -101,10 +101,12 @@ Reference<BufferRoot> LangParser::parseBuffer(const std::vector<Reference<TokenB
 		else if(tokens[parseinfo.i]->isIdentifier() && tokens[parseinfo.i]->getIdentifierValue() == "struct")
 		{
 			const size_t struct_char_position = tokens[parseinfo.i]->char_index;
+			const size_t struct_num_chars = tokens[parseinfo.i]->num_chars;
+
 			VRef<StructureType> t = parseStructType(parseinfo);
 				
 			if(named_types.find(t->name) != named_types.end())
-				throw LangParserExcep("struct with name '" + t->name + "' already defined: ", errorPosition(*parseinfo.text_buffer, struct_char_position));
+				throw LangParserExcep("struct with name '" + t->name + "' already defined: ", errorPosition(*parseinfo.text_buffer, struct_char_position, struct_num_chars));
 
 			named_types.insert(std::make_pair(t->name, t));
 			named_types_ordered_out.push_back(t);
@@ -154,7 +156,7 @@ Reference<BufferRoot> LangParser::parseBuffer(const std::vector<Reference<TokenB
 			parseinfo.order_num++;
 		}
 		else
-			throw LangParserExcep("Expected 'def'.", errorPosition(*source_buffer, tokens[parseinfo.i]->char_index));
+			throw LangParserExcep("Expected 'def'.", errorPosition(parseinfo));
 	}
 
 	// Update order_num
@@ -755,7 +757,7 @@ Reference<ASTNode> LangParser::parseLetBlock(ParseInfo& p)
 		
 		while(p.i < p.tokens.size() && !(p.tokens[p.i]->isIdentifier() && p.tokens[p.i]->getIdentifierValue() == "in"))
 		{
-			const unsigned int let_position = p.i;
+			const unsigned int let_token_i = p.i;
 			Reference<LetASTNode> let = parseLet(p);
 
 			// Before we add it, go back over the other lets in the let block to make sure this name is unique.
@@ -763,7 +765,7 @@ Reference<ASTNode> LangParser::parseLetBlock(ParseInfo& p)
 				for(size_t w=0; w<let->vars.size(); ++w)
 					for(size_t t=0; t<lets[z]->vars.size(); ++t)
 						if(lets[z]->vars[t].name == let->vars[w].name)
-							throw LangParserExcep("Let with this name already defined in let block.", errorPosition(*p.text_buffer, p.tokens[let_position]->char_index));
+							throw LangParserExcep("Let with this name already defined in let block.", errorPosition(*p.text_buffer, p.tokens[let_token_i]->char_index, p.tokens[let_token_i]->num_chars));
 
 			lets.push_back(let);
 		}
@@ -1864,9 +1866,9 @@ void LangParser::parseParameterList(ParseInfo& p, std::vector<FunctionDefinition
 }
 
 
-BufferPosition LangParser::errorPosition(const SourceBuffer& buffer, size_t char_index)
+BufferPosition LangParser::errorPosition(const SourceBuffer& buffer, size_t char_index, size_t num_chars)
 {
-	return BufferPosition(SourceBufferConstRef(&buffer), char_index, /*len=*/1);
+	return BufferPosition(SourceBufferConstRef(&buffer), char_index, num_chars);
 }
 
 
@@ -1888,7 +1890,7 @@ BufferPosition LangParser::errorPosition(const ParseInfo& p)
 BufferPosition LangParser::errorPositionPrevToken(ParseInfo& p)
 {
 	if(p.i >= 1 && p.i < p.tokens.size() + 1)
-		return errorPosition(*p.text_buffer, p.tokens[p.i - 1]->char_index);
+		return errorPosition(*p.text_buffer, p.tokens[p.i - 1]->char_index, p.tokens[p.i - 1]->num_chars);
 	else
 		return BufferPosition(p.text_buffer, 0, 0);
 }

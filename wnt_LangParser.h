@@ -72,7 +72,7 @@ public:
 	static void test();
 
 private:
-	BufferPosition errorPosition(const SourceBuffer& buffer, size_t pos);
+	BufferPosition errorPosition(const SourceBuffer& buffer, size_t pos, size_t num_chars);
 	BufferPosition errorPosition(const ParseInfo& parseinfo);
 	BufferPosition errorPositionPrevToken(ParseInfo& parseinfo);
 
