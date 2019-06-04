@@ -261,7 +261,7 @@ void testMainFloatArgInvalidProgram(const std::string& src)
 	catch(Winter::BaseException& e)
 	{
 		// Expected.
-		testPrint("Expected exception occurred: " + e.what());
+		testPrint("Expected exception occurred: " + e.messageWithPosition());
 	}
 }
 
@@ -367,9 +367,9 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 		}
 		catch(BaseException& e)
 		{
-			conPrint("Failed to get space bound: " + e.what());
+			conPrint("Failed to get space bound: " + e.messageWithPosition());
 			if((test_flags & ALLOW_SPACE_BOUND_FAILURE) == 0)
-				failTest("Failed to get space bound: " + e.what());
+				failTest("Failed to get space bound: " + e.messageWithPosition());
 		}
 
 		try
@@ -381,9 +381,9 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 		}
 		catch(BaseException& e)
 		{
-			conPrint("Failed to get time bound: " + e.what());
+			conPrint("Failed to get time bound: " + e.messageWithPosition());
 			if((test_flags & ALLOW_TIME_BOUND_FAILURE) == 0)
-				failTest("Failed to get time bound: " + e.what());
+				failTest("Failed to get time bound: " + e.messageWithPosition());
 		}
 
 
@@ -612,7 +612,7 @@ void testTimeBoundInvalidForMainFloatArg(const std::string& src, uint32 test_fla
 		}
 		catch(Winter::BaseException& e)
 		{
-			conPrint("Caught expected exception from getTimeBound(): " + e.what());
+			conPrint("Caught expected exception from getTimeBound(): " + e.messageWithPosition());
 			conPrint("Computing time bound took " + timer.elapsedString());
 		}
 	}
@@ -980,9 +980,9 @@ void testMainStringArg(const std::string& src, const std::string& arg, const std
 		}
 		catch(BaseException& e)
 		{
-			conPrint("Failed to get space bound: " + e.what());
+			conPrint("Failed to get space bound: " + e.messageWithPosition());
 			if((test_flags & ALLOW_SPACE_BOUND_FAILURE) == 0)
-				failTest("Failed to get space bound: " + e.what());
+				failTest("Failed to get space bound: " + e.messageWithPosition());
 		}
 
 		try
@@ -994,9 +994,9 @@ void testMainStringArg(const std::string& src, const std::string& arg, const std
 		}
 		catch(BaseException& e)
 		{
-			conPrint("Failed to get time bound: " + e.what());
+			conPrint("Failed to get time bound: " + e.messageWithPosition());
 			if((test_flags & ALLOW_TIME_BOUND_FAILURE) == 0)
-				failTest("Failed to get time bound: " + e.what());
+				failTest("Failed to get time bound: " + e.messageWithPosition());
 		}
 
 
@@ -1238,9 +1238,9 @@ void testMainInt64Arg(const std::string& src, int64 x, int64 target_return_val, 
 		}
 		catch(BaseException& e)
 		{
-			conPrint("Failed to get space bound: " + e.what());
+			conPrint("Failed to get space bound: " + e.messageWithPosition());
 			if((test_flags & ALLOW_SPACE_BOUND_FAILURE) == 0)
-				failTest("Failed to get space bound: " + e.what());
+				failTest("Failed to get space bound: " + e.messageWithPosition());
 		}
 
 		try
@@ -1252,9 +1252,9 @@ void testMainInt64Arg(const std::string& src, int64 x, int64 target_return_val, 
 		}
 		catch(BaseException& e)
 		{
-			conPrint("Failed to get time bound: " + e.what());
+			conPrint("Failed to get time bound: " + e.messageWithPosition());
 			if((test_flags & ALLOW_TIME_BOUND_FAILURE) == 0)
-				failTest("Failed to get time bound: " + e.what());
+				failTest("Failed to get time bound: " + e.messageWithPosition());
 		}
 
 
@@ -1473,7 +1473,7 @@ void testMainIntegerArgInvalidProgram(const std::string& src)
 	catch(Winter::BaseException& e)
 	{
 		// Expected.
-		testPrint("Expected exception occurred: " + e.what());
+		testPrint("Expected exception occurred: " + e.messageWithPosition());
 	}
 }
 
@@ -1502,7 +1502,7 @@ void testMainInt64ArgInvalidProgram(const std::string& src)
 	catch(Winter::BaseException& e)
 	{
 		// Expected.
-		testPrint("Expected exception occurred: " + e.what());
+		testPrint("Expected exception occurred: " + e.messageWithPosition());
 	}
 }
 

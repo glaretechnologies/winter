@@ -21,7 +21,7 @@ namespace Diagnostics
 const std::string positionString(const BufferPosition& pos)
 {
 	if(pos.buffer.isNull())
-		return "Unknown";
+		return "\nPosition unknown";
 
 	size_t line, col;
 	StringUtils::getPosition(pos.buffer->source, pos.pos, line, col);
@@ -39,6 +39,8 @@ const std::string positionString(const BufferPosition& pos)
 	s += pos.buffer->name + ", line " + toString(line + 1) + ":\n";
 	s += linestr + "\n";
 	col = col < (unsigned int)linestr.size() ? col : (unsigned int)linestr.size();
+
+	// Draw a pointer under the error location, and a squiggly line to the right for the remaining chars in the token.
 	for(unsigned int i=0; i<col; ++i)
 	{
 		// If the source line has a tab, we need to use a tab for spacing as well, to match the position correctly.
@@ -47,8 +49,10 @@ const std::string positionString(const BufferPosition& pos)
 		else
 			s += " ";
 	}
-
+	
 	s += "^";
+	for(size_t z=1; z<pos.len; ++z)
+		s += "~";
 
 	return s;
 }
