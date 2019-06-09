@@ -1,7 +1,7 @@
 /*=====================================================================
 FuzzTests.h
 -----------
-Copyright Glare Technologies Limited 2015 -
+Copyright Glare Technologies Limited 2019 -
 =====================================================================*/
 #pragma once
 

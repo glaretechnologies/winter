@@ -1,7 +1,7 @@
 /*=====================================================================
-wnt_TupleLiteral.cpp
---------------------
-Copyright Glare Technologies Limited 2015 -
+FuzzTests.cpp
+-------------
+Copyright Glare Technologies Limited 2019 -
 =====================================================================*/
 #include "wnt_TupleLiteral.h"
 
@@ -17,8 +17,8 @@ Copyright Glare Technologies Limited 2015 -
 #include "wnt_LangParser.h"
 #include "wnt_LetASTNode.h"
 #include "wnt_LetBlock.h"
+#include <maths/PCG32.h>
 #include <utils/Timer.h>
-#include <utils/MTwister.h>
 #include <utils/Task.h>
 #include <utils/TaskManager.h>
 #include <utils/MemMappedFile.h>
@@ -467,14 +467,14 @@ struct Choice
 };
 
 
-static std::string readRandomProgramFromFuzzerInput(const std::vector<std::string>* fuzzer_input, MTwister& rng)
+static std::string readRandomProgramFromFuzzerInput(const std::vector<std::string>* fuzzer_input, PCG32& rng)
 {
 	// Pick a random input line to get started
 	std::string start_string;
 	while(start_string.empty())
 	{
 		// Pick a line to start at
-		size_t linenum = myMin(fuzzer_input->size()-1, (size_t)(fuzzer_input->size() * rng.unitRandom()));
+		size_t linenum = rng.nextUInt((uint32)fuzzer_input->size());
 
 		// If we are in whitespace, pick another line.
 		if(::isAllWhitespace((*fuzzer_input)[linenum]))
@@ -502,7 +502,7 @@ struct BuildRandomSubTreeArgs
 
 
 // Build random abstract-syntax sub-tree
-static ASTNodeRef buildRandomASSubTree(BuildRandomSubTreeArgs& args, MTwister& rng, const std::vector<Choice>& choices, int depth)
+static ASTNodeRef buildRandomASSubTree(BuildRandomSubTreeArgs& args, PCG32& rng, const std::vector<Choice>& choices, int depth)
 {
 	const float r = rng.unitRandom();
 
@@ -690,7 +690,7 @@ public:
 	{
 		Timer timer;
 		Timer print_timer;
-		MTwister rng(rng_seed);
+		PCG32 rng(rng_seed);
 
 		std::ofstream outfile("e:/fuzz_output/fuzz_thread_" + toString(thread_index) + ".txt"); // TEMP HACK HARD CODED PATH
 		
@@ -724,6 +724,7 @@ public:
 
 					root = lang_parser.parseBuffer(tokens,
 						source_buffer,
+						rng.unitRandom() < 0.2, // check structure types
 						named_types,
 						named_types_ordered,
 						function_order_num
@@ -839,7 +840,7 @@ public:
 	{
 		Timer timer;
 		Timer print_timer;
-		MTwister rng(rng_seed);
+		PCG32 rng(rng_seed);
 
 		const std::string fuzz_output_path = "d:/fuzz_output/fuzz_thread_" + toString(thread_index) + ".txt"; // TEMP HACK HARD CODED PATH
 		std::ofstream outfile(fuzz_output_path);

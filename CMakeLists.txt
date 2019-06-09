@@ -215,8 +215,6 @@ ${INDIGO_TRUNK_DIR}/utils/Lock.cpp
 ${INDIGO_TRUNK_DIR}/utils/Lock.h
 ${INDIGO_TRUNK_DIR}/utils/MemMappedFile.cpp
 ${INDIGO_TRUNK_DIR}/utils/MemMappedFile.h
-${INDIGO_TRUNK_DIR}/utils/MTwister.cpp
-${INDIGO_TRUNK_DIR}/utils/MTwister.h
 ${INDIGO_TRUNK_DIR}/utils/Mutex.cpp
 ${INDIGO_TRUNK_DIR}/utils/Mutex.h
 ${INDIGO_TRUNK_DIR}/utils/MyThread.cpp
