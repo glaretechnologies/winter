@@ -17,7 +17,6 @@ Copyright Glare Technologies Limited 2018 -
 #include "wnt_LetBlock.h"
 #include "wnt_LetASTNode.h"
 #include <utils/Timer.h>
-#include <utils/MTwister.h>
 #include <utils/Task.h>
 #include <utils/TaskManager.h>
 #include <utils/MemMappedFile.h>
@@ -5328,6 +5327,7 @@ void LanguageTests::run()
 
 	testTimeBounds();
 
+	testMainFloatArgInvalidProgram("def g(float x) fl: 1 / x         def main(float x) float : g(2)");
 
 	// TODO: why is this vector being parsed as doubles?
 	//testMainFloatArgInvalidProgram("def main(float x): elem(-[1.0, 2.0, 3.0, 4.0]v, 2)");//, 1.0f, -3.0f, 0);

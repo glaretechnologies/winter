@@ -51,7 +51,7 @@ public:
 		SumTypeType,
 		ErrorTypeType,
 		TupleTypeType,
-		OpaqueStructureTypeType,
+		//OpaqueStructureTypeType,
 		OpenCLImageTypeType
 	};
 
@@ -688,7 +688,9 @@ public:
 
 
 // An unknown named type.  Useful for parsing an isolated piece of source code where not all types are known.
-class OpaqueStructureType : public Type
+// NOTE: Instead of using this type, for now we will try the check_structures_exist flag for LangParser::parseBuffer().
+// It can just be set to false for parsing isolated bits of code.
+/*class OpaqueStructureType : public Type
 {
 public:
 	OpaqueStructureType(const std::string& name_);
@@ -715,7 +717,7 @@ public:
 	virtual size_t memSize() const { return 0; }
 
 	std::string name;
-};
+};*/
 
 
 class OpenCLImageType : public Type

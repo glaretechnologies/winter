@@ -72,14 +72,15 @@ static const SrcLocation prevTokenLoc(ParseInfo& p)
 
 
 Reference<BufferRoot> LangParser::parseBuffer(const std::vector<Reference<TokenBase> >& tokens, 
-										   const SourceBufferRef& source_buffer,
-										   std::map<std::string, TypeVRef>& named_types,
+											const SourceBufferRef& source_buffer,
+											bool check_structures_exist,
+											std::map<std::string, TypeVRef>& named_types,
 											std::vector<TypeVRef>& named_types_ordered_out,
 											int& order_num)
 {
 	Reference<BufferRoot> root = new BufferRoot(SrcLocation(0, 0, source_buffer.getPointer()));
 
-	ParseInfo parseinfo(tokens, named_types, root->top_level_defs, order_num);
+	ParseInfo parseinfo(tokens, named_types, root->top_level_defs, order_num, check_structures_exist);
 	parseinfo.text_buffer = source_buffer.getPointer();
 
 	// NEW: go through buffer and see if there is a 'else' token
@@ -977,10 +978,18 @@ TypeVRef LangParser::parseElementaryType(ParseInfo& p)
 					return new GenericType(t, i);
 
 			// If it wasn't a generic type, then it's completely unknown, like a rolling stone.
-			//throw LangParserExcep("Unknown type '" + t + "'." + errorPositionPrevToken(p));
-			TypeVRef the_type = new OpaqueStructureType(t);
-			the_type->address_space = address_space;
-			return the_type;
+			if(p.check_structures_exist)
+				throw LangParserExcep("Unknown type '" + t + "'.", errorPositionPrevToken(p));
+			else
+			{
+				//TypeVRef the_type = new OpaqueStructureType(t);
+				//the_type->address_space = address_space;
+				//return the_type;
+
+				TypeVRef the_type = new StructureType(t, std::vector<TypeVRef>(), std::vector<std::string>());
+				the_type->address_space = address_space;
+				return the_type;
+			}
 		}
 		else
 		{

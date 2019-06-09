@@ -1094,7 +1094,7 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		std::vector<Reference<TokenBase> > tokens;
 		Lexer::process(source_buffers[i], tokens);
 
-		Reference<BufferRoot> buffer_root = parser.parseBuffer(tokens, source_buffers[i], named_types, named_types_ordered, function_order_num);
+		Reference<BufferRoot> buffer_root = parser.parseBuffer(tokens, source_buffers[i], /*check_structures_exist=*/true, named_types, named_types_ordered, function_order_num);
 
 		// Run any function rewriters passed in by the user on the parsed function definitions.
 		for(size_t z=0; z<args.function_rewriters.size(); ++z)

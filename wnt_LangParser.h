@@ -35,8 +35,8 @@ class ParseInfo
 public:
 	ParseInfo(const std::vector<Reference<TokenBase> >& tokens_, std::map<std::string, TypeVRef>& named_types_,
 		std::vector<ASTNodeRef>& top_level_defs_,
-		int order_num_) 
-		: i(0), tokens(tokens_), named_types(named_types_), top_level_defs(top_level_defs_), order_num(order_num_)/*, else_token_present(false)*/ {}
+		int order_num_, bool check_structures_exist_)
+		: i(0), tokens(tokens_), named_types(named_types_), top_level_defs(top_level_defs_), order_num(order_num_), check_structures_exist(check_structures_exist_)/*, else_token_present(false)*/ {}
 	
 	const std::vector<Reference<TokenBase> >& tokens;
 	const SourceBuffer* text_buffer;
@@ -45,6 +45,7 @@ public:
 	std::vector<ASTNodeRef>& top_level_defs; // Either function definitions or named constants.
 	//bool else_token_present;
 	int order_num;
+	bool check_structures_exist;
 
 	std::vector<std::string> generic_type_params; // Used when parsing types.
 };
@@ -62,8 +63,12 @@ public:
 
 	~LangParser();
 
+	// check_structures_exist - Can be set to false when parsing isolated pieces of code that are not preceded by the structure definitions it usually requires.
+	// Otherwise an exception will be thrown when an unknown typename is encountered.
+	// Throws LangParserExcep
 	Reference<BufferRoot> parseBuffer(const std::vector<Reference<TokenBase> >& tokens, 
 		const SourceBufferRef& source_buffer,
+		bool check_structures_exist,
 		std::map<std::string, TypeVRef>& named_types,
 		std::vector<TypeVRef>& named_types_ordered_out,
 		int& function_order_num

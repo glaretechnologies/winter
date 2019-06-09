@@ -1592,8 +1592,8 @@ llvm::Type* ErrorType::LLVMType(llvm::Module& module) const
 //===============================================================================
 
 
-OpaqueStructureType::OpaqueStructureType(const std::string& name_)
-:	Type(StructureTypeType), name(name_) // NOTE: should be OpaqueStructureTypeType?  breaks getTexCoords linking tho.
+/*OpaqueStructureType::OpaqueStructureType(const std::string& name_)
+:	Type(OpaqueStructureTypeType), name(name_)
 {}
 
 
@@ -1623,7 +1623,7 @@ bool OpaqueStructureType::matchTypes(const Type& b, std::vector<TypeRef>& type_m
 llvm::Type* OpaqueStructureType::LLVMType(llvm::Module& module) const
 {
 	return llvm::Type::getVoidTy(module.getContext());
-}
+}*/
 
 //===============================================================================
 
