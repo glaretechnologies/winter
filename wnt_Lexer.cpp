@@ -238,16 +238,16 @@ void Lexer::parseNumericLiteral(const SourceBufferRef& buffer, Parser& parser, s
 			parser.advance(); // Consume 'x'
 
 			// Parse hex digits.  Note: This could can be optimised a lot, hexStringTo64UInt() call is slow etc..
-			std::string digits = "0x";
+			std::string digits;
 			while(parser.notEOF() && (isNumeric(parser.current()) || (parser.current() >= 'a' && parser.current() <= 'f') || (parser.current() >= 'A' && parser.current() <= 'F')))
 			{
 				digits.push_back(parser.current());
 				parser.advance();
 			}
-			if(digits.size() == 2) // if still "0x":
+			if(digits.empty()) // if still "":
 				throw LexerExcep("Failed to parse hexadecimal integer literal.", errorPosition(buffer, char_index));
 
-			uint64 val = hexStringTo64UInt(digits);
+			uint64 val = hexStringToUInt64(digits);
 			x = bitCast<int64>(val);
 		}
 		else
