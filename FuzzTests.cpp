@@ -692,7 +692,7 @@ public:
 		Timer print_timer;
 		PCG32 rng(rng_seed);
 
-		std::ofstream outfile("e:/fuzz_output/fuzz_thread_" + toString(thread_index) + ".txt"); // TEMP HACK HARD CODED PATH
+		std::ofstream outfile(fuzzer_output_dir + "/fuzz_thread_" + toString(thread_index) + ".txt");
 		
 		// See comment in FuzzTask below about this number.
 		const int N = 134217728;
@@ -784,7 +784,7 @@ public:
 
 			const std::string src = root.nonNull() ? root->sourceString() : "";
 
-			conPrint("-------------------------------\n" + src + "\n-------------------------------");//TEMP
+			//conPrint("-------------------------------\n" + src + "\n-------------------------------");//TEMP
 
 			const uint64 src_hash = XXH64(src.data(), src.size(), 0);
 		
@@ -830,6 +830,7 @@ public:
 	Mutex* tested_programs_mutex;
 	std::unordered_set<uint64>* tested_program_hashes;
 	std::vector<std::string>* fuzzer_input;
+	std::string fuzzer_output_dir;
 };
 
 
@@ -842,7 +843,7 @@ public:
 		Timer print_timer;
 		PCG32 rng(rng_seed);
 
-		const std::string fuzz_output_path = "d:/fuzz_output/fuzz_thread_" + toString(thread_index) + ".txt"; // TEMP HACK HARD CODED PATH
+		const std::string fuzz_output_path = fuzzer_output_dir + "/fuzz_thread_" + toString(thread_index) + ".txt"; // TEMP HACK HARD CODED PATH
 		std::ofstream outfile(fuzz_output_path);
 		
 		// We want to N to be quite large, but not so large that the tested_program_hashes set uses up all our RAM.
@@ -1011,10 +1012,11 @@ done:
 	Mutex* tested_programs_mutex;
 	std::unordered_set<uint64>* tested_program_hashes;
 	const std::vector<std::string>* fuzzer_input;
+	std::string fuzzer_output_dir;
 };
 
 
-void doASTFuzzTests()
+void doASTFuzzTests(const std::string& fuzzer_input_dir, const std::string& fuzzer_output_dir)
 {
 	/*
 		ASTNode::FunctionExpressionType,
@@ -1089,7 +1091,7 @@ void doASTFuzzTests()
 
 		std::vector<std::string> fuzzer_input;
 		std::string filecontent;
-		FileUtils::readEntireFileTextMode("o:/winter/trunk/fuzzer_input.txt", filecontent); // TEMP HACK hardcoded path
+		FileUtils::readEntireFileTextMode(fuzzer_input_dir + "/fuzzer_input.txt", filecontent);
 		fuzzer_input = ::split(filecontent, '\n');
 
 
@@ -1102,7 +1104,7 @@ void doASTFuzzTests()
 			Mutex tested_programs_mutex;
 			std::unordered_set<uint64> tested_program_hashes;
 
-			const int NUM_THREADS = 1;
+			const int NUM_THREADS = PlatformUtils::getNumLogicalProcessors();
 			Indigo::TaskManager manager("Fuzz thread manager", NUM_THREADS);
 			for(int i=0; i<NUM_THREADS; ++i)
 			{
@@ -1112,6 +1114,7 @@ void doASTFuzzTests()
 				t->tested_programs_mutex = &tested_programs_mutex;
 				t->tested_program_hashes = &tested_program_hashes;
 				t->fuzzer_input = &fuzzer_input;
+				t->fuzzer_output_dir = fuzzer_output_dir;
 				manager.addTask(t);
 
 				rng_seed++;
@@ -1127,7 +1130,7 @@ void doASTFuzzTests()
 }
 
 
-void fuzzTests()
+void fuzzTests(const std::string& fuzzer_input_dir, const std::string& fuzzer_output_dir)
 {
 	try
 	{
@@ -1198,7 +1201,7 @@ void fuzzTests()
 
 		std::vector<std::string> fuzzer_input;
 		std::string filecontent;
-		FileUtils::readEntireFileTextMode("n:/winter/trunk/fuzzer_input.txt", filecontent); // TEMP HACK hardcoded path
+		FileUtils::readEntireFileTextMode(fuzzer_input_dir + "/fuzzer_input.txt", filecontent);
 		fuzzer_input = ::split(filecontent, '\n');
 
 
@@ -1211,7 +1214,7 @@ void fuzzTests()
 			Mutex tested_programs_mutex;
 			std::unordered_set<uint64> tested_program_hashes;
 
-			const int NUM_THREADS = 4;
+			const int NUM_THREADS = PlatformUtils::getNumLogicalProcessors();
 			Indigo::TaskManager manager("fuzz thread manager", NUM_THREADS);
 			for(int i=0; i<NUM_THREADS; ++i)
 			{
@@ -1221,6 +1224,7 @@ void fuzzTests()
 				t->tested_programs_mutex = &tested_programs_mutex;
 				t->tested_program_hashes = &tested_program_hashes;
 				t->fuzzer_input = &fuzzer_input;
+				t->fuzzer_output_dir = fuzzer_output_dir;
 				manager.addTask(t);
 
 				rng_seed++;

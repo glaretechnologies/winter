@@ -200,6 +200,8 @@ set(WINTER_FILES
 
 ########### Utils ################
 SET(util_files
+${INDIGO_TRUNK_DIR}/utils/ArgumentParser.cpp
+${INDIGO_TRUNK_DIR}/utils/ArgumentParser.h
 ${INDIGO_TRUNK_DIR}/utils/Clock.cpp
 ${INDIGO_TRUNK_DIR}/utils/Clock.h
 ${INDIGO_TRUNK_DIR}/utils/Condition.cpp

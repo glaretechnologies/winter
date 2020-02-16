@@ -19,6 +19,7 @@ Copyright Glare Technologies Limited 2015 -
 #include "PerfTests.h"
 #include "utils/FileUtils.h"
 #include "utils/Clock.h"
+#include "utils/ArgumentParser.h"
 #include <iostream>
 #include <cassert>
 #include <fstream>
@@ -40,7 +41,19 @@ int main(int argc, char** argv)
 
 	VirtualMachine::init();
 
-	if(std::string(argv[1]) == "--test")
+	std::vector<std::string> arg_vec;
+	for(int i=0; i<argc; ++i)
+		arg_vec.push_back(argv[i]);
+
+	std::map<std::string, std::vector<ArgumentParser::ArgumentType> > args_syntax;
+	args_syntax["--test"] = std::vector<ArgumentParser::ArgumentType>(0);
+	args_syntax["--fuzz"] = std::vector<ArgumentParser::ArgumentType>(2, ArgumentParser::ArgumentType_string); // two string args
+	args_syntax["--astfuzz"] = std::vector<ArgumentParser::ArgumentType>(2, ArgumentParser::ArgumentType_string); // two string args
+	args_syntax["--perftest"] = std::vector<ArgumentParser::ArgumentType>(0);
+
+	ArgumentParser args(arg_vec, args_syntax);
+
+	if(args.isArgPresent("--test"))
 	{
 #if BUILD_TESTS
 		LanguageTests::run();
@@ -50,23 +63,30 @@ int main(int argc, char** argv)
 		return 1;
 #endif
 	}
-	else if(std::string(argv[1]) == "--fuzz")
+	else if(args.isArgPresent("--fuzz"))
 	{
 #if BUILD_TESTS
-		fuzzTests();
+		// e.g. --fuzz N:/winter/trunk d:/fuzz_output
+		fuzzTests(
+			args.getArgStringValue("--fuzz", 0), // fuzzer input dir
+			args.getArgStringValue("--fuzz", 1) // fuzzer output dir
+		);
 #endif
 		return 0;
 	}
-	else if(std::string(argv[1]) == "--perftest")
+	else if(args.isArgPresent("--astfuzz"))
+	{
+#if BUILD_TESTS
+		doASTFuzzTests(
+			args.getArgStringValue("--astfuzz", 0), // fuzzer input dir
+			args.getArgStringValue("--astfuzz", 1) // fuzzer output dir
+		);
+#endif
+		return 0;
+	}
+	else if(args.isArgPresent("--perftest"))
 	{
 		PerfTests::run();
-		return 0;
-	}
-	else if(std::string(argv[1]) == "--astfuzz")
-	{
-#if BUILD_TESTS
-		doASTFuzzTests();
-#endif
 		return 0;
 	}
 

@@ -21,10 +21,10 @@ FuzzTests
 -------------------
 
 =====================================================================*/
-void fuzzTests();
+void fuzzTests(const std::string& fuzzer_input_dir, const std::string& fuzzer_output_dir);
 
 
-void doASTFuzzTests();
+void doASTFuzzTests(const std::string& fuzzer_input_dir, const std::string& fuzzer_output_dir);
 
 
 bool testFuzzProgram(const std::string& src);
