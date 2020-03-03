@@ -2023,7 +2023,7 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 		"bool isNaN_float_(float x) { return isnan(x); }		\n"
 		"bool isNAN_float_(float x) { return isnan(x); }		\n"
 		"float mod_float__float_(float x, float y) { if(x < 0) { const float z = y - fmod(-x, y); return z == y ? 0.f : z; } else return fmod(x, y); }     \n"
-		"int mod_int__int_(int x, int y) { return (unsigned int)x % y; }        \n"
+		"int mod_int__int_(int x, int y) { int z = x % y; return (z < 0) ? z + y : z; }        \n"
 		"float _frem__float__float_(float x, float y) { return fmod(x, y); }        \n"
 		"float floatNaN__() { return nan((uint)0); }		\n"
 		"float dot1_vector_float__2___vector_float__2__(float2 a, float2 b) { return a.x * b.x; } \n"

@@ -2859,6 +2859,8 @@ static void testExternalMathsFunctions()
 	testMainIntegerArg("def main(int x) int : mod(5, x)", 4, 1, INCLUDE_EXTERNAL_MATHS_FUNCS);
 	testMainIntegerArg("def main(int x) int : mod(5, 4)", 4, 1, INCLUDE_EXTERNAL_MATHS_FUNCS);
 	testMainIntegerArg("def main(int x) int : mod(5, x)", 3, 2, INCLUDE_EXTERNAL_MATHS_FUNCS);
+	testMainIntegerArg("def main(int x) int : mod(-5, x)", 7, 2, INCLUDE_EXTERNAL_MATHS_FUNCS);
+	testMainIntegerArg("def main(int x) int : mod(4, x)", 7, 4, INCLUDE_EXTERNAL_MATHS_FUNCS);
 
 	// isFinite
 	testMainFloatArg("def main(float x) float : isFinite(x) ? 1.0 : 0.0", 10.f, 1.0f, INCLUDE_EXTERNAL_MATHS_FUNCS);
