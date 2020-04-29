@@ -217,6 +217,8 @@ ${INDIGO_TRUNK_DIR}/utils/FileUtils.cpp
 ${INDIGO_TRUNK_DIR}/utils/FileUtils.h
 ${INDIGO_TRUNK_DIR}/utils/Lock.cpp
 ${INDIGO_TRUNK_DIR}/utils/Lock.h
+${INDIGO_TRUNK_DIR}/utils/MemAlloc.cpp
+${INDIGO_TRUNK_DIR}/utils/MemAlloc.h
 ${INDIGO_TRUNK_DIR}/utils/MemMappedFile.cpp
 ${INDIGO_TRUNK_DIR}/utils/MemMappedFile.h
 ${INDIGO_TRUNK_DIR}/utils/Mutex.cpp
@@ -252,8 +254,6 @@ ${INDIGO_TRUNK_DIR}/utils/UTF8Utils.h
 )
 
 SET(maths_files
-${INDIGO_TRUNK_DIR}/maths/SSE.cpp
-${INDIGO_TRUNK_DIR}/maths/SSE.h
 )
 
 SET(testutils_files
@@ -284,8 +284,8 @@ ${INDIGO_TRUNK_DIR}/double-conversion/utils.h
 )
 
 SET(xxhash_files
-${INDIGO_TRUNK_DIR}/zstd-1.0.0/lib/common/xxhash.c
-${INDIGO_TRUNK_DIR}/zstd-1.0.0/lib/common/xxhash.h
+${INDIGO_TRUNK_DIR}/zstd-1.4.4/lib/common/xxhash.c
+${INDIGO_TRUNK_DIR}/zstd-1.4.4/lib/common/xxhash.h
 )
 
 
@@ -325,7 +325,7 @@ ${llvmdir}/include
 ${INDIGO_TRUNK_DIR}
 ${INDIGO_TRUNK_DIR}/utils
 ${INDIGO_TRUNK_DIR}/maths
-${INDIGO_TRUNK_DIR}/zstd-1.0.0/lib/common
+${INDIGO_TRUNK_DIR}/zstd-1.4.4/lib/common
 ${INDIGO_TRUNK_DIR}/opencl/khronos
 ${WINTER_INCLUDE_DIRS}
 )

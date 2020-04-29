@@ -1488,9 +1488,9 @@ llvm::Type* OpaqueType::LLVMType(llvm::Module& module) const
 const std::string OpaqueType::OpenCLCType() const
 { 
 	if(address_space.empty())
-		return "void*";
+		return "const void*";
 	else
-		return address_space + " void*";
+		return address_space + " const void*";
 }
 
 
