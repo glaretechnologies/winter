@@ -3519,19 +3519,19 @@ static void testLambdaExpressionsAndClosures()
 	results = testMainFloat("def main() float :				\n\
 				  let f = \\(float x) : x*x  in		\n\
 				  f(2.0)", 4.0f);
-	testAssert(results.maindef->body->nodeType() == ASTNode::MulExpressionType);
+	testAssert(results.maindef->body->nodeType() == ASTNode::MulExpressionType || results.maindef->body->nodeType() == ASTNode::FloatLiteralType);
 
 	results = testMainFloat("def main() float :				\n\
 				  let f = \\(float x) : x*x  in		\n\
 					let g = f in					\n\
 				  g(2.0)", 4.0f);
-	testAssert(results.maindef->body->nodeType() == ASTNode::MulExpressionType);
+	testAssert(results.maindef->body->nodeType() == ASTNode::MulExpressionType || results.maindef->body->nodeType() == ASTNode::FloatLiteralType);
 
 	results = testMainFloatArg("def main(float x) float :				\n\
 				  let f = \\(float x) : x*x  in		\n\
 					let g = f in					\n\
 				  g(x)", 2.0f, 4.0f, INVALID_OPENCL);
-	testAssert(results.maindef->body->nodeType() == ASTNode::MulExpressionType);
+	testAssert(results.maindef->body->nodeType() == ASTNode::MulExpressionType || results.maindef->body->nodeType() == ASTNode::FloatLiteralType);
 
 	testMainFloat("def main() float :				\n\
 				  let f = \\(float x) : x*x  in		\n\
@@ -3548,7 +3548,7 @@ static void testLambdaExpressionsAndClosures()
 					def main() float :           \n\
 					let f = makeLambda()  in   \n\
 				  f(2.0)", 4.0f);
-	testAssert(results.maindef->body->nodeType() == ASTNode::MulExpressionType);
+	testAssert(results.maindef->body->nodeType() == ASTNode::MulExpressionType || results.maindef->body->nodeType() == ASTNode::FloatLiteralType);
 
 	// Test variable capture: the returned lambda needs to capture the value of x.
 	testMainFloat("	def makeFunc(float x) function<float> : \\() : x      \n\
@@ -3593,7 +3593,7 @@ static void testLambdaExpressionsAndClosures()
 					def main() float :                         \n\
 						let z = compose(mulByTwo)  in \n\
 						z(4.0)", 8.0f);
-	testAssert(results.maindef->body->nodeType() == ASTNode::MulExpressionType); // Function calls should be inlined.
+	testAssert(results.maindef->body->nodeType() == ASTNode::MulExpressionType || results.maindef->body->nodeType() == ASTNode::FloatLiteralType); // Function calls should be inlined.
 
 	// Test lambda with function call in it.
 	results = testMainFloatArg("def square(float z) float : z*z						\n\
@@ -3602,7 +3602,7 @@ static void testLambdaExpressionsAndClosures()
 							f = \\(float y) : square(y)							\n\
 						in													\n\
 							f(x)", 4.0f, 16.0f, INVALID_OPENCL);
-	testAssert(results.maindef->body->nodeType() == ASTNode::MulExpressionType); // Function calls should be inlined.
+	testAssert(results.maindef->body->nodeType() == ASTNode::MulExpressionType || results.maindef->body->nodeType() == ASTNode::FloatLiteralType); // Function calls should be inlined.
 
 	// Test return of a lambda with a function call in it
 	results = testMainFloatArg("def square(float z) float : z*z						\n\
@@ -3612,7 +3612,7 @@ static void testLambdaExpressionsAndClosures()
 							f = makeLambda()							\n\
 						in													\n\
 							f(x)", 4.0f, 16.0f, INVALID_OPENCL);
-	testAssert(results.maindef->body->nodeType() == ASTNode::MulExpressionType); // Function calls should be inlined.
+	testAssert(results.maindef->body->nodeType() == ASTNode::MulExpressionType || results.maindef->body->nodeType() == ASTNode::FloatLiteralType); // Function calls should be inlined.
 
 	// Test lambda being return from a function, where the lambda has a call to a function argument in it.
 	testMainFloat("def compose(function<float, float> f) : \\(float x) : f(x)       \n\
@@ -5217,7 +5217,7 @@ void LanguageTests::run()
 	{ len(res) = 1 }
 
 	----------------------------
-	valid = 
+	valid =
 	0 >= 0 && 0 < len(f(x))
 	true && 0 < len(f(x))
 	0 < len(f(x))

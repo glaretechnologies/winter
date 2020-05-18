@@ -664,7 +664,7 @@ void BufferRoot::print(int depth, std::ostream& s) const
 }
 
 
-std::string BufferRoot::sourceString() const
+std::string BufferRoot::sourceString(int depth) const
 {
 	std::string s;
 	for(unsigned int i=0; i<top_level_defs.size(); ++i)
@@ -677,7 +677,7 @@ std::string BufferRoot::sourceString() const
 			{
 				if(top_level_defs[i].downcastToPtr<Winter::FunctionDefinition>()->body.nonNull()) // If not a built-in function:
 				{
-					std::string func_src = top_level_defs[i]->sourceString();
+					std::string func_src = top_level_defs[i]->sourceString(depth);
 					s += func_src;
 					s += "\n";
 				}
@@ -685,7 +685,7 @@ std::string BufferRoot::sourceString() const
 			}
 		default:
 			{
-				std::string node_src = top_level_defs[i]->sourceString();
+				std::string node_src = top_level_defs[i]->sourceString(depth);
 				s += node_src;
 				s += "\n";
 				break;
@@ -830,7 +830,7 @@ void FloatLiteral::print(int depth, std::ostream& s) const
 }
 
 
-std::string FloatLiteral::sourceString() const
+std::string FloatLiteral::sourceString(int depth) const
 {
 	return floatLiteralString(this->value);
 }
@@ -878,7 +878,7 @@ void DoubleLiteral::print(int depth, std::ostream& s) const
 }
 
 
-std::string DoubleLiteral::sourceString() const
+std::string DoubleLiteral::sourceString(int depth) const
 {
 	return doubleLiteralString(this->value);
 }
@@ -926,7 +926,7 @@ void IntLiteral::print(int depth, std::ostream& s) const
 }
 
 
-std::string IntLiteral::sourceString() const
+std::string IntLiteral::sourceString(int depth) const
 {
 	if(num_bits == 32)
 	{
@@ -998,7 +998,7 @@ void BoolLiteral::print(int depth, std::ostream& s) const
 }
 
 
-std::string BoolLiteral::sourceString() const
+std::string BoolLiteral::sourceString(int depth) const
 {
 	return boolToString(this->value);
 }
@@ -1075,7 +1075,7 @@ void MapLiteral::print(int depth, std::ostream& s) const
 }
 
 
-std::string MapLiteral::sourceString() const
+std::string MapLiteral::sourceString(int depth) const
 {
 	assert(0);
 	return "";
@@ -1191,7 +1191,7 @@ void StringLiteral::print(int depth, std::ostream& s) const
 }
 
 
-std::string StringLiteral::sourceString() const
+std::string StringLiteral::sourceString(int depth) const
 {
 	return "\"" + this->value + "\"";
 }
@@ -1394,7 +1394,7 @@ void CharLiteral::print(int depth, std::ostream& s) const
 }
 
 
-std::string CharLiteral::sourceString() const
+std::string CharLiteral::sourceString(int depth) const
 {
 	return "'" + this->value + "'";
 }
@@ -1683,9 +1683,9 @@ void AdditionExpression::print(int depth, std::ostream& s) const
 }
 
 
-std::string AdditionExpression::sourceString() const
+std::string AdditionExpression::sourceString(int depth) const
 {
-	return "(" + a->sourceString() + " + " + b->sourceString() + ")";
+	return "(" + a->sourceString(depth) + " + " + b->sourceString(depth) + ")";
 }
 
 
@@ -1906,9 +1906,9 @@ void SubtractionExpression::print(int depth, std::ostream& s) const
 }
 
 
-std::string SubtractionExpression::sourceString() const
+std::string SubtractionExpression::sourceString(int depth) const
 {
-	return "(" + a->sourceString() + " - " + b->sourceString() + ")";
+	return "(" + a->sourceString(depth) + " - " + b->sourceString(depth) + ")";
 }
 
 
@@ -2244,9 +2244,9 @@ void MulExpression::print(int depth, std::ostream& s) const
 }
 
 
-std::string MulExpression::sourceString() const
+std::string MulExpression::sourceString(int depth) const
 {
-	return "(" + a->sourceString() + " * " + b->sourceString() + ")";
+	return "(" + a->sourceString(depth) + " * " + b->sourceString(depth) + ")";
 }
 
 
@@ -2907,9 +2907,9 @@ void DivExpression::print(int depth, std::ostream& s) const
 }
 
 
-std::string DivExpression::sourceString() const
+std::string DivExpression::sourceString(int depth) const
 {
-	return "(" + a->sourceString() + " / " + b->sourceString() + ")";
+	return "(" + a->sourceString(depth) + " / " + b->sourceString(depth) + ")";
 }
 
 
@@ -3072,9 +3072,9 @@ const std::string BinaryBitwiseExpression::opToken() const
 }
 
 
-std::string BinaryBitwiseExpression::sourceString() const
+std::string BinaryBitwiseExpression::sourceString(int depth) const
 {
-	return "(" + a->sourceString() + " " + opToken() + " " + b->sourceString() + ")";
+	return "(" + a->sourceString(depth) + " " + opToken() + " " + b->sourceString(depth) + ")";
 }
 
 
@@ -3333,9 +3333,9 @@ void BinaryBooleanExpr::print(int depth, std::ostream& s) const
 }
 
 
-std::string BinaryBooleanExpr::sourceString() const
+std::string BinaryBooleanExpr::sourceString(int depth) const
 {
-	return "(" + a->sourceString() + (this->t == OR ? " || " : " && ") + b->sourceString() + ")";
+	return "(" + a->sourceString(depth) + (this->t == OR ? " || " : " && ") + b->sourceString(depth) + ")";
 }
 
 
@@ -3536,9 +3536,9 @@ void UnaryMinusExpression::print(int depth, std::ostream& s) const
 }
 
 
-std::string UnaryMinusExpression::sourceString() const
+std::string UnaryMinusExpression::sourceString(int depth) const
 {
-	return "-" + expr->sourceString();
+	return "-" + expr->sourceString(depth);
 }
 
 
@@ -3704,9 +3704,9 @@ void LogicalNegationExpr::print(int depth, std::ostream& s) const
 }
 
 
-std::string LogicalNegationExpr::sourceString() const
+std::string LogicalNegationExpr::sourceString(int depth) const
 {
-	return "!" + expr->sourceString();
+	return "!" + expr->sourceString(depth);
 }
 
 
@@ -3888,9 +3888,9 @@ static const std::string tokenString(unsigned int token_type)
 }
 
 
-std::string ComparisonExpression::sourceString() const
+std::string ComparisonExpression::sourceString(int depth) const
 {
-	return "(" + a->sourceString() + tokenString(this->token->getType()) + b->sourceString() + ")";
+	return "(" + a->sourceString(depth) + tokenString(this->token->getType()) + b->sourceString(depth) + ")";
 }
 
 
@@ -4183,7 +4183,7 @@ void ArraySubscript::print(int depth, std::ostream& s) const
 }
 
 
-std::string ArraySubscript::sourceString() const
+std::string ArraySubscript::sourceString(int depth) const
 {
 	assert(0);
 	return "";
@@ -4296,9 +4296,9 @@ void NamedConstant::print(int depth, std::ostream& s) const
 }
 
 
-std::string NamedConstant::sourceString() const
+std::string NamedConstant::sourceString(int depth) const
 {
-	return name + " = " + value_expr->sourceString();
+	return name + " = " + value_expr->sourceString(depth);
 }
 
 

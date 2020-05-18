@@ -113,12 +113,12 @@ void ArrayLiteral::print(int depth, std::ostream& s) const
 }
 
 
-std::string ArrayLiteral::sourceString() const
+std::string ArrayLiteral::sourceString(int depth) const
 {
 	std::string s = "[";
 	for(size_t i=0; i<elements.size(); ++i)
 	{
-		s += elements[i]->sourceString();
+		s += elements[i]->sourceString(depth);
 		if(i + 1 < elements.size())
 			s += ", ";
 	}

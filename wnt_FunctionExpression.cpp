@@ -859,15 +859,21 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 		// TODO: check function is bound etc..?
 		if(this->static_target_function)
 		{
-			/*this->can_constant_fold = true;
-			for(size_t i=0; i<argument_expressions.size(); ++i)
-				can_constant_fold = can_constant_fold && argument_expressions[i]->can_constant_fold;
-			this->can_constant_fold = this->can_constant_fold && expressionIsWellTyped(*this, payload);*/
-			this->can_maybe_constant_fold = true;
-			for(size_t i=0; i<argument_expressions.size(); ++i)
+			// If the target function is an external function, but the function ptr is null, we can't call it, so don't try and constant fold.
+			if(this->static_target_function->external_function.nonNull() && this->static_target_function->external_function->func == NULL)
+				this->can_maybe_constant_fold = false;
+			else
 			{
-				const bool arg_is_literal = checkFoldExpression(argument_expressions[i], payload, stack);
-				this->can_maybe_constant_fold = this->can_maybe_constant_fold && arg_is_literal;
+				/*this->can_constant_fold = true;
+				for(size_t i=0; i<argument_expressions.size(); ++i)
+					can_constant_fold = can_constant_fold && argument_expressions[i]->can_constant_fold;
+				this->can_constant_fold = this->can_constant_fold && expressionIsWellTyped(*this, payload);*/
+				this->can_maybe_constant_fold = true;
+				for(size_t i=0; i<argument_expressions.size(); ++i)
+				{
+					const bool arg_is_literal = checkFoldExpression(argument_expressions[i], payload, stack);
+					this->can_maybe_constant_fold = this->can_maybe_constant_fold && arg_is_literal;
+				}
 			}
 		}
 		else
@@ -955,10 +961,16 @@ void FunctionExpression::checkInlineExpression(TraversalPayload& payload, std::v
 		}*/
 	}
 
+	const bool verbose = false;
 
-	if(target_func && !target_func->noinline && !target_func->isExternalFunction() && target_func->body.nonNull()) // If is potentially inlinable:
+	// If we are optimising for OpenCL, and the target function has the opencl_noinline attribute, don't inline.
+	const bool opencl_allow_inline = (payload.linker == NULL) || !payload.linker->optimise_for_opencl || !target_func || (payload.linker->optimise_for_opencl && !target_func->opencl_noinline);
+	if(verbose && !opencl_allow_inline)
+		conPrint("Not inlining due to opencl_noinline attribute.");
+	
+
+	if(target_func && !target_func->noinline && opencl_allow_inline && !target_func->isExternalFunction() && target_func->body.nonNull()) // If is potentially inlinable:
 	{
-		const bool verbose = false;
 		if(verbose) conPrint("\n=================== Considering inlining function call =====================\n");
 		if(verbose) conPrint("target func: " + target_func->sig.toString());
 
@@ -1636,7 +1648,7 @@ void FunctionExpression::print(int depth, std::ostream& s) const
 }
 
 
-std::string FunctionExpression::sourceString() const
+std::string FunctionExpression::sourceString(int depth) const
 {
 	std::string s;
 	if(!this->static_function_name.empty())
@@ -1646,13 +1658,13 @@ std::string FunctionExpression::sourceString() const
 		if(this->get_func_expr->nodeType() == ASTNode::VariableASTNodeType)
 			s += this->get_func_expr.downcastToPtr<Variable>()->name;
 		else
-			s += "(" + this->get_func_expr->sourceString() + ")"; // Wrap parens around the 'get func' expression if needed. (needed currently for lambdas etc..)
+			s += "(" + this->get_func_expr->sourceString(depth) + ")"; // Wrap parens around the 'get func' expression if needed. (needed currently for lambdas etc..)
 	}
 		
 	s += "(";
 	for(unsigned int i=0; i<argument_expressions.size(); ++i)
 	{
-		s += argument_expressions[i]->sourceString();
+		s += argument_expressions[i]->sourceString(depth);
 		if(i + 1 < argument_expressions.size())
 			s += ", ";
 	}
@@ -1924,6 +1936,18 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 	{
 		return "fmax(" + argument_expressions[0]->emitOpenCLC(params) + ", " + argument_expressions[1]->emitOpenCLC(params) + ")";
 	}
+	else if(static_function_name == "cross" && (argument_expressions.size() == 2) &&
+		((argument_expressions[0]->type()->getType() == Type::VectorTypeType && argument_expressions[0]->type().downcastToPtr<VectorType>()->elem_type->getType() == Type::FloatType) ||
+		(argument_expressions[0]->type()->getType() == Type::VectorTypeType && argument_expressions[0]->type().downcastToPtr<VectorType>()->elem_type->getType() == Type::DoubleType)))
+	{
+		return "cross(" + argument_expressions[0]->emitOpenCLC(params) + ", " + argument_expressions[1]->emitOpenCLC(params) + ")";
+	}
+	else if(static_function_name == "length" && (argument_expressions.size() == 1) &&
+		((argument_expressions[0]->type()->getType() == Type::VectorTypeType && argument_expressions[0]->type().downcastToPtr<VectorType>()->elem_type->getType() == Type::FloatType) ||
+		(argument_expressions[0]->type()->getType() == Type::VectorTypeType && argument_expressions[0]->type().downcastToPtr<VectorType>()->elem_type->getType() == Type::DoubleType)))
+		{
+		return "length(" + argument_expressions[0]->emitOpenCLC(params) + ")";
+	}
 	else if(static_function_name == "iterate")
 	{
 		//TODO: check arg 0 is constant.
@@ -1961,18 +1985,18 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 	/*else if(static_target_function && static_target_function->built_in_func_impl.nonNull() &&
 		(static_target_function->built_in_func_impl->builtInType() == BuiltInFunctionImpl::BuiltInType_Constructor))
 	{
+		// Struct constructor: for this we will emit a 'compound literal' expression such as
+		// b = (struct point) { 5, 6 };
+		// (See http://nickdesaulniers.github.io/blog/2013/07/25/designated-initialization-with-pointers-in-c/)
+
 		// NOTE: Unforunately this code crashes the AMD OpenCL C compiler, see
 		// https://community.amd.com/message/2867567
 		// So we can't use this approach for now.
 
-		// Struct constructor: for this we will emit a 'compound literal' expression such as 
-		// b = (struct point) { 5, 6 };
-		// (See http://nickdesaulniers.github.io/blog/2013/07/25/designated-initialization-with-pointers-in-c/)
-
 		std::string s = "(" + this->type()->OpenCLCType() + ") {";
 		for(unsigned int i=0; i<argument_expressions.size(); ++i)
 		{
-			if((argument_expressions[i]->nodeType() == ASTNode::VariableASTNodeType) && (argument_expressions[i].downcastToPtr<Variable>()->binding_type == Variable::ArgumentVariable) && argument_expressions[i]->type()->OpenCLPassByPointer())
+			if((argument_expressions[i]->nodeType() == ASTNode::VariableASTNodeType) && (argument_expressions[i].downcastToPtr<Variable>()->binding_type == Variable::BindingType_Argument) && argument_expressions[i]->type()->OpenCLPassByPointer())
 				s += "*"; // Will need to deref pointer args.
 			s += argument_expressions[i]->emitOpenCLC(params);
 

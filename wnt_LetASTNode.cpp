@@ -46,11 +46,11 @@ void LetASTNode::print(int depth, std::ostream& s) const
 }
 
 
-std::string LetASTNode::sourceString() const
+std::string LetASTNode::sourceString(int depth) const
 {
 	if(vars.size() == 1)
 	{
-		return vars[0].name + " = " + expr->sourceString();
+		return vars[0].name + " = " + expr->sourceString(depth);
 	}
 	else
 	{
@@ -61,7 +61,7 @@ std::string LetASTNode::sourceString() const
 			if(i + 1 < vars.size())
 				s += ", ";
 		}
-		s += " = " + expr->sourceString();
+		s += " = " + expr->sourceString(depth);
 		return s;
 	}
 }

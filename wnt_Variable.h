@@ -40,7 +40,7 @@ public:
 	virtual ValueRef exec(VMState& vmstate);
 	virtual TypeRef type() const;
 	virtual void print(int depth, std::ostream& s) const;
-	virtual std::string sourceString() const;
+	virtual std::string sourceString(int depth) const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;

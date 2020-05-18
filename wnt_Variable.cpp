@@ -564,7 +564,7 @@ void Variable::print(int depth, std::ostream& s) const
 }
 
 
-std::string Variable::sourceString() const
+std::string Variable::sourceString(int depth) const
 {
 	return this->name;
 }

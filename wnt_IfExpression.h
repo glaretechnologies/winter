@@ -51,7 +51,7 @@ public:
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual void updateChild(const ASTNode* old_val, ASTNodeRef& new_val);
 	virtual void print(int depth, std::ostream& s) const;
-	virtual std::string sourceString() const;
+	virtual std::string sourceString(int depth) const;
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
 	//virtual void emitCleanupLLVMCode(EmitLLVMCodeParams& params, llvm::Value* string_val) const;

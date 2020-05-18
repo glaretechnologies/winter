@@ -58,7 +58,7 @@ public:
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual void updateChild(const ASTNode* old_val, ASTNodeRef& new_val);
 	virtual void print(int depth, std::ostream& s) const;
-	virtual std::string sourceString() const;
+	virtual std::string sourceString(int depth) const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
 	virtual llvm::Value* emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret_space_ptr) const;
 	virtual Reference<ASTNode> clone(CloneMapType& clone_map);
@@ -142,6 +142,7 @@ public:
 	int order_num; // Used for establishing an ordering between function definitions and named constants, to avoid circular references.
 
 	bool noinline; // Optional attribute.  False by default.  If true, function won't be inlined.
+	bool opencl_noinline; // Optional attribute.  False by default.  If true, function won't be inlined, if optimise_for_opencl vm arg is true.
 
 	int64 llvm_reported_stack_size; // -1 if this information is not returned by LLVM
 

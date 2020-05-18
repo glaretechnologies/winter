@@ -81,14 +81,14 @@ void LetBlock::print(int depth, std::ostream& s) const
 }
 
 
-std::string LetBlock::sourceString() const
+std::string LetBlock::sourceString(int depth) const
 {
 	std::string s;
-	s += "let\n";
+	s += "\n" + std::string(depth, '\t') + "let\n";
 	for(size_t i=0; i<lets.size(); ++i)
-		s += "\t" + lets[i]->sourceString() + "\n";
-	s += "in\n\t";
-	s += expr->sourceString();
+		s += std::string(depth + 1, '\t') + lets[i]->sourceString(depth + 1) + "\n";
+	s += std::string(depth, '\t') + "in\n";
+	s += std::string(depth + 1, '\t') + expr->sourceString(depth + 1);
 	return s;
 }
 

@@ -606,7 +606,8 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 :	linker(
 		args.try_coerce_int_to_double_first,
 		args.emit_in_bound_asserts,
-		args.real_is_double
+		args.real_is_double,
+		args.optimise_for_opencl
 	),
 	llvm_context(NULL),
 	llvm_module(NULL),
@@ -1308,13 +1309,28 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 			simplify_if_change = payload.tree_changed;
 		}
 
+		// Do Constant Folding
+		bool constant_fold_change = false;
+		if(args.do_constant_folding)
+		{
+			std::vector<ASTNode*> stack;
+			TraversalPayload payload(TraversalPayload::ComputeCanConstantFold);
+			payload.linker = &linker;
+			for(size_t i=0; i<linker.top_level_defs.size(); ++i)
+				linker.top_level_defs[i]->traverse(payload, stack);
+
+			assert(stack.size() == 0);
+
+			constant_fold_change = payload.tree_changed;
+		}
+
 		/*{
 			std::ofstream file("post_inlining_source.win");
 			for(size_t i=0; i<linker.top_level_defs.size(); ++i)
 				file << linker.top_level_defs[i]->sourceString() << "\n\n";
 		}*/
 
-		bool changed = inline_change || dce_change || simplify_if_change;
+		bool changed = inline_change || dce_change || simplify_if_change || constant_fold_change;
 		if(!changed)
 			break;
 	}
@@ -1820,7 +1836,7 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 
 		// C99 keywords  (from http://stackoverflow.com/a/8140120)
 		"auto",
-		"enum",       
+		"enum",
 		"break",
 		"extern",
 		"case",

@@ -75,6 +75,7 @@ FunctionDefinition::FunctionDefinition(const SrcLocation& src_loc, int order_num
 	is_anon_func(false),
 	num_uses(0),
 	noinline(false),
+	opencl_noinline(false),
 	sig(name, makeArgTypeVector(args_)),
 	llvm_reported_stack_size(-1)
 {
@@ -529,7 +530,7 @@ void FunctionDefinition::print(int depth, std::ostream& s) const
 }
 
 
-std::string FunctionDefinition::sourceString() const
+std::string FunctionDefinition::sourceString(int depth) const
 {
 	std::string s;
 
@@ -557,13 +558,27 @@ std::string FunctionDefinition::sourceString() const
 			s += ", ";
 	}
 	s += ") ";
+
+	// Write function attributes, if present
+	if(this->noinline)
+		s += "!noinline ";
+	if(this->opencl_noinline)
+		s += "!opencl_noinline ";
+
 	if(this->declared_return_type.nonNull())
 		s += this->declared_return_type->toString() + " ";
 	s += ": ";
 	if(body.isNull())
-		return s + " [NULL BODY]";
+	{
+		if(built_in_func_impl.nonNull())
+			return s + " [Built-in]";
+		else if(external_function.nonNull())
+			return s + " [External]";
+		else
+			return s + " [NULL BODY]";
+	}
 	else
-		return s + body->sourceString();
+		return s + body->sourceString(depth + 1);
 }
 
 
@@ -1464,6 +1479,8 @@ Reference<ASTNode> FunctionDefinition::clone(CloneMapType& clone_map)
 		this->declared_return_type,
 		this->built_in_func_impl
 	);
+	f->noinline = this->noinline;
+	f->opencl_noinline = this->opencl_noinline;
 
 	// NOTE: We don't need to copy free_variables as they should be cleared after copying anyway, since variables will be rebound for copied trees.
 	f->captured_var_types = this->captured_var_types;

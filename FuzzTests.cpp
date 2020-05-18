@@ -782,7 +782,7 @@ public:
 			}*/
 			
 
-			const std::string src = root.nonNull() ? root->sourceString() : "";
+			const std::string src = root.nonNull() ? root->sourceString(0) : "";
 
 			//conPrint("-------------------------------\n" + src + "\n-------------------------------");//TEMP
 

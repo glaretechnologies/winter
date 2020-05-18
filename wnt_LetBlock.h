@@ -35,7 +35,7 @@ public:
 	virtual ValueRef exec(VMState& vmstate);
 	virtual TypeRef type() const { return expr->type(); }
 	virtual void print(int depth, std::ostream& s) const;
-	virtual std::string sourceString() const;
+	virtual std::string sourceString(int depth) const;
 	virtual std::string emitOpenCLC(EmitOpenCLCodeParams& params) const;
 	virtual void traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack);
 	virtual void updateChild(const ASTNode* old_val, ASTNodeRef& new_val);

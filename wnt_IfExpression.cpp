@@ -189,9 +189,9 @@ void IfExpression::print(int depth, std::ostream& s) const
 }
 
 
-std::string IfExpression::sourceString() const
+std::string IfExpression::sourceString(int depth) const
 {
-	std::string s = "if " + condition->sourceString() + " then " + then_expr->sourceString() + " else " + else_expr->sourceString() + "";
+	std::string s = "if " + condition->sourceString(depth) + " then " + then_expr->sourceString(depth) + " else " + else_expr->sourceString(depth) + "";
 	return s;
 }
 
