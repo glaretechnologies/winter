@@ -25,7 +25,7 @@ class Linker
 {
 public:
 	Linker(bool try_coerce_int_to_double_first, bool emit_in_bound_asserts, 
-		bool real_is_double);
+		bool real_is_double, bool optimise_for_opencl);
 	~Linker();
 
 	void addFunctions(const std::vector<FunctionDefinitionRef>& func_defs);
@@ -74,6 +74,7 @@ public:
 	bool try_coerce_int_to_double_first;
 	bool emit_in_bound_asserts;
 	bool real_is_double;
+	bool optimise_for_opencl;
 };
 
 

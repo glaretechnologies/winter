@@ -22,10 +22,11 @@ namespace Winter
 
 
 Linker::Linker(bool try_coerce_int_to_double_first_, bool emit_in_bound_asserts_, 
-	bool real_is_double_)
+	bool real_is_double_, bool optimise_for_opencl_)
 :	try_coerce_int_to_double_first(try_coerce_int_to_double_first_),
 	emit_in_bound_asserts(emit_in_bound_asserts_),
-	real_is_double(real_is_double_)
+	real_is_double(real_is_double_),
+	optimise_for_opencl(optimise_for_opencl_)
 {}
 
 
