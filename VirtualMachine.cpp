@@ -105,6 +105,9 @@ namespace Winter
 // Also dumps to "module_assembly.txt" in current working dir.
 static const bool DUMP_MODULE_IR_AND_ASSEMBLY = false;
 
+// Dumps optimised Winter code to optimised_src.win.
+static const bool DUMP_OPTIMISED_WINTER_CODE = false;
+
 
 //=====================================================================================
 
@@ -1457,6 +1460,14 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		for(size_t i=0; i<linker.top_level_defs.size(); ++i)
 			linker.top_level_defs[i]->traverse(payload, stack);
 		assert(stack.size() == 0);
+	}
+
+	// Dump optimised winter code
+	if(DUMP_OPTIMISED_WINTER_CODE)
+	{
+		std::ofstream file("optimised_src.win");
+		for(size_t i=0; i<linker.top_level_defs.size(); ++i)
+			file << linker.top_level_defs[i]->sourceString(/*depth=*/0) + "\n\n";
 	}
 }
 
