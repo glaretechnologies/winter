@@ -837,11 +837,21 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 #if TARGET_LLVM_VERSION >= 60
 			cpu_name = llvm::sys::getHostCPUName();
 #else
-			if(cpu_info.family == 6 && cpu_info.model > 70)
+			//if(cpu_info.family == 6 && cpu_info.model > 70)
+			//	cpu_name = "corei7";
+			//else
+			cpu_name = llvm::sys::getHostCPUName();
+			if(cpu_name == "generic" || cpu_name == "x86-64") // If LLVM 3.4 can't detect it, it's probably something pretty new, so just consider it >= to a corei7 in terms of capabilities.
 				cpu_name = "corei7";
-			else
-				cpu_name = llvm::sys::getHostCPUName();
 #endif
+
+			// TEMP: (TODO REMOVE) print out some details
+			printVar(cpu_info.family);
+			printVar(cpu_info.model);
+			conPrint("llvm::sys::getHostCPUName(): " + std::string(llvm::sys::getHostCPUName()));
+			conPrint("Using cpu_name: " + cpu_name);
+
+			
 
 			// Select the host computer architecture as the target.
 			this->target_machine = engine_builder.selectTarget(
