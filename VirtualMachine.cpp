@@ -75,6 +75,7 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Analysis/Lint.h"
+#include "llvm/Support/ErrorHandling.h"
 #if TARGET_LLVM_VERSION >= 60
 #include "llvm/IR/DiagnosticHandler.h"
 #include "llvm/IR/DiagnosticPrinter.h"
@@ -907,8 +908,19 @@ VirtualMachine::~VirtualMachine()
 }
 
 
+static void fatalErrorHandler(void *user_data,
+	const std::string& reason,
+	bool gen_crash_diag)
+{
+	stdErrPrint("LLVM encountered a fatal error: " + reason);
+	throw BaseException("LLVM encountered a fatal error: " + reason);
+}
+
+
 void VirtualMachine::init()
 {
+	llvm::install_fatal_error_handler(fatalErrorHandler, /*user data=*/NULL);
+
 	// Since we will be calling LLVM functions from multiple threads, we need to call this.
 #if TARGET_LLVM_VERSION < 36
 	llvm::llvm_start_multithreaded();
@@ -948,6 +960,8 @@ void VirtualMachine::shutdown() // Calls llvm_shutdown()
 #if TARGET_LLVM_VERSION < 36
 	llvm::llvm_stop_multithreaded(); // Call this manually since we're not calling llvm::llvm_shutdown().
 #endif
+
+	llvm::remove_fatal_error_handler();
 }
 
 
