@@ -830,28 +830,27 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			PlatformUtils::CPUInfo cpu_info;
 			PlatformUtils::getCPUInfo(cpu_info);
 
-			// There is an issue with LLVM, that if it encounters a newer CPU model than it knows about, then it just returns 
-			// "x86-64", which has less feature support than we actually have.  So in this case just use "corei7" which should give us the features we need.
+			// There is an issue with older LLVMs, that if it encounters a newer CPU model than it knows about, then it just returns 
+			// "x86-64" or "generic", which have less feature support than we actually have.  So in this case just use "corei7" which should give us the features we need.
 			// This issue seems to have been fixed in LLVM 6, which tries to autodetect a suitable cpu if it doesn't have an exact match.
+			//
+			// Some example CPUs that are not detected properly by LLVM 3.4:
+			//
+			// Ryzen 3300x:
+			// cpu_info.family: 23
+			// cpu_info.model: 113
+			//
+			// Threadripper:
+			// cpu_info.family: 23
+			// cpu_info.model: 1
 			std::string cpu_name;
 #if TARGET_LLVM_VERSION >= 60
 			cpu_name = llvm::sys::getHostCPUName();
 #else
-			//if(cpu_info.family == 6 && cpu_info.model > 70)
-			//	cpu_name = "corei7";
-			//else
 			cpu_name = llvm::sys::getHostCPUName();
 			if(cpu_name == "generic" || cpu_name == "x86-64") // If LLVM 3.4 can't detect it, it's probably something pretty new, so just consider it >= to a corei7 in terms of capabilities.
 				cpu_name = "corei7";
 #endif
-
-			// TEMP: (TODO REMOVE) print out some details
-			printVar(cpu_info.family);
-			printVar(cpu_info.model);
-			conPrint("llvm::sys::getHostCPUName(): " + std::string(llvm::sys::getHostCPUName()));
-			conPrint("Using cpu_name: " + cpu_name);
-
-			
 
 			// Select the host computer architecture as the target.
 			this->target_machine = engine_builder.selectTarget(
