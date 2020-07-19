@@ -834,6 +834,8 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			// "x86-64" or "generic", which have less feature support than we actually have.  So in this case just use "corei7" which should give us the features we need.
 			// This issue seems to have been fixed in LLVM 6, which tries to autodetect a suitable cpu if it doesn't have an exact match.
 			//
+			// Failing to detect a CPU properly will result in an error like "LLVM encountered a fatal error: Cannot select: intrinsic %llvm.x86.sse41.dpps".
+			//
 			// Some example CPUs that are not detected properly by LLVM 3.4:
 			//
 			// Ryzen 3300x:
