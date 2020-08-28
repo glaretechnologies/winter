@@ -130,7 +130,7 @@ letters ```a``` to ```f```, for example
 Int literals may have an ```i``` or ```u``` suffix followed by the desired bit width for the value,
 for example
 
-```100i16``` is 32-bit signed integer with value 100,
+```100i16``` is a 16-bit signed integer with value 100,
 
 ```1152921504606846976u64``` is a 64-bit unsigned integer with value 1152921504606846976.
 
