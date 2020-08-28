@@ -262,7 +262,7 @@ NOTE: Syntax for vector literals may change.
 
 ## Tuple Literal
 
-An tuple literal is written using square brackets, with an ```t``` suffix.
+An tuple literal is written using square brackets, with a ```t``` suffix.
 
 ```
 [1, 2, 3]t
