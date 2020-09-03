@@ -33,10 +33,8 @@
 #endif
 //#include "utils/Obfuscator.h"
 
-#if !defined(OSX) // Current Mac builder has a defective GPU, skip tests that may run on GPU.
 #define WINTER_OPENCL_TESTS 1
 static const bool DUMP_OPENCL_C_SOURCE = false; // Dumps to opencl_source.c
-#endif
 
 static const bool PRINT_MEM_BOUNDS_AND_USAGE = false;
 
@@ -519,7 +517,7 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 	}
 	catch(Winter::BaseException& e)
 	{
-		failTest(e.what());
+		failTest(e.messageWithPosition());
 	}
 	catch(Indigo::Exception& e)
 	{
