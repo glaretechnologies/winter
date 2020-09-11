@@ -233,7 +233,7 @@ std::string IfExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 	const std::string result_var_name = "if_res_" + toString(params.uid++);
 
 	std::string s;
-	s += this->type()->OpenCLCType() + " " + result_var_name + ";\n";
+	s += this->type()->OpenCLCType(params) + " " + result_var_name + ";\n";
 
 	s += "if(" + condition->emitOpenCLC(params) + ") {\n";
 

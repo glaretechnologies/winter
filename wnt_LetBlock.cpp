@@ -137,7 +137,7 @@ std::string LetBlock::emitOpenCLC(EmitOpenCLCodeParams& params) const
 {
 	const std::string result_var_name = "let_result_" + toString(params.uid++);
 
-	std::string s = this->type()->OpenCLCType() + " " + result_var_name + ";\n";
+	std::string s = this->type()->OpenCLCType(params) + " " + result_var_name + ";\n";
 	s += "{\n";
 
 	for(size_t i=0; i<lets.size(); ++i)
@@ -154,18 +154,18 @@ std::string LetBlock::emitOpenCLC(EmitOpenCLCodeParams& params) const
 			if(this->lets[i]->expr->type()->OpenCLPassByPointer() && (this->lets[i]->expr->nodeType() == ASTNode::VariableASTNodeType) && (this->lets[i]->expr.downcastToPtr<Variable>()->binding_type == Variable::BindingType_Argument))
 				let_expression = "*" + let_expression;
 
-			s += "\t" + this->lets[i]->type()->OpenCLCType() + " " + mapOpenCLCVarName(params.opencl_c_keywords, this->lets[i]->vars[0].name) + " = " + let_expression + ";\n";
+			s += "\t" + this->lets[i]->type()->OpenCLCType(params) + " " + mapOpenCLCVarName(params.opencl_c_keywords, this->lets[i]->vars[0].name) + " = " + let_expression + ";\n";
 		}
 		else
 		{
 			// Destructuring:
 			assert(this->lets[i]->type()->getType() == Type::TupleTypeType);
 			const std::string let_var_value_name = "let_var_value_" + toString(params.uid++);
-			s += "\t" + this->lets[i]->type()->OpenCLCType() + " " + let_var_value_name + " = " + let_expression + ";\n";
+			s += "\t" + this->lets[i]->type()->OpenCLCType(params) + " " + let_var_value_name + " = " + let_expression + ";\n";
 			for(size_t z=0; z<this->lets[i]->vars.size(); ++z)
 			{
 				const TypeRef elem_type = this->lets[i]->type().downcastToPtr<TupleType>()->component_types[z];
-				s += "\t" + elem_type->OpenCLCType() + " " + mapOpenCLCVarName(params.opencl_c_keywords, this->lets[i]->vars[z].name) + " = " + let_var_value_name + ".field_" + toString(z) + ";\n";
+				s += "\t" + elem_type->OpenCLCType(params) + " " + mapOpenCLCVarName(params.opencl_c_keywords, this->lets[i]->vars[z].name) + " = " + let_var_value_name + ".field_" + toString(z) + ";\n";
 			}
 		}
 	}

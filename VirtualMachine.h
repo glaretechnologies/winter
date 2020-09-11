@@ -122,6 +122,7 @@ public:
 	static void init(); // Initialise LLVM.  Throws Winter::BaseException on failure.
 	static void shutdown(); // Calls llvm_shutdown()
 
+	// Returns a null reference if a function matching the signature is not found.
 	Reference<FunctionDefinition> findMatchingFunction(const FunctionSignature& sig);
 
 	void* getJittedFunction(const FunctionSignature& sig);

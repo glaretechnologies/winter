@@ -1909,9 +1909,13 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 		"_Complex",
 		"_Imaginary",
 				
-		"half", // not actually described as a keyword in the spec, but seems to be treated as one.
+		// Reserved data types
+		"half",
+		"complex",
+		"imaginary",
 
-		// Table 6.3
+
+		// Table 6.3 "Other Built-in Data Types":
 		"image2d_t",
 		"image3d_t",
 		"image2d_array_t",
@@ -2029,7 +2033,7 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 			{
 				if(!ContainerUtils::contains(emitted_tuples, used_tuples[z])) // If not emitted yet:
 				{
-					struct_def_code += used_tuples[z]->getOpenCLCDefinition(vm_args.comments_in_opencl_output);
+					struct_def_code += used_tuples[z]->getOpenCLCDefinition(params, vm_args.comments_in_opencl_output);
 					emitted_tuples.insert(used_tuples[z]); // Add to set of emitted tuples
 				}
 			}
@@ -2048,16 +2052,16 @@ VirtualMachine::OpenCLCCode VirtualMachine::buildOpenCLCode(const BuildOpenCLCod
 	for(auto i = params.tuple_types_used.begin(); i != params.tuple_types_used.end(); ++i)
 		if(!ContainerUtils::contains(emitted_tuples, *i)) // If not emitted yet:
 		{
-			struct_def_code += (*i)->getOpenCLCDefinition(vm_args.comments_in_opencl_output);
-			constructor_code += (*i)->getOpenCLCConstructor(vm_args.comments_in_opencl_output);
+			struct_def_code += (*i)->getOpenCLCDefinition(params, vm_args.comments_in_opencl_output);
+			constructor_code += (*i)->getOpenCLCConstructor(params, vm_args.comments_in_opencl_output);
 			emitted_tuples.insert(*i); // Add to set of emitted tuples
 		}
 
 	for(auto i = args.tuple_types_used.begin(); i != args.tuple_types_used.end(); ++i)
 		if(!ContainerUtils::contains(emitted_tuples, *i)) // If not emitted yet:
 		{
-			struct_def_code += (*i)->getOpenCLCDefinition(vm_args.comments_in_opencl_output);
-			constructor_code += (*i)->getOpenCLCConstructor(vm_args.comments_in_opencl_output);
+			struct_def_code += (*i)->getOpenCLCDefinition(params, vm_args.comments_in_opencl_output);
+			constructor_code += (*i)->getOpenCLCConstructor(params, vm_args.comments_in_opencl_output);
 			emitted_tuples.insert(*i); // Add to set of emitted tuples
 		}
 

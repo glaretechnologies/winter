@@ -154,7 +154,7 @@ std::string VectorLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 	if(!(this->elements[0]->type()->getType() == Type::FloatType || this->elements[0]->type()->getType() == Type::DoubleType || (this->elements[0]->type()->getType() == Type::IntType && this->elements[0]->type().downcastToPtr<Int>()->numBits() == 32)))
 		throw ExceptionWithPosition("Only vectors of float or int32 supported for OpenCL currently.", errorContext(this));
 
-	const std::string elem_typename = this->elements[0]->type()->OpenCLCType();
+	const std::string elem_typename = this->elements[0]->type()->OpenCLCType(params);
 	if(has_int_suffix)
 	{
 		// "((float4)(1.0f))"

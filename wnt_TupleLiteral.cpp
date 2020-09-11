@@ -130,7 +130,7 @@ std::string TupleLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 		*/
 		std::string statements;
-		std::string s = "(" + t->OpenCLCType() + "){";
+		std::string s = "(" + t->OpenCLCType(params) + "){";
 		for(size_t i=0; i<elements.size(); ++i)
 		{
 			params.blocks.push_back("");
@@ -151,7 +151,7 @@ std::string TupleLiteral::emitOpenCLC(EmitOpenCLCodeParams& params) const
 	{
 		const std::string struct_var_name = "tuple_" + toString(params.uid++);
 	
-		std::string s = t->OpenCLCType() + " " + struct_var_name + ";\n";
+		std::string s = t->OpenCLCType(params) + " " + struct_var_name + ";\n";
 
 		for(size_t i=0; i<elements.size(); ++i)
 		{

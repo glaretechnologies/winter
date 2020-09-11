@@ -2030,6 +2030,9 @@ std::string FunctionExpression::emitOpenCLC(EmitOpenCLCodeParams& params) const
 			f(&arg1, &arg2, x)
 		*/
 
+		if(this->static_target_function == NULL)
+			throw BaseException("static_target_function was NULL in FunctionExpression::emitOpenCLC(), static_function_name: '" + static_function_name + "'.");
+
 		std::string arg_eval_s = "";
 
 		std::string use_func_name = (/*this->target_function->isExternalFunction() ||*/ isCallToBuiltInOpenCLFunction(this->static_target_function)) ? 
@@ -2082,7 +2085,7 @@ std::string FunctionExpression::emitCodeForFuncArg(EmitOpenCLCodeParams& params,
 			// "SomeStruct f_arg_xx = g();"
 
 			const std::string arg_name = func_arg_name + "_arg_" + toString(params.uid++);
-			const std::string arg_eval_s = arg_expression->type()->OpenCLCType() + " " + arg_name + " = " + arg_expression->emitOpenCLC(params) + ";\n";
+			const std::string arg_eval_s = arg_expression->type()->OpenCLCType(params) + " " + arg_name + " = " + arg_expression->emitOpenCLC(params) + ";\n";
 
 			if(params.emit_comments)
 				params.blocks.back() += "// arg for " + target_func->sig.toString() + ":\n";

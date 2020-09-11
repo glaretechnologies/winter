@@ -195,11 +195,18 @@ static void doCKeywordTests()
 	// Test function names.  Actually because of type decoration, function names (always?) won't clash with OpenCL C keywords.
 	testMainFloatArg("def switch(float x) float : x      def main(float x) : switch(x)", 10.0f, 10.f);
 	testMainFloatArg("def switch(float x) !noinline float : x      def main(float x) : switch(x)", 10.0f, 10.f);
-	
+
 	// Test structure names
-//TEMP FAILING	testMainFloatArg(
-//TEMP FAILING		"struct switch { float x }			\n"
-//TEMP FAILING		"def main(float x) float : switch(x).x", 10.0f, 10.f);
+	testMainFloatArg(
+		"struct switch { float x }			\n"
+		"def main(float x) float : switch(x).x", 10.0f, 10.f);
+
+	// Test use of 'complex' struct (complex is a reserved word in OpenCL and can't be used)
+	testMainFloatArg(
+		"struct complex { float re, float im }   \n"
+		"	def f(complex c) !noinline float : c.re	\n"
+		"	def main(float x) float : let c = complex(x, x + 1.0) in f(c)",
+		10.0f, 10.f);
 }
 
 

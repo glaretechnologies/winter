@@ -25,6 +25,7 @@
 #include <StringUtils.h>
 #include <FileUtils.h>
 #include <ContainerUtils.h>
+#include <PlatformUtils.h>
 #include <Timer.h>
 #include <cassert>
 #include <fstream>
@@ -430,7 +431,7 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 					{
 						std::ofstream file("opencl_source.c");
 						file << extended_source;
-						conPrint("Dumped OpenCL C source to opencl_source.c.");
+						conPrint("Dumped OpenCL C source to " + PlatformUtils::getCurrentWorkingDirPath() + "/opencl_source.c.");
 					}
 				}
 
@@ -520,6 +521,10 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 		failTest(e.messageWithPosition());
 	}
 	catch(Indigo::Exception& e)
+	{
+		failTest(e.what());
+	}
+	catch(PlatformUtils::PlatformUtilsExcep& e)
 	{
 		failTest(e.what());
 	}

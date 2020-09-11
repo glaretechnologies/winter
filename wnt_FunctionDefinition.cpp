@@ -589,9 +589,9 @@ std::string FunctionDefinition::sourceString(int depth) const
 std::string FunctionDefinition::openCLCArgumentCode(EmitOpenCLCodeParams& params, const TypeVRef& arg_type, const std::string& arg_name)
 {
 	if(arg_type->OpenCLPassByPointer())
-		return "const " + arg_type->address_space + " " + arg_type->OpenCLCType() + "* const " + mapOpenCLCVarName(params.opencl_c_keywords, arg_name);
+		return "const " + arg_type->address_space + " " + arg_type->OpenCLCType(params) + "* const " + mapOpenCLCVarName(params.opencl_c_keywords, arg_name);
 	else
-		return "const " + arg_type->OpenCLCType() + " " + mapOpenCLCVarName(params.opencl_c_keywords, arg_name);
+		return "const " + arg_type->OpenCLCType(params) + " " + mapOpenCLCVarName(params.opencl_c_keywords, arg_name);
 }
 
 
@@ -601,7 +601,7 @@ std::string FunctionDefinition::emitOpenCLC(EmitOpenCLCodeParams& params) const
 
 
 	// Emit forwards declaration to file scope code:
-	std::string opencl_sig = this->returnType()->OpenCLCType() + " ";
+	std::string opencl_sig = this->returnType()->OpenCLCType(params) + " ";
 	opencl_sig += sig.typeMangledName() + "(";
 	for(unsigned int i=0; i<args.size(); ++i)
 	{

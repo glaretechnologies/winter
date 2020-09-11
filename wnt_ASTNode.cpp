@@ -4340,7 +4340,7 @@ std::string NamedConstant::emitOpenCLC(EmitOpenCLCodeParams& params) const
 	else
 	{
 		// Need to declare this as constant otherwise get "error: global variable must be declared in addrSpace constant"
-		return type()->OpenCLCType() + " __constant " + name + " = " + value_expr->emitOpenCLC(params) + ";";
+		return type()->OpenCLCType(params) + " __constant " + name + " = " + value_expr->emitOpenCLC(params) + ";";
 	}
 }
 

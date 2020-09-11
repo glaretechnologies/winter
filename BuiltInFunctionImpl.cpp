@@ -2529,8 +2529,8 @@ const std::string IterateBuiltInFunc::emitOpenCLForFunctionArg(EmitOpenCLCodePar
 	)
 {
 	assert(*this->state_type == *argument_expressions[1]->type());
-	const std::string state_typename = state_type->OpenCLCType();
-	const std::string tuple_typename = f->returnType()->OpenCLCType();
+	const std::string state_typename = state_type->OpenCLCType(params);
+	const std::string tuple_typename = f->returnType()->OpenCLCType(params);
 	const VRef<StructureType> captured_var_struct_type = f->getCapturedVariablesStructType();
 
 	std::string s;
@@ -2581,7 +2581,7 @@ const std::string IterateBuiltInFunc::emitOpenCLForFunctionArg(EmitOpenCLCodePar
 	{
 		// Emit code to capture variables:
 		std::string cap_code;
-		cap_code += captured_var_struct_type->OpenCLCType() + " captured_vars_" + toString(use_uid) + ";\n";
+		cap_code += captured_var_struct_type->OpenCLCType(params) + " captured_vars_" + toString(use_uid) + ";\n";
 		size_t i=0;
 		const auto unique_free_vars = f->getUniqueFreeVarList();
 		for(auto z = unique_free_vars.begin(); z != unique_free_vars.end(); ++z, ++i)

@@ -72,7 +72,7 @@ llvm::Type* Float::LLVMType(llvm::Module& module) const
 }
 
 
-const std::string Float::OpenCLCType() const
+const std::string Float::OpenCLCType(EmitOpenCLCodeParams& params) const
 { 
 	if(address_space.empty())
 		return "float";
@@ -115,7 +115,7 @@ llvm::Type* Double::LLVMType(llvm::Module& module) const
 }
 
 
-const std::string Double::OpenCLCType() const
+const std::string Double::OpenCLCType(EmitOpenCLCodeParams& params) const
 { 
 	if(address_space.empty())
 		return "double";
@@ -200,7 +200,7 @@ llvm::Type* Int::LLVMType(llvm::Module& module) const
 }
 
 
-const std::string Int::OpenCLCType() const
+const std::string Int::OpenCLCType(EmitOpenCLCodeParams& params) const
 {
 	const std::string u_prefix = is_signed ? "" : "u";
 	if(num_bits == 16)
@@ -571,7 +571,7 @@ llvm::Type* Function::LLVMType(llvm::Module& module) const
 }
 
 
-const std::string Function::OpenCLCType() const
+const std::string Function::OpenCLCType(EmitOpenCLCodeParams& params) const
 {
 	throw BaseException("Function (closure) types not supported for OpenCL C emission");
 }
@@ -602,13 +602,13 @@ const std::string ArrayType::toString() const
 }
 
 
-const std::string ArrayType::OpenCLCType() const
+const std::string ArrayType::OpenCLCType(EmitOpenCLCodeParams& params) const
 {
 	// For e.g. an array of floats, use type 'float*'.
 	if(this->address_space.empty())
-		return "__constant " + elem_type->OpenCLCType() + "*";
+		return "__constant " + elem_type->OpenCLCType(params) + "*";
 	else
-		return address_space + " " + elem_type->OpenCLCType() + "*";
+		return address_space + " " + elem_type->OpenCLCType(params) + "*";
 }
 
 
@@ -650,10 +650,10 @@ const std::string VArrayType::toString() const
 }
 
 
-const std::string VArrayType::OpenCLCType() const
+const std::string VArrayType::OpenCLCType(EmitOpenCLCodeParams& params) const
 {
 	// For e.g. an array of floats, use type 'float*'.
-	return elem_type->OpenCLCType() + "*";
+	return elem_type->OpenCLCType(params) + "*";
 }
 
 
@@ -849,7 +849,7 @@ llvm::Type* Map::LLVMType(llvm::Module& module) const
 }
 
 
-const std::string Map::OpenCLCType() const
+const std::string Map::OpenCLCType(EmitOpenCLCodeParams& params) const
 {
 	assert(0);
 	return "";
@@ -919,6 +919,11 @@ llvm::Type* StructureType::LLVMType(llvm::Module& module) const
 }
 
 
+const std::string StructureType::OpenCLCType(EmitOpenCLCodeParams& params) const
+{
+	return mapOpenCLCVarName(params.opencl_c_keywords, name);
+}
+
 
 /*const std::string StructureType::toString() const 
 { 
@@ -956,16 +961,16 @@ const std::string StructureType::definitionString() const // Winter definition s
 
 const std::string StructureType::getOpenCLCDefinition(EmitOpenCLCodeParams& params, bool emit_comments) const // Get full definition string, e.g. struct a { float b; };
 {
-	const std::string use_name = mapOpenCLCVarName(params.opencl_c_keywords, name);
+	const std::string use_struct_name = this->OpenCLCType(params);
 
-	std::string s = "typedef struct " + use_name + "\n{\n";
+	std::string s = "typedef struct " + use_struct_name + "\n{\n";
 
 	for(size_t i=0; i<component_types.size(); ++i)
 	{
-		s += "\t" + component_types[i]->OpenCLCType() + " " + component_names[i] + ";\n";
+		s += "\t" + component_types[i]->OpenCLCType(params) + " " + component_names[i] + ";\n";
 	}
 
-	s += "} " + use_name + ";\n\n";
+	s += "} " + use_struct_name + ";\n\n";
 
 /*
 	// Make constructor.
@@ -981,7 +986,7 @@ const std::string StructureType::getOpenCLCDefinition(EmitOpenCLCodeParams& para
 	for(size_t i=0; i<component_types.size(); ++i)
 	{
 		// Non pass-by-value types are passed with a const C pointer.
-		const std::string use_type = !component_types[i]->OpenCLPassByPointer() ? component_types[i]->OpenCLCType() : ("const " + component_types[i]->OpenCLCType() + "* const ");
+		const std::string use_type = !component_types[i]->OpenCLPassByPointer() ? component_types[i]->OpenCLCType(params) : ("const " + component_types[i]->OpenCLCType(params) + "* const ");
 		s += use_type + " " + component_names[i];
 		if(i + 1 < component_types.size())
 			s += ", ";
@@ -1014,7 +1019,7 @@ const std::string StructureType::getOpenCLCConstructor(EmitOpenCLCodeParams& par
 	for(size_t i=0; i<component_types.size(); ++i)
 	{
 		// Non pass-by-value types are passed with a const C pointer.
-		const std::string use_type = !component_types[i]->OpenCLPassByPointer() ? component_types[i]->OpenCLCType() : ("const " + component_types[i]->OpenCLCType() + "* const ");
+		const std::string use_type = !component_types[i]->OpenCLPassByPointer() ? component_types[i]->OpenCLCType(params) : ("const " + component_types[i]->OpenCLCType(params) + "* const ");
 		s += use_type + " " + component_names[i];
 		if(i + 1 < component_types.size())
 			s += ", ";
@@ -1240,14 +1245,14 @@ const std::string TupleType::toString() const
 /*
  struct { float e0; float e1; }
 */
-const std::string TupleType::OpenCLCType() const
+const std::string TupleType::OpenCLCType(EmitOpenCLCodeParams& params) const
 {
 	return makeSafeStringForFunctionName(this->toString());
 	/*std::string s = "struct { ";
 
 	for(size_t i=0; i<component_types.size(); ++i)
 	{
-		s += component_types[i]->OpenCLCType() + " field_" + ::toString(i) + "; ";
+		s += component_types[i]->OpenCLCType(params) + " field_" + ::toString(i) + "; ";
 	}
 
 	s += "}";
@@ -1255,18 +1260,18 @@ const std::string TupleType::OpenCLCType() const
 }
 
 
-const std::string TupleType::getOpenCLCDefinition(bool emit_comments) const // Get full definition string, e.g. struct a { float b; };
+const std::string TupleType::getOpenCLCDefinition(EmitOpenCLCodeParams& params, bool emit_comments) const // Get full definition string, e.g. struct a { float b; };
 {
 	std::string s;
 	if(emit_comments) 
 		s += "// Definition of tuple " + toString() + "\n";
 	s += "typedef struct\n{\n";
 
- 	const std::string tuple_typename = OpenCLCType(); // makeSafeStringForFunctionName(this->toString());
+ 	const std::string tuple_typename = OpenCLCType(params); // makeSafeStringForFunctionName(this->toString());
 
 	for(size_t i=0; i<component_types.size(); ++i)
 	{
-		s += "\t" + component_types[i]->OpenCLCType() + " field_" + ::toString(i) + ";\n";
+		s += "\t" + component_types[i]->OpenCLCType(params) + " field_" + ::toString(i) + ";\n";
 	}
 
 	s += "} " + tuple_typename + ";\n\n";
@@ -1288,7 +1293,7 @@ const std::string TupleType::getOpenCLCDefinition(bool emit_comments) const // G
 	for(size_t i=0; i<component_types.size(); ++i)
 	{
 		// Non pass-by-value types are passed with a const C pointer.
-		const std::string use_type = !component_types[i]->OpenCLPassByPointer() ? component_types[i]->OpenCLCType() : ("const " + component_types[i]->OpenCLCType() + "* const ");
+		const std::string use_type = !component_types[i]->OpenCLPassByPointer() ? component_types[i]->OpenCLCType(params) : ("const " + component_types[i]->OpenCLCType(params) + "* const ");
 		s += use_type + " field_" + ::toString(i);
 		if(i + 1 < component_types.size())
 			s += ", ";
@@ -1305,11 +1310,11 @@ const std::string TupleType::getOpenCLCDefinition(bool emit_comments) const // G
 }
 
 
-const std::string TupleType::getOpenCLCConstructor(bool emit_comments) const
+const std::string TupleType::getOpenCLCConstructor(EmitOpenCLCodeParams& params, bool emit_comments) const
 {
 	std::string s;
 
-	const std::string tuple_typename = OpenCLCType(); // makeSafeStringForFunctionName(this->toString());
+	const std::string tuple_typename = OpenCLCType(params); // makeSafeStringForFunctionName(this->toString());
 
 	// Make constructor.
 	// for struct tuple_float__float_ { float a, float b }, will look like    
@@ -1328,7 +1333,7 @@ const std::string TupleType::getOpenCLCConstructor(bool emit_comments) const
 	for(size_t i=0; i<component_types.size(); ++i)
 	{
 		// Non pass-by-value types are passed with a const C pointer.
-		const std::string use_type = !component_types[i]->OpenCLPassByPointer() ? component_types[i]->OpenCLCType() : ("const " + component_types[i]->OpenCLCType() + "* const ");
+		const std::string use_type = !component_types[i]->OpenCLPassByPointer() ? component_types[i]->OpenCLCType(params) : ("const " + component_types[i]->OpenCLCType(params) + "* const ");
 		s += use_type + " field_" + ::toString(i);
 		if(i + 1 < component_types.size())
 			s += ", ";
@@ -1435,10 +1440,10 @@ const std::string VectorType::toString() const
 }
 
 
-const std::string VectorType::OpenCLCType() const
+const std::string VectorType::OpenCLCType(EmitOpenCLCodeParams& params) const
 {
 	// float4, float8 etc..
-	return this->elem_type->OpenCLCType() + ::toString(this->num);
+	return this->elem_type->OpenCLCType(params) + ::toString(this->num);
 }
 
 
@@ -1485,7 +1490,7 @@ llvm::Type* OpaqueType::LLVMType(llvm::Module& module) const
 }
 
 
-const std::string OpaqueType::OpenCLCType() const
+const std::string OpaqueType::OpenCLCType(EmitOpenCLCodeParams& params) const
 { 
 	if(address_space.empty())
 		return "const void*";
@@ -1507,7 +1512,7 @@ const std::string SumType::toString() const
 }
 
 
-const std::string SumType::OpenCLCType() const
+const std::string SumType::OpenCLCType(EmitOpenCLCodeParams& params) const
 {
 	assert(0);
 	return "";
@@ -1563,7 +1568,7 @@ const std::string ErrorType::toString() const
 }
 
 
-const std::string ErrorType::OpenCLCType() const
+const std::string ErrorType::OpenCLCType(EmitOpenCLCodeParams& params) const
 {
 	assert(0);
 	return "";
@@ -1603,7 +1608,7 @@ const std::string OpaqueStructureType::toString() const
 }
 
 
-const std::string OpaqueStructureType::OpenCLCType() const
+const std::string OpaqueStructureType::OpenCLCType(EmitOpenCLCodeParams& params) const
 {
 	return name;
 }
@@ -1648,7 +1653,7 @@ const std::string OpenCLImageType::toString() const
 }
 
 
-const std::string OpenCLImageType::OpenCLCType() const
+const std::string OpenCLImageType::OpenCLCType(EmitOpenCLCodeParams& params) const
 {
 	switch(image_type)
 	{
