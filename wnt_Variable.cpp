@@ -314,7 +314,7 @@ void Variable::traverse(TraversalPayload& payload, std::vector<ASTNode*>& stack)
 	{
 		assert(this->binding_type != BindingType_Unbound);
 		if(this->binding_type == BindingType_Unbound)
-			ExceptionWithPosition("No such function, function argument, named constant or let definition '" + this->name + "'.", errorContext(*this, payload));
+			throw ExceptionWithPosition("No such function, function argument, named constant or let definition '" + this->name + "'.", errorContext(*this, payload));
 	}
 	else if(payload.operation == TraversalPayload::ComputeCanConstantFold)
 	{
