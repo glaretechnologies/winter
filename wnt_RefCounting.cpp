@@ -275,7 +275,7 @@ void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_
 
 	if(type->getType() == Type::StructureTypeType)
 	{
-		const StructureType* struct_type = type.downcastToPtr<StructureType>();
+		const StructureType* struct_type = type.downcastToPtr<const StructureType>();
 
 		// Get arg 0 - (a pointer to) the ref counted value
 		llvm::Value* struct_ptr = LLVMUtils::getNthArg(llvm_func, 0);
@@ -313,7 +313,7 @@ void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_
 	}
 	else if(type->getType() == Type::TupleTypeType)
 	{
-		const TupleType* tuple_type = type.downcastToPtr<TupleType>();
+		const TupleType* tuple_type = type.downcastToPtr<const TupleType>();
 
 		// Get arg 0 - (a pointer to) the ref counted value
 		llvm::Value* struct_ptr = LLVMUtils::getNthArg(llvm_func, 0);
@@ -376,7 +376,7 @@ void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_
 
 	if(type->getType() == Type::VArrayTypeType)
 	{
-		const TypeVRef elem_type = type.downcastToPtr<VArrayType>()->elem_type;
+		const TypeVRef elem_type = type.downcastToPtr<const VArrayType>()->elem_type;
 
 		// Load number of elements
 		llvm::Value* num_elems_ptr = LLVMUtils::createStructGEP(&builder, val, 1, "num elems ptr");
