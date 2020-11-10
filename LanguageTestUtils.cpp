@@ -89,8 +89,8 @@ In this case, sp - 6 contains the lowest byte that is not 0xEE.
 	*/
 
 
-// Stack marking stuff is causing a crash on macOS currently.
-#if defined(OSX)
+// Stack marking stuff is causing a crash on macOS currently, also in VS2019.  So just disable for now.
+#if 1
 
 #define MARK_STACK
 #define GET_TOUCHED_STACK_SIZE(touched_stack_size_out) touched_stack_size_out = 0;
