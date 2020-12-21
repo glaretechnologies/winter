@@ -769,7 +769,7 @@ Reference<ASTNode> LangParser::parseLetBlock(ParseInfo& p)
 				for(size_t w=0; w<let->vars.size(); ++w)
 					for(size_t t=0; t<lets[z]->vars.size(); ++t)
 						if(lets[z]->vars[t].name == let->vars[w].name)
-							throw LangParserExcep("Let with this name already defined in let block.", errorPosition(*p.text_buffer, p.tokens[let_token_i]->char_index, p.tokens[let_token_i]->num_chars));
+							throw LangParserExcep("Let with the name '" + lets[z]->vars[t].name + "' already defined in let block.", errorPosition(*p.text_buffer, p.tokens[let_token_i]->char_index, p.tokens[let_token_i]->num_chars));
 
 			lets.push_back(let);
 		}
