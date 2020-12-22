@@ -827,8 +827,8 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			this->triple.append("-elf"); // MCJIT requires the -elf suffix currently, see https://groups.google.com/forum/#!topic/llvm-dev/DOmHEXhNNWw
 
 
-			PlatformUtils::CPUInfo cpu_info;
-			PlatformUtils::getCPUInfo(cpu_info);
+			// PlatformUtils::CPUInfo cpu_info;
+			// PlatformUtils::getCPUInfo(cpu_info);
 
 			// There is an issue with older LLVMs, that if it encounters a newer CPU model than it knows about, then it just returns 
 			// "x86-64" or "generic", which have less feature support than we actually have.  So in this case just use "corei7" which should give us the features we need.
@@ -845,14 +845,9 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			// Threadripper:
 			// cpu_info.family: 23
 			// cpu_info.model: 1
-			std::string cpu_name;
-#if TARGET_LLVM_VERSION >= 60
-			cpu_name = llvm::sys::getHostCPUName();
-#else
-			cpu_name = llvm::sys::getHostCPUName();
-			if(cpu_name == "generic" || cpu_name == "x86-64") // If LLVM 3.4 can't detect it, it's probably something pretty new, so just consider it >= to a corei7 in terms of capabilities.
+			std::string cpu_name = llvm::sys::getHostCPUName();
+			if(cpu_name == "generic" || cpu_name == "x86-64") // If LLVM can't detect it, it's probably something pretty new, so just consider it >= to a corei7 in terms of capabilities.
 				cpu_name = "corei7";
-#endif
 
 			// Select the host computer architecture as the target.
 			this->target_machine = engine_builder.selectTarget(
