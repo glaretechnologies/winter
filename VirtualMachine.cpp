@@ -312,12 +312,12 @@ static int freeClosure(ClosureRep* closure)
 
 class ExecArrayMapTask;
 
-static Indigo::TaskManager* winter_global_task_manager = NULL;
+static glare::TaskManager* winter_global_task_manager = NULL;
 static std::vector<Reference<ExecArrayMapTask> > exec_array_map_tasks;
 
 typedef void (WINTER_JIT_CALLING_CONV * VARRAY_WORK_FUNCTION) (uint64* output, uint64* input, size_t begin, size_t end); // Winter code
 
-class ExecMapTask : public Indigo::Task
+class ExecMapTask : public glare::Task
 {
 public:
 	virtual void run(size_t thread_index)
@@ -358,7 +358,7 @@ void execVArrayMap(uint64* output, uint64* input, VARRAY_WORK_FUNCTION work_func
 
 typedef void (WINTER_JIT_CALLING_CONV * ARRAY_WORK_FUNCTION) (void* output, void* input, void* map_function, size_t begin, size_t end); // Winter code
 
-class ExecArrayMapTask : public Indigo::Task
+class ExecArrayMapTask : public glare::Task
 {
 public:
 	virtual void run(size_t thread_index)
@@ -629,7 +629,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 	/*if(!winter_global_task_manager)
 	{
 		const size_t num_threads = 8;
-		winter_global_task_manager = new Indigo::TaskManager(num_threads);
+		winter_global_task_manager = new glare::TaskManager(num_threads);
 		exec_array_map_tasks.resize(num_threads);
 		for(size_t i=0; i<num_threads; ++i)
 			exec_array_map_tasks[i] = new ExecArrayMapTask();

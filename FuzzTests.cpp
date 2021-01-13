@@ -36,8 +36,8 @@ Copyright Glare Technologies Limited 2019 -
 #include <fstream>
 
 #if FUZZING_USE_OPENCL
-#include "../../indigo/trunk/opencl/OpenCL.h"
-#include "../../indigo/trunk/opencl/OpenCLBuffer.h"
+#include <opencl/OpenCL.h>
+#include <opencl/OpenCLBuffer.h>
 #endif
 
 
@@ -683,7 +683,7 @@ static ASTNodeRef buildRandomASSubTree(BuildRandomSubTreeArgs& args, PCG32& rng,
 }
 
 
-class ASTFuzzTask : public Indigo::Task
+class ASTFuzzTask : public glare::Task
 {
 public:
 	void run(size_t thread_index)
@@ -834,7 +834,7 @@ public:
 };
 
 
-class FuzzTask : public Indigo::Task
+class FuzzTask : public glare::Task
 {
 public:
 	void run(size_t thread_index)
@@ -1105,7 +1105,7 @@ void doASTFuzzTests(const std::string& fuzzer_input_dir, const std::string& fuzz
 			std::unordered_set<uint64> tested_program_hashes;
 
 			const int NUM_THREADS = PlatformUtils::getNumLogicalProcessors();
-			Indigo::TaskManager manager("Fuzz thread manager", NUM_THREADS);
+			glare::TaskManager manager("Fuzz thread manager", NUM_THREADS);
 			for(int i=0; i<NUM_THREADS; ++i)
 			{
 				Reference<ASTFuzzTask> t = new ASTFuzzTask();
@@ -1215,7 +1215,7 @@ void fuzzTests(const std::string& fuzzer_input_dir, const std::string& fuzzer_ou
 			std::unordered_set<uint64> tested_program_hashes;
 
 			const int NUM_THREADS = PlatformUtils::getNumLogicalProcessors();
-			Indigo::TaskManager manager("fuzz thread manager", NUM_THREADS);
+			glare::TaskManager manager("fuzz thread manager", NUM_THREADS);
 			for(int i=0; i<NUM_THREADS; ++i)
 			{
 				Reference<FuzzTask> t = new FuzzTask();
