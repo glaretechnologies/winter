@@ -11,7 +11,7 @@ File created by ClassTemplate on Wed Jun 11 01:53:25 2008
 #include "utils/Parser.h"
 #include "utils/UTF8Utils.h"
 #include "utils/BitUtils.h"
-#include "indigo/TestUtils.h"
+#include <TestUtils.h>
 #include "maths/mathstypes.h"
 
 

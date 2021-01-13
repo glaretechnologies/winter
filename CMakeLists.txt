@@ -230,11 +230,9 @@ ${INDIGO_TRUNK_DIR}/utils/Parser.h
 ${INDIGO_TRUNK_DIR}/utils/Platform.h
 ${INDIGO_TRUNK_DIR}/utils/PlatformUtils.cpp
 ${INDIGO_TRUNK_DIR}/utils/PlatformUtils.h
-${INDIGO_TRUNK_DIR}/utils/PrintOutput.cpp
 ${INDIGO_TRUNK_DIR}/utils/PrintOutput.h
 ${INDIGO_TRUNK_DIR}/utils/StandardPrintOutput.cpp
 ${INDIGO_TRUNK_DIR}/utils/StandardPrintOutput.h
-${INDIGO_TRUNK_DIR}/utils/Reference.cpp
 ${INDIGO_TRUNK_DIR}/utils/Reference.h
 ${INDIGO_TRUNK_DIR}/utils/ReferenceTest.cpp
 ${INDIGO_TRUNK_DIR}/utils/ReferenceTest.h
@@ -246,21 +244,14 @@ ${INDIGO_TRUNK_DIR}/utils/TaskManager.cpp
 ${INDIGO_TRUNK_DIR}/utils/TaskManager.h
 ${INDIGO_TRUNK_DIR}/utils/TaskRunnerThread.cpp
 ${INDIGO_TRUNK_DIR}/utils/TaskRunnerThread.h
+${INDIGO_TRUNK_DIR}/utils/TestUtils.cpp
+${INDIGO_TRUNK_DIR}/utils/TestUtils.h
 ${INDIGO_TRUNK_DIR}/utils/Timer.cpp
 ${INDIGO_TRUNK_DIR}/utils/Timer.h
 ${INDIGO_TRUNK_DIR}/utils/VRef.h
 ${INDIGO_TRUNK_DIR}/utils/UTF8Utils.cpp
 ${INDIGO_TRUNK_DIR}/utils/UTF8Utils.h
 )
-
-SET(maths_files
-)
-
-SET(testutils_files
-${INDIGO_TRUNK_DIR}/indigo/TestUtils.cpp
-${INDIGO_TRUNK_DIR}/indigo/TestUtils.h
-)
-
 
 SET(double_conversion_files
 ${INDIGO_TRUNK_DIR}/double-conversion/bignum-dtoa.cc
@@ -313,7 +304,6 @@ endif()
 
 SOURCE_GROUP(winter FILES ${WINTER_FILES})
 SOURCE_GROUP(utils FILES ${util_files})
-SOURCE_GROUP(maths FILES ${maths_files})
 SOURCE_GROUP(double_conversion FILES ${double_conversion_files})
 SOURCE_GROUP(opencl FILES ${glare_opencl_files})
 SOURCE_GROUP(xxhash FILES ${xxhash_files})

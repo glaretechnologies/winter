@@ -431,7 +431,7 @@ protected:
 	static llvm::Value* emitExternalLinkageCall(const std::string& target_name, EmitLLVMCodeParams& params);
 
 private:
-//	INDIGO_DISABLE_COPY(ASTNode)
+//	GLARE_DISABLE_COPY(ASTNode)
 
 	ASTNodeType node_type;
 	SrcLocation location;

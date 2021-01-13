@@ -13,7 +13,7 @@
 #include "Linker.h"
 #include "Value.h"
 #include "CompiledValue.h"
-#include "indigo/TestUtils.h"
+#include <TestUtils.h>
 #include <StandardPrintOutput.h>
 #include <Mutex.h>
 #include <Lock.h>

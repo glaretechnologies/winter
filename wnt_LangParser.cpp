@@ -20,12 +20,12 @@ File created by ClassTemplate on Wed Jun 11 02:56:20 2008
 #include "wnt_LetASTNode.h"
 #include "wnt_LetBlock.h"
 #include "BuiltInFunctionImpl.h"
-#include "indigo/TestUtils.h"
-#include "indigo/globals.h"
+#include "utils/TestUtils.h"
 #include "maths/mathstypes.h"
 #include "utils/StringUtils.h"
 #include "utils/ContainerUtils.h"
 #include "utils/Parser.h"
+#include "utils/ConPrint.h"
 #include <assert.h>
 #include <map>
 

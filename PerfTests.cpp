@@ -9,11 +9,11 @@ Copyright Glare Technologies Limited 2018 -
 #include "LanguageTestUtils.h"
 #include "VirtualMachine.h"
 #include "wnt_MathsFuncs.h"
-#include "indigo/TestUtils.h"
-#include <utils/Timer.h>
-#include <utils/ConPrint.h>
-#include <utils/StringUtils.h>
-#include <maths/mathstypes.h>
+#include "utils/TestUtils.h"
+#include "utils/Timer.h"
+#include "utils/ConPrint.h"
+#include "utils/StringUtils.h"
+#include "maths/mathstypes.h"
 
 
 namespace Winter
