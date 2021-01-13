@@ -168,11 +168,11 @@ bool testFuzzProgram(const std::string& src)
 			cl_kernel kernel = opencl->clCreateKernel(program, "main_kernel", &result);
 
 			if(!kernel)
-				throw Indigo::Exception("clCreateKernel failed");
+				throw glare::Exception("clCreateKernel failed");
 
 
-			if(opencl->clSetKernelArg(kernel, 0, sizeof(cl_float), &argument) != CL_SUCCESS) throw Indigo::Exception("clSetKernelArg failed 0");
-			if(opencl->clSetKernelArg(kernel, 1, sizeof(cl_mem), &output_buffer.getDevicePtr()) != CL_SUCCESS) throw Indigo::Exception("clSetKernelArg failed 1");
+			if(opencl->clSetKernelArg(kernel, 0, sizeof(cl_float), &argument) != CL_SUCCESS) throw glare::Exception("clSetKernelArg failed 0");
+			if(opencl->clSetKernelArg(kernel, 1, sizeof(cl_mem), &output_buffer.getDevicePtr()) != CL_SUCCESS) throw glare::Exception("clSetKernelArg failed 1");
 
 			// Launch the kernel
 			const size_t block_size = 1;
@@ -190,7 +190,7 @@ bool testFuzzProgram(const std::string& src)
 				NULL				// event
 			);
 			if(result != CL_SUCCESS)
-				throw Indigo::Exception("clEnqueueNDRangeKernel failed: " + OpenCL::errorString(result));
+				throw glare::Exception("clEnqueueNDRangeKernel failed: " + OpenCL::errorString(result));
 
 
 			SSE_ALIGN float host_output_buffer[1];
@@ -208,7 +208,7 @@ bool testFuzzProgram(const std::string& src)
 				NULL //&readback_event // event
 			);
 			if(result != CL_SUCCESS)
-				throw Indigo::Exception("clEnqueueReadBuffer failed: " + OpenCL::errorString(result));
+				throw glare::Exception("clEnqueueReadBuffer failed: " + OpenCL::errorString(result));
 
 			// Free the context and command queue for this device.
 			opencl->deviceFree(context, command_queue);
@@ -236,7 +236,7 @@ bool testFuzzProgram(const std::string& src)
 		//std::cerr << e.what() << std::endl;
 		return false;
 	}
-	catch(Indigo::Exception& )
+	catch(glare::Exception& )
 	{
 		//std::cerr << e.what() << std::endl;
 		return false;
@@ -359,11 +359,11 @@ static bool testFuzzASTProgram(Reference<BufferRoot>& root)//const std::vector<F
 			cl_kernel kernel = opencl->clCreateKernel(program, "main_kernel", &result);
 
 			if(!kernel)
-				throw Indigo::Exception("clCreateKernel failed");
+				throw glare::Exception("clCreateKernel failed");
 
 
-			if(opencl->clSetKernelArg(kernel, 0, sizeof(cl_float), &argument) != CL_SUCCESS) throw Indigo::Exception("clSetKernelArg failed 0");
-			if(opencl->clSetKernelArg(kernel, 1, sizeof(cl_mem), &output_buffer.getDevicePtr()) != CL_SUCCESS) throw Indigo::Exception("clSetKernelArg failed 1");
+			if(opencl->clSetKernelArg(kernel, 0, sizeof(cl_float), &argument) != CL_SUCCESS) throw glare::Exception("clSetKernelArg failed 0");
+			if(opencl->clSetKernelArg(kernel, 1, sizeof(cl_mem), &output_buffer.getDevicePtr()) != CL_SUCCESS) throw glare::Exception("clSetKernelArg failed 1");
 
 			// Launch the kernel
 			const size_t block_size = 1;
@@ -381,7 +381,7 @@ static bool testFuzzASTProgram(Reference<BufferRoot>& root)//const std::vector<F
 				NULL				// event
 			);
 			if(result != CL_SUCCESS)
-				throw Indigo::Exception("clEnqueueNDRangeKernel failed: " + OpenCL::errorString(result));
+				throw glare::Exception("clEnqueueNDRangeKernel failed: " + OpenCL::errorString(result));
 
 
 			SSE_ALIGN float host_output_buffer[1];
@@ -399,7 +399,7 @@ static bool testFuzzASTProgram(Reference<BufferRoot>& root)//const std::vector<F
 				NULL //&readback_event // event
 			);
 			if(result != CL_SUCCESS)
-				throw Indigo::Exception("clEnqueueReadBuffer failed: " + OpenCL::errorString(result));
+				throw glare::Exception("clEnqueueReadBuffer failed: " + OpenCL::errorString(result));
 
 			// Free the context and command queue for this device.
 			opencl->deviceFree(context, command_queue);
@@ -427,7 +427,7 @@ static bool testFuzzASTProgram(Reference<BufferRoot>& root)//const std::vector<F
 		stdErrPrint(e.what());
 		return false;
 	}
-	catch(Indigo::Exception& )
+	catch(glare::Exception& )
 	{
 		//std::cerr << e.what() << std::endl;
 		return false;

@@ -236,7 +236,7 @@ static int stringElem(StringRep* s, uint64 index)
 		const uint8* data = (const uint8*)s + sizeof(StringRep);
 		return (int)UTF8Utils::charAt(data, s->len, index);
 	}
-	catch(Indigo::Exception&)
+	catch(glare::Exception&)
 	{
 		assert(0); // Out of bounds read
 		return 0;
@@ -253,7 +253,7 @@ static ValueRef stringElemInterpreted(const vector<ValueRef>& args)
 		const uint32 c = UTF8Utils::charAt((const uint8*)s.c_str(), s.size(), index);
 		return new CharValue(UTF8Utils::charString(c));
 	}
-	catch(Indigo::Exception& e)
+	catch(glare::Exception& e)
 	{
 		// Out of bounds read.
 		throw BaseException(e.what());

@@ -451,7 +451,7 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 						build_log
 					);
 				}
-				catch(Indigo::Exception& e)
+				catch(glare::Exception& e)
 				{
 					failTest("Build failed: " + e.what() + "\nOpenCL device: " + device->description() + "\nbuild_log:\n" + build_log);
 				}
@@ -501,7 +501,7 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 					NULL // event
 				);
 				if(result != CL_SUCCESS)
-					throw Indigo::Exception("clEnqueueReadBuffer failed: " + OpenCL::errorString(result));
+					throw glare::Exception("clEnqueueReadBuffer failed: " + OpenCL::errorString(result));
 
 				const float opencl_result = host_output_buffer[0];
 
@@ -520,7 +520,7 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 	{
 		failTest(e.messageWithPosition());
 	}
-	catch(Indigo::Exception& e)
+	catch(glare::Exception& e)
 	{
 		failTest(e.what());
 	}
@@ -753,7 +753,7 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 							build_log
 						);
 					}
-					catch(Indigo::Exception& e)
+					catch(glare::Exception& e)
 					{
 						failTest("Build failed: " + e.what() + "\nOpenCL device: " + device->description() + "\nbuild_log:\n" + build_log + "\nextended_source: \n" + extended_source);
 					}
@@ -787,7 +787,7 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 						NULL // event
 					);
 					if(result != CL_SUCCESS)
-						throw Indigo::Exception("clEnqueueReadBuffer failed: " + OpenCL::errorString(result));
+						throw glare::Exception("clEnqueueReadBuffer failed: " + OpenCL::errorString(result));
 
 					const double opencl_result = host_output_buffer[0];
 
@@ -809,7 +809,7 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 	{
 		failTest(e.what());
 	}
-	catch(Indigo::Exception& e)
+	catch(glare::Exception& e)
 	{
 		failTest(e.what());
 	}
@@ -1024,7 +1024,7 @@ void testMainStringArg(const std::string& src, const std::string& arg, const std
 		failTest(e.what());
 
 	}
-	catch(Indigo::Exception& e)
+	catch(glare::Exception& e)
 	{
 		failTest(e.what());
 	}
@@ -1118,7 +1118,7 @@ TestResults testMainIntegerArg(const std::string& src, int x, int target_return_
 						build_log
 					);
 				}
-				catch(Indigo::Exception& e)
+				catch(glare::Exception& e)
 				{
 					failTest("Build failed: " + e.what() + "\nOpenCL device: " + device->description() + "\nbuild_log:\n" + build_log);
 				}
@@ -1151,7 +1151,7 @@ TestResults testMainIntegerArg(const std::string& src, int x, int target_return_
 					NULL // event
 				);
 				if(result != CL_SUCCESS)
-					throw Indigo::Exception("clEnqueueReadBuffer failed: " + OpenCL::errorString(result));
+					throw glare::Exception("clEnqueueReadBuffer failed: " + OpenCL::errorString(result));
 
 				const int opencl_result = host_output_buffer[0];
 
@@ -1170,7 +1170,7 @@ TestResults testMainIntegerArg(const std::string& src, int x, int target_return_
 	{
 		failTest(e.what());
 	}
-	catch(Indigo::Exception& e)
+	catch(glare::Exception& e)
 	{
 		failTest(e.what());
 	}
@@ -1280,7 +1280,7 @@ void testMainInt64Arg(const std::string& src, int64 x, int64 target_return_val, 
 	{
 		failTest(e.what());
 	}
-	catch(Indigo::Exception& e)
+	catch(glare::Exception& e)
 	{
 		failTest(e.what());
 	}
@@ -1336,7 +1336,7 @@ void testMainInt16Arg(const std::string& src, int16 x, int16 target_return_val, 
 	{
 		failTest(e.what());
 	}
-	catch(Indigo::Exception& e)
+	catch(glare::Exception& e)
 	{
 		failTest(e.what());
 	}
@@ -1392,7 +1392,7 @@ void testMainUInt32Arg(const std::string& src, uint32 x, uint32 target_return_va
 	{
 		failTest(e.what());
 	}
-	catch(Indigo::Exception& e)
+	catch(glare::Exception& e)
 	{
 		failTest(e.what());
 	}
@@ -1445,7 +1445,7 @@ void testMainBoolArg(const std::string& src, bool x, bool target_return_val, uin
 	{
 		failTest(e.what());
 	}
-	catch(Indigo::Exception& e)
+	catch(glare::Exception& e)
 	{
 		failTest(e.what());
 	}
