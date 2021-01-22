@@ -120,68 +120,66 @@ TypeRef FunctionDefinition::type() const
 
 ValueRef FunctionDefinition::exec(VMState& vmstate)
 {
-	// Capture variables at this point, by getting them off the arg and let stack.
+	// Capture variables
 	vector<ValueRef> vals;
-	if(vmstate.capture_vars)
+	
+	const auto unique_free_vars = this->getUniqueFreeVarList();
+
+	for(auto it = unique_free_vars.begin(); it != unique_free_vars.end(); ++it)
 	{
-		const auto unique_free_vars = this->getUniqueFreeVarList();
+		Variable* free_var = *it;
 
-		for(auto it = unique_free_vars.begin(); it != unique_free_vars.end(); ++it)
+		// If this free variable is free in more than one lambda, we will need to get the captured value from the captured-val struct of the outer lambda.
+		const FunctionDefinition* free_in_looser_lambda = NULL;
+		bool found_this_lambda = false;
+		for(int q=(int)free_var->enclosing_lambdas.size()-1; q >= 0; --q) // From inner to outer lambda:
 		{
-			Variable* free_var = *it;
-
-			// If this free variable is free in more than one lambda, we will need to get the captured value from the captured-val struct of the outer lambda.
-			const FunctionDefinition* free_in_looser_lambda = NULL;
-			bool found_this_lambda = false;
-			for(int q=(int)free_var->enclosing_lambdas.size()-1; q >= 0; --q) // From inner to outer lambda:
+			const FunctionDefinition* func = free_var->enclosing_lambdas[q];
+			if(func == this)
+				found_this_lambda = true;
+			else if(found_this_lambda)
 			{
-				const FunctionDefinition* func = free_var->enclosing_lambdas[q];
-				if(func == this)
-					found_this_lambda = true;
-				else if(found_this_lambda)
+				if(func->free_variables.count(free_var) > 0)
 				{
-					if(func->free_variables.count(free_var) > 0)
-					{
-						free_in_looser_lambda = func;
-						break;
-					}
+					free_in_looser_lambda = func;
+					break;
 				}
 			}
+		}
 
-			if(free_in_looser_lambda)
+		if(free_in_looser_lambda)
+		{
+			// Get ref to capturedVars structure of values, will be passed in as last arg to function
+			ValueRef captured_struct = vmstate.argument_stack.back();
+			const StructureValue* s = checkedCast<StructureValue>(captured_struct.getPointer());
+
+			const size_t free_index = free_in_looser_lambda->getFreeIndexForVar(free_var);
+			ValueRef val = s->fields[free_index];
+
+			vals.push_back(val);
+		}
+		else if(free_var->binding_type == Variable::BindingType_Argument)
+		{
+			vals.push_back(vmstate.argument_stack[vmstate.func_args_start.back() + free_var->arg_index]);
+		}
+		else if(free_var->binding_type == Variable::BindingType_Let)
+		{
+			LetASTNode* bound_let_node = free_var->bound_let_node;
+			ValueRef val = free_var->bound_let_node->exec(vmstate);
+
+			if(bound_let_node->vars.size() != 1)
 			{
-				// Get ref to capturedVars structure of values, will be passed in as last arg to function
-				ValueRef captured_struct = vmstate.argument_stack.back();
-				const StructureValue* s = checkedCast<StructureValue>(captured_struct.getPointer());
-
-				const size_t free_index = free_in_looser_lambda->getFreeIndexForVar(free_var);
-				ValueRef val = s->fields[free_index];
-
-				vals.push_back(val);
+				// Destructuring assignment, return the particular element from the tuple.
+				const TupleValue* t = checkedCast<TupleValue>(val.getPointer());
+				val = t->e[free_var->let_var_index];
 			}
-			else if(free_var->binding_type == Variable::BindingType_Argument)
-			{
-				vals.push_back(vmstate.argument_stack[vmstate.func_args_start.back() + free_var->arg_index]);
-			}
-			else if(free_var->binding_type == Variable::BindingType_Let)
-			{
-				LetASTNode* bound_let_node = free_var->bound_let_node;
-				ValueRef val = free_var->bound_let_node->exec(vmstate);
 
-				if(bound_let_node->vars.size() != 1)
-				{
-					// Destructuring assignment, return the particular element from the tuple.
-					const TupleValue* t = checkedCast<TupleValue>(val.getPointer());
-					val = t->e[free_var->let_var_index];
-				}
-
-				vals.push_back(val);
-			}
-			else
-			{
-				assert(0);
-				throw BaseException("internal error 136");
-			}
+			vals.push_back(val);
+		}
+		else
+		{
+			assert(0);
+			throw BaseException("internal error 136");
 		}
 	}
 

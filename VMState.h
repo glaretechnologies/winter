@@ -16,7 +16,7 @@ class Value;
 class VMState
 {
 public:
-	VMState() : trace(false), ostream(NULL), capture_vars(true) {}
+	VMState() : trace(false), ostream(NULL) {}
 
 	std::vector<ValueRef> argument_stack;
 
@@ -39,8 +39,6 @@ public:
 
 	bool trace; // If true, do a verbose trace of the execution, printing out values etc..
 	std::ostream* ostream; // Stream to write the trace to.
-
-	bool capture_vars; // Sometimes we don't need to capture vars when executing closures expressions, e.g. when we just want to get the function pointer.
 };
 
 
