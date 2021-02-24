@@ -524,10 +524,6 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 	{
 		failTest(e.what());
 	}
-	catch(PlatformUtils::PlatformUtilsExcep& e)
-	{
-		failTest(e.what());
-	}
 	exit(1);
 }
 
