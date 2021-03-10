@@ -1464,6 +1464,9 @@ llvm::Type* VectorType::LLVMType(llvm::Module& module) const
 	return llvm::VectorType::get(
 		this->elem_type->LLVMType(module),
 		this->num
+#if TARGET_LLVM_VERSION >= 110
+		, /*scalable=*/false
+#endif
 	);
 }
 

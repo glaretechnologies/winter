@@ -34,9 +34,6 @@ project(${PROJECT_NAME})
 set(CURRENT_TARGET winter)
 
 
-# mark_as_advanced(CMAKE_C_FLAGS_SDKDEBUG CMAKE_CXX_FLAGS_SDKDEBUG CMAKE_EXE_LINKER_FLAGS_SDKDEBUG CMAKE_SHARED_LINKER_FLAGS_SDKDEBUG CMAKE_MODULE_LINKER_FLAGS_SDKDEBUG)
-
-
 # Function for checking an environment variable exists
 function(checkAndGetEnvVar envvar result)
 	if(DEFINED ENV{${envvar}})
@@ -49,10 +46,7 @@ function(checkAndGetEnvVar envvar result)
 endfunction()
 
 checkAndGetEnvVar(INDIGO_TRUNK_DIR INDIGO_TRUNK_DIR)
-#set(INDIGO_TRUNK_DIR $ENV{INDIGO_TRUNK_DIR})
 MESSAGE("Indigo trunk dir: ${INDIGO_TRUNK_DIR}")
-
-
 
 # Supported versions: 3.4, 3.6, 6.0.0, 8.0.0, 11.0.0
 set(LLVM_VERSION "11.0.0")
@@ -63,27 +57,26 @@ MESSAGE("Target LLVM version: ${LLVM_VERSION}")
 string(REPLACE "." "_" LLVM_VERSION_PATH ${LLVM_VERSION})
 
 
-#set(LIBS_ENV "D:/programming")
 checkAndGetEnvVar(INDIGO_LIBS LIBS_ENV)
 
 if(WIN32)
 	if(MSVC_VERSION EQUAL 1600) # VS2012
-		set(INDIGO_VS_VER 2010)
+		set(WINTER_VS_VER 2010)
 	elseif(MSVC_VERSION EQUAL 1700) # VS2012
-		set(INDIGO_VS_VER 2012)
+		set(WINTER_VS_VER 2012)
 	elseif(MSVC_VERSION EQUAL 1800) # VS2013
-		set(INDIGO_VS_VER 2013)
+		set(WINTER_VS_VER 2013)
 	elseif(MSVC_VERSION EQUAL 1900) # VS2015
-		set(INDIGO_VS_VER 2015)
+		set(WINTER_VS_VER 2015)
 	elseif(MSVC_VERSION EQUAL 1911 OR MSVC_VERSION EQUAL 1912) # VS2017
-		set(INDIGO_VS_VER 2017)
+		set(WINTER_VS_VER 2017)
 	elseif(MSVC_VERSION GREATER_EQUAL 1920)
-		set(INDIGO_VS_VER 2019)
+		set(WINTER_VS_VER 2019)
 	else()
 		message(FATAL_ERROR "Unhandled MSVC version")
 	endif()
 	
-	set(llvmdir "${LIBS_ENV}/llvm/llvm_${LLVM_VERSION_PATH}_install_vs${INDIGO_VS_VER}_${WINTER_BITNESS}")
+	set(llvmdir "${LIBS_ENV}/llvm/llvm_${LLVM_VERSION_PATH}_install_vs${WINTER_VS_VER}_${WINTER_BITNESS}")
 	
 else() # Mac or Linux.
 	set(llvmdir "${LIBS_ENV}/llvm/llvm_${LLVM_VERSION_PATH}_install")
@@ -206,8 +199,6 @@ ${INDIGO_TRUNK_DIR}/utils/Condition.h
 ${INDIGO_TRUNK_DIR}/utils/ConPrint.cpp
 ${INDIGO_TRUNK_DIR}/utils/ConPrint.h
 ${INDIGO_TRUNK_DIR}/utils/ContainerUtils.h
-${INDIGO_TRUNK_DIR}/utils/CycleTimer.cpp
-${INDIGO_TRUNK_DIR}/utils/CycleTimer.h
 ${INDIGO_TRUNK_DIR}/utils/DynamicLib.cpp
 ${INDIGO_TRUNK_DIR}/utils/DynamicLib.h
 ${INDIGO_TRUNK_DIR}/utils/FileUtils.cpp
@@ -231,8 +222,6 @@ ${INDIGO_TRUNK_DIR}/utils/PrintOutput.h
 ${INDIGO_TRUNK_DIR}/utils/StandardPrintOutput.cpp
 ${INDIGO_TRUNK_DIR}/utils/StandardPrintOutput.h
 ${INDIGO_TRUNK_DIR}/utils/Reference.h
-${INDIGO_TRUNK_DIR}/utils/ReferenceTest.cpp
-${INDIGO_TRUNK_DIR}/utils/ReferenceTest.h
 ${INDIGO_TRUNK_DIR}/utils/StringUtils.cpp
 ${INDIGO_TRUNK_DIR}/utils/StringUtils.h
 ${INDIGO_TRUNK_DIR}/utils/Task.cpp
@@ -330,8 +319,6 @@ ${testutils_files}
 
 
 
-
-
 if(WIN32)
 	add_definitions(-DUNICODE -D_UNICODE)
 	add_definitions(/MP)
@@ -339,25 +326,15 @@ if(WIN32)
 	# Set warning level to 4 - this shows some useful stuff not in /W3 in vs2012.
 	add_definitions(/W4)
 	
-	##### Ignore some warnings #####	
-	# ''function': was declared deprecated'
-	add_definitions(/wd4996)
-	
-	# ''this' : used in base member initializer list' (get it in LLVM a lot)
-	add_definitions(/wd4355)
-	
+	################################# Ignore some warnings #################################
+
 	# 'conditional expression is constant' - don't want this warning as we tend to turn off code with 'if(false) {}'
 	add_definitions(/wd4127)
 
 	# 'unreferenced formal parameter'
 	add_definitions(/wd4100)
-	
-	# 'assignment operator could not be generated'
-	add_definitions(/wd4512)	
 
-	# 'nonstandard extension used : nameless struct/union'
-	add_definitions(/wd4201)
-	################################
+	########################################################################################
 	
 	#add_definitions(/GS- /fp:fast)
 	
@@ -457,75 +434,75 @@ if(WIN32)
 	
 	if(LLVM_VERSION STREQUAL "11.0.0")
 		SET(LLVM_LIBS
-LLVMAggressiveInstCombine.lib            
-LLVMAnalysis.lib                         
-LLVMAsmParser.lib                        
-LLVMAsmPrinter.lib                       
-LLVMBinaryFormat.lib                     
-LLVMBitReader.lib                        
-LLVMBitstreamReader.lib                  
-LLVMBitWriter.lib                        
-LLVMCFGuard.lib                          
-LLVMCodeGen.lib                          
-LLVMCore.lib                             
-LLVMCoroutines.lib                       
-LLVMCoverage.lib                         
-LLVMDebugInfoCodeView.lib                
-LLVMDebugInfoDWARF.lib                   
-LLVMDebugInfoGSYM.lib                    
-LLVMDebugInfoMSF.lib                     
-LLVMDebugInfoPDB.lib                     
-LLVMDemangle.lib                         
-LLVMDlltoolDriver.lib                    
-LLVMDWARFLinker.lib                      
-LLVMExecutionEngine.lib                  
-LLVMExtensions.lib                       
-LLVMFrontendOpenACC.lib                  
-LLVMFrontendOpenMP.lib                   
-LLVMFuzzMutate.lib                       
-LLVMGlobalISel.lib                       
-LLVMInstCombine.lib                      
-LLVMInstrumentation.lib                  
-LLVMInterpreter.lib                      
-LLVMipo.lib                              
-LLVMIRReader.lib                         
-LLVMJITLink.lib                          
-LLVMLibDriver.lib                        
-LLVMLineEditor.lib                       
-LLVMLinker.lib                           
-LLVMLTO.lib                              
-LLVMMC.lib                               
-LLVMMCA.lib                              
-LLVMMCDisassembler.lib                   
-LLVMMCJIT.lib                            
-LLVMMCParser.lib                         
-LLVMMIRParser.lib                        
-LLVMObjCARCOpts.lib                      
-LLVMObject.lib                           
-LLVMObjectYAML.lib                       
-LLVMOption.lib                           
-LLVMOrcError.lib                         
-LLVMOrcJIT.lib                           
-LLVMPasses.lib                           
-LLVMProfileData.lib                      
-LLVMRemarks.lib                          
-LLVMRuntimeDyld.lib                      
-LLVMScalarOpts.lib                       
-LLVMSelectionDAG.lib                     
-LLVMSupport.lib                          
-LLVMSymbolize.lib                        
-LLVMTableGen.lib                         
-LLVMTarget.lib                           
-LLVMTextAPI.lib                          
-LLVMTransformUtils.lib                   
-LLVMVectorize.lib                        
-LLVMWindowsManifest.lib                  
-LLVMX86AsmParser.lib                     
-LLVMX86CodeGen.lib                       
-LLVMX86Desc.lib                          
-LLVMX86Disassembler.lib                  
-LLVMX86Info.lib                          
-LLVMXRay.lib							   
+			LLVMAggressiveInstCombine.lib            
+			LLVMAnalysis.lib                         
+			LLVMAsmParser.lib                        
+			LLVMAsmPrinter.lib                       
+			LLVMBinaryFormat.lib                     
+			LLVMBitReader.lib                        
+			LLVMBitstreamReader.lib                  
+			LLVMBitWriter.lib                        
+			LLVMCFGuard.lib                          
+			LLVMCodeGen.lib                          
+			LLVMCore.lib                             
+			LLVMCoroutines.lib                       
+			LLVMCoverage.lib                         
+			LLVMDebugInfoCodeView.lib                
+			LLVMDebugInfoDWARF.lib                   
+			LLVMDebugInfoGSYM.lib                    
+			LLVMDebugInfoMSF.lib                     
+			LLVMDebugInfoPDB.lib                     
+			LLVMDemangle.lib                         
+			LLVMDlltoolDriver.lib                    
+			LLVMDWARFLinker.lib                      
+			LLVMExecutionEngine.lib                  
+			LLVMExtensions.lib                       
+			LLVMFrontendOpenACC.lib                  
+			LLVMFrontendOpenMP.lib                   
+			LLVMFuzzMutate.lib                       
+			LLVMGlobalISel.lib                       
+			LLVMInstCombine.lib                      
+			LLVMInstrumentation.lib                  
+			LLVMInterpreter.lib                      
+			LLVMipo.lib                              
+			LLVMIRReader.lib                         
+			LLVMJITLink.lib                          
+			LLVMLibDriver.lib                        
+			LLVMLineEditor.lib                       
+			LLVMLinker.lib                           
+			LLVMLTO.lib                              
+			LLVMMC.lib                               
+			LLVMMCA.lib                              
+			LLVMMCDisassembler.lib                   
+			LLVMMCJIT.lib                            
+			LLVMMCParser.lib                         
+			LLVMMIRParser.lib                        
+			LLVMObjCARCOpts.lib                      
+			LLVMObject.lib                           
+			LLVMObjectYAML.lib                       
+			LLVMOption.lib                           
+			LLVMOrcError.lib                         
+			LLVMOrcJIT.lib                           
+			LLVMPasses.lib                           
+			LLVMProfileData.lib                      
+			LLVMRemarks.lib                          
+			LLVMRuntimeDyld.lib                      
+			LLVMScalarOpts.lib                       
+			LLVMSelectionDAG.lib                     
+			LLVMSupport.lib                          
+			LLVMSymbolize.lib                        
+			LLVMTableGen.lib                         
+			LLVMTarget.lib                           
+			LLVMTextAPI.lib                          
+			LLVMTransformUtils.lib                   
+			LLVMVectorize.lib                        
+			LLVMWindowsManifest.lib                  
+			LLVMX86AsmParser.lib                     
+			LLVMX86CodeGen.lib                       
+			LLVMX86Desc.lib                          
+			LLVMX86Disassembler.lib                  
+			LLVMX86Info.lib                          
+			LLVMXRay.lib							   
 		)
 	elseif(LLVM_VERSION STREQUAL "8.0.0")
 		SET(LLVM_LIBS
