@@ -285,7 +285,7 @@ llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 		llvm::IRBuilder<> entry_block_builder(&params.currently_building_func->getEntryBlock(), params.currently_building_func->getEntryBlock().getFirstInsertionPt());
 
 		const uint64 total_varray_size_B = sizeof(uint64)*3 + elem_size_B * num_elems;
-		const uint64 total_varray_size_uint64s = Maths::roundedUpDivide(total_varray_size_B, sizeof(uint64));
+		const uint64 total_varray_size_uint64s = Maths::roundedUpDivide<uint64>(total_varray_size_B, sizeof(uint64));
 
 		// NOTE: use int64s as the allocation type so we get the necessary alignment for the uint64s in VArrayRep.
 		llvm::Value* alloca_ptr = entry_block_builder.CreateAlloca(
