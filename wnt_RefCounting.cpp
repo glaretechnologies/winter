@@ -62,13 +62,7 @@ llvm::Function* emitIncrRefCountFunc(llvm::Module* module, const llvm::DataLayou
 		false // varargs
 	);
 
-	llvm::Constant* llvm_func_constant = module->getOrInsertFunction(
-		func_name, // Name
-		functype // Type
-	);
-
-	assert(llvm::isa<llvm::Function>(llvm_func_constant));
-	llvm::Function* llvm_func = static_cast<llvm::Function*>(llvm_func_constant);
+	llvm::Function* llvm_func = LLVMUtils::getFunctionFromModule(module, func_name, functype);
 	llvm::BasicBlock* block = llvm::BasicBlock::Create(module->getContext(), "entry", llvm_func);
 	llvm::IRBuilder<> builder(block);
 		
@@ -98,13 +92,12 @@ llvm::Function* getOrInsertDecrementorForType(llvm::Module* module, const ConstT
 		false // varargs
 	);
 
-	llvm::Constant* llvm_func_constant = module->getOrInsertFunction(
+	llvm::Function* llvm_func = LLVMUtils::getFunctionFromModule(module, 
 		"decr_" + type->toString(), // Name
 		functype // Type
 	);
 
-	assert(llvm::isa<llvm::Function>(llvm_func_constant));
-	return static_cast<llvm::Function*>(llvm_func_constant);
+	return llvm_func;
 }
 
 
@@ -116,13 +109,12 @@ llvm::Function* getOrInsertDestructorForType(llvm::Module* module, const ConstTy
 		false // varargs
 	);
 
-	llvm::Constant* llvm_func_constant = module->getOrInsertFunction(
+	llvm::Function* llvm_func = LLVMUtils::getFunctionFromModule(module, 
 		"destructor_" + type->toString(), // Name
 		functype // Type
 	);
 
-	assert(llvm::isa<llvm::Function>(llvm_func_constant));
-	return static_cast<llvm::Function*>(llvm_func_constant);
+	return llvm_func;
 }
 
 
@@ -361,7 +353,7 @@ void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_
 		llvm::Value* cap_var_struct_ptr = LLVMUtils::createStructGEP(&builder, closure, Function::capturedVarStructIndex(), "cap_var_struct_ptr");
 
 		// Call the destructor!
-		builder.CreateCall(destructor_ptr, cap_var_struct_ptr);
+		LLVMUtils::createCallWithValue(&builder, destructor_ptr, cap_var_struct_ptr);
 
 		builder.CreateRetVoid();
 		return;

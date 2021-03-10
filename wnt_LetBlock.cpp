@@ -360,8 +360,13 @@ void addMetaDataCommentToInstruction(EmitLLVMCodeParams& params, llvm::Instructi
 	instr->setMetadata(safe_comment, mdnode);
 }
 
-
-static llvm::Function* getOrInsertTracePrintFloatCall(llvm::Module* module)
+static
+#if TARGET_LLVM_VERSION >= 110
+llvm::FunctionCallee
+#else
+llvm::Function* 
+#endif
+getOrInsertTracePrintFloatCall(llvm::Module* module)
 {
 	// void tracePrintFloat(const char* var_name, float val)
 
@@ -376,6 +381,12 @@ static llvm::Function* getOrInsertTracePrintFloatCall(llvm::Module* module)
 		false // varargs
 	);
 
+#if TARGET_LLVM_VERSION >= 110
+	return module->getOrInsertFunction(
+		"tracePrintFloat", // Name
+		functype // Type
+	);
+#else
 	llvm::Constant* llvm_func_constant = module->getOrInsertFunction(
 		"tracePrintFloat", // Name
 		functype // Type
@@ -383,6 +394,7 @@ static llvm::Function* getOrInsertTracePrintFloatCall(llvm::Module* module)
 
 	assert(llvm::isa<llvm::Function>(llvm_func_constant));
 	return static_cast<llvm::Function*>(llvm_func_constant);
+#endif
 }
 
 
@@ -394,7 +406,7 @@ static void emitTracePrintCall(EmitLLVMCodeParams& params, const string& var_nam
 	// Get a pointer to the zeroth elem
 	llvm::Value* elem_0 = LLVMUtils::createStructGEP(params.builder, string_global, 0);
 
-	llvm::Function* f = getOrInsertTracePrintFloatCall(params.module);
+	LLVMUtils::FunctionCalleeType f = getOrInsertTracePrintFloatCall(params.module);
 	llvm::Value* args[2] = { elem_0, float_value };
 	params.builder->CreateCall(f, args);
 }

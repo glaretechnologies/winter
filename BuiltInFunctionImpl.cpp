@@ -35,6 +35,9 @@
 #include <llvm/IR/CallingConv.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Intrinsics.h>
+#if TARGET_LLVM_VERSION >= 110
+#include <llvm/IR/IntrinsicsX86.h> // New for ~11.0
+#endif
 #ifdef _MSC_VER
 #pragma warning(pop) // Re-enable warnings
 #endif
@@ -675,11 +678,7 @@ public:
 		llvm::Value* args[] = { elem, captured_var_struct_ptr };
 
 		// Call function on element
-		llvm::Value* mapped_elem = builder.CreateCall(
-			function, // Callee
-			args, // Args
-			"map function call" // Name
-		);
+		llvm::Value* mapped_elem = LLVMUtils::createCallWithValue(&builder, function, args, "map function call");
 
 		// Get pointer to output element
 		llvm::Value* out_elem_ptr = builder.CreateInBoundsGEP(return_ptr, indices);
@@ -721,13 +720,7 @@ llvm::Value* ArrayMapBuiltInFunc::insertWorkFunction(EmitLLVMCodeParams& params)
 		false // varargs
 	);
 
-	llvm::Constant* llvm_func_constant = params.module->getOrInsertFunction(
-		"work_function", // Name
-		functype // Type
-	);
-
-	assert(llvm::isa<llvm::Function>(llvm_func_constant));
-	llvm::Function* llvm_func = static_cast<llvm::Function*>(llvm_func_constant);
+	llvm::Function* llvm_func = LLVMUtils::getFunctionFromModule(params.module, "work_function", functype);
 	llvm::BasicBlock* block = llvm::BasicBlock::Create(params.module->getContext(), "entry", llvm_func);
 	llvm::IRBuilder<> builder(block);
 		
@@ -844,9 +837,7 @@ llvm::Value* ArrayMapBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 			false // varargs
 		);
 
-		llvm::Constant* llvm_func_constant = params.module->getOrInsertFunction("execArrayMap", functype);
-
-		llvm::Function* llvm_func = static_cast<llvm::Function*>(llvm_func_constant);
+		llvm::Function* llvm_func = LLVMUtils::getFunctionFromModule(params.module, "execArrayMap", functype);
 
 		llvm::SmallVector<llvm::Value*, 8> args;
 		args.push_back(params.builder->CreatePointerCast(return_ptr, voidptr)); // output
@@ -1219,7 +1210,7 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 
 		// Call function on element
 		llvm::Value* args[] = { running_state_value, array_elem, captured_var_struct_ptr };
-		llvm::Value* next_running_state_value = params.builder->CreateCall(function, args);
+		llvm::Value* next_running_state_value = LLVMUtils::createCallWithValue(params.builder, function, args);
 
 		// Store new value in running_state_alloca
 		params.builder->CreateStore(next_running_state_value, new_state_alloca); // running_state_alloca);
@@ -1232,7 +1223,7 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 			array_elem, // array element
 			captured_var_struct_ptr };
 
-		params.builder->CreateCall(function, args);
+		LLVMUtils::createCallWithValue(params.builder, function, args);
 
 		// Copy the state from new_state_alloca to running_state_alloca
 		//if(state_type->getType() == Type::ArrayTypeType)
@@ -1450,7 +1441,7 @@ static llvm::Value* loadGatherElements(EmitLLVMCodeParams& params, int arg_offse
 
 	// Start with a vector of Undefs.
 	llvm::Value* vec = llvm::ConstantVector::getSplat(
-		index_vec_num_elems,
+		LLVMUtils::makeVectorElemCount(index_vec_num_elems),
 		llvm::UndefValue::get(array_elem_type->LLVMType(*params.module))
 	);
 
@@ -2380,10 +2371,7 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 	args.push_back(captured_var_struct_ptr); // captured var struct ptr
 
-	params.builder->CreateCall(
-		function, // Callee
-		args // Args
-	);
+	LLVMUtils::createCallWithValue(params.builder, function, args);
 
 	// The result of the function (tuple<State, bool>) should now be stored in 'tuple_alloca'.
 
@@ -4545,7 +4533,8 @@ static llvm::Value* emitCallToBinaryFunction(llvm::IRBuilder<>* builder, llvm::M
 		*module
 	);
 
-	llvm::Constant* llvm_func_constant = module->getOrInsertFunction(
+	llvm::Function* llvm_func_constant = LLVMUtils::getFunctionFromModule(
+		module,
 		compare_sig.typeMangledName(),
 		llvm_func_type // Type
 	);
@@ -4671,9 +4660,12 @@ llvm::Value* CompareEqualBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) c
 
 		// For later LLVMs, use experimental horizontal reduce here to do the reduction.
 #if TARGET_LLVM_VERSION >= 60
-
+#if TARGET_LLVM_VERSION >= 110
+		llvm::Type* types[] = { par_eq->getType() }; // vector type
+#else
 		llvm::Type* types[] = { llvm::Type::getIntNTy(*params.context, 1), // elem type
 			par_eq->getType() }; // vector type
+#endif
 
 		llvm::Function* vec_reduce_and = llvm::Intrinsic::getDeclaration(params.module, 
 			is_compare_not_equal ? llvm::Intrinsic::experimental_vector_reduce_or : llvm::Intrinsic::experimental_vector_reduce_and, 

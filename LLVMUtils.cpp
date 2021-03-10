@@ -104,6 +104,29 @@ llvm::Value* createCollectionCopy(const TypeVRef& collection_type, llvm::Value* 
 }
 
 
+llvm::Function* getFunctionFromModule(llvm::Module* module, const std::string& func_name, llvm::FunctionType* functype)
+{
+#if TARGET_LLVM_VERSION >= 110
+	llvm::FunctionCallee callee = module->getOrInsertFunction(
+		func_name, // Name
+		functype // Type
+	);
+	llvm::Value* llvm_func_constant = callee.getCallee();
+#else
+	llvm::Constant* llvm_func_constant = module->getOrInsertFunction(
+		func_name, // Name
+		functype // Type
+	);
+#endif
+
+	assert(llvm::isa<llvm::Function>(llvm_func_constant));
+	if(!llvm::isa<llvm::Function>(llvm_func_constant))
+		throw BaseException("Internal error: While tring to get function " + func_name + " with getOrInsertFunction(): was not a function.");
+
+	return static_cast<llvm::Function*>(llvm_func_constant);
+}
+
+
 }; // end namespace LLVMUtils
 
 

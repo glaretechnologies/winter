@@ -70,6 +70,7 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "llvm/MC/MCObjectFileInfo.h"
 #include "llvm/MC/MCInstPrinter.h"
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
+#include "llvm/Support/Host.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/TargetSelect.h"
@@ -845,7 +846,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			// Threadripper:
 			// cpu_info.family: 23
 			// cpu_info.model: 1
-			std::string cpu_name = llvm::sys::getHostCPUName();
+			std::string cpu_name = (std::string)llvm::sys::getHostCPUName();
 			if(cpu_name == "generic" || cpu_name == "x86-64") // If LLVM can't detect it, it's probably something pretty new, so just consider it >= to a corei7 in terms of capabilities.
 				cpu_name = "corei7";
 
@@ -1745,7 +1746,7 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 				if(func.nonNull() && func->built_llvm_function)
 				{
 					entry_point_funcs.insert(func->built_llvm_function);
-					export_list_strings.push_back(func->built_llvm_function->getName()); // NOTE: is LLVM func built yet?
+					export_list_strings.push_back((std::string)func->built_llvm_function->getName()); // NOTE: is LLVM func built yet?
 				}
 			}
 
@@ -2284,7 +2285,11 @@ void VirtualMachine::compileToNativeAssembly(llvm::Module* mod, const std::strin
 #if TARGET_LLVM_VERSION >= 80
 		NULL,
 #endif
+#if TARGET_LLVM_VERSION >= 110
+		llvm::CGFT_AssemblyFile
+#else
 		llvm::TargetMachine::CGFT_AssemblyFile
+#endif
 	))
 		throw Winter::BaseException("Unable to emit assembly file!");
 #else

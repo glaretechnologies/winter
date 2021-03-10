@@ -2296,7 +2296,15 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 	if(captured_var_struct_ptr != NULL)
 		args.push_back(captured_var_struct_ptr);
 
+#if TARGET_LLVM_VERSION >= 110
+	llvm::Type* ptr_function_type = target_llvm_func->getType();
+	llvm::Type* function_type = ptr_function_type->getPointerElementType();
+	assert(llvm::isa<llvm::FunctionType>(function_type));
+	llvm::FunctionCallee callee(llvm::cast<llvm::FunctionType>(function_type), target_llvm_func);
+	llvm::CallInst* call_inst = params.builder->CreateCall(callee, args);
+#else
 	llvm::CallInst* call_inst = params.builder->CreateCall(target_llvm_func, args);
+#endif
 
 	// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
 	call_inst->setCallingConv(llvm::CallingConv::C);

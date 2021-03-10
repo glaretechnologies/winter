@@ -933,13 +933,11 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 		assert(params.module->getFunction(destructor_name) == NULL);
 
-		llvm::Constant* llvm_func_constant = params.module->getOrInsertFunction(
+		llvm::Function* destructor = LLVMUtils::getFunctionFromModule(
+			params.module,
 			destructor_name, // Name
 			destructor_type // Type
 		);
-
-		assert(llvm::isa<llvm::Function>(llvm_func_constant));
-		llvm::Function* destructor = static_cast<llvm::Function*>(llvm_func_constant);
 		llvm::BasicBlock* block = llvm::BasicBlock::Create(params.module->getContext(), "entry", destructor);
 		llvm::IRBuilder<> builder(block);
 
@@ -1088,10 +1086,18 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 		use_name += "_with_cap_var_struct_arg";
 
 
-	llvm::Constant* llvm_func_constant = module->getOrInsertFunction(
-		use_name, //makeSafeStringForFunctionName(this->sig.toString()), // Name
+#if TARGET_LLVM_VERSION >= 110
+	llvm::FunctionCallee callee = module->getOrInsertFunction(
+		use_name, // Name
 		functype // Type
 	);
+	llvm::Value* llvm_func_constant = callee.getCallee();
+#else
+	llvm::Constant* llvm_func_constant = module->getOrInsertFunction(
+		use_name, // Name
+		functype // Type
+	);
+#endif
 
 	if(!llvm::isa<llvm::Function>(llvm_func_constant))
 	{

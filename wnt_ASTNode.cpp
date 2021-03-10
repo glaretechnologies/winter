@@ -1285,19 +1285,16 @@ llvm::Value* StringLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 		llvm::IRBuilder<> entry_block_builder(&params.currently_building_func->getEntryBlock(), params.currently_building_func->getEntryBlock().getFirstInsertionPt());
 
 		const uint64 total_string_size_B = sizeof(uint64)*3 + value.size();
+		const uint64 total_string_size_uint64s = Maths::roundedUpDivide(total_string_size_B, sizeof(uint64));
 
-		llvm::Value* alloca_ptr = entry_block_builder.Insert(new llvm::AllocaInst(
-			llvm::Type::getInt8Ty(*params.context), // type - byte
-#if TARGET_LLVM_VERSION >= 60
-			0, // address space
-#endif
-			llvm::ConstantInt::get(*params.context, llvm::APInt(64, total_string_size_B, true)), // number of bytes needed.
-			8, // alignment
+		// NOTE: use int64s as the allocation type so we get the necessary alignment for the uint64s in StringRep.
+		llvm::Value* alloca_ptr = entry_block_builder.CreateAlloca(
+			llvm::Type::getInt64Ty(*params.context), // type - int64
+			llvm::ConstantInt::get(*params.context, llvm::APInt(64, total_string_size_uint64s, true)), // num elems
 			"string_stack_space"
-		));
+		);
 
-
-		// Cast resulting allocated uint8* to string type.
+		// Cast resulting allocated int64* to string type.
 		llvm::Type* string_type = this->type()->LLVMType(*params.module);
 		assert(string_type->isPointerTy());
 		string_value = params.builder->CreatePointerCast(alloca_ptr, string_type);
@@ -1305,7 +1302,9 @@ llvm::Value* StringLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 		// Emit a memcpy from the global data to the string value
 		llvm::Value* data_ptr = LLVMUtils::createStructGEP(params.builder, string_value, 3, "string_literal_data_ptr");
 
-#if TARGET_LLVM_VERSION >= 80
+#if TARGET_LLVM_VERSION >= 110
+		params.builder->CreateMemCpy(/*dst=*/data_ptr, /*dst align=*/llvm::MaybeAlign(), /*src=*/elem_0, /*src align=*/llvm::MaybeAlign(), /*size=*/value.size());
+#elif TARGET_LLVM_VERSION >= 80
 		params.builder->CreateMemCpy(/*dst=*/data_ptr, /*dst align=*/1, /*src=*/elem_0, /*src align=*/1, /*size=*/value.size());
 #else
 		params.builder->CreateMemCpy(data_ptr, elem_0, value.size(), /*align=*/1);
@@ -3571,7 +3570,7 @@ llvm::Value* UnaryMinusExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm
 		if(vec_type->elem_type->getType() == Type::FloatType)
 		{
 			llvm::Value* neg_one_vec = llvm::ConstantVector::getSplat(
-				vec_type->num,
+				LLVMUtils::makeVectorElemCount(vec_type->num),
 				llvm::ConstantFP::get(*params.context, llvm::APFloat(-1.0f))
 			);
 
@@ -3583,7 +3582,7 @@ llvm::Value* UnaryMinusExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm
 		else if(vec_type->elem_type->getType() == Type::DoubleType)
 		{
 			llvm::Value* neg_one_vec = llvm::ConstantVector::getSplat(
-				vec_type->num,
+				LLVMUtils::makeVectorElemCount(vec_type->num),
 				llvm::ConstantFP::get(*params.context, llvm::APFloat(-1.0))
 			);
 
@@ -3595,7 +3594,7 @@ llvm::Value* UnaryMinusExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm
 		else if(vec_type->elem_type->getType() == Type::IntType)
 		{
 			llvm::Value* neg_one_vec = llvm::ConstantVector::getSplat(
-				vec_type->num,
+				LLVMUtils::makeVectorElemCount(vec_type->num),
 				llvm::ConstantInt::get(*params.context, llvm::APInt(32, (uint64_t)-1, true))
 			);
 

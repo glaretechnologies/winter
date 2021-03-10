@@ -285,19 +285,16 @@ llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 		llvm::IRBuilder<> entry_block_builder(&params.currently_building_func->getEntryBlock(), params.currently_building_func->getEntryBlock().getFirstInsertionPt());
 
 		const uint64 total_varray_size_B = sizeof(uint64)*3 + elem_size_B * num_elems;
+		const uint64 total_varray_size_uint64s = Maths::roundedUpDivide(total_varray_size_B, sizeof(uint64));
 
-		llvm::Value* alloca_ptr = entry_block_builder.Insert(new llvm::AllocaInst(
-			llvm::Type::getInt8Ty(*params.context), // byte, 
-#if TARGET_LLVM_VERSION >= 60
-			0, // address space
-#endif
-			llvm::ConstantInt::get(*params.context, llvm::APInt(64, total_varray_size_B, true)), // number of bytes needed.
-			8, // alignment
+		// NOTE: use int64s as the allocation type so we get the necessary alignment for the uint64s in VArrayRep.
+		llvm::Value* alloca_ptr = entry_block_builder.CreateAlloca(
+			llvm::Type::getInt64Ty(*params.context), // type - int64
+			llvm::ConstantInt::get(*params.context, llvm::APInt(64, total_varray_size_uint64s, true)), // num elems
 			this->type()->toString() + " stack space"
-		));
+		);
 
-
-		// Cast resulting allocated uint8* down to VArrayRep for the right type, e.g. varray<T>
+		// Cast resulting allocated int64* down to VArrayRep for the right type, e.g. varray<T>
 		llvm::Type* varray_T_type = this->type()->LLVMType(*params.module);
 		assert(varray_T_type->isPointerTy());
 

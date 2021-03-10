@@ -13,6 +13,7 @@ Copyright Glare Technologies Limited 2015 -
 #include "Value.h"
 #include "Linker.h"
 #include "BuiltInFunctionImpl.h"
+#include "LLVMUtils.h"
 #include "LLVMTypeUtils.h"
 #include "ProofUtils.h"
 #include "utils/StringUtils.h"
@@ -338,7 +339,7 @@ llvm::Value* VectorLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 
 		// Start with a vector of Undefs.
 		llvm::Value* v = llvm::ConstantVector::getSplat(
-			(unsigned int)this->elements.size(),
+			LLVMUtils::makeVectorElemCount(this->elements.size()),
 			llvm::UndefValue::get(this->elements[0]->type()->LLVMType(*params.module))
 		);
 
