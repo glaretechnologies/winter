@@ -18,7 +18,6 @@ Copyright Glare Technologies Limited 2014 -
 #include "ProofUtils.h"
 #include "utils/StringUtils.h"
 #include "maths/mathstypes.h"
-#include <ostream>
 #ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
 #endif

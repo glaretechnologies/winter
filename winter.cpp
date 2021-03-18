@@ -19,8 +19,9 @@ Copyright Glare Technologies Limited 2015 -
 #include "PerfTests.h"
 #include "utils/FileUtils.h"
 #include "utils/Clock.h"
+#include "utils/StringUtils.h"
+#include "utils/ConPrint.h"
 #include "utils/ArgumentParser.h"
-#include <iostream>
 #include <cassert>
 #include <fstream>
 using namespace Winter;
@@ -35,7 +36,7 @@ int main(int argc, char** argv)
 
 	if(argc < 2)
 	{
-		std::cerr << "Usage: winter program.win" << std::endl;
+		conPrint("Usage: winter program.win");
 		return 1;
 	}
 
@@ -113,12 +114,12 @@ int main(int argc, char** argv)
 		// cast to correct type
 		float_void_func mainf = (float_void_func)f;
 
-		std::cout << "Calling JIT'd function..." << std::endl;
+		conPrint("Calling JIT'd function...");
 
 		// Call the JIT'd function
 		const float result = mainf();
 
-		std::cout << "JIT'd function returned " << result << std::endl;
+		conPrint("JIT'd function returned " + toString(result));
 
 
 		VMState vmstate;
@@ -129,7 +130,7 @@ int main(int argc, char** argv)
 
 		vmstate.func_args_start.pop_back();
 
-		std::cout << "Program returned " << retval->toString() << std::endl;
+		conPrint("Program returned " + retval->toString());
 
 
 		assert(vmstate.argument_stack.empty());
@@ -151,12 +152,12 @@ int main(int argc, char** argv)
 	}
 	catch(Winter::BaseException& e)
 	{
-		std::cerr << e.what() << std::endl;
+		stdErrPrint(e.what());
 		return 1;
 	}
 	catch(FileUtils::FileUtilsExcep& e)
 	{
-		std::cerr << e.what() << std::endl;
+		stdErrPrint(e.what());
 		return 1;
 	}
 
@@ -164,10 +165,10 @@ int main(int argc, char** argv)
 	const bool found_mem_leaks = _CrtDumpMemoryLeaks() != 0; // == TRUE;
 	if(found_mem_leaks)
 	{
-		std::cout << "***************** Memory leak(s) detected! **************" << std::endl;
+		conPrint("***************** Memory leak(s) detected! **************");
 	}
 	else
-		std::cout << "------------ No memory leaks detected. -----------" << std::endl;
+		conPrint("------------ No memory leaks detected. -----------");
 #endif
 
 
