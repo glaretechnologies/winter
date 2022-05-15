@@ -311,6 +311,12 @@ static int freeClosure(ClosureRep* closure)
 //=====================================================================================
 
 
+// #define WINTER_GLOBAL_TASK_SUPPORT 1
+
+
+#if WINTER_GLOBAL_TASK_SUPPORT
+
+
 class ExecArrayMapTask;
 
 static glare::TaskManager* winter_global_task_manager = NULL;
@@ -400,6 +406,9 @@ void execArrayMap(void* output, void* input, size_t array_size, void* map_functi
 
 	winter_global_task_manager->waitForTasksToComplete();
 }
+
+
+#endif // WINTER_GLOBAL_TASK_SUPPORT
 
 
 //=====================================================================================
@@ -515,8 +524,10 @@ public:
 		// For example "sin" looked up with SearchForAddressOfSymbol() was returning a sin function from ucrtbase(d).dll,
 		// which is slower than the sin function explicitly returned below.
 
+#if WINTER_GLOBAL_TASK_SUPPORT
 		if(name == "execArrayMap")
 			return (uint64_t)execArrayMap;
+#endif
 		if(name == "tracePrintFloat")
 			return (uint64_t)tracePrintFloat;
 
@@ -627,14 +638,16 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 	stats.num_closure_allocations = 0;
 	stats.num_free_vars_stored = 0;
 	
-	/*if(!winter_global_task_manager)
+#if WINTER_GLOBAL_TASK_SUPPORT
+	if(!winter_global_task_manager)
 	{
 		const size_t num_threads = 8;
 		winter_global_task_manager = new glare::TaskManager(num_threads);
 		exec_array_map_tasks.resize(num_threads);
 		for(size_t i=0; i<num_threads; ++i)
 			exec_array_map_tasks[i] = new ExecArrayMapTask();
-	}*/
+	}
+#endif
 
 	try
 	{
