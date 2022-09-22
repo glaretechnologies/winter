@@ -87,7 +87,7 @@ public:
 
 	virtual size_t getSubtreeCodeComplexity() const { return 1; } // TEMP HACK
 
-	const BuiltInFunctionImplType builtInType() const { return builtin_type; }
+	BuiltInFunctionImplType builtInType() const { return builtin_type; }
 private:
 	BuiltInFunctionImplType builtin_type;
 };

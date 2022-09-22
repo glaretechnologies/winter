@@ -336,7 +336,7 @@ void Lexer::parseComment(const SourceBufferRef& buffer, Parser& parser)
 
 void Lexer::process(const SourceBufferRef& src, std::vector<Reference<TokenBase> >& tokens_out)
 {
-	Parser parser(src->source.c_str(), src->source.length());
+	Parser parser(src->source);
 
 	while(parser.notEOF())
 	{

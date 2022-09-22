@@ -145,7 +145,7 @@ public:
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 	virtual llvm::Type* LLVMType(llvm::Module& module) const;
 	virtual const std::string OpenCLCType(EmitOpenCLCodeParams& params) const { return name; }
-	const int genericTypeParamIndex() const { return generic_type_param_index; }
+	int genericTypeParamIndex() const { return generic_type_param_index; }
 	virtual size_t memSize() const { return 0; }
 private:
 	std::string name;
