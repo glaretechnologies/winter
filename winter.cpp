@@ -36,7 +36,7 @@ int main(int argc, char** argv)
 
 	if(argc < 2)
 	{
-		conPrint("Usage: winter program.win");
+		conPrint("Usage: \nwinter program.win\nor\nwinter --test");
 		return 1;
 	}
 
@@ -57,6 +57,7 @@ int main(int argc, char** argv)
 	if(args.isArgPresent("--test"))
 	{
 #if BUILD_TESTS
+		conPrint("Running Winter tests...");
 		LanguageTests::run();
 		return 0;
 #else

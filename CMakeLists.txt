@@ -1,52 +1,29 @@
-cmake_minimum_required (VERSION 2.8.7)
+cmake_minimum_required (VERSION 3.0)
 
-# set a dummy project name, so we can detect the bitness
-project (dummy)
 
-set(PROJECT_NAME "winter")
+project("winter")
 
+set(CURRENT_TARGET winter)
+
+set(WINTER_BITNESS 64)
 
 set(WINTER_USE_OPENCL TRUE)
 
 
-# detect bitness
-if(WIN32)
-	if(CMAKE_CL_64)
-		set(WINTER_64_BIT TRUE)
-		set(WINTER_BITNESS 64)
-		set(PROJECT_NAME "winter64")
-	else()
-		set(WINTER_64_BIT FALSE)
-		set(WINTER_BITNESS 32)
-		set(PROJECT_NAME "winter32")
-	endif()
-else()
-	#linux stuff goes here
-	set(WINTER_64_BIT FALSE)
-	set(WINTER_BITNESS 64)
-	set(PROJECT_NAME "winter64")
+SET(GLARE_CORE_TRUNK_DIR "" CACHE PATH "Path to glare-core repo trunk dir.")
+
+if(GLARE_CORE_TRUNK_DIR STREQUAL "")
+	MESSAGE(FATAL_ERROR "ERROR: Please set GLARE_CORE_TRUNK_DIR to the path to glare-core repo trunk dir, e.g. -DGLARE_CORE_TRUNK_DIR=path/to/glare/core")
 endif()
 
-# Set the real project name
-project(${PROJECT_NAME})
+
+SET(LIBS_DIR "" CACHE PATH "Path to libraries dir.  llvm builds should be in this dir, for example LIBS_DIR/llvm/llvm_11_0_0_install_vs2022_64")
+
+if(LIBS_DIR STREQUAL "")
+	MESSAGE(FATAL_ERROR "ERROR: Please set LIBS_DIR to the path to llvm builds can be found in, e.g. -DLIBS_DIR=c:/libs")
+endif()
 
 
-set(CURRENT_TARGET winter)
-
-
-# Function for checking an environment variable exists
-function(checkAndGetEnvVar envvar result)
-	if(DEFINED ENV{${envvar}})
-		# To prevent issues with \ characters in macros, replace possible \ INDIGO_LIBS env vars and store it in INDIGO_LIBS_ENV.
-		string(REPLACE "\\" "/" var $ENV{${envvar}})
-		set (${result} ${var} PARENT_SCOPE)
-	else()
-		MESSAGE(FATAL_ERROR "ERROR: Environment variable ${envvar} not defined.")
-	endif()
-endfunction()
-
-checkAndGetEnvVar(INDIGO_TRUNK_DIR INDIGO_TRUNK_DIR)
-MESSAGE("Indigo trunk dir: ${INDIGO_TRUNK_DIR}")
 
 # Supported versions: 3.4, 3.6, 6.0.0, 8.0.0, 11.0.0
 set(LLVM_VERSION "11.0.0")
@@ -57,29 +34,23 @@ MESSAGE("Target LLVM version: ${LLVM_VERSION}")
 string(REPLACE "." "_" LLVM_VERSION_PATH ${LLVM_VERSION})
 
 
-checkAndGetEnvVar(INDIGO_LIBS LIBS_ENV)
-
 if(WIN32)
-	if(MSVC_VERSION EQUAL 1600) # VS2012
-		set(WINTER_VS_VER 2010)
-	elseif(MSVC_VERSION EQUAL 1700) # VS2012
-		set(WINTER_VS_VER 2012)
-	elseif(MSVC_VERSION EQUAL 1800) # VS2013
-		set(WINTER_VS_VER 2013)
-	elseif(MSVC_VERSION EQUAL 1900) # VS2015
+	if(MSVC_VERSION EQUAL 1900)
 		set(WINTER_VS_VER 2015)
-	elseif(MSVC_VERSION EQUAL 1911 OR MSVC_VERSION EQUAL 1912) # VS2017
+	elseif(MSVC_VERSION EQUAL 1911 OR MSVC_VERSION EQUAL 1912)
 		set(WINTER_VS_VER 2017)
-	elseif(MSVC_VERSION GREATER_EQUAL 1920)
+	elseif(MSVC_VERSION GREATER_EQUAL 1920 AND MSVC_VERSION LESS 1930)
 		set(WINTER_VS_VER 2019)
+	elseif(MSVC_VERSION GREATER_EQUAL 1930 AND MSVC_VERSION LESS 1940)
+		set(WINTER_VS_VER 2022)
 	else()
 		message(FATAL_ERROR "Unhandled MSVC version")
 	endif()
 	
-	set(llvmdir "${LIBS_ENV}/llvm/llvm_${LLVM_VERSION_PATH}_install_vs${WINTER_VS_VER}_${WINTER_BITNESS}")
+	set(llvmdir "${LIBS_DIR}/llvm/llvm_${LLVM_VERSION_PATH}_install_vs${WINTER_VS_VER}_${WINTER_BITNESS}")
 	
 else() # Mac or Linux.
-	set(llvmdir "${LIBS_ENV}/llvm/llvm_${LLVM_VERSION_PATH}_install")
+	set(llvmdir "${LIBS_DIR}/llvm/llvm_${LLVM_VERSION_PATH}_install")
 
 #	set (CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "$ENV{INDIGO_OUTPUT}/test_builds")
 #	set (CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "$ENV{INDIGO_OUTPUT}/test_builds")
@@ -100,8 +71,6 @@ endif()
 
 MESSAGE("llvmdir: ${llvmdir}")
 
-
-set(WINTER_INCLUDE_DIRS "")
 
 
 if(WINTER_USE_OPENCL)
@@ -190,100 +159,102 @@ set(WINTER_FILES
 
 ########### Utils ################
 SET(util_files
-${INDIGO_TRUNK_DIR}/utils/ArgumentParser.cpp
-${INDIGO_TRUNK_DIR}/utils/ArgumentParser.h
-${INDIGO_TRUNK_DIR}/utils/Clock.cpp
-${INDIGO_TRUNK_DIR}/utils/Clock.h
-${INDIGO_TRUNK_DIR}/utils/Condition.cpp
-${INDIGO_TRUNK_DIR}/utils/Condition.h
-${INDIGO_TRUNK_DIR}/utils/ConPrint.cpp
-${INDIGO_TRUNK_DIR}/utils/ConPrint.h
-${INDIGO_TRUNK_DIR}/utils/ContainerUtils.h
-${INDIGO_TRUNK_DIR}/utils/DynamicLib.cpp
-${INDIGO_TRUNK_DIR}/utils/DynamicLib.h
-${INDIGO_TRUNK_DIR}/utils/FileUtils.cpp
-${INDIGO_TRUNK_DIR}/utils/FileUtils.h
-${INDIGO_TRUNK_DIR}/utils/Lock.cpp
-${INDIGO_TRUNK_DIR}/utils/Lock.h
-${INDIGO_TRUNK_DIR}/utils/MemAlloc.cpp
-${INDIGO_TRUNK_DIR}/utils/MemAlloc.h
-${INDIGO_TRUNK_DIR}/utils/MemMappedFile.cpp
-${INDIGO_TRUNK_DIR}/utils/MemMappedFile.h
-${INDIGO_TRUNK_DIR}/utils/Mutex.cpp
-${INDIGO_TRUNK_DIR}/utils/Mutex.h
-${INDIGO_TRUNK_DIR}/utils/MyThread.cpp
-${INDIGO_TRUNK_DIR}/utils/MyThread.h
-${INDIGO_TRUNK_DIR}/utils/Parser.cpp
-${INDIGO_TRUNK_DIR}/utils/Parser.h
-${INDIGO_TRUNK_DIR}/utils/Platform.h
-${INDIGO_TRUNK_DIR}/utils/PlatformUtils.cpp
-${INDIGO_TRUNK_DIR}/utils/PlatformUtils.h
-${INDIGO_TRUNK_DIR}/utils/PrintOutput.h
-${INDIGO_TRUNK_DIR}/utils/StandardPrintOutput.cpp
-${INDIGO_TRUNK_DIR}/utils/StandardPrintOutput.h
-${INDIGO_TRUNK_DIR}/utils/Reference.h
-${INDIGO_TRUNK_DIR}/utils/StringUtils.cpp
-${INDIGO_TRUNK_DIR}/utils/StringUtils.h
-${INDIGO_TRUNK_DIR}/utils/Task.cpp
-${INDIGO_TRUNK_DIR}/utils/Task.h
-${INDIGO_TRUNK_DIR}/utils/TaskManager.cpp
-${INDIGO_TRUNK_DIR}/utils/TaskManager.h
-${INDIGO_TRUNK_DIR}/utils/TaskRunnerThread.cpp
-${INDIGO_TRUNK_DIR}/utils/TaskRunnerThread.h
-${INDIGO_TRUNK_DIR}/utils/TestUtils.cpp
-${INDIGO_TRUNK_DIR}/utils/TestUtils.h
-${INDIGO_TRUNK_DIR}/utils/Timer.cpp
-${INDIGO_TRUNK_DIR}/utils/Timer.h
-${INDIGO_TRUNK_DIR}/utils/VRef.h
-${INDIGO_TRUNK_DIR}/utils/UTF8Utils.cpp
-${INDIGO_TRUNK_DIR}/utils/UTF8Utils.h
+${GLARE_CORE_TRUNK_DIR}/utils/ArgumentParser.cpp
+${GLARE_CORE_TRUNK_DIR}/utils/ArgumentParser.h
+${GLARE_CORE_TRUNK_DIR}/utils/Clock.cpp
+${GLARE_CORE_TRUNK_DIR}/utils/Clock.h
+${GLARE_CORE_TRUNK_DIR}/utils/Condition.cpp
+${GLARE_CORE_TRUNK_DIR}/utils/Condition.h
+${GLARE_CORE_TRUNK_DIR}/utils/ConPrint.cpp
+${GLARE_CORE_TRUNK_DIR}/utils/ConPrint.h
+${GLARE_CORE_TRUNK_DIR}/utils/ContainerUtils.h
+${GLARE_CORE_TRUNK_DIR}/utils/DynamicLib.cpp
+${GLARE_CORE_TRUNK_DIR}/utils/DynamicLib.h
+${GLARE_CORE_TRUNK_DIR}/utils/FileUtils.cpp
+${GLARE_CORE_TRUNK_DIR}/utils/FileUtils.h
+${GLARE_CORE_TRUNK_DIR}/utils/Lock.cpp
+${GLARE_CORE_TRUNK_DIR}/utils/Lock.h
+${GLARE_CORE_TRUNK_DIR}/utils/MemAlloc.cpp
+${GLARE_CORE_TRUNK_DIR}/utils/MemAlloc.h
+${GLARE_CORE_TRUNK_DIR}/utils/MemMappedFile.cpp
+${GLARE_CORE_TRUNK_DIR}/utils/MemMappedFile.h
+${GLARE_CORE_TRUNK_DIR}/utils/Mutex.cpp
+${GLARE_CORE_TRUNK_DIR}/utils/Mutex.h
+${GLARE_CORE_TRUNK_DIR}/utils/MyThread.cpp
+${GLARE_CORE_TRUNK_DIR}/utils/MyThread.h
+${GLARE_CORE_TRUNK_DIR}/utils/Parser.cpp
+${GLARE_CORE_TRUNK_DIR}/utils/Parser.h
+${GLARE_CORE_TRUNK_DIR}/utils/Platform.h
+${GLARE_CORE_TRUNK_DIR}/utils/PlatformUtils.cpp
+${GLARE_CORE_TRUNK_DIR}/utils/PlatformUtils.h
+${GLARE_CORE_TRUNK_DIR}/utils/PrintOutput.h
+${GLARE_CORE_TRUNK_DIR}/utils/StandardPrintOutput.cpp
+${GLARE_CORE_TRUNK_DIR}/utils/StandardPrintOutput.h
+${GLARE_CORE_TRUNK_DIR}/utils/Reference.h
+${GLARE_CORE_TRUNK_DIR}/utils/StringUtils.cpp
+${GLARE_CORE_TRUNK_DIR}/utils/StringUtils.h
+${GLARE_CORE_TRUNK_DIR}/utils/Task.cpp
+${GLARE_CORE_TRUNK_DIR}/utils/Task.h
+${GLARE_CORE_TRUNK_DIR}/utils/TaskManager.cpp
+${GLARE_CORE_TRUNK_DIR}/utils/TaskManager.h
+${GLARE_CORE_TRUNK_DIR}/utils/TaskRunnerThread.cpp
+${GLARE_CORE_TRUNK_DIR}/utils/TaskRunnerThread.h
+${GLARE_CORE_TRUNK_DIR}/utils/TestUtils.cpp
+${GLARE_CORE_TRUNK_DIR}/utils/TestUtils.h
+${GLARE_CORE_TRUNK_DIR}/utils/Timer.cpp
+${GLARE_CORE_TRUNK_DIR}/utils/Timer.h
+${GLARE_CORE_TRUNK_DIR}/utils/VRef.h
+${GLARE_CORE_TRUNK_DIR}/utils/UTF8Utils.cpp
+${GLARE_CORE_TRUNK_DIR}/utils/UTF8Utils.h
 )
 
 SET(double_conversion_files
-${INDIGO_TRUNK_DIR}/double-conversion/bignum-dtoa.cc
-${INDIGO_TRUNK_DIR}/double-conversion/bignum-dtoa.h
-${INDIGO_TRUNK_DIR}/double-conversion/bignum.cc
-${INDIGO_TRUNK_DIR}/double-conversion/bignum.h
-${INDIGO_TRUNK_DIR}/double-conversion/cached-powers.cc
-${INDIGO_TRUNK_DIR}/double-conversion/cached-powers.h
-${INDIGO_TRUNK_DIR}/double-conversion/diy-fp.cc
-${INDIGO_TRUNK_DIR}/double-conversion/diy-fp.h
-${INDIGO_TRUNK_DIR}/double-conversion/double-conversion.cc
-${INDIGO_TRUNK_DIR}/double-conversion/double-conversion.h
-${INDIGO_TRUNK_DIR}/double-conversion/fast-dtoa.cc
-${INDIGO_TRUNK_DIR}/double-conversion/fast-dtoa.h
-${INDIGO_TRUNK_DIR}/double-conversion/fixed-dtoa.cc
-${INDIGO_TRUNK_DIR}/double-conversion/fixed-dtoa.h
-${INDIGO_TRUNK_DIR}/double-conversion/ieee.h
-${INDIGO_TRUNK_DIR}/double-conversion/strtod.cc
-${INDIGO_TRUNK_DIR}/double-conversion/strtod.h
-${INDIGO_TRUNK_DIR}/double-conversion/utils.h
+${GLARE_CORE_TRUNK_DIR}/double-conversion/bignum.cc
+${GLARE_CORE_TRUNK_DIR}/double-conversion/bignum.h
+${GLARE_CORE_TRUNK_DIR}/double-conversion/bignum-dtoa.cc
+${GLARE_CORE_TRUNK_DIR}/double-conversion/bignum-dtoa.h
+${GLARE_CORE_TRUNK_DIR}/double-conversion/cached-powers.cc
+${GLARE_CORE_TRUNK_DIR}/double-conversion/cached-powers.h
+${GLARE_CORE_TRUNK_DIR}/double-conversion/diy-fp.h
+${GLARE_CORE_TRUNK_DIR}/double-conversion/double-conversion.h
+${GLARE_CORE_TRUNK_DIR}/double-conversion/double-to-string.cc
+${GLARE_CORE_TRUNK_DIR}/double-conversion/double-to-string.h
+${GLARE_CORE_TRUNK_DIR}/double-conversion/fast-dtoa.cc
+${GLARE_CORE_TRUNK_DIR}/double-conversion/fast-dtoa.h
+${GLARE_CORE_TRUNK_DIR}/double-conversion/fixed-dtoa.cc
+${GLARE_CORE_TRUNK_DIR}/double-conversion/fixed-dtoa.h
+${GLARE_CORE_TRUNK_DIR}/double-conversion/ieee.h
+${GLARE_CORE_TRUNK_DIR}/double-conversion/string-to-double.cc
+${GLARE_CORE_TRUNK_DIR}/double-conversion/string-to-double.h
+${GLARE_CORE_TRUNK_DIR}/double-conversion/strtod.cc
+${GLARE_CORE_TRUNK_DIR}/double-conversion/strtod.h
+${GLARE_CORE_TRUNK_DIR}/double-conversion/utils.h
 )
 
 SET(xxhash_files
-${INDIGO_TRUNK_DIR}/zstd-1.4.4/lib/common/xxhash.c
-${INDIGO_TRUNK_DIR}/zstd-1.4.4/lib/common/xxhash.h
+${GLARE_CORE_TRUNK_DIR}/zstd-1.5.2/lib/common/xxhash.c
+${GLARE_CORE_TRUNK_DIR}/zstd-1.5.2/lib/common/xxhash.h
 )
 
 
 if(WINTER_USE_OPENCL)
 	SET(glare_opencl_files
-	${INDIGO_TRUNK_DIR}/opencl/OpenCL.cpp
-	${INDIGO_TRUNK_DIR}/opencl/OpenCL.h
-	${INDIGO_TRUNK_DIR}/opencl/OpenCLKernel.cpp
-	${INDIGO_TRUNK_DIR}/opencl/OpenCLKernel.h
-	${INDIGO_TRUNK_DIR}/opencl/OpenCLBuffer.cpp
-	${INDIGO_TRUNK_DIR}/opencl/OpenCLBuffer.h
-	${INDIGO_TRUNK_DIR}/opencl/OpenCLContext.cpp
-	${INDIGO_TRUNK_DIR}/opencl/OpenCLContext.h
-	${INDIGO_TRUNK_DIR}/opencl/OpenCLDevice.cpp
-	${INDIGO_TRUNK_DIR}/opencl/OpenCLDevice.h
-	${INDIGO_TRUNK_DIR}/opencl/OpenCLPlatform.cpp
-	${INDIGO_TRUNK_DIR}/opencl/OpenCLPlatform.h
-	${INDIGO_TRUNK_DIR}/opencl/OpenCLProgram.cpp
-	${INDIGO_TRUNK_DIR}/opencl/OpenCLProgram.h
-	${INDIGO_TRUNK_DIR}/opencl/OpenCLCommandQueue.cpp
-	${INDIGO_TRUNK_DIR}/opencl/OpenCLCommandQueue.h
+	${GLARE_CORE_TRUNK_DIR}/opencl/OpenCL.cpp
+	${GLARE_CORE_TRUNK_DIR}/opencl/OpenCL.h
+	${GLARE_CORE_TRUNK_DIR}/opencl/OpenCLKernel.cpp
+	${GLARE_CORE_TRUNK_DIR}/opencl/OpenCLKernel.h
+	${GLARE_CORE_TRUNK_DIR}/opencl/OpenCLBuffer.cpp
+	${GLARE_CORE_TRUNK_DIR}/opencl/OpenCLBuffer.h
+	${GLARE_CORE_TRUNK_DIR}/opencl/OpenCLContext.cpp
+	${GLARE_CORE_TRUNK_DIR}/opencl/OpenCLContext.h
+	${GLARE_CORE_TRUNK_DIR}/opencl/OpenCLDevice.cpp
+	${GLARE_CORE_TRUNK_DIR}/opencl/OpenCLDevice.h
+	${GLARE_CORE_TRUNK_DIR}/opencl/OpenCLPlatform.cpp
+	${GLARE_CORE_TRUNK_DIR}/opencl/OpenCLPlatform.h
+	${GLARE_CORE_TRUNK_DIR}/opencl/OpenCLProgram.cpp
+	${GLARE_CORE_TRUNK_DIR}/opencl/OpenCLProgram.h
+	${GLARE_CORE_TRUNK_DIR}/opencl/OpenCLCommandQueue.cpp
+	${GLARE_CORE_TRUNK_DIR}/opencl/OpenCLCommandQueue.h
 	)
 endif()
 
@@ -293,17 +264,15 @@ SOURCE_GROUP(utils FILES ${util_files})
 SOURCE_GROUP(double_conversion FILES ${double_conversion_files})
 SOURCE_GROUP(opencl FILES ${glare_opencl_files})
 SOURCE_GROUP(xxhash FILES ${xxhash_files})
-SOURCE_GROUP(testutils FILES ${testutils_files})
 
 
 include_directories(
 ${llvmdir}/include
-${INDIGO_TRUNK_DIR}
-${INDIGO_TRUNK_DIR}/utils
-${INDIGO_TRUNK_DIR}/maths
-${INDIGO_TRUNK_DIR}/zstd-1.4.4/lib/common
-${INDIGO_TRUNK_DIR}/opencl/khronos
-${WINTER_INCLUDE_DIRS}
+${GLARE_CORE_TRUNK_DIR}
+${GLARE_CORE_TRUNK_DIR}/utils
+${GLARE_CORE_TRUNK_DIR}/maths
+${GLARE_CORE_TRUNK_DIR}/zstd-1.5.2/lib/common
+${GLARE_CORE_TRUNK_DIR}/opencl/khronos
 )
 
 
@@ -314,14 +283,13 @@ ${maths_files}
 ${double_conversion_files}
 ${glare_opencl_files}
 ${xxhash_files}
-${testutils_files}
 )
 
 
 
 if(WIN32)
 	add_definitions(-DUNICODE -D_UNICODE)
-	add_definitions(/MP)
+	add_definitions(/MP) # Build with multiple processes
 	
 	# Set warning level to 4 - this shows some useful stuff not in /W3 in vs2012.
 	add_definitions(/W4)
@@ -339,8 +307,7 @@ if(WIN32)
 	#add_definitions(/GS- /fp:fast)
 	
 	# Add SSE2 support for 32-bit.  It's implicitly on for 64-bit.
-	if(WINTER_64_BIT)
-	else()
+	if(WINTER_BITNESS EQUAL 32)
 		add_definitions(/arch:SSE2)
 	endif()
 	
@@ -352,19 +319,11 @@ if(WIN32)
 	else()
 		SET(GL_OPT "/GL")
 	endif()
-	
-	if(WIN_RUNTIME_STATIC)
-		SET(WIN_RUNTIME_OPT "/MT")
-		SET(WIN_RUNTIME_OPT_DEBUG "/MTd")
-	else()
-		SET(WIN_RUNTIME_OPT)
-		SET(WIN_RUNTIME_OPT_DEBUG)
-	endif()
-	
+		
 	# Append optimisation flags.
-	SET(CMAKE_CXX_FLAGS_DEBUG			"${CMAKE_CXX_FLAGS_DEBUG}			${WIN_RUNTIME_OPT_DEBUG} -DBUILD_TESTS=1")
-	SET(CMAKE_CXX_FLAGS_RELEASE			"${CMAKE_CXX_FLAGS_RELEASE}			${WIN_RUNTIME_OPT} -D_SECURE_SCL=0 /Ox ${GL_OPT} -DNDEBUG /Zi -DBUILD_TESTS=1")
-	SET(CMAKE_CXX_FLAGS_RELWITHDEBINFO	"${CMAKE_CXX_FLAGS_RELWITHDEBINFO}	${WIN_RUNTIME_OPT} /O2 -D_SECURE_SCL=0 -DNDEBUG -DBUILD_TESTS=1")
+	SET(CMAKE_CXX_FLAGS_DEBUG			"${CMAKE_CXX_FLAGS_DEBUG}			-DBUILD_TESTS=1")	
+	SET(CMAKE_CXX_FLAGS_RELWITHDEBINFO	"${CMAKE_CXX_FLAGS_RELWITHDEBINFO}	/O2 -D_SECURE_SCL=0 -DNDEBUG -DBUILD_TESTS=1")
+	SET(CMAKE_CXX_FLAGS_RELEASE			"${CMAKE_CXX_FLAGS_RELEASE}			/O2 -D_SECURE_SCL=0 ${GL_OPT} -DNDEBUG /Zi -DBUILD_TESTS=1")
 	
 else() # Linux
 	#add_definitions(-D__SSSE3__ -D__NO_AVX__)
