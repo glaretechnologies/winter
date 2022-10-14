@@ -257,7 +257,7 @@ void Lexer::parseNumericLiteral(const SourceBufferRef& buffer, Parser& parser, s
 				const size_t pos = parser.currentPos();
 				string_view next_token;
 				parser.parseNonWSToken(next_token);
-				throw LexerExcep("Failed to parse int.  (Next chars '" + next_token.to_string() + "')", errorPosition(buffer, pos));
+				throw LexerExcep("Failed to parse int.  (Next chars '" + toString(next_token) + "')", errorPosition(buffer, pos));
 			}
 		}
 
@@ -274,7 +274,7 @@ void Lexer::parseNumericLiteral(const SourceBufferRef& buffer, Parser& parser, s
 				const size_t pos = parser.currentPos();
 				string_view next_token;
 				parser.parseNonWSToken(next_token);
-				throw LexerExcep("Failed to parse integer suffix after 'i':.  (Next chars '" + next_token.to_string() + "')", errorPosition(buffer, pos));
+				throw LexerExcep("Failed to parse integer suffix after 'i':.  (Next chars '" + toString(next_token) + "')", errorPosition(buffer, pos));
 			}
 		}
 		else if(parser.currentIsChar('u'))
@@ -289,7 +289,7 @@ void Lexer::parseNumericLiteral(const SourceBufferRef& buffer, Parser& parser, s
 					const size_t pos = parser.currentPos();
 					string_view next_token;
 					parser.parseNonWSToken(next_token);
-					throw LexerExcep("Failed to parse integer suffix after 'u':.  (Next chars '" + next_token.to_string() + "')", errorPosition(buffer, pos));
+					throw LexerExcep("Failed to parse integer suffix after 'u':.  (Next chars '" + toString(next_token) + "')", errorPosition(buffer, pos));
 				}
 			}
 		}
