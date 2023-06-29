@@ -1210,7 +1210,7 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 
 llvm::Function* FunctionDefinition::buildLLVMFunction(
 	llvm::Module* module,
-	const PlatformUtils::CPUInfo& cpu_info,
+	const WinterCPUInfo& cpu_info,
 	const llvm::DataLayout/*TargetData*/* target_data,
 	const CommonFunctions& common_functions,
 	std::set<VRef<const Type>, ConstTypeVRefLessThan>& destructors_called_types,

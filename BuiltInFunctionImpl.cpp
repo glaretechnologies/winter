@@ -2642,8 +2642,10 @@ llvm::Value* DotProductBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) con
 	llvm::Value* a = LLVMUtils::getNthArg(params.currently_building_func, 0);
 	llvm::Value* b = LLVMUtils::getNthArg(params.currently_building_func, 1);
 
+	// TODO: Add Neon (ARM64) instruction for dot product
+
 	// If have SSE4.1 and this is a 4-vector of floats, using DPPS instruction
-	if(vector_type->elem_type->getType() == Type::FloatType && this->vector_type->num == 4 && params.cpu_info->sse4_1)
+	if(vector_type->elem_type->getType() == Type::FloatType && this->vector_type->num == 4 && (params.cpu_info->isX64() && params.cpu_info->cpu_info.sse4_1))
 	{
 		// Emit dot product intrinsic
 		llvm::SmallVector<llvm::Value*, 3> args;
@@ -2677,7 +2679,7 @@ llvm::Value* DotProductBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) con
 		);
 	}
 	// If have SSE4.1 and this is a 2-vector of doubles, using DPPD instruction
-	else if(vector_type->elem_type->getType() == Type::DoubleType && this->vector_type->num == 2 && params.cpu_info->sse4_1)
+	else if(vector_type->elem_type->getType() == Type::DoubleType && this->vector_type->num == 2 && (params.cpu_info->isX64() && params.cpu_info->cpu_info.sse4_1))
 	{
 		// Emit dot product intrinsic
 		llvm::SmallVector<llvm::Value*, 3> args;

@@ -111,8 +111,14 @@ void Linker::addExternalFunctions(vector<ExternalFunctionRef>& funcs)
 
 void Linker::buildLLVMCode(llvm::Module* module, const llvm::DataLayout* target_data, const CommonFunctions& common_functions, ProgramStats& stats, bool emit_trace_code)
 {
-	PlatformUtils::CPUInfo cpu_info;
-	PlatformUtils::getCPUInfo(cpu_info);
+	WinterCPUInfo cpu_info;
+
+#if defined(__x86_64__) || defined(_M_X64)
+	cpu_info.arch = WinterCPUInfo::Arch_x64;
+	PlatformUtils::getCPUInfo(cpu_info.cpu_info);
+#else
+	winter_cpu_info.arch = WinterCPUInfo::Arch_ARM64;
+#endif
 
 	std::set<VRef<const Type>, ConstTypeVRefLessThan> destructors_called_types;
 

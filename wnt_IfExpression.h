@@ -28,7 +28,6 @@ namespace llvm { class Function; };
 namespace llvm { class Value; };
 namespace llvm { class Module; };
 namespace llvm { class LLVMContext; };
-namespace PlatformUtils { class CPUInfo; }
 
 
 namespace Winter

@@ -16,6 +16,7 @@ File created by ClassTemplate on Wed Jun 11 03:55:25 2008
 #include <utils/Reference.h>
 #include <utils/RefCounted.h>
 #include <utils/Platform.h>
+#include <utils/PlatformUtils.h>
 #include <utils/SmallVector.h>
 #include <string>
 #include <vector>
@@ -36,7 +37,6 @@ namespace llvm { template<typename T, typename Inserter > class IRBuilder; };
 namespace llvm { template<bool preserveNames> class IRBuilderDefaultInserter; };
 namespace llvm { template<bool preserveNames, typename T, typename Inserter > class IRBuilder; };
 #endif
-namespace PlatformUtils { class CPUInfo; }
 
 
 namespace Winter
@@ -59,6 +59,7 @@ class LetBlock;
 class NamedConstant;
 struct ProgramStats;
 class SrcLocation;
+struct WinterCPUInfo;
 
 
 typedef std::map<ASTNode*, ASTNode*> CloneMapType;
@@ -215,7 +216,7 @@ class EmitLLVMCodeParams
 {
 public:
 	FunctionDefinition* currently_building_func_def;
-	const PlatformUtils::CPUInfo* cpu_info;
+	const WinterCPUInfo* cpu_info;
 	
 	// These template arguments are the defaults from IRBuilder.h.  Written explicitly here so we can forwards declare this type.
 #if TARGET_LLVM_VERSION >= 60
@@ -324,6 +325,21 @@ inline GetSpaceBoundResults operator + (const GetSpaceBoundResults& a, const Get
 {
 	return GetSpaceBoundResults(a.stack_space + b.stack_space, a.heap_space + b.heap_space);
 }
+
+
+struct WinterCPUInfo
+{
+	enum Arch
+	{
+		Arch_x64,
+		Arch_ARM64
+	};
+
+	bool isX64() const { return arch == Arch_x64; }
+
+	Arch arch;
+	PlatformUtils::CPUInfo cpu_info; // set if arch == Arch_x64
+};
 
 
 /*=====================================================================

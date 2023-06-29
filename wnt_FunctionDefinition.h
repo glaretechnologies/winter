@@ -74,7 +74,7 @@ public:
 	// This will be needed for when a global function is passed as a first-class function argument, e.g. when the top-level function definition square() is passed to map().
 	llvm::Function* buildLLVMFunction(
 		llvm::Module* module,
-		const PlatformUtils::CPUInfo& cpu_info,
+		const WinterCPUInfo& cpu_info,
 		const llvm::DataLayout* data_layout,
 		const CommonFunctions& common_functions,
 		std::set<VRef<const Type>, ConstTypeVRefLessThan>& destructors_called_types,
