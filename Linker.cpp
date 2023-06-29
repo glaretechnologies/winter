@@ -117,7 +117,7 @@ void Linker::buildLLVMCode(llvm::Module* module, const llvm::DataLayout* target_
 	cpu_info.arch = WinterCPUInfo::Arch_x64;
 	PlatformUtils::getCPUInfo(cpu_info.cpu_info);
 #else
-	winter_cpu_info.arch = WinterCPUInfo::Arch_ARM64;
+	cpu_info.arch = WinterCPUInfo::Arch_ARM64;
 #endif
 
 	std::set<VRef<const Type>, ConstTypeVRefLessThan> destructors_called_types;
