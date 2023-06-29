@@ -834,8 +834,14 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			// OSX_DEPLOYMENT_TARGET should correspond to the version number in the -mmacosx-version-min
 			// flag passed to the compiler.
 #if defined(OSX_DEPLOYMENT_TARGET)
+
+#if defined(__x86_64__) || defined(_M_X64)
 			this->triple = "x86_64-apple-macosx" + std::string(OSX_DEPLOYMENT_TARGET);
 #else
+			this->triple = "aarch64-apple-macosx" + std::string(OSX_DEPLOYMENT_TARGET);
+#endif
+
+#else // else if !defined(OSX_DEPLOYMENT_TARGET):
 			this->triple = llvm::sys::getProcessTriple();
 #endif
 			this->triple.append("-elf"); // MCJIT requires the -elf suffix currently, see https://groups.google.com/forum/#!topic/llvm-dev/DOmHEXhNNWw
@@ -860,8 +866,14 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			// cpu_info.family: 23
 			// cpu_info.model: 1
 			std::string cpu_name = (std::string)llvm::sys::getHostCPUName();
+
+#if defined(__x86_64__) || defined(_M_X64)
 			if(cpu_name == "generic" || cpu_name == "x86-64") // If LLVM can't detect it, it's probably something pretty new, so just consider it >= to a corei7 in terms of capabilities.
 				cpu_name = "corei7";
+#else // Else on ARM64:
+
+#endif
+
 
 			// Select the host computer architecture as the target.
 			this->target_machine = engine_builder.selectTarget(
