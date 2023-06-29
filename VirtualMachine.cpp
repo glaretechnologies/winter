@@ -874,6 +874,8 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 
 #endif
 
+			std::string error_string;
+			engine_builder.setErrorStr(&error_string);
 
 			// Select the host computer architecture as the target.
 			this->target_machine = engine_builder.selectTarget(
@@ -881,6 +883,9 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 				"",  // march
 				cpu_name, // mcpu - e.g. "corei7", "core-avx2"
 				llvm::SmallVector<std::string, 4>());
+
+			if(this->target_machine == NULL)
+				throw BaseException("Winter::VirtualMachine(): Failed to select target: " + error_string);
 
 			// Enable floating point op fusion, to allow for FMA codegen.
 			this->target_machine->Options.AllowFPOpFusion = llvm::FPOpFusion::Fast;
