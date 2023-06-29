@@ -32,7 +32,13 @@ File created by ClassTemplate on Wed Jun 11 03:55:25 2008
 #include "utils/ConPrint.h"
 #include "maths/mathstypes.h"
 #include "maths/vec2.h"
+
+#if defined(_M_X64) || defined(__x86_64__)
 #include <xmmintrin.h> // SSE header file
+#else // Else if not x64, assume ARM64.
+#include "libs/sse2neon.h" // Use SSE2Neon to convert SSE intrinsics to Neon intrinsics.  TODO: write the used intrinsics by hand below.
+#endif
+
 #ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
 #endif
