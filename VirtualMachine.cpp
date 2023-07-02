@@ -49,6 +49,7 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ManagedStatic.h"
@@ -72,7 +73,9 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/SourceMgr.h"
+#if TARGET_LLVM_VERSION < 150
 #include "llvm/Support/TargetRegistry.h"
+#endif
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Analysis/Lint.h"
@@ -946,11 +949,15 @@ VirtualMachine::~VirtualMachine()
 
 
 static void fatalErrorHandler(void *user_data,
+#if TARGET_LLVM_VERSION >= 150
+	const char *reason,
+#else
 	const std::string& reason,
+#endif
 	bool gen_crash_diag)
 {
-	stdErrPrint("LLVM encountered a fatal error: " + reason);
-	throw BaseException("LLVM encountered a fatal error: " + reason);
+	stdErrPrint("LLVM encountered a fatal error: " + std::string(reason));
+	throw BaseException("LLVM encountered a fatal error: " + std::string(reason));
 }
 
 
@@ -973,6 +980,7 @@ void VirtualMachine::init()
 	// See https://stackoverflow.com/questions/24467404/dlclose-doesnt-really-unload-shared-object-no-matter-how-many-times-it-is-call
 	llvm::cl::ResetAllOptionOccurrences();
 
+#if TARGET_LLVM_VERSION < 150 // TEMP
 	// Enable -warn-stack-size= option.
 	// We use this to get the stack size for compiled functions - 
 	// see use of llvm::DiagnosticInfoStackSize below.
@@ -983,6 +991,7 @@ void VirtualMachine::init()
 	const bool res = llvm::cl::ParseCommandLineOptions(2, argv, /*overview=*/"", &stream);
 	if(!res)
 		throw BaseException("VirtualMachine::init(): Failed to set command line options: " + stream.str());
+#endif
 #endif
 }
 
@@ -1688,7 +1697,11 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 		llvm::raw_fd_ostream f(
 			"unoptimised_module_IR.txt",
 			errorinfo,
+#if TARGET_LLVM_VERSION >= 150
+			llvm::sys::fs::OF_Text
+#else
 			llvm::sys::fs::F_Text
+#endif
 		);
 #else
 		std::string errorinfo;
@@ -1823,7 +1836,11 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 		llvm::raw_fd_ostream f(
 			"optimised_module_IR.txt",
 			errorinfo,
+#if TARGET_LLVM_VERSION >= 150
+			llvm::sys::fs::OF_Text
+#else
 			llvm::sys::fs::F_Text
+#endif
 		);
 #else
 		std::string errorinfo;
@@ -2293,7 +2310,15 @@ void VirtualMachine::compileToNativeAssembly(llvm::Module* mod, const std::strin
 	std::string err;
 #if TARGET_LLVM_VERSION >= 36
 	std::error_code errcode;
-	llvm::raw_fd_ostream raw_out(filename.c_str(), errcode, llvm::sys::fs::F_None);
+
+	llvm::raw_fd_ostream raw_out(filename.c_str(), errcode, 
+#if TARGET_LLVM_VERSION >= 150
+		llvm::sys::fs::OF_None
+#else
+		llvm::sys::fs::F_None
+#endif
+	);
+
 	if(errcode)
 		throw Winter::BaseException("Error when opening file to print assembly to: " + errcode.message());
 #else

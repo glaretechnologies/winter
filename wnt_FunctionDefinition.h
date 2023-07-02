@@ -98,7 +98,6 @@ public:
 
 
 	// llvm::Type* getClosureStructLLVMType(llvm::LLVMContext& context) const;
-	TypeRef getFullClosureType() const;
 	VRef<StructureType> getCapturedVariablesStructType() const;
 
 	// If the function is return by value, returns winter_index, else returns winter_index + 1

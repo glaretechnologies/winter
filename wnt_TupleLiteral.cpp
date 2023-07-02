@@ -262,7 +262,7 @@ llvm::Value* TupleLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 	for(unsigned int i=0; i<tuple_type->component_types.size(); ++i)
 	{
 		// Get the pointer to the structure field.
-		llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, result_struct_val, i);
+		llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, result_struct_val, i, tuple_type->LLVMType(*params.module));
 
 		llvm::Value* arg_value_or_ptr = this->elements[i]->emitLLVMCode(params);
 

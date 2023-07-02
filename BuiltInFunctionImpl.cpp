@@ -258,7 +258,7 @@ llvm::Value* Constructor::emitLLVMCode(EmitLLVMCodeParams& params) const
 		for(unsigned int i=0; i<this->struct_type->component_types.size(); ++i)
 		{
 			// Get the pointer to the structure field.
-			llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, struct_ptr, i);
+			llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, struct_ptr, i, this->struct_type->LLVMType(*params.module));
 
 			llvm::Value* arg_value_or_ptr = LLVMUtils::getNthArg(params.currently_building_func, i + 1);
 
@@ -335,10 +335,11 @@ llvm::Value* GetField::emitLLVMCode(EmitLLVMCodeParams& params) const
 			// Pointer to structure will be in 0th argument.
 			llvm::Value* struct_ptr = LLVMUtils::getNthArg(params.currently_building_func, 0);
 
-			llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, struct_ptr, this->index, field_name + " ptr");
+			llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, struct_ptr, this->index, this->struct_type->LLVMType(*params.module), field_name + " ptr");
 
-			llvm::Value* loaded_val = params.builder->CreateLoad(
+			llvm::Value* loaded_val = LLVMUtils::createLoad(params,
 				field_ptr,
+				field_type,
 				field_name // name
 			);
 
@@ -356,7 +357,7 @@ llvm::Value* GetField::emitLLVMCode(EmitLLVMCodeParams& params) const
 			// Pointer to structure will be in 1st argument.
 			llvm::Value* struct_ptr = LLVMUtils::getNthArg(params.currently_building_func, 1);
 
-			llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, struct_ptr, this->index, field_name + " ptr");
+			llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, struct_ptr, this->index, this->struct_type->LLVMType(*params.module), field_name + " ptr");
 
 			LLVMUtils::createCollectionCopy(
 				field_type, 
@@ -461,7 +462,7 @@ llvm::Value* UpdateElementBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) 
 			llvm::ConstantInt::get(*params.context, llvm::APInt(32, 0)), // get the zero-th array
 			index // get the indexed element in the array
 		};
-		llvm::Value* new_elem_ptr = params.builder->CreateInBoundsGEP(return_ptr, indices, "new elem ptr");
+		llvm::Value* new_elem_ptr = LLVMUtils::createInBoundsGEP(*params.builder, return_ptr, collection_type.downcastToPtr<ArrayType>()->LLVMType(*params.module), indices);//params.builder->CreateInBoundsGEP(return_ptr, indices, "new elem ptr");
 
 		params.builder->CreateStore(newval, new_elem_ptr);
 	}
@@ -521,12 +522,13 @@ llvm::Value* GetTupleElementBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 			// Pointer to structure will be in 0th argument.
 			llvm::Value* struct_ptr = LLVMUtils::getNthArg(params.currently_building_func, 0);
 
-			llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, struct_ptr, this->index, field_name + " ptr");
+			llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, struct_ptr, this->index, this->tuple_type->LLVMType(*params.module), field_name + " ptr");
 
-			llvm::Value* loaded_val = params.builder->CreateLoad(
-				field_ptr,
-				field_name // name
-			);
+			//llvm::Value* loaded_val = params.builder->CreateLoad(
+			//	field_ptr,
+			//	field_name // name
+			//);
+			llvm::Value* loaded_val = LLVMUtils::createLoad(params.builder, field_ptr, field_type, params.module, field_name);
 
 			// TEMP NEW: increment ref count if this is a string
 			//if(field_type->getType() == Type::StringType)
@@ -542,7 +544,7 @@ llvm::Value* GetTupleElementBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 			// Pointer to structure will be in 1st argument.
 			llvm::Value* struct_ptr = LLVMUtils::getNthArg(params.currently_building_func, 1);
 
-			llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, struct_ptr, this->index, field_name + " ptr");
+			llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, struct_ptr, this->index, this->tuple_type->LLVMType(*params.module), field_name + " ptr");
 
 			LLVMUtils::createCollectionCopy(
 				field_type, 
@@ -599,9 +601,10 @@ llvm::Value* GetVectorElement::emitLLVMCode(EmitLLVMCodeParams& params) const
 	}
 	else
 	{
-		vec_value = params.builder->CreateLoad(
+		vec_value = LLVMUtils::createLoad(params.builder,
 			LLVMUtils::getNthArg(params.currently_building_func, 0),
-			false, // true,// TEMP: volatile = true to pick up returned vector);
+			vector_type->elem_type,//false, // true,// TEMP: volatile = true to pick up returned vector);
+			params.module,
 			"argument" // name
 		);
 	}
@@ -672,19 +675,22 @@ public:
 			i // get the indexed element in the array
 		};
 
-		llvm::Value* elem_ptr = builder.CreateInBoundsGEP(input_array, indices);
-		llvm::Value* elem = builder.CreateLoad(elem_ptr);
+		llvm::Value* elem_ptr = LLVMUtils::createInBoundsGEP(builder, input_array, array_llvm_type, indices);
+		llvm::Value* elem = LLVMUtils::createLoad(&builder, elem_ptr, elem_llvm_type);
 
 		llvm::Value* args[] = { elem, captured_var_struct_ptr };
 
 		// Call function on element
-		llvm::Value* mapped_elem = LLVMUtils::createCallWithValue(&builder, function, args, "map function call");
+		llvm::Value* mapped_elem = LLVMUtils::createCallWithValue(&builder, function, function_llvm_type, args, "map function call");
 
 		// Get pointer to output element
-		llvm::Value* out_elem_ptr = builder.CreateInBoundsGEP(return_ptr, indices);
+		llvm::Value* out_elem_ptr = LLVMUtils::createInBoundsGEP(builder, return_ptr, array_llvm_type, indices);
 		return builder.CreateStore(mapped_elem, out_elem_ptr); // Store the element in the output array
 	}
 
+	llvm::Type* array_llvm_type;
+	llvm::Type* elem_llvm_type;
+	llvm::Type* function_llvm_type;
 	llvm::Value* return_ptr;
 	llvm::Value* function;
 	llvm::Value* captured_var_struct_ptr;
@@ -726,6 +732,9 @@ llvm::Value* ArrayMapBuiltInFunc::insertWorkFunction(EmitLLVMCodeParams& params)
 		
 
 	ArrayMapBuiltInFunc_CreateLoopBodyCallBack callback;
+	callback.array_llvm_type = this->from_type->LLVMType(*params.module);
+	callback.elem_llvm_type = this->from_type->elem_type->LLVMType(*params.module);
+	callback.function_llvm_type = this->func_type->functionLLVMType(*params.module);
 	callback.return_ptr = LLVMUtils::getNthArg(llvm_func, 0);
 
 	// If we have a specialised function to use, insert a call to it directly, else used the function pointer passed in as an argument.
@@ -741,7 +750,11 @@ llvm::Value* ArrayMapBuiltInFunc::insertWorkFunction(EmitLLVMCodeParams& params)
 
 	llvm::Function::arg_iterator AI = llvm_func->arg_begin();
 	{
+#if TARGET_LLVM_VERSION >= 150
+		llvm::AttrBuilder attr_builder(*params.context);
+#else
 		llvm::AttrBuilder attr_builder;
+#endif
 		attr_builder.addAlignmentAttr(32);
 		attr_builder.addAttribute(llvm::Attribute::NoAlias);		
 		setArgumentAttributes(params.context, AI, /*index=*/1, attr_builder);
@@ -750,7 +763,11 @@ llvm::Value* ArrayMapBuiltInFunc::insertWorkFunction(EmitLLVMCodeParams& params)
 	AI++;
 
 	{
+#if TARGET_LLVM_VERSION >= 150
+		llvm::AttrBuilder attr_builder(*params.context);
+#else
 		llvm::AttrBuilder attr_builder;
+#endif
 		attr_builder.addAlignmentAttr(32);
 		attr_builder.addAttribute(llvm::Attribute::NoAlias);
 		setArgumentAttributes(params.context, AI, /*index=*/2, attr_builder);
@@ -793,10 +810,14 @@ llvm::Value* ArrayMapBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 	llvm::Value* function = params.builder->CreateLoad(function_ptr);*/
 
+	llvm::Type* func_llvm_type = func_type->functionLLVMType(*params.module);
+	llvm::Type* func_ptr_llvm_type = LLVMTypeUtils::pointerType(func_llvm_type);
+
 	llvm::Value* closure_ptr = LLVMUtils::getNthArg(params.currently_building_func, 1);
-	llvm::Value* function_ptr = LLVMUtils::createStructGEP(params.builder, closure_ptr, Function::functionPtrIndex());
-	llvm::Value* function = params.builder->CreateLoad(function_ptr);
-	llvm::Value* captured_var_struct_ptr = LLVMUtils::createStructGEP(params.builder, closure_ptr, Function::capturedVarStructIndex());
+	llvm::Type* closure_type = func_type->closureLLVMStructType(*params.module);
+	llvm::Value* function_ptr_ptr = LLVMUtils::createStructGEP(params.builder, closure_ptr, Function::functionPtrIndex(), closure_type);
+	llvm::Value* function_ptr = LLVMUtils::createLoad(params.builder, function_ptr_ptr, func_ptr_llvm_type);
+	llvm::Value* captured_var_struct_ptr = LLVMUtils::createStructGEP(params.builder, closure_ptr, Function::capturedVarStructIndex(), closure_type);
 
 
 	//llvm::Value* function_ptr = params.builder->CreateLoad(
@@ -843,7 +864,7 @@ llvm::Value* ArrayMapBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 		args.push_back(params.builder->CreatePointerCast(return_ptr, voidptr)); // output
 		args.push_back(params.builder->CreatePointerCast(input_array, voidptr)); // input
 		args.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(64, this->from_type->num_elems))); // array_size
-		args.push_back(params.builder->CreatePointerCast(function, voidptr)); // map_function
+		args.push_back(params.builder->CreatePointerCast(function_ptr, voidptr)); // map_function
 
 		//TODO: captured_var_struct_ptr stuff
 
@@ -855,8 +876,11 @@ llvm::Value* ArrayMapBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	else
 	{
 		ArrayMapBuiltInFunc_CreateLoopBodyCallBack callback;
+		callback.array_llvm_type = this->from_type->LLVMType(*params.module);
+		callback.elem_llvm_type = this->from_type->elem_type->LLVMType(*params.module);
+		callback.function_llvm_type = this->func_type->functionLLVMType(*params.module);
 		callback.return_ptr = return_ptr;
-		callback.function = function;
+		callback.function = function_ptr;
 		callback.captured_var_struct_ptr = captured_var_struct_ptr;
 		callback.input_array = input_array;
 	
@@ -959,10 +983,19 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 		initial_state_ptr_or_value = LLVMUtils::getNthArg(params.currently_building_func, 3); // Pointer to, or value of initial state
 	}
 
-	llvm::Value* function_ptr = LLVMUtils::createStructGEP(params.builder, closure_ptr, Function::functionPtrIndex());
-	llvm::Value* function = params.builder->CreateLoad(function_ptr);
-	llvm::Value* captured_var_struct_ptr = LLVMUtils::createStructGEP(params.builder, closure_ptr, Function::capturedVarStructIndex());
+	llvm::Type* func_closure_llvm_type = func_type->LLVMStructType(*params.module);
+	llvm::Type* func_llvm_type = func_type->functionLLVMType(*params.module);
+	llvm::Type* func_ptr_llvm_type = LLVMTypeUtils::pointerType(func_llvm_type);
 
+	llvm::Value* function_ptr_ptr = LLVMUtils::createStructGEP(params.builder, closure_ptr, Function::functionPtrIndex(), func_closure_llvm_type);
+	llvm::Value* function_ptr = LLVMUtils::createLoad(params.builder, function_ptr_ptr, func_ptr_llvm_type);
+
+	//LLVMTypeUtils::getBaseCapturedVarStructType(*params.module)->dump();
+
+	llvm::Value* captured_var_struct_ptr = LLVMUtils::createStructGEP(params.builder, closure_ptr, Function::capturedVarStructIndex(), func_closure_llvm_type);
+
+	llvm::Type* array_llvm_type = array_type->LLVMType(*params.module);
+	llvm::Type* elem_llvm_type = array_type->elem_type->LLVMType(*params.module);
 
 	// Emit the alloca in the entry block for better code-gen.
 	// We will emit the alloca at the start of the block, so that it doesn't go after any terminator instructions already created which have to be at the end of the block.
@@ -994,7 +1027,8 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 			}
 			else
 			{
-				params.builder->CreateStore(params.builder->CreateLoad(initial_state_ptr_or_value), running_state_alloca);
+				llvm::Value* val = LLVMUtils::createLoad(params.builder, initial_state_ptr_or_value, elem_llvm_type);
+				params.builder->CreateStore(val, running_state_alloca);
 			}
 		}
 
@@ -1027,8 +1061,8 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 			loop_index_var // get the indexed element in the array
 		};
 
-		llvm::Value* array_elem_ptr = params.builder->CreateInBoundsGEP(array_arg, indices, "array elem ptr");
-		llvm::Value* array_elem = params.builder->CreateLoad(array_elem_ptr, "array elem");
+		llvm::Value* array_elem_ptr = LLVMUtils::createInBoundsGEP(*params.builder, array_arg, array_llvm_type, indices, "array elem ptr");
+		llvm::Value* array_elem = LLVMUtils::createLoad(params.builder, array_elem_ptr, elem_llvm_type, "array elem");
 
 		// Set up params.argument_values to override the existing values.
 		params.argument_values.resize(2);
@@ -1049,7 +1083,7 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 
 		// Store the new value to running_state_alloca at the correct index
 		indices[1] = index_llvm_val;
-		llvm::Value* target_elem_ptr = params.builder->CreateInBoundsGEP(running_state_alloca, indices, "target elem ptr");
+		llvm::Value* target_elem_ptr = LLVMUtils::createInBoundsGEP(*params.builder, running_state_alloca, array_llvm_type, indices, "target elem ptr");
 
 		params.builder->CreateStore(new_value_llvm_val, target_elem_ptr);
 
@@ -1087,7 +1121,7 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 		if(state_type->passByValue())
 		{
 			// The running state needs to be loaded from running_state_alloca and returned directly.
-			return params.builder->CreateLoad(running_state_alloca);
+			return LLVMUtils::createLoad(params.builder, running_state_alloca, state_type->LLVMType(*params.module));
 		}
 		else
 		{
@@ -1100,7 +1134,8 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 			}
 			else
 			{
-				params.builder->CreateStore(params.builder->CreateLoad(running_state_alloca), return_ptr);
+
+				params.builder->CreateStore(LLVMUtils::createLoad(params.builder, running_state_alloca, state_type->LLVMType(*params.module)), return_ptr);
 				return return_ptr;
 			}
 		}
@@ -1140,7 +1175,7 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 			}
 			else
 			{
-				llvm::Value* initial_state = params.builder->CreateLoad(initial_state_ptr_or_value);
+				llvm::Value* initial_state = LLVMUtils::createLoad(params.builder, initial_state_ptr_or_value, state_type->LLVMType(*params.module));
 				params.builder->CreateStore(initial_state, new_state_alloca); // running_state_alloca);
 			}
 		}
@@ -1187,8 +1222,8 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 		loop_index_var // get the indexed element in the array
 	};
 
-	llvm::Value* array_elem_ptr = params.builder->CreateInBoundsGEP(array_arg, indices, "array elem ptr");
-	llvm::Value* array_elem = params.builder->CreateLoad(array_elem_ptr, "array elem");
+	llvm::Value* array_elem_ptr = LLVMUtils::createInBoundsGEP(*params.builder, array_arg, array_llvm_type, indices, "array elem ptr");
+	llvm::Value* array_elem = LLVMUtils::createLoad(params.builder, array_elem_ptr, elem_llvm_type, "array elem");
 
 	// Copy the state from new_state_alloca to running_state_alloca
 	if(state_type->getType() == Type::ArrayTypeType)
@@ -1198,7 +1233,7 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 	}
 	else
 	{
-		llvm::Value* state = params.builder->CreateLoad(new_state_alloca); // Load the state from new_state_alloca
+		llvm::Value* state = LLVMUtils::createLoad(params.builder, new_state_alloca, state_type->LLVMType(*params.module)); // Load the state from new_state_alloca
 		params.builder->CreateStore(state, running_state_alloca); // Store the state in running_state_alloca
 	}
 
@@ -1206,11 +1241,11 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 	if(state_type->passByValue())
 	{
 		// Load running state
-		llvm::Value* running_state_value = params.builder->CreateLoad(running_state_alloca);
+		llvm::Value* running_state_value = LLVMUtils::createLoad(params.builder, running_state_alloca, state_type->LLVMType(*params.module));
 
 		// Call function on element
 		llvm::Value* args[] = { running_state_value, array_elem, captured_var_struct_ptr };
-		llvm::Value* next_running_state_value = LLVMUtils::createCallWithValue(params.builder, function, args);
+		llvm::Value* next_running_state_value = LLVMUtils::createCallWithValue(params.builder, function_ptr, func_type->functionLLVMType(*params.module), args);
 
 		// Store new value in running_state_alloca
 		params.builder->CreateStore(next_running_state_value, new_state_alloca); // running_state_alloca);
@@ -1223,7 +1258,7 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 			array_elem, // array element
 			captured_var_struct_ptr };
 
-		LLVMUtils::createCallWithValue(params.builder, function, args);
+		LLVMUtils::createCallWithValue(params.builder, function_ptr, func_type->functionLLVMType(*params.module), args);
 
 		// Copy the state from new_state_alloca to running_state_alloca
 		//if(state_type->getType() == Type::ArrayTypeType)
@@ -1270,7 +1305,7 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 	// Finally load and store the running state value to the SRET return ptr.
 	if(state_type->passByValue())
 	{
-		llvm::Value* running_state = params.builder->CreateLoad(new_state_alloca);// running_state_alloca);
+		llvm::Value* running_state = LLVMUtils::createLoad(params.builder, new_state_alloca, state_type->LLVMType(*params.module)); // running_state_alloca);
 		return running_state;
 	}
 	else
@@ -1284,7 +1319,7 @@ llvm::Value* ArrayFoldBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) cons
 		}
 		else
 		{
-			llvm::Value* running_state = params.builder->CreateLoad(new_state_alloca/*running_state_alloca*/);
+			llvm::Value* running_state = LLVMUtils::createLoad(params.builder, new_state_alloca, state_type->LLVMType(*params.module));
 			params.builder->CreateStore(running_state, return_ptr);
 			return return_ptr;
 		}
@@ -1353,7 +1388,7 @@ ValueRef ArraySubscriptBuiltInFunc::invoke(VMState& vmstate)
 }
 
 
-static llvm::Value* loadElement(EmitLLVMCodeParams& params, int arg_offset)
+static llvm::Value* loadElement(EmitLLVMCodeParams& params, int arg_offset, llvm::Type* array_type, llvm::Type* elem_llvm_type)
 {
 	llvm::Value* array_ptr = LLVMUtils::getNthArg(params.currently_building_func, arg_offset + 0);
 	llvm::Value* index     = LLVMUtils::getNthArg(params.currently_building_func, arg_offset + 1);
@@ -1363,14 +1398,9 @@ static llvm::Value* loadElement(EmitLLVMCodeParams& params, int arg_offset)
 		index, // get the indexed element in the array
 	};
 
-	llvm::Value* elem_ptr = params.builder->CreateInBoundsGEP(
-		array_ptr, // ptr
-		indices
-	);
+	llvm::Value* elem_ptr = LLVMUtils::createInBoundsGEP(*params.builder, array_ptr, array_type, indices);
 
-	return params.builder->CreateLoad(
-		elem_ptr
-	);
+	return LLVMUtils::createLoad(params.builder, elem_ptr, elem_llvm_type);
 }
 
 
@@ -1380,6 +1410,8 @@ static llvm::Value* loadGatherElements(EmitLLVMCodeParams& params, int arg_offse
 {
 	llvm::Value* array_ptr = LLVMUtils::getNthArg(params.currently_building_func, arg_offset + 0);
 	llvm::Value* index_vec = LLVMUtils::getNthArg(params.currently_building_func, arg_offset + 1);
+
+	llvm::Type* elem_llvm_type = array_elem_type->LLVMType(*params.module);
 
 	// We have a single ptr, we need to shuffle it to an array of ptrs.
 
@@ -1391,7 +1423,7 @@ static llvm::Value* loadGatherElements(EmitLLVMCodeParams& params, int arg_offse
 	std::cout << std::endl;*/
 
 	// TEMP: Get pointer to index 0 of the array:
-	llvm::Value* array_elem0_ptr = LLVMUtils::createStructGEP(params.builder, array_ptr, 0);
+	llvm::Value* array_elem0_ptr = LLVMUtils::createStructGEP(params.builder, array_ptr, 0, elem_llvm_type);
 
 	/*std::cout << "array_elem0_ptr" << std::endl;
 	array_elem0_ptr->dump();
@@ -1424,10 +1456,8 @@ static llvm::Value* loadGatherElements(EmitLLVMCodeParams& params, int arg_offse
 		index_vec // get the indexed element in the array
 	};
 
-	llvm::Value* elem_ptr = params.builder->CreateInBoundsGEP(
-		shuffled_ptr, // ptr
-		indices
-	);
+	
+	llvm::Value* elem_ptr = LLVMUtils::createInBoundsGEP(*params.builder, shuffled_ptr, LLVMTypeUtils::pointerType(elem_llvm_type), indices);
 
 	//std::cout << "elem_ptr:" << std::endl;
 	//elem_ptr->dump();//TEMP
@@ -1448,11 +1478,12 @@ static llvm::Value* loadGatherElements(EmitLLVMCodeParams& params, int arg_offse
 	for(int i=0; i<index_vec_num_elems; ++i)
 	{
 		// Emit code to load value i
-		llvm::Value* val_i = params.builder->CreateLoad(
+		llvm::Value* val_i = LLVMUtils::createLoad(params.builder,
 			params.builder->CreateExtractElement( // Get pointer i out of the elem_ptr vector
 				elem_ptr, 
 				llvm::ConstantInt::get(*params.context, llvm::APInt(32, i))
-			)
+			),
+			elem_llvm_type
 		);
 
 		vec = params.builder->CreateInsertElement(
@@ -1470,10 +1501,11 @@ llvm::Value* ArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 {
 	// Let's assume Arrays are always pass-by-pointer for now.
 
-	TypeVRef field_type = this->array_type->elem_type;
+	TypeVRef elem_type = this->array_type->elem_type;
+	llvm::Type* elem_llvm_type = elem_type->LLVMType(*params.module);
 
 	// Bounds check the index
-	const int arg_offset = field_type->passByValue() ? 0 : 1;
+	const int arg_offset = elem_type->passByValue() ? 0 : 1;
 	llvm::Value* index     = LLVMUtils::getNthArg(params.currently_building_func, arg_offset + 1);
 
 	const bool do_bounds_check = false;//TEMP
@@ -1481,7 +1513,7 @@ llvm::Value* ArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 	if(do_bounds_check)
 	{
 		// Code for out of bounds array access result.
-		llvm::Value* out_of_bounds_val = field_type->getInvalidLLVMValue(*params.module);
+		llvm::Value* out_of_bounds_val = elem_type->getInvalidLLVMValue(*params.module);
 
 		
 
@@ -1512,9 +1544,12 @@ llvm::Value* ArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 		params.builder->SetInsertPoint(ThenBB);
 
 		// Code for in-bounds access result
+		
 		llvm::Value* elem_val = loadElement(
 			params, 
-			arg_offset // arg offset - we have an sret arg.
+			arg_offset, // arg offset - we have an sret arg.
+			array_type->LLVMType(*params.module),
+			elem_llvm_type
 		);
 
 		params.builder->CreateBr(MergeBB);
@@ -1523,7 +1558,7 @@ llvm::Value* ArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 		ThenBB = params.builder->GetInsertBlock();
 
 		// Emit else block.
-		the_function->getBasicBlockList().push_back(ElseBB);
+		LLVMUtils::pushBasicBlocKToBackOfFunc(the_function, ElseBB);
 		params.builder->SetInsertPoint(ElseBB);
 
 		params.builder->CreateBr(MergeBB);
@@ -1533,10 +1568,11 @@ llvm::Value* ArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 
 
 		// Emit merge block.
-		the_function->getBasicBlockList().push_back(MergeBB);
+		LLVMUtils::pushBasicBlocKToBackOfFunc(the_function, MergeBB);
+		//the_function->insert(the_function->end(), MergeBB);
 		params.builder->SetInsertPoint(MergeBB);
 		llvm::PHINode *PN = params.builder->CreatePHI(
-			field_type->LLVMType(*params.module), //field_type->passByValue() ? field_type->LLVMType(*params.context) : LLVMTypeUtils::pointerType(*field_type->LLVMType(*params.context)),
+			elem_llvm_type, //field_type->passByValue() ? field_type->LLVMType(*params.context) : LLVMTypeUtils::pointerType(*field_type->LLVMType(*params.context)),
 			0, // num reserved values
 			"iftmp"
 		);
@@ -1546,7 +1582,7 @@ llvm::Value* ArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 
 		llvm::Value* phi_result = PN;
 
-		if(field_type->passByValue())
+		if(elem_type->passByValue())
 		{
 			return phi_result;
 		}
@@ -1569,11 +1605,13 @@ llvm::Value* ArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 		{
 			// Scalar index
 
-			if(field_type->passByValue())
+			if(elem_type->passByValue())
 			{
 				return loadElement(
 					params, 
-					0 // arg offset - zero as no sret zeroth arg.
+					0, // arg offset - zero as no sret zeroth arg.
+					array_type->LLVMType(*params.module),
+					elem_llvm_type
 				);
 			}
 			else // Else if element type is pass-by-pointer
@@ -1583,7 +1621,9 @@ llvm::Value* ArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params)
 
 				llvm::Value* elem_val = loadElement(
 					params, 
-					1 // arg offset - we have an sret arg.
+					1, // arg offset - we have an sret arg.
+					array_type->LLVMType(*params.module),
+					elem_llvm_type
 				);
 
 				// Store the element
@@ -1693,17 +1733,23 @@ llvm::Value* VArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 {
 	// Let's assume VArrays are always pass-by-pointer for now.
 
-	TypeVRef field_type = this->array_type->elem_type;
+	TypeVRef elem_type = this->array_type->elem_type;
+	llvm::Type* varray_llvm_type = this->array_type->LLVMStructType(*params.module);
+	llvm::Type* elem_llvm_type = elem_type->LLVMType(*params.module);
 
-	const int arg_offset = field_type->passByValue() ? 0 : 1;
+	const int arg_offset = elem_type->passByValue() ? 0 : 1;
 	llvm::Value* index     = LLVMUtils::getNthArg(params.currently_building_func, arg_offset + 1);
 
-	
+	llvm::Type* data_type = llvm::ArrayType::get(  // Variable-size array of element types
+		elem_type->LLVMType(*params.module),
+		0 // Num elements
+	);
+
 	if(index_type->getType() == Type::IntType)
 	{
 		// Scalar index
 
-		if(field_type->passByValue())
+		if(elem_type->passByValue())
 		{
 			llvm::Value* varray_ptr = LLVMUtils::getNthArg(params.currently_building_func, arg_offset + 0);
 			
@@ -1712,13 +1758,19 @@ llvm::Value* VArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 
 			//llvm::Value* data_ptr_ptr = params.builder->CreateStructGEP(varray_ptr, 1, "data ptr ptr");
 			//llvm::Value* data_ptr = params.builder->CreateLoad(data_ptr_ptr);
-			llvm::Value* data_ptr = LLVMUtils::createStructGEP(params.builder, varray_ptr, 3, "data_ptr"); // [0 x T]*
+		
+
+			llvm::Value* data_ptr = LLVMUtils::createStructGEP(params.builder, varray_ptr, 3, varray_llvm_type, "data_ptr"); // [0 x T]*
 
 			llvm::Value* indices[] = { llvm::ConstantInt::get(*params.context, llvm::APInt(64, 0)), index };
-			llvm::Value* elem_ptr = params.builder->CreateInBoundsGEP(data_ptr, llvm::makeArrayRef(indices));
-
 			
-			return params.builder->CreateLoad(elem_ptr);
+#if TARGET_LLVM_VERSION >= 150
+			llvm::Value* elem_ptr = LLVMUtils::createInBoundsGEP(*params.builder, data_ptr, data_type, indices);
+#else
+			llvm::Value* elem_ptr = LLVMUtils::createInBoundsGEP(*params.builder, data_ptr, data_type, llvm::makeArrayRef(indices));
+#endif
+
+			return LLVMUtils::createLoad(params.builder, elem_ptr, elem_llvm_type);
 		}
 		else // Else if element type is pass-by-pointer
 		{
@@ -1726,11 +1778,15 @@ llvm::Value* VArraySubscriptBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params
 			llvm::Value* return_ptr = LLVMUtils::getNthArg(params.currently_building_func, 0);
 
 			llvm::Value* varray_ptr = LLVMUtils::getNthArg(params.currently_building_func, arg_offset + 0);
-			llvm::Value* data_ptr = LLVMUtils::createStructGEP(params.builder, varray_ptr, 3, "data_ptr"); // [0 x T]*
+			llvm::Value* data_ptr = LLVMUtils::createStructGEP(params.builder, varray_ptr, 3, varray_llvm_type, "data_ptr"); // [0 x T]*
 
 			llvm::Value* indices[] = { llvm::ConstantInt::get(*params.context, llvm::APInt(64, 0)), index };
-			llvm::Value* elem_ptr = params.builder->CreateInBoundsGEP(data_ptr, llvm::makeArrayRef(indices));
-			llvm::Value* elem_val = params.builder->CreateLoad(elem_ptr);
+#if TARGET_LLVM_VERSION >= 150
+			llvm::Value* elem_ptr = LLVMUtils::createInBoundsGEP(*params.builder, data_ptr, data_type, indices);
+#else
+			llvm::Value* elem_ptr = LLVMUtils::createInBoundsGEP(*params.builder, data_ptr, data_type, llvm::makeArrayRef(indices));
+#endif
+			llvm::Value* elem_val = LLVMUtils::createLoad(params.builder, elem_ptr, elem_llvm_type);
 
 			// Store the element
 			params.builder->CreateStore(
@@ -1799,7 +1855,7 @@ public:
 	virtual llvm::Value* emitLoopBody(llvm::IRBuilder<>& builder, llvm::Module* module, llvm::Value* i)
 	{
 		llvm::Value* indices[2] = {llvm::ConstantInt::get(module->getContext(), llvm::APInt(32, 0)), i };
-		llvm::Value* element_ptr = builder.CreateInBoundsGEP(data_ptr, indices);
+		llvm::Value* element_ptr = LLVMUtils::createInBoundsGEP(builder, data_ptr, array_type->LLVMDataArrayType(*module), indices);
 
 		if(array_type->elem_type->passByValue())
 		{
@@ -1863,32 +1919,36 @@ llvm::Value* MakeVArrayBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) con
 	call_inst->setCallingConv(llvm::CallingConv::C);
 
 	// Cast resulting allocated void* down to VArrayRep for the right type, e.g. varray<T>
-	llvm::Type* varray_T_type = this->array_type->LLVMType(*params.module);
-	assert(varray_T_type->isPointerTy());
+	//llvm::Type* varray_T_type = this->array_type->LLVMType(*params.module);
+	//assert(varray_T_type->isPointerTy());
+
+	llvm::Type* varray_T_struct_type = this->array_type->LLVMStructType(*params.module);
+	llvm::Type* varray_T_type = LLVMTypeUtils::pointerType(varray_T_struct_type);
 
 	llvm::Value* varray_ptr = params.builder->CreatePointerCast(call_inst, varray_T_type);
 	uint64 initial_flags = 1; // flag = 1 = heap allocated
 
 
+
 	// Set the reference count to 1
-	llvm::Value* ref_ptr = LLVMUtils::createStructGEP(params.builder, varray_ptr, 0, "varray_literal_ref_ptr");
+	llvm::Value* ref_ptr = LLVMUtils::createStructGEP(params.builder, varray_ptr, 0, varray_T_struct_type, "varray_literal_ref_ptr");
 	llvm::Value* one = llvm::ConstantInt::get(*params.context, llvm::APInt(64, 1, /*signed=*/true));
 	llvm::StoreInst* store_inst = params.builder->CreateStore(one, ref_ptr);
 	addMetaDataCommentToInstruction(params, store_inst, "makeVArray result set initial ref count to 1");
 
 	// Set VArray length
-	llvm::Value* length_ptr = LLVMUtils::createStructGEP(params.builder, varray_ptr, 1, "varray_literal_length_ptr");
+	llvm::Value* length_ptr = LLVMUtils::createStructGEP(params.builder, varray_ptr, 1, varray_T_struct_type, "varray_literal_length_ptr");
 	llvm::StoreInst* store_length_inst = params.builder->CreateStore(count_val, length_ptr);
 	addMetaDataCommentToInstruction(params, store_length_inst, "makeVArray result set initial length count.");
 
 	// Set the flags
-	llvm::Value* flags_ptr = LLVMUtils::createStructGEP(params.builder, varray_ptr, 2, "varray_literal_flags_ptr");
+	llvm::Value* flags_ptr = LLVMUtils::createStructGEP(params.builder, varray_ptr, 2, varray_T_struct_type, "varray_literal_flags_ptr");
 	llvm::Value* flags_contant_val = llvm::ConstantInt::get(*params.context, llvm::APInt(64, initial_flags));
 	llvm::StoreInst* store_flags_inst = params.builder->CreateStore(flags_contant_val, flags_ptr);
 	addMetaDataCommentToInstruction(params, store_flags_inst, "makeVArray result set initial flags to " + toString(initial_flags));
 
 
-	llvm::Value* data_ptr = LLVMUtils::createStructGEP(params.builder, varray_ptr, 3, "varray_literal_data_ptr");
+	llvm::Value* data_ptr = LLVMUtils::createStructGEP(params.builder, varray_ptr, 3, varray_T_struct_type, "varray_literal_data_ptr");
 
 
 	// Emit for loop to write count copies of the element to the varray.
@@ -2279,12 +2339,11 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 		for(size_t i=0; i<invariant_data_types.size(); ++i)
 			invariant_data_ptr_or_value[i] = LLVMUtils::getNthArg(params.currently_building_func, 3 + (int)i); // Pointer to, or value of invariant_data
 	}
+	llvm::Type* closure_type = func_type->closureLLVMStructType(*params.module);
 
-
-	llvm::Value* function_ptr = LLVMUtils::createStructGEP(params.builder, closure_ptr, Function::functionPtrIndex());
-	llvm::Value* function = params.builder->CreateLoad(function_ptr);
-	llvm::Value* captured_var_struct_ptr = LLVMUtils::createStructGEP(params.builder, closure_ptr, Function::capturedVarStructIndex());
-
+	llvm::Value* function_ptr_ptr = LLVMUtils::createStructGEP(params.builder, closure_ptr, Function::functionPtrIndex(), closure_type);
+	llvm::Value* function_ptr = LLVMUtils::createLoad(params.builder, function_ptr_ptr, LLVMTypeUtils::pointerType(func_type->functionLLVMType(*params.module)));
+	llvm::Value* captured_var_struct_ptr = LLVMUtils::createStructGEP(params.builder, closure_ptr, Function::capturedVarStructIndex(), closure_type);
 
 	// Allocate space on stack for tuple<State, bool> returned from f.
 		
@@ -2292,8 +2351,9 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	// We will emit the alloca at the start of the block, so that it doesn't go after any terminator instructions already created which have to be at the end of the block.
 	llvm::IRBuilder<> entry_block_builder(&params.currently_building_func->getEntryBlock(), params.currently_building_func->getEntryBlock().getFirstInsertionPt());
 
+	llvm::Type* tuple_type = func_type->return_type->LLVMType(*params.module); // tuple<State, bool>
 	llvm::Value* tuple_alloca = entry_block_builder.CreateAlloca(
-		func_type->return_type->LLVMType(*params.module), // tuple<State, bool>
+		tuple_type, 
 		llvm::ConstantInt::get(*params.context, llvm::APInt(32, 1, true)), // num elems
 		"tuple_space"
 	);
@@ -2323,7 +2383,9 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 		}
 		else
 		{*/
-			params.builder->CreateStore(params.builder->CreateLoad(initial_state_ptr_or_value), state_alloca);
+			params.builder->CreateStore(
+				LLVMUtils::createLoad(params.builder, initial_state_ptr_or_value, state_type->LLVMType(*params.module)),
+				state_alloca);
 		//}
 		// Load and store initial state in running state
 		//llvm::Value* initial_state = params.builder->CreateLoad(initial_state_ptr_or_value);
@@ -2364,20 +2426,20 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	// Call function f
 	llvm::SmallVector<llvm::Value*, 8> args;
 	args.push_back(tuple_alloca); // SRET return value arg
-	args.push_back(state_type->passByValue() ? params.builder->CreateLoad(state_alloca) : state_alloca); // current state
+	args.push_back(state_type->passByValue() ? LLVMUtils::createLoad(params.builder, state_alloca, state_type->LLVMType(*params.module)) : state_alloca); // current state
 	args.push_back(loop_index_var); // iteration
 	for(size_t i=0; i<invariant_data_types.size(); ++i)
 		args.push_back(invariant_data_ptr_or_value[i]);
 
 	args.push_back(captured_var_struct_ptr); // captured var struct ptr
 
-	LLVMUtils::createCallWithValue(params.builder, function, args);
+	LLVMUtils::createCallWithValue(params.builder, function_ptr, func_type->functionLLVMType(*params.module), args);
 
 	// The result of the function (tuple<State, bool>) should now be stored in 'tuple_alloca'.
 
 	// copy tuple_alloca->first to state_alloca
 
-	llvm::Value* state = params.builder->CreateLoad(LLVMUtils::createStructGEP(params.builder, tuple_alloca, 0)); // Load the state from tuple_alloca
+	llvm::Value* state = LLVMUtils::createLoad(params.builder, LLVMUtils::createStructGEP(params.builder, tuple_alloca, 0, tuple_type), state_type->LLVMType(*params.module)); // Load the state from tuple_alloca
 	params.builder->CreateStore(state, state_alloca); // Store the state in state_alloca
 
 	/*llvm::Value* next_running_state_value = NULL;
@@ -2398,9 +2460,7 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	}*/
 
 	// Load the 'continue boolean'
-	llvm::Value* continue_bool_ptr = LLVMUtils::createStructGEP(params.builder, tuple_alloca, 1);
-	llvm::Value* continue_bool = params.builder->CreateLoad(continue_bool_ptr);
-
+	llvm::Value* continue_bool = LLVMUtils::createLoadFromStruct(params.builder, tuple_alloca, /*field index=*/1, tuple_type, "continue_bool");
 
   
 	// Create increment of loop index
@@ -2432,7 +2492,7 @@ llvm::Value* IterateBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 
 	
 	// Finally load and store the running state value to the SRET return ptr.
-	llvm::Value* running_state = params.builder->CreateLoad(state_alloca);
+	llvm::Value* running_state = LLVMUtils::createLoad(params.builder, state_alloca, state_type->LLVMType(*params.module));
 	if(state_type->passByValue())
 	{
 		return running_state;
@@ -4141,8 +4201,7 @@ llvm::Value* LengthBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 	case Type::VArrayTypeType:
 		{
 			llvm::Value* varray_ptr = LLVMUtils::getNthArg(params.currently_building_func, 0);
-			llvm::Value* len_field_ptr = LLVMUtils::createStructGEP(params.builder, varray_ptr, 1, "len_field_ptr");
-			return params.builder->CreateLoad(len_field_ptr, false, "len_value");
+			return LLVMUtils::createLoadFromStruct(params.builder, varray_ptr, 1, type->LLVMStructType(*params.module), "len_value");
 		}
 	case Type::TupleTypeType:
 		return llvm::ConstantInt::get(*params.context, llvm::APInt(64, type.downcastToPtr<TupleType>()->component_types.size()));
@@ -4370,8 +4429,10 @@ static llvm::Value* emitArrayCompareEqualLLVMCode(llvm::IRBuilder<>* builder_, l
 		loop_index_var // get the indexed element in the array
 	};
 
-	llvm::Value* a_elem_ptr = builder.CreateInBoundsGEP(a_code, indices);
-	llvm::Value* b_elem_ptr = builder.CreateInBoundsGEP(b_code, indices);
+	llvm::Type* elem_type = array_type.elem_type->LLVMType(*module);
+
+	llvm::Value* a_elem_ptr = LLVMUtils::createInBoundsGEP(builder, a_code, LLVMTypeUtils::pointerType(elem_type), indices);
+	llvm::Value* b_elem_ptr = LLVMUtils::createInBoundsGEP(builder, b_code, LLVMTypeUtils::pointerType(elem_type), indices);
 	llvm::Value* compare_elems_res = emitElemCompareEqualLLVMCode(&builder, module, array_type.elem_type, 
 		a_elem_ptr, b_elem_ptr, /*is_compare_not_equal=*/false);
 
@@ -4404,7 +4465,7 @@ static llvm::Value* emitArrayCompareEqualLLVMCode(llvm::IRBuilder<>* builder_, l
 	//============================= after_BB ================================
 	builder.SetInsertPoint(after_BB);
 
-	return builder.CreateLoad(res_space);
+	return LLVMUtils::createLoad(&builder, res_space, llvm::Type::getInt1Ty(module->getContext()));
 }
 
 
@@ -4424,13 +4485,16 @@ static llvm::Value* emitVArrayCompareEqualLLVMCode(llvm::IRBuilder<>* builder_, 
 {
 	llvm::IRBuilder<>& builder = *builder_;
 
+	llvm::Type* varray_llvm_type = varray_type.LLVMStructType(*module);
+	llvm::Type* varray_data_llvm_type = varray_type.LLVMDataArrayType(*module);
+
 	// Load length fields from varray objects:
-	llvm::Value* a_len = builder.CreateLoad(LLVMUtils::createStructGEP(builder_, a_code, 1, "a_len"));
-	llvm::Value* b_len = builder.CreateLoad(LLVMUtils::createStructGEP(builder_, b_code, 1, "b_len"));
+	llvm::Value* a_len = LLVMUtils::createLoadFromStruct(builder_, a_code, 1, varray_llvm_type, "a_len");
+	llvm::Value* b_len = LLVMUtils::createLoadFromStruct(builder_, b_code, 1, varray_llvm_type, "b_len");
 
 	// Get data pointers for the varray objects:
-	llvm::Value* a_data_ptr = LLVMUtils::createStructGEP(builder_, a_code, 3, "a_data_ptr"); // [0 x T]*
-	llvm::Value* b_data_ptr = LLVMUtils::createStructGEP(builder_, b_code, 3, "b_data_ptr"); // [0 x T]*
+	llvm::Value* a_data_ptr = LLVMUtils::createStructGEP(builder_, a_code, 3, varray_llvm_type, "a_data_ptr"); // [0 x T]*
+	llvm::Value* b_data_ptr = LLVMUtils::createStructGEP(builder_, b_code, 3, varray_llvm_type, "b_data_ptr"); // [0 x T]*
 
 	llvm::Value* begin_index = llvm::ConstantInt::get(module->getContext(), llvm::APInt(64, 0));
 	llvm::Value* end_index   = a_len;
@@ -4444,8 +4508,10 @@ static llvm::Value* emitVArrayCompareEqualLLVMCode(llvm::IRBuilder<>* builder_, 
 	llvm::BasicBlock* elems_equal_BB = llvm::BasicBlock::Create(module->getContext(), "elems_equal_BB", current_func);
 	llvm::BasicBlock* after_BB = llvm::BasicBlock::Create(module->getContext(), "after_loop", current_func);
 
+	llvm::Type* bool_llvm_type = llvm::Type::getInt1Ty(module->getContext());
+
 	// Allocate space for a boolean which is either 'elems are not equal' or 'elems are all equal' depending on is_compare_not_equal.
-	llvm::Value* res_space = builder.CreateAlloca(llvm::Type::getInt1Ty(module->getContext()), 
+	llvm::Value* res_space = builder.CreateAlloca(bool_llvm_type, 
 		llvm::ConstantInt::get(module->getContext(), llvm::APInt(64, 1)), "res_space");
 
 	if(is_compare_not_equal)
@@ -4485,8 +4551,8 @@ static llvm::Value* emitVArrayCompareEqualLLVMCode(llvm::IRBuilder<>* builder_, 
 	};
 
 
-	llvm::Value* a_elem_ptr = builder.CreateInBoundsGEP(a_data_ptr, indices);
-	llvm::Value* b_elem_ptr = builder.CreateInBoundsGEP(b_data_ptr, indices);
+	llvm::Value* a_elem_ptr = LLVMUtils::createInBoundsGEP(builder, a_data_ptr, varray_data_llvm_type, indices);
+	llvm::Value* b_elem_ptr = LLVMUtils::createInBoundsGEP(builder, b_data_ptr, varray_data_llvm_type, indices);
 
 	llvm::Value* compare_elems_res = emitElemCompareEqualLLVMCode(&builder, module, varray_type.elem_type, 
 		a_elem_ptr, b_elem_ptr, /*is_compare_not_equal=*/false);
@@ -4520,7 +4586,7 @@ static llvm::Value* emitVArrayCompareEqualLLVMCode(llvm::IRBuilder<>* builder_, 
 	//============================= after_BB ================================
 	builder.SetInsertPoint(after_BB);
 
-	return builder.CreateLoad(res_space);
+	return LLVMUtils::createLoad(&builder, res_space, bool_llvm_type);
 }
 
 
@@ -4557,13 +4623,13 @@ static llvm::Value* emitElemCompareEqualLLVMCode(llvm::IRBuilder<>* builder, llv
 	case Type::FloatType:
 	case Type::DoubleType:
 		return is_compare_not_equal ? 
-			builder->CreateFCmpONE(builder->CreateLoad(a_code), builder->CreateLoad(b_code)) : 
-			builder->CreateFCmpOEQ(builder->CreateLoad(a_code), builder->CreateLoad(b_code));
+			builder->CreateFCmpONE(LLVMUtils::createLoad(builder, a_code, type->LLVMType(*module)), LLVMUtils::createLoad(builder, b_code, type->LLVMType(*module))) : 
+			builder->CreateFCmpOEQ(LLVMUtils::createLoad(builder, a_code, type->LLVMType(*module)), LLVMUtils::createLoad(builder, b_code, type->LLVMType(*module)));
 	case Type::IntType:
 	case Type::BoolType:
 		return is_compare_not_equal ? 
-			builder->CreateICmpNE(builder->CreateLoad(a_code), builder->CreateLoad(b_code)) :
-			builder->CreateICmpEQ(builder->CreateLoad(a_code), builder->CreateLoad(b_code));
+			builder->CreateICmpNE(LLVMUtils::createLoad(builder, a_code, type->LLVMType(*module)), LLVMUtils::createLoad(builder, b_code, type->LLVMType(*module))) :
+			builder->CreateICmpEQ(LLVMUtils::createLoad(builder, a_code, type->LLVMType(*module)), LLVMUtils::createLoad(builder, b_code, type->LLVMType(*module)));
 	case Type::StructureTypeType:
 	case Type::TupleTypeType:
 	{
@@ -4572,12 +4638,12 @@ static llvm::Value* emitElemCompareEqualLLVMCode(llvm::IRBuilder<>* builder, llv
 	}
 	case Type::VectorTypeType:
 	{
-		return emitCallToBinaryFunction(builder, module, compare_func_name, type, builder->CreateLoad(a_code), builder->CreateLoad(b_code));
+		return emitCallToBinaryFunction(builder, module, compare_func_name, type, LLVMUtils::createLoad(builder, a_code, type->LLVMType(*module)), LLVMUtils::createLoad(builder, b_code, type->LLVMType(*module)));
 	}
 	case Type::StringType:
 	{
 		// For string equality we will emit a call to the external func compareNotEqualString() or compareEqualString().
-		return emitCallToBinaryFunction(builder, module, is_compare_not_equal ? "compareNotEqualString" : "compareEqualString", type, builder->CreateLoad(a_code), builder->CreateLoad(b_code));
+		return emitCallToBinaryFunction(builder, module, is_compare_not_equal ? "compareNotEqualString" : "compareEqualString", type, LLVMUtils::createLoad(builder, a_code, type->LLVMType(*module)), LLVMUtils::createLoad(builder, b_code, type->LLVMType(*module)));
 	}
 	case Type::ArrayTypeType:
 	{
@@ -4612,19 +4678,20 @@ llvm::Value* CompareEqualBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) c
 	case Type::TupleTypeType:
 	{
 		const TupleType* a_tuple_type = arg_type.downcastToPtr<TupleType>();
+		llvm::Type* a_tuple_llvm_type = arg_type.downcastToPtr<TupleType>()->LLVMStructType(*params.module);
 
 		// For each element:
 		llvm::Value* elem_0_equal = emitElemCompareEqualLLVMCode(params.builder, params.module, a_tuple_type->component_types[0],
-			LLVMUtils::createStructGEP(params.builder, a_code, 0),
-			LLVMUtils::createStructGEP(params.builder, b_code, 0),
+			LLVMUtils::createStructGEP(params.builder, a_code, 0, a_tuple_llvm_type),
+			LLVMUtils::createStructGEP(params.builder, b_code, 0, a_tuple_llvm_type),
 			is_compare_not_equal);
 
 		llvm::Value* conjunction = elem_0_equal;
 		for(size_t i=1; i<a_tuple_type->component_types.size(); ++i)
 		{
 			llvm::Value* elem_i_equal = emitElemCompareEqualLLVMCode(params.builder, params.module, a_tuple_type->component_types[i],
-				LLVMUtils::createStructGEP(params.builder, a_code, (unsigned int)i),
-				LLVMUtils::createStructGEP(params.builder, b_code, (unsigned int)i),
+				LLVMUtils::createStructGEP(params.builder, a_code, (unsigned int)i, a_tuple_llvm_type),
+				LLVMUtils::createStructGEP(params.builder, b_code, (unsigned int)i, a_tuple_llvm_type),
 				is_compare_not_equal);
 
 			conjunction = params.builder->CreateBinOp(is_compare_not_equal ? llvm::Instruction::Or : llvm::Instruction::And, conjunction, elem_i_equal);
@@ -4634,19 +4701,20 @@ llvm::Value* CompareEqualBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) c
 	case Type::StructureTypeType:
 	{
 		const StructureType* a_struct_type = arg_type.downcastToPtr<StructureType>();
+		llvm::Type* a_struct_llvm_type = arg_type.downcastToPtr<StructureType>()->LLVMStructType(*params.module);
 
 		// For each element:
 		llvm::Value* elem_0_equal = emitElemCompareEqualLLVMCode(params.builder, params.module, a_struct_type->component_types[0],
-			LLVMUtils::createStructGEP(params.builder, a_code, 0),
-			LLVMUtils::createStructGEP(params.builder, b_code, 0),
+			LLVMUtils::createStructGEP(params.builder, a_code, 0, a_struct_llvm_type),
+			LLVMUtils::createStructGEP(params.builder, b_code, 0, a_struct_llvm_type),
 			is_compare_not_equal);
 
 		llvm::Value* conjunction = elem_0_equal;
 		for(size_t i=1; i<a_struct_type->component_types.size(); ++i)
 		{
 			llvm::Value* elem_i_equal = emitElemCompareEqualLLVMCode(params.builder, params.module, a_struct_type->component_types[i],
-				LLVMUtils::createStructGEP(params.builder, a_code, (unsigned int)i),
-				LLVMUtils::createStructGEP(params.builder, b_code, (unsigned int)i),
+				LLVMUtils::createStructGEP(params.builder, a_code, (unsigned int)i, a_struct_llvm_type),
+				LLVMUtils::createStructGEP(params.builder, b_code, (unsigned int)i, a_struct_llvm_type),
 				is_compare_not_equal);
 
 			conjunction = params.builder->CreateBinOp(is_compare_not_equal ? llvm::Instruction::Or : llvm::Instruction::And, conjunction, elem_i_equal);
@@ -4670,7 +4738,11 @@ llvm::Value* CompareEqualBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) c
 #endif
 
 		llvm::Function* vec_reduce_and = llvm::Intrinsic::getDeclaration(params.module, 
+#if TARGET_LLVM_VERSION >= 150
+			is_compare_not_equal ? llvm::Intrinsic::vector_reduce_or : llvm::Intrinsic::vector_reduce_and, 
+#else
 			is_compare_not_equal ? llvm::Intrinsic::experimental_vector_reduce_or : llvm::Intrinsic::experimental_vector_reduce_and, 
+#endif
 			types);
 
 		return params.builder->CreateCall(vec_reduce_and, par_eq);

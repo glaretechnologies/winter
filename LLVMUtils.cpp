@@ -47,17 +47,27 @@ llvm::Value* getLastArg(llvm::Function *func)
 
 #if TARGET_LLVM_VERSION >= 60
 llvm::Value* createStructGEP(llvm::IRBuilder</*true, */llvm::ConstantFolder, llvm::IRBuilderDefaultInserter/*<true>*/ >* builder,
-		llvm::Value* struct_ptr, unsigned int field_index, const llvm::Twine& name)
+		llvm::Value* struct_ptr, unsigned int field_index, llvm::Type* struct_llvm_type, const llvm::Twine& name)
 #else
 llvm::Value* createStructGEP(llvm::IRBuilder<true, llvm::ConstantFolder, llvm::IRBuilderDefaultInserter<true> >* builder,
-		llvm::Value* struct_ptr, unsigned int field_index, const llvm::Twine& name)
+		llvm::Value* struct_ptr, unsigned int field_index, llvm::Type* struct_llvm_type, const llvm::Twine& name)
 #endif
 {
+	assert(llvm::isa<llvm::StructType>(struct_llvm_type));
+
 #if TARGET_LLVM_VERSION >= 60 // not sure the actual version the type arg was introduced.
-	return builder->CreateStructGEP(NULL, struct_ptr, field_index);
+	return builder->CreateStructGEP(struct_llvm_type, struct_ptr, field_index);
 #else
 	return builder->CreateStructGEP(      struct_ptr, field_index);
 #endif
+}
+
+
+llvm::LoadInst* createLoadFromStruct(llvm::IRBuilder<>* builder, llvm::Value* src_ptr, unsigned int field_index, llvm::Type* struct_llvm_type, const llvm::Twine& field_val_name)
+{
+	assert(llvm::isa<llvm::StructType>(struct_llvm_type));
+	llvm::Value* field_ptr = createStructGEP(builder, src_ptr, field_index, struct_llvm_type);
+	return createLoad(builder, field_ptr, llvm::cast<llvm::StructType>(struct_llvm_type)->getElementType(field_index), field_val_name);
 }
 
 
@@ -71,6 +81,7 @@ llvm::Value* createStructGEP(llvm::IRBuilder<true, llvm::ConstantFolder, llvm::I
 //
 //	return builder->CreateLoad(field_ptr, name);
 //}
+
 
 
 llvm::Value* createCollectionCopy(const TypeVRef& collection_type, llvm::Value* dest_ptr, llvm::Value* src_ptr, EmitLLVMCodeParams& params)
@@ -87,17 +98,17 @@ llvm::Value* createCollectionCopy(const TypeVRef& collection_type, llvm::Value* 
 
 	if(use_memcpy)
 	{
-		const unsigned int type_alignment = params.target_data->getABITypeAlignment(collection_type->LLVMType(*params.module));
+		const auto type_alignment = params.target_data->getABITypeAlignment(collection_type->LLVMType(*params.module));
 
 		llvm::Type* llvm_type = collection_type->LLVMType(*params.module);
 		const uint64_t size_B = params.target_data->getTypeAllocSize(llvm_type);
 		llvm::Value* size = llvm::ConstantInt::get(*params.context, llvm::APInt(64, size_B, /*signed=*/false));
-		return createMemCpy(params.builder, dest_ptr, src_ptr, size, /*align=*/type_alignment);
+		return createMemCpy(params.builder, dest_ptr, src_ptr, size, /*align=*/(unsigned int)type_alignment);
 	}
 	else
 	{
 		return params.builder->CreateStore(
-			params.builder->CreateLoad(src_ptr),
+			createLoad(params.builder, src_ptr, collection_type, params.module),
 			dest_ptr
 		);
 	}

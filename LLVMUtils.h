@@ -40,11 +40,22 @@ llvm::Value* getLastArg(llvm::Function *func);
 
 #if TARGET_LLVM_VERSION >= 60
 llvm::Value* createStructGEP(llvm::IRBuilder</*true, */llvm::ConstantFolder, llvm::IRBuilderDefaultInserter/*<true>*/ >* builder,
-	llvm::Value* struct_ptr, unsigned int field_index, const llvm::Twine& name = "");
+	llvm::Value* struct_ptr, unsigned int field_index, llvm::Type* elem_type, const llvm::Twine& name = "");
 #else
 llvm::Value* createStructGEP(llvm::IRBuilder<true, llvm::ConstantFolder, llvm::IRBuilderDefaultInserter<true> >* builder,
-	llvm::Value* struct_ptr, unsigned int field_index, const llvm::Twine& name = "");
+	llvm::Value* struct_ptr, unsigned int field_index, llvm::Type* elem_type, const llvm::Twine& name = "");
 #endif
+
+
+template <class BuilderClass>
+llvm::Value* createInBoundsGEP(BuilderClass& builder, llvm::Value* data_ptr, llvm::Type* type, llvm::ArrayRef<llvm::Value*> indices, const llvm::Twine& name = "")
+{
+#if TARGET_LLVM_VERSION >= 150
+	return builder.CreateInBoundsGEP(type, data_ptr, indices, name);
+#else
+	return builder.CreateInBoundsGEP(data_ptr, indices, name);
+#endif
+}
 
 
 //llvm::Value* createFieldLoad(llvm::Value* structure_ptr, int field_index, llvm::IRBuilder<>* builder, const llvm::Twine& name);
@@ -69,7 +80,11 @@ inline llvm::Value* createMemCpy(Builder* builder, llvm::Value* dest_ptr, llvm::
 #if TARGET_LLVM_VERSION >= 110
 inline llvm::ElementCount makeVectorElemCount(size_t num)
 {
+#if TARGET_LLVM_VERSION >= 150
+	return llvm::ElementCount::get((unsigned int)num, /*scalable=*/false);
+#else
 	return llvm::ElementCount((unsigned int)num, /*scalable=*/false);
+#endif
 }
 #else
 inline unsigned int makeVectorElemCount(size_t num)
@@ -89,21 +104,57 @@ llvm::Function* getFunctionFromModule(llvm::Module* module, const std::string& f
 
 
 template <class Builder>
-llvm::Value* createCallWithValue(Builder* builder, llvm::Value* target_llvm_func, llvm::ArrayRef<llvm::Value*> args, const llvm::Twine& name = "")
+llvm::Value* createCallWithValue(Builder* builder, llvm::Value* target_llvm_func, llvm::Type* llvm_function_type, llvm::ArrayRef<llvm::Value*> args, const llvm::Twine& name = "")
 {
+	assert(llvm::isa<llvm::FunctionType>(llvm_function_type));
 #if TARGET_LLVM_VERSION >= 110
-
-	llvm::Type* ptr_function_type = target_llvm_func->getType();
-
-	llvm::Type* function_type = ptr_function_type->getPointerElementType();
-
-	assert(llvm::isa<llvm::FunctionType>(function_type));
-
-	return builder->CreateCall(llvm::FunctionCallee(llvm::cast<llvm::FunctionType>(function_type), target_llvm_func), args, name);
+	return builder->CreateCall(llvm::FunctionCallee(llvm::cast<llvm::FunctionType>(llvm_function_type), target_llvm_func), args, name);
 #else
 	return builder->CreateCall(target_llvm_func, args, name);
 #endif
 }
+
+
+static inline llvm::LoadInst* createLoad(llvm::IRBuilder<>* builder, llvm::Value* src_ptr, const TypeVRef& type, llvm::Module* module, const llvm::Twine& name = "")
+{
+#if TARGET_LLVM_VERSION >= 150
+	return builder->CreateLoad(type->LLVMType(*module), src_ptr, name);
+#else
+	return builder->CreateLoad(src_ptr, name);
+#endif
+}
+
+static inline llvm::LoadInst* createLoad(llvm::IRBuilder<>* builder, llvm::Value* src_ptr, llvm::Type* type, const llvm::Twine& name = "")
+{
+#if TARGET_LLVM_VERSION >= 150
+	return builder->CreateLoad(type, src_ptr, name);
+#else
+	return builder->CreateLoad(src_ptr, name);
+#endif
+}
+
+static inline llvm::LoadInst* createLoad(EmitLLVMCodeParams& params, llvm::Value* src_ptr, const TypeVRef& type, const llvm::Twine& name = "")
+{
+#if TARGET_LLVM_VERSION >= 150
+	return params.builder->CreateLoad(type->LLVMType(*params.module), src_ptr, name);
+#else
+	return params.builder->CreateLoad(src_ptr, name);
+#endif
+}
+
+
+llvm::LoadInst* createLoadFromStruct(llvm::IRBuilder<>* builder, llvm::Value* src_ptr, unsigned int field_index, llvm::Type* llvm_type, const llvm::Twine& field_val_name = "");
+
+
+static inline void pushBasicBlocKToBackOfFunc(llvm::Function* llvm_func, llvm::BasicBlock* block)
+{
+#if TARGET_LLVM_VERSION >= 160
+	llvm_func->insert(llvm_func->end(), block);
+#else
+	llvm_func->getBasicBlockList().push_back(block);
+#endif
+}
+
 
 }; // end namespace LLVMUtils
 

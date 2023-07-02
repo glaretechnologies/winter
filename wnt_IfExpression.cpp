@@ -15,6 +15,7 @@ Copyright Glare Technologies Limited 2014 -
 #include "Linker.h"
 #include "BuiltInFunctionImpl.h"
 #include "LLVMTypeUtils.h"
+#include "LLVMUtils.h"
 #include "ProofUtils.h"
 #include "utils/StringUtils.h"
 #include "maths/mathstypes.h"
@@ -309,7 +310,7 @@ llvm::Value* IfExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 	ThenBB = params.builder->GetInsertBlock();
 
 	// Emit else block.
-	the_function->getBasicBlockList().push_back(ElseBB);
+	LLVMUtils::pushBasicBlocKToBackOfFunc(the_function, ElseBB);
 	params.builder->SetInsertPoint(ElseBB);
 
 	llvm::Value* else_value = else_expr->emitLLVMCode(params, return_val_addr);
@@ -320,7 +321,7 @@ llvm::Value* IfExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 	ElseBB = params.builder->GetInsertBlock();
 
 	// Emit merge block.
-	the_function->getBasicBlockList().push_back(MergeBB);
+	LLVMUtils::pushBasicBlocKToBackOfFunc(the_function, MergeBB);
 	params.builder->SetInsertPoint(MergeBB);
 
 	// Create phi node for result value

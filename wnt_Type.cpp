@@ -274,13 +274,13 @@ bool String::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const
 }
 
 
-llvm::Type* String::LLVMType(llvm::Module& module) const
+llvm::Type* String::LLVMStructType(llvm::Module& module) const
 {
 	// See if there is a struct with this name already:
 	const std::string use_name = "string";
-	llvm::StructType* existing_struct_type = module.getTypeByName(use_name);
+	llvm::StructType* existing_struct_type = LLVMTypeUtils::getStructureTypeForName(use_name, module);
 	if(existing_struct_type)
-		return LLVMTypeUtils::pointerType(*existing_struct_type);
+		return existing_struct_type;
 
 	// else create the named struct:
 
@@ -295,13 +295,16 @@ llvm::Type* String::LLVMType(llvm::Module& module) const
 	};
 
 
-	llvm::StructType* struct_type = llvm::StructType::create(
+	return llvm::StructType::create(
 		module.getContext(),
 		field_types,
 		use_name
 	);
+}
 
-	return LLVMTypeUtils::pointerType(*struct_type);
+llvm::Type* String::LLVMType(llvm::Module& module) const
+{
+	return LLVMTypeUtils::pointerType(LLVMStructType(module));
 
 
 
@@ -440,94 +443,9 @@ const std::string Function::toString() const // { return "function";
 	return s + ">";
 }
 
-/*
 
-
-
-Let's say we have f(int x, int y, int z) x 
-That has captured two vars, and one uncaptured var (z)
-so we have
-struct CapturedVars
+llvm::FunctionType* Function::destructorLLVMType(llvm::Module& module) const
 {
-	int x;
-	int y;
-}
-
-void (*FPtr)(int x, int y, int z, CapturedVars* vars);
-
-and finally
-
-struct Closure
-{
-	FPtr func;
-	CapturedVars vars;
-}
-
-*/
-llvm::Type* Function::LLVMType(llvm::Module& module) const
-{
-	//TEMP: this need to be in sync with FunctionDefinition::emitLLVMCode()
-	const bool simple_func_ptr = false;
-	if(simple_func_ptr)
-	{
-		// Looks like we're not allowed to pass functions directly as args, have to be pointer-to-funcs
-		llvm::Type* t = LLVMTypeUtils::pointerType(*LLVMTypeUtils::llvmFunctionType(
-			arg_types,
-			false, // use captured var struct ptr arg
-			return_type,
-			module
-		));
-
-		//std::cout << "Function::LLVMType: " << std::endl;
-		//t->dump();
-		//std::cout << std::endl;
-		return t;
-	}
-
-	const std::string use_name = makeSafeStringForFunctionName(this->toString()) + "closure";
-	llvm::StructType* existing_struct_type = module.getTypeByName(use_name);
-	if(existing_struct_type)
-		return LLVMTypeUtils::pointerType(existing_struct_type);
-
-
-	// Build Empty LLVM CapturedVars struct
-	//vector<const llvm::Type*> cap_var_types;
-	
-	//for(size_t i=0; i<this->captured_var_types.size(); ++i)
-	//	cap_var_types.push_back(this->captured_var_types[i]->LLVMType(context));
-
-	/*const llvm::Type* cap_var_struct = llvm::StructType::get(
-		context,
-		cap_var_types
-	);*/
-
-
-	// Build vector of function args
-	/*vector<const llvm::Type*> llvm_arg_types(this->arg_types.size());
-	for(size_t i=0; i<this->arg_types.size(); ++i)
-		llvm_arg_types[i] = this->arg_types[i]->LLVMType(context);
-
-	// Add Pointer to captured var struct, if there are any captured vars
-	if(use_captured_vars)
-		llvm_arg_types.push_back(LLVMTypeUtils::pointerType(*cap_var_struct));
-
-	//TEMP HACK: add hidden void* arg  NOTE: should only do this when hidden_void_arg is true.
-	llvm_arg_types.push_back(LLVMTypeUtils::voidPtrType(context));
-
-	// Construct the function pointer type
-	const llvm::Type* func_ptr_type = LLVMTypeUtils::pointerType(*llvm::FunctionType::get(
-		this->return_type->LLVMType(context), // result type
-		llvm_arg_types,
-		false // is var arg
-	));*/
-
-	llvm::Type* func_ptr_type = LLVMTypeUtils::pointerType(*LLVMTypeUtils::llvmFunctionType(
-		arg_types,
-		true, // use captured var struct ptr arg
-		return_type,
-		module
-	));
-
 	llvm::Type* destructor_arg_types[1] = { LLVMTypeUtils::getPtrToBaseCapturedVarStructType(module) };
 
 	llvm::FunctionType* destructor_type = llvm::FunctionType::get(
@@ -535,6 +453,81 @@ llvm::Type* Function::LLVMType(llvm::Module& module) const
 		destructor_arg_types,
 		false // varargs
 	);
+	return destructor_type;
+}
+
+
+llvm::FunctionType* Function::functionLLVMType(llvm::Module& module) const
+{
+	return LLVMTypeUtils::llvmFunctionType(
+		arg_types,
+		true, // use captured var struct ptr arg
+		return_type,
+		module
+	);
+}
+
+
+llvm::StructType* Function::closureLLVMStructType(llvm::Module& module) const
+{
+	//TEMP: this need to be in sync with FunctionDefinition::emitLLVMCode()
+	//const bool simple_func_ptr = false;
+	//if(simple_func_ptr)
+	//{
+	//	// Looks like we're not allowed to pass functions directly as args, have to be pointer-to-funcs
+	//	llvm::Type* t = LLVMTypeUtils::pointerType(*LLVMTypeUtils::llvmFunctionType(
+	//		arg_types,
+	//		false, // use captured var struct ptr arg
+	//		return_type,
+	//		module
+	//	));
+	//
+	//	//std::cout << "Function::LLVMType: " << std::endl;
+	//	//t->dump();
+	//	//std::cout << std::endl;
+	//	return t;
+	//}
+
+	const std::string use_name = makeSafeStringForFunctionName(this->toString()) + "closure";
+	llvm::StructType* existing_struct_type = LLVMTypeUtils::getStructureTypeForName(use_name, module);
+	if(existing_struct_type)
+		return existing_struct_type;
+
+
+	// Build Empty LLVM CapturedVars struct
+	//vector<const llvm::Type*> cap_var_types;
+
+	//for(size_t i=0; i<this->captured_var_types.size(); ++i)
+	//	cap_var_types.push_back(this->captured_var_types[i]->LLVMType(context));
+
+	/*const llvm::Type* cap_var_struct = llvm::StructType::get(
+	context,
+	cap_var_types
+	);*/
+
+
+	// Build vector of function args
+	/*vector<const llvm::Type*> llvm_arg_types(this->arg_types.size());
+	for(size_t i=0; i<this->arg_types.size(); ++i)
+	llvm_arg_types[i] = this->arg_types[i]->LLVMType(context);
+
+	// Add Pointer to captured var struct, if there are any captured vars
+	if(use_captured_vars)
+	llvm_arg_types.push_back(LLVMTypeUtils::pointerType(*cap_var_struct));
+
+	//TEMP HACK: add hidden void* arg  NOTE: should only do this when hidden_void_arg is true.
+	llvm_arg_types.push_back(LLVMTypeUtils::voidPtrType(context));
+
+	// Construct the function pointer type
+	const llvm::Type* func_ptr_type = LLVMTypeUtils::pointerType(*llvm::FunctionType::get(
+	this->return_type->LLVMType(context), // result type
+	llvm_arg_types,
+	false // is var arg
+	));*/
+
+	llvm::Type* func_ptr_type = LLVMTypeUtils::pointerType(functionLLVMType(module));
+
+	llvm::FunctionType* destructor_type = destructorLLVMType(module);
 
 	//vector<const llvm::Type*> field_types;
 
@@ -564,10 +557,46 @@ llvm::Type* Function::LLVMType(llvm::Module& module) const
 	//std::cout << "closure_struct_type: " << std::endl;
 	//closure_struct_type->dump();
 	//std::cout << std::endl;
-	
+
+	return closure_struct_type;
+}
+
+/*
+
+
+
+Let's say we have f(int x, int y, int z) x 
+That has captured two vars, and one uncaptured var (z)
+so we have
+struct CapturedVars
+{
+	int x;
+	int y;
+}
+
+void (*FPtr)(int x, int y, int z, CapturedVars* vars);
+
+and finally
+
+struct Closure
+{
+	FPtr func;
+	CapturedVars vars;
+}
+
+*/
+llvm::Type* Function::LLVMType(llvm::Module& module) const
+{
+	llvm::Type* closure_struct_type = closureLLVMStructType(module);
 
 	// Return pointer to structure type.
 	return LLVMTypeUtils::pointerType(*closure_struct_type);
+}
+
+
+llvm::Type* Function::LLVMStructType(llvm::Module& module) const
+{
+	return closureLLVMStructType(module);
 }
 
 
@@ -669,52 +698,22 @@ bool VArrayType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) c
 }
 
 
-llvm::Type* VArrayType::LLVMType(llvm::Module& module) const
+llvm::Type* VArrayType::LLVMDataArrayType(llvm::Module& module) const
+{
+	return llvm::ArrayType::get(  // Variable-size array of element types
+		this->elem_type->LLVMType(module),
+		0 // Num elements
+	);
+}
+
+
+llvm::Type* VArrayType::LLVMStructType(llvm::Module& module) const
 {
 	// See if there is a struct with this name already:
-	/*const std::string use_name = makeSafeStringForFunctionName(this->toString());
-	llvm::StructType* existing_struct_type = module.getTypeByName(use_name);
-	if(existing_struct_type)
-		return LLVMTypeUtils::pointerType(*existing_struct_type);
-
-	// else create the named struct:
-
-	llvm::Type* field_types[] = {
-		llvm::Type::getInt64Ty(module.getContext()), // Reference count field
-		LLVMTypeUtils::pointerType(*this->elem_type->LLVMType(module)) // Pointer to element type
-	};
-
-	llvm::StructType* struct_type = llvm::StructType::create(
-		module.getContext(),
-		llvm::makeArrayRef(field_types, 2)
-		// NOTE: is_packed is default = false.
-	);
-
-	return LLVMTypeUtils::pointerType(*struct_type);*/
-
-	//return LLVMTypeUtils::pointerType(
-	//	*this->elem_type->LLVMType(module) // Element type
-	//);
-	/*llvm::Type* field_types[] = {
-		llvm::Type::getInt64Ty(module.getContext()), // Reference count field
-		LLVMTypeUtils::pointerType(*this->elem_type->LLVMType(module)) // Pointer to element type
-	};
-
-	return LLVMTypeUtils::pointerType(*llvm::StructType::get(
-		module.getContext(),
-		llvm::makeArrayRef(field_types, 2)
-	));*/
-
-	/*return LLVMTypeUtils::pointerType(
-		*llvm::Type::getInt64Ty(module.getContext())
-	);*/
-
-
-	// See if there is a struct with this name already:
 	const std::string use_name = makeSafeStringForFunctionName(this->toString());
-	llvm::StructType* existing_struct_type = module.getTypeByName(use_name);
+	llvm::StructType* existing_struct_type = LLVMTypeUtils::getStructureTypeForName(use_name, module);
 	if(existing_struct_type)
-		return LLVMTypeUtils::pointerType(*existing_struct_type);
+		return existing_struct_type;
 
 	// else create the named struct:
 
@@ -734,24 +733,20 @@ llvm::Type* VArrayType::LLVMType(llvm::Module& module) const
 		llvm::Type::getInt64Ty(module.getContext()), // Reference count field
 		llvm::Type::getInt64Ty(module.getContext()), // length field (num elements)
 		llvm::Type::getInt64Ty(module.getContext()), // flags
-		llvm::ArrayType::get(  // Variable-size array of element types
-			this->elem_type->LLVMType(module),
-			0 // Num elements
-		)
+		LLVMDataArrayType(module)
 	};
 
-	//return LLVMTypeUtils::pointerType(*llvm::StructType::get(
-	//	module.getContext(),
-	//	llvm::makeArrayRef(field_types)
-	//));
-
-	llvm::StructType* struct_type = llvm::StructType::create(
+	return llvm::StructType::create(
 		module.getContext(),
 		field_types,
 		use_name
 	);
+}
 
-	return LLVMTypeUtils::pointerType(*struct_type);
+
+llvm::Type* VArrayType::LLVMType(llvm::Module& module) const
+{
+	return LLVMTypeUtils::pointerType(LLVMStructType(module));
 }
 
 
@@ -900,7 +895,7 @@ bool StructureType::matchTypes(const Type& b, std::vector<TypeRef>& type_mapping
 llvm::Type* StructureType::LLVMType(llvm::Module& module) const
 {
 	// See if there is a struct with this name already:
-	llvm::StructType* existing_struct_type = module.getTypeByName(this->name);
+	llvm::StructType* existing_struct_type = LLVMTypeUtils::getStructureTypeForName(this->name, module);
 	if(existing_struct_type)
 		return existing_struct_type;
 

@@ -114,7 +114,7 @@ TypeRef FunctionDefinition::type() const
 	const TypeRef return_type = this->returnType();
 	if(return_type.isNull()) return NULL;
 
-	return new Function(makeArgTypeVector(this->args), TypeVRef(return_type), /*captured_var_types, */true); //this->use_captured_vars);
+	return new Function(makeArgTypeVector(this->args), TypeVRef(return_type), /*use_captured_vars_=*/true);
 }
 
 
@@ -649,20 +649,11 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 	params.stats->num_closure_allocations++;
 
-	TypeRef this_closure_type = this->type();
+	TypeRef this_function_type = this->type();
+	assert(this_function_type.isType<Function>());
 
-	// NOTE: this type doesn't have the actual captured var struct.
-	llvm::Type* this_closure_llvm_type = this_closure_type->LLVMType(*params.module);
-	assert(this_closure_llvm_type->isPointerTy());
-	assert(this_closure_llvm_type->getPointerElementType()->isStructTy());
-	llvm::StructType* this_closure_llvm_struct_type = (llvm::StructType*)this_closure_llvm_type->getPointerElementType();
-	
-	// llvm::StructType::elements() function is not present in LLVM 3.4.
-	llvm::StructType::element_iterator it = this_closure_llvm_struct_type->element_begin();
-	for(int i=0; i<Function::functionPtrIndex(); ++i)
-		it++;
 
-	llvm::Type* func_ptr_type = *it; // this_closure_llvm_struct_type->elements()[Function::functionPtrIndex()];
+	llvm::Type* func_ptr_type = LLVMTypeUtils::pointerType(this_function_type.downcastToPtr<Function>()->functionLLVMType(*params.module));
 
 
 	/////////////////////// Get closure destructor type ///////////////
@@ -693,7 +684,11 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 	};
 	llvm::StructType* closure_type = llvm::StructType::create(
 		*params.context,
+#if TARGET_LLVM_VERSION >= 150
+		closure_field_types,
+#else
 		llvm::makeArrayRef(closure_field_types),
+#endif
 		this->sig.typeMangledName() + "_closure"
 	);
 
@@ -787,14 +782,14 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 
 	// Set the reference count in the closure to 1
-	llvm::Value* closure_ref_count_ptr = LLVMUtils::createStructGEP(params.builder, closure_pointer, 0, "closure_ref_count_ptr");
+	llvm::Value* closure_ref_count_ptr = LLVMUtils::createStructGEP(params.builder, closure_pointer, 0, closure_type, "closure_ref_count_ptr");
 	llvm::Value* one = llvm::ConstantInt::get(*params.context, llvm::APInt(64, 1, /*signed=*/true));
 	llvm::StoreInst* store_inst = params.builder->CreateStore(one, closure_ref_count_ptr);
 	addMetaDataCommentToInstruction(params, store_inst, "Set initial ref count to 1");
 	
 
 	// Set the flags
-	llvm::Value* flags_ptr = LLVMUtils::createStructGEP(params.builder, closure_pointer, 1, "closure_flags_ptr");
+	llvm::Value* flags_ptr = LLVMUtils::createStructGEP(params.builder, closure_pointer, 1, closure_type, "closure_flags_ptr");
 	llvm::Value* flags_contant_val = llvm::ConstantInt::get(*params.context, llvm::APInt(64, initial_flags));
 	llvm::StoreInst* store_flags_inst = params.builder->CreateStore(flags_contant_val, flags_ptr);
 	addMetaDataCommentToInstruction(params, store_flags_inst, "set initial flags to " + toString(initial_flags));
@@ -807,14 +802,15 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			true // use_cap_var_struct_ptr: Since we're storing a func ptr, it will be passed the captured var struct on usage.
 		);
 
-		llvm::Value* func_field_ptr = LLVMUtils::createStructGEP(params.builder, closure_pointer, Function::functionPtrIndex(), "function_field_ptr");
+		llvm::Value* func_field_ptr = LLVMUtils::createStructGEP(params.builder, closure_pointer, Function::functionPtrIndex(), closure_type, "function_field_ptr"); // NOTE: func->getType() correct? or should be pointerType(xx)?
 		llvm::StoreInst* store_inst_ = params.builder->CreateStore(func, func_field_ptr); // Do the store.
 		addMetaDataCommentToInstruction(params, store_inst_, "Store function pointer in closure");
 	}
 
 	// Store captured vars in closure.
-	
-	llvm::Value* captured_var_struct_ptr = LLVMUtils::createStructGEP(params.builder, closure_pointer, Function::capturedVarStructIndex(), "captured_var_struct_ptr");
+	llvm::Value* captured_var_struct_ptr = LLVMUtils::createStructGEP(params.builder, closure_pointer, Function::capturedVarStructIndex(), closure_type, "captured_var_struct_ptr");
+
+	llvm::Type* base_captured_var_llvm_type = this->getCapturedVariablesStructType()->LLVMStructType(*params.module); //LLVMTypeUtils::getBaseCapturedVarStructType(*params.module);
 
 	const auto unique_free_vars = this->getUniqueFreeVarList();
 
@@ -859,9 +855,9 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			llvm::Value* current_func_captured_var_struct = params.builder->CreateBitCast(base_current_func_captured_var_struct, LLVMTypeUtils::pointerType(actual_cap_var_struct_type), "actual_cap_var_struct_type");
 
 			const size_t free_index = free_in_looser_lambda->getFreeIndexForVar(free_var);
-			llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, current_func_captured_var_struct, (unsigned int)free_index);
+			llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, current_func_captured_var_struct, (unsigned int)free_index, actual_cap_var_struct_type);
 
-			val = params.builder->CreateLoad(field_ptr);
+			val = LLVMUtils::createLoad(params.builder, field_ptr, cap_var_type_win, params.module);
 		}
 		else if(free_var->binding_type == Variable::BindingType_Argument)
 		{
@@ -887,12 +883,13 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 				// Value should be a pointer to a tuple struct.
 				if(cap_var_type_win->passByValue())
 				{
-					llvm::Value* tuple_elem = params.builder->CreateLoad(LLVMUtils::createStructGEP(params.builder, val, free_var->let_var_index, "tuple_elem_ptr"));
+					llvm::Value* tuple_elem_ptr = LLVMUtils::createStructGEP(params.builder, val, free_var->let_var_index, cap_var_type_win->LLVMType(*params.module), "tuple_elem_ptr");
+					llvm::Value* tuple_elem = LLVMUtils::createLoad(params.builder, tuple_elem_ptr, cap_var_type_win, params.module);
 					val = tuple_elem;
 				}
 				else
 				{
-					llvm::Value* tuple_elem = LLVMUtils::createStructGEP(params.builder, val, free_var->let_var_index, "tuple_elem_ptr");
+					llvm::Value* tuple_elem = LLVMUtils::createStructGEP(params.builder, val, free_var->let_var_index, cap_var_type_win->LLVMType(*params.module), "tuple_elem_ptr");
 					val = tuple_elem;
 				}
 			}
@@ -904,7 +901,7 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 		
 		// store in captured var structure field
-		llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, captured_var_struct_ptr, (unsigned int)free_var_index, "captured_var_" + toString(free_var_index) + "_field_ptr");
+		llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, captured_var_struct_ptr, (unsigned int)free_var_index, base_captured_var_llvm_type, "captured_var_" + toString(free_var_index) + "_field_ptr");
 
 		if(cap_var_type_win->passByValue())
 		{
@@ -957,20 +954,24 @@ llvm::Value* FunctionDefinition::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		temp_params.builder = &builder;
 		captured_var_struct_type->emitDestructorCall(temp_params, actual_captured_var_struct, "captured var struct destructor call");
 		
-		builder.CreateRetVoid();
+		builder.CreateRetVoid(); // Finish the destructor function
 
 		// Store a pointer to the destructor in the closure.
-		llvm::StoreInst* store_inst_ = params.builder->CreateStore(destructor, LLVMUtils::createStructGEP(params.builder, 
+		llvm::Value* closure_destr_ptr_ptr = LLVMUtils::createStructGEP(params.builder, 
 			closure_pointer, 
 			Function::destructorPtrIndex(), 
-			"destructor ptr"));
+			closure_type,
+			"destructor ptr"
+		);
+
+		llvm::StoreInst* store_inst_ = params.builder->CreateStore(destructor, closure_destr_ptr_ptr);
 
 		addMetaDataCommentToInstruction(params, store_inst_, "Store destructor in closure");
 	}
 
 
 
-	// Bitcast the closure pointer down to the 'base' closure type.
+	// Bitcast the full closure pointer down to the 'base' closure type.
 	llvm::Type* base_closure_type = this->type()->LLVMType(*params.module);
 
 	return params.builder->CreateBitCast(
@@ -1047,7 +1048,11 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 	// NOTE: It looks like function attributes are being removed from function declarations in the IR, when the function is not called anywhere.
 	
 	
+#if TARGET_LLVM_VERSION >= 150
+	llvm::AttrBuilder function_attr_builder(module->getContext());
+#else
 	llvm::AttrBuilder function_attr_builder;
+#endif
 	function_attr_builder.addAttribute(llvm::Attribute::NoUnwind); // Does not throw exceptions
 
 	if(this->noinline)
@@ -1127,7 +1132,12 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 	// If this is an external allocation function, mark the result as noalias.
 	if(external_function.nonNull() && external_function->is_allocation_function)
 	{
+#if TARGET_LLVM_VERSION >= 150
+		llvm_func->addRetAttr(llvm::Attribute::NoAlias);
+#else
 		llvm_func->addAttribute(UseAttributeList::ReturnIndex, llvm::Attribute::NoAlias);
+#endif
+		
 	}
 
 	
@@ -1139,7 +1149,13 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 
 	// Boolean type needs to have zero-extend attribute to be ABI-compatible with C++.
 	if(this->returnType()->getType() == Type::BoolType)
+	{
+#if TARGET_LLVM_VERSION >= 150
+		llvm_func->addRetAttr(llvm::Attribute::ZExt);
+#else
 		llvm_func->addAttribute(UseAttributeList::ReturnIndex, llvm::Attribute::ZExt);
+#endif
+	}
 
 	// Set calling convention.  NOTE: LLVM claims to be C calling conv. by default, but doesn't seem to be.
 	llvm_func->setCallingConv(llvm::CallingConv::C);
@@ -1158,8 +1174,13 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 			AI->setName("ret");
 
 			// Set SRET and NoAlias attributes.
+#if TARGET_LLVM_VERSION >= 150
+			llvm::AttrBuilder builder(module->getContext());
+			builder.addStructRetAttr(this->returnType()->LLVMType(*module));
+#else
 			llvm::AttrBuilder builder;
 			builder.addAttribute(llvm::Attribute::StructRet);
+#endif
 			builder.addAttribute(llvm::Attribute::NoAlias);
 			setArgumentAttributes(&module->getContext(), AI, 1, builder);
 		}
@@ -1168,7 +1189,11 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 			// Hidden pointer to env arg.
 			AI->setName("hidden");
 
+#if TARGET_LLVM_VERSION >= 150
+			llvm::AttrBuilder builder(module->getContext());
+#else
 			llvm::AttrBuilder builder;
+#endif
 			//builder.addAttribute(llvm::Attribute::ByVal);
 
 			builder.addAttribute(llvm::Attribute::ReadOnly); // From LLVM Lang ref: 
@@ -1185,7 +1210,11 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 
 			if(!this->args[winter_arg_index].type->passByValue()) // If pointer arg:
 			{
+#if TARGET_LLVM_VERSION >= 150
+				llvm::AttrBuilder builder(module->getContext());
+#else
 				llvm::AttrBuilder builder;
+#endif
 				builder.addAttribute(llvm::Attribute::ReadOnly);
 				builder.addAttribute(llvm::Attribute::NoAlias);
 				setArgumentAttributes(&module->getContext(), AI, /*index=*/i + 1, builder);
@@ -1194,7 +1223,11 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 			// Boolean type needs to have zero-extend attribute to be ABI-compatible with C++.
 			if(this->args[winter_arg_index].type->getType() == Type::BoolType)
 			{
+#if TARGET_LLVM_VERSION >= 150
+				llvm::AttrBuilder builder(module->getContext());
+#else
 				llvm::AttrBuilder builder;
+#endif
 				builder.addAttribute(llvm::Attribute::ZExt);
 				setArgumentAttributes(&module->getContext(), AI, /*index=*/i + 1, builder);
 			}

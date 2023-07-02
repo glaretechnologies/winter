@@ -10,6 +10,9 @@ Generated at 2011-04-25 19:15:39 +0100
 #include "wnt_ASTNode.h"
 
 
+namespace llvm { class Type; }
+
+
 namespace Winter
 {
 
@@ -54,6 +57,8 @@ void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_
 
 llvm::Function* getOrInsertDecrementorForType(llvm::Module* module, const ConstTypeVRef& type);
 llvm::Function* getOrInsertDestructorForType(llvm::Module* module, const ConstTypeVRef& type);
+
+llvm::Type* refCountLLVMType(llvm::Module* module);
 
 } // end namespace RefCounting
 

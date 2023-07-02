@@ -49,12 +49,18 @@ namespace RefCounting
 {
 
 
+llvm::Type* refCountLLVMType(llvm::Module* module) { return llvm::Type::getInt64Ty(module->getContext()); }
+//static llvm::Type* refCountPtrType(llvm::Module* module) { return LLVMTypeUtils::pointerType(refCountType(module)); }
+
+
 // Emit increment ref count function (incrStringRefCount etc..)
 // arg 0: pointer to refcounted value
 // Returns: void
 llvm::Function* emitIncrRefCountFunc(llvm::Module* module, const llvm::DataLayout* target_data, const string& func_name, const ConstTypeVRef& refcounted_type)
 {
-	llvm::Type* arg_types[] = { refcounted_type->LLVMType(*module) };
+	llvm::Type* refcounted_llvm_type = refcounted_type->LLVMType(*module);
+
+	llvm::Type* arg_types[] = { refcounted_llvm_type };
 
 	llvm::FunctionType* functype = llvm::FunctionType::get(
 		llvm::Type::getVoidTy(module->getContext()), // return type
@@ -67,8 +73,9 @@ llvm::Function* emitIncrRefCountFunc(llvm::Module* module, const llvm::DataLayou
 	llvm::IRBuilder<> builder(block);
 		
 	llvm::Value* refcounted_val = LLVMUtils::getNthArg(llvm_func, 0); // Get arg 0.
-	llvm::Value* ref_ptr = LLVMUtils::createStructGEP(&builder, refcounted_val, 0, "ref_ptr"); // Get pointer to ref count
-	llvm::Value* ref_count = builder.CreateLoad(ref_ptr, "ref_count"); // Load the ref count
+
+	llvm::Value* ref_ptr = LLVMUtils::createStructGEP(&builder, refcounted_val, 0, refcounted_type->LLVMStructType(*module), "ref_ptr"); // Get pointer to ref count
+	llvm::Value* ref_count = LLVMUtils::createLoad(&builder, ref_ptr, refCountLLVMType(module), "ref_count"); // Load the ref count
 	llvm::Value* one = llvm::ConstantInt::get(module->getContext(), llvm::APInt(64, 1, /*signed=*/true));
 	llvm::Value* new_ref_count = builder.CreateAdd(ref_count, one, "incremented_ref_count");
 		
@@ -175,14 +182,16 @@ void emitDecrementorForType(llvm::Module* module, const llvm::DataLayout* target
 	// Get arg 0 - (a pointer to) the ref counted value
 	llvm::Value* refcounted_val = LLVMUtils::getNthArg(llvm_func, 0);
 
+	llvm::Type* refcounted_struct_llvm_type = refcounted_type->LLVMStructType(*module);
+
 	// Load ref count
-	llvm::Value* ref_ptr = LLVMUtils::createStructGEP(&builder, refcounted_val, 0, "ref_ptr");
-	llvm::Value* ref_count = builder.CreateLoad(ref_ptr, "ref_count");
+	llvm::Value* ref_ptr = LLVMUtils::createStructGEP(&builder, refcounted_val, 0, refcounted_struct_llvm_type, "ref_ptr");
+	llvm::Value* ref_count = LLVMUtils::createLoad(&builder, ref_ptr, refCountLLVMType(module), "ref_count");
 
 	// Load flags
 	const int flags_index = refcounted_type->getType() == Type::FunctionType ? 1 : 2;
-	llvm::Value* flags_ptr = LLVMUtils::createStructGEP(&builder, refcounted_val, flags_index, "flags_ptr");
-	llvm::Value* flags_val = builder.CreateLoad(flags_ptr, "flags_val");
+	llvm::Value* flags_ptr = LLVMUtils::createStructGEP(&builder, refcounted_val, flags_index, refcounted_struct_llvm_type, "flags_ptr");
+	llvm::Value* flags_val = LLVMUtils::createLoad(&builder, flags_ptr, llvm::Type::getInt64Ty(module->getContext()), "flags_val");
 
 
 	// Create blocks for the then and else cases.  Insert the 'then' block at the end of the function.
@@ -229,7 +238,7 @@ void emitDecrementorForType(llvm::Module* module, const llvm::DataLayout* target
 	ThenBB = builder.GetInsertBlock();
 
 	// Emit else block.
-	llvm_func->getBasicBlockList().push_back(ElseBB);
+	LLVMUtils::pushBasicBlocKToBackOfFunc(llvm_func, ElseBB);
 	builder.SetInsertPoint(ElseBB);
 
 	// Emit decrement of ref count
@@ -249,7 +258,7 @@ void emitDecrementorForType(llvm::Module* module, const llvm::DataLayout* target
 	ElseBB = builder.GetInsertBlock();
 
 	// Emit merge block.
-	llvm_func->getBasicBlockList().push_back(MergeBB);
+	LLVMUtils::pushBasicBlocKToBackOfFunc(llvm_func, MergeBB);
 	builder.SetInsertPoint(MergeBB);
 
 	builder.CreateRetVoid();
@@ -278,7 +287,7 @@ void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_
 			if(struct_type->component_types[i]->hasDestructor())
 			{
 				// Get a pointer to the field memory.
-				llvm::Value* field_ptr = LLVMUtils::createStructGEP(&builder, struct_ptr, (unsigned int)i, struct_type->name + "." + struct_type->component_names[i] + " ptr");
+				llvm::Value* field_ptr = LLVMUtils::createStructGEP(&builder, struct_ptr, (unsigned int)i, struct_type->LLVMStructType(*module), struct_type->name + "." + struct_type->component_names[i] + " ptr");
 				
 				// If the field type is heap allocated, this means that the element is just a pointer to the field value.
 				// So we need to load the pointer from the structure.
@@ -287,7 +296,7 @@ void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_
 				if(struct_type->component_types[i]->isHeapAllocated())
 				{
 					// Emit call to decrementor
-					llvm::Value* field_val = builder.CreateLoad(field_ptr);
+					llvm::Value* field_val = LLVMUtils::createLoad(&builder, field_ptr, struct_type->component_types[i], module);
 					llvm::Function* elem_decrementor_func = getOrInsertDecrementorForType(module, struct_type->component_types[i]);
 					builder.CreateCall(elem_decrementor_func, field_val);
 				}
@@ -316,12 +325,12 @@ void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_
 			if(tuple_type->component_types[i]->hasDestructor())
 			{
 				// Get a pointer to the field memory.
-				llvm::Value* field_ptr = LLVMUtils::createStructGEP(&builder, struct_ptr, (unsigned int)i, tuple_type->toString() + ".field_" + ::toString(i) + " ptr");
+				llvm::Value* field_ptr = LLVMUtils::createStructGEP(&builder, struct_ptr, (unsigned int)i, tuple_type->LLVMStructType(*module), tuple_type->toString() + ".field_" + ::toString(i) + " ptr");
 				
 				if(tuple_type->component_types[i]->isHeapAllocated())
 				{
 					// Emit call to decrementor
-					llvm::Value* field_val = builder.CreateLoad(field_ptr);
+					llvm::Value* field_val = LLVMUtils::createLoad(&builder, field_ptr, tuple_type->component_types[i], module);
 					llvm::Function* elem_decrementor_func = getOrInsertDecrementorForType(module, tuple_type->component_types[i]);
 					builder.CreateCall(elem_decrementor_func, field_val);
 				}
@@ -346,14 +355,17 @@ void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_
 		llvm::Value* closure = LLVMUtils::getNthArg(llvm_func, 0);
 
 		// Load the destructor ptr
-		llvm::Value* destructor_ptr_ptr = LLVMUtils::createStructGEP(&builder, closure, Function::destructorPtrIndex(), "destructor_ptr_ptr");
-		llvm::Value* destructor_ptr = builder.CreateLoad(destructor_ptr_ptr, 0, "destructor_ptr");
+		llvm::Type* closure_llvm_type = type.downcastToPtr<const Function>()->closureLLVMStructType(*module);
+		llvm::Value* destructor_ptr_ptr = LLVMUtils::createStructGEP(&builder, closure, Function::destructorPtrIndex(), closure_llvm_type, "destructor_ptr_ptr");
+		llvm::Type* destructor_ptr_llvm_type = LLVMTypeUtils::pointerType(type.downcastToPtr<const Function>()->destructorLLVMType(*module));
+		llvm::Value* destructor_ptr = LLVMUtils::createLoad(&builder, destructor_ptr_ptr, destructor_ptr_llvm_type, "destructor_ptr");
+		//llvm::Value* destructor_ptr = builder.CreateLoad(destructor_ptr_ptr, 0, "destructor_ptr");
 
 		// Get a pointer to the captured var struct (at the end of the closure)
-		llvm::Value* cap_var_struct_ptr = LLVMUtils::createStructGEP(&builder, closure, Function::capturedVarStructIndex(), "cap_var_struct_ptr");
+		llvm::Value* cap_var_struct_ptr = LLVMUtils::createStructGEP(&builder, closure, Function::capturedVarStructIndex(), closure_llvm_type, "cap_var_struct_ptr");
 
 		// Call the destructor!
-		LLVMUtils::createCallWithValue(&builder, destructor_ptr, cap_var_struct_ptr);
+		LLVMUtils::createCallWithValue(&builder, destructor_ptr, type.downcastToPtr<const Function>()->destructorLLVMType(*module), /*args=*/cap_var_struct_ptr);
 
 		builder.CreateRetVoid();
 		return;
@@ -371,8 +383,10 @@ void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_
 		const TypeVRef elem_type = type.downcastToPtr<const VArrayType>()->elem_type;
 
 		// Load number of elements
-		llvm::Value* num_elems_ptr = LLVMUtils::createStructGEP(&builder, val, 1, "num elems ptr");
-		llvm::Value* num_elems = builder.CreateLoad(num_elems_ptr);
+		llvm::Value* num_elems = LLVMUtils::createLoadFromStruct(&builder, val, 1, type->LLVMStructType(*module));
+
+		llvm::Type* llvm_struct_type = type->LLVMStructType(*module);
+		llvm::Type* data_array_llvm_type = type.downcastToPtr<const VArrayType>()->LLVMDataArrayType(*module);
 
 		// If elements have destructors, loop over them and call the destructor for each one.
 		if(elem_type->hasDestructor())
@@ -403,23 +417,21 @@ void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_
 			//---------------------
 
 			// Get ptr to varray element
-			llvm::Value* data_ptr = LLVMUtils::createStructGEP(&builder, val, 3, "data_ptr"); // [0 x VArray<T>]*
+			llvm::Value* data_ptr = LLVMUtils::createStructGEP(&builder, val, 3, llvm_struct_type, "data_ptr"); // [0 x VArray<T>]*
 
-			//data_ptr->getType()->dump();
 			//std::cout << std::endl;
 
 			// First index of zero selects [0 x VArray<T>], second index gets array element
 			llvm::Value* indices[] = { llvm::ConstantInt::get(module->getContext(), llvm::APInt(64, 0)), loop_index_var, };
-			llvm::Value* elem_ptr = builder.CreateInBoundsGEP(data_ptr, llvm::makeArrayRef(indices));
+			llvm::Value* elem_ptr = LLVMUtils::createInBoundsGEP(builder, data_ptr, data_array_llvm_type, llvm::makeArrayRef(indices));
 
-			//elem_ptr->getType()->dump();
 			//std::cout << std::endl;
 
 			llvm::Value* elem_value;
 			if(elem_type->isHeapAllocated())
 			{
 				// Emit call to decrementor
-				elem_value = builder.CreateLoad(elem_ptr); // elem value is actually a pointer.
+				elem_value = LLVMUtils::createLoad(&builder, elem_ptr, elem_type, module); // elem value is actually a pointer.
 				llvm::Function* elem_destructor_func = getOrInsertDecrementorForType(module, elem_type);
 				builder.CreateCall(elem_destructor_func, elem_value);
 			}
@@ -467,7 +479,7 @@ void emitDestructorForType(llvm::Module* module, const llvm::DataLayout* target_
 
 
 	// Emit merge block.
-	llvm_func->getBasicBlockList().push_back(MergeBB);
+	LLVMUtils::pushBasicBlocKToBackOfFunc(llvm_func, MergeBB);
 	builder.SetInsertPoint(MergeBB);
 
 	builder.CreateRetVoid();

@@ -41,6 +41,8 @@ llvm::Type* voidPtrType(llvm::LLVMContext& context);
 llvm::Type* getBaseCapturedVarStructType(llvm::Module& module);
 llvm::Type* getPtrToBaseCapturedVarStructType(llvm::Module& module);
 
+llvm::StructType* getStructureTypeForName(const std::string& name, llvm::Module& module);
+
 llvm::FunctionType* llvmFunctionType(const std::vector<TypeVRef>& arg_types, 
 									 bool captured_var_struct_ptr_arg,
 									 TypeVRef return_type, 

@@ -1235,13 +1235,13 @@ llvm::Value* StringLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 {
 	// Make a global constant character array for the string data.
 	llvm::Value* string_global = params.builder->CreateGlobalString(this->value);
+	llvm::Value* elem_0 = string_global;
 
 	// Get a pointer to the zeroth elem
-	llvm::Value* elem_0 = LLVMUtils::createStructGEP(params.builder, string_global, 0);
-
-
 	const bool alloc_on_heap = mayEscapeCurrentlyBuildingFunction(params, this->type());
 	this->llvm_allocated_on_heap = alloc_on_heap;
+
+	llvm::Type* string_struct_type = this->type()->LLVMStructType(*params.module);
 
 	llvm::Value* string_value;
 	uint64 initial_flags;
@@ -1299,12 +1299,13 @@ llvm::Value* StringLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 		);
 
 		// Cast resulting allocated int64* to string type.
-		llvm::Type* string_type = this->type()->LLVMType(*params.module);
+		
+		llvm::Type* string_type = LLVMTypeUtils::pointerType(string_struct_type);
 		assert(string_type->isPointerTy());
 		string_value = params.builder->CreatePointerCast(alloca_ptr, string_type);
 
 		// Emit a memcpy from the global data to the string value
-		llvm::Value* data_ptr = LLVMUtils::createStructGEP(params.builder, string_value, 3, "string_literal_data_ptr");
+		llvm::Value* data_ptr = LLVMUtils::createStructGEP(params.builder, string_value, 3, string_struct_type, "string_literal_data_ptr");
 
 #if TARGET_LLVM_VERSION >= 110
 		params.builder->CreateMemCpy(/*dst=*/data_ptr, /*dst align=*/llvm::MaybeAlign(), /*src=*/elem_0, /*src align=*/llvm::MaybeAlign(), /*size=*/value.size());
@@ -1319,19 +1320,19 @@ llvm::Value* StringLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 
 
 	// Set the reference count to 1
-	llvm::Value* ref_ptr = LLVMUtils::createStructGEP(params.builder, string_value, 0, "string_ref_ptr");
+	llvm::Value* ref_ptr = LLVMUtils::createStructGEP(params.builder, string_value, 0, string_struct_type, "string_ref_ptr");
 	llvm::Value* one = llvm::ConstantInt::get(*params.context, llvm::APInt(64, 1, /*signed=*/true));
 	llvm::StoreInst* store_inst = params.builder->CreateStore(one, ref_ptr);
 	addMetaDataCommentToInstruction(params, store_inst, "string literal set intial ref count to 1");
 
 	// Set the length field
-	llvm::Value* len_ptr = LLVMUtils::createStructGEP(params.builder, string_value, 1, "string_len_ptr");
+	llvm::Value* len_ptr = LLVMUtils::createStructGEP(params.builder, string_value, 1, string_struct_type, "string_len_ptr");
 	llvm::Value* len_val = llvm::ConstantInt::get(*params.context, llvm::APInt(64, this->value.size(), /*signed=*/true));
 	llvm::StoreInst* len_store_inst = params.builder->CreateStore(len_val, len_ptr);
 	addMetaDataCommentToInstruction(params, len_store_inst, "string literal set intial length to " + toString(this->value.size()));
 
 	// Set the flags
-	llvm::Value* flags_ptr = LLVMUtils::createStructGEP(params.builder, string_value, 2, "string_literal_flags_ptr");
+	llvm::Value* flags_ptr = LLVMUtils::createStructGEP(params.builder, string_value, 2, string_struct_type, "string_literal_flags_ptr");
 	llvm::Value* flags_contant_val = llvm::ConstantInt::get(*params.context, llvm::APInt(64, initial_flags));
 	llvm::StoreInst* store_flags_inst = params.builder->CreateStore(flags_contant_val, flags_ptr);
 	addMetaDataCommentToInstruction(params, store_flags_inst, "string literal set intial flags to " + toString(initial_flags));

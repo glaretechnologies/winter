@@ -2128,7 +2128,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 {
 	params.stats->initial_num_llvm_function_calls++;
 
-	llvm::Value* target_llvm_func = NULL;
+	llvm::Value* target_llvm_func = NULL; // Pointer to target function to call.
 	TypeRef target_ret_type = this->type();
 
 	llvm::Value* closure_pointer = NULL;
@@ -2136,15 +2136,32 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 
 	if(!this->static_target_function)
 	{
+		std::vector<TypeVRef> arg_types;
+		arg_types.reserve(argument_expressions.size());
+		for(size_t i=0; i<argument_expressions.size(); ++i)
+			arg_types.push_back(TypeVRef(argument_expressions[i]->type()));
+
+		llvm::Type* target_func_type = LLVMTypeUtils::llvmFunctionType(
+			arg_types,
+			true, // use captured var struct ptr arg
+			TypeVRef(target_ret_type),
+			*params.module
+		);
+		llvm::Type* target_func_ptr_type = LLVMTypeUtils::pointerType(target_func_type);
+
 		// Emit code to get the function closure.
 		closure_pointer = this->get_func_expr->emitLLVMCode(params, NULL);
 
+		llvm::Type* closure_type = this->get_func_expr->type().downcastToPtr<Function>()->closureLLVMStructType(*params.module);
+
 		// Get the actual function pointer from the closure
-		llvm::Value* target_llvm_func_ptr = LLVMUtils::createStructGEP(params.builder, closure_pointer, Function::functionPtrIndex(), "function_ptr_ptr");
-		target_llvm_func = params.builder->CreateLoad(target_llvm_func_ptr, "function_ptr");
+		llvm::Value* target_llvm_func_ptr = LLVMUtils::createStructGEP(params.builder, closure_pointer, Function::functionPtrIndex(), closure_type, "function_ptr_ptr");
+		
+
+		target_llvm_func = LLVMUtils::createLoad(params.builder, target_llvm_func_ptr, target_func_ptr_type, "function_ptr");
 
 		// Get the captured var struct from the closure
-		captured_var_struct_ptr = LLVMUtils::createStructGEP(params.builder, closure_pointer, Function::capturedVarStructIndex(), "captured_var_struct_ptr"); // field index
+		captured_var_struct_ptr = LLVMUtils::createStructGEP(params.builder, closure_pointer, Function::capturedVarStructIndex(), closure_type, "captured_var_struct_ptr"); // field index
 	}
 	else // else if this->static_target_function:
 	{
@@ -2164,8 +2181,8 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			llvm::Value* result;
 			if(field_type->passByValue())
 			{
-				llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, struct_ptr, field_index, get_field_func->struct_type->name + "." + field_name + " ptr");
-				llvm::Value* loaded_val = params.builder->CreateLoad(field_ptr, field_name);
+				llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, struct_ptr, field_index, get_field_func->struct_type->LLVMType(*params.module), get_field_func->struct_type->name + "." + field_name + " ptr");
+				llvm::Value* loaded_val = LLVMUtils::createLoad(params.builder, field_ptr, field_type->LLVMType(*params.module), field_name);
 
 				// TEMP NEW: increment ref count if this is a string
 				//if(field_type->getType() == Type::StringType)
@@ -2175,7 +2192,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			}
 			else
 			{
-				result = LLVMUtils::createStructGEP(params.builder, struct_ptr, field_index, get_field_func->struct_type->name + "." + field_name + " ptr");
+				result = LLVMUtils::createStructGEP(params.builder, struct_ptr, field_index, get_field_func->struct_type->LLVMType(*params.module), get_field_func->struct_type->name + "." + field_name + " ptr");
 			}
 
 			field_type->emitIncrRefCount(params, result, "GetField " + get_field_func->struct_type->name + "." + field_name + " result increment");
@@ -2203,8 +2220,8 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			llvm::Value* result;
 			if(field_type->passByValue())
 			{
-				llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, struct_ptr, field_index, field_name + " ptr");
-				llvm::Value* loaded_val = params.builder->CreateLoad(field_ptr, field_name);
+				llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, struct_ptr, field_index, get_field_func->tuple_type->LLVMStructType(*params.module), field_name + " ptr");
+				llvm::Value* loaded_val = LLVMUtils::createLoad(params.builder, field_ptr, field_type->LLVMType(*params.module), field_name);
 
 				// TEMP NEW: increment ref count if this is a string
 				//if(field_type->getType() == Type::StringType)
@@ -2214,7 +2231,7 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 			}
 			else
 			{
-				result = LLVMUtils::createStructGEP(params.builder, struct_ptr, field_index, field_name + " ptr");
+				result = LLVMUtils::createStructGEP(params.builder, struct_ptr, field_index, get_field_func->tuple_type->LLVMStructType(*params.module), field_name + " ptr");
 			}
 
 			field_type->emitIncrRefCount(params, result, "GetTupleElement " + get_field_func->tuple_type->toString() + " " + field_name + " result increment");
@@ -2297,10 +2314,23 @@ llvm::Value* FunctionExpression::emitLLVMCode(EmitLLVMCodeParams& params, llvm::
 		args.push_back(captured_var_struct_ptr);
 
 #if TARGET_LLVM_VERSION >= 110
-	llvm::Type* ptr_function_type = target_llvm_func->getType();
-	llvm::Type* function_type = ptr_function_type->getPointerElementType();
-	assert(llvm::isa<llvm::FunctionType>(function_type));
-	llvm::FunctionCallee callee(llvm::cast<llvm::FunctionType>(function_type), target_llvm_func);
+
+	std::vector<TypeVRef> arg_types;
+	arg_types.reserve(argument_expressions.size());
+	for(size_t i=0; i<argument_expressions.size(); ++i)
+		arg_types.push_back(TypeVRef(argument_expressions[i]->type()));
+
+	llvm::Type* target_func_type = LLVMTypeUtils::llvmFunctionType(
+		arg_types,
+		captured_var_struct_ptr != NULL, // use captured var struct ptr arg
+		TypeVRef(target_ret_type),
+		*params.module
+	);
+
+	//llvm::Type* ptr_function_type = target_llvm_func->getType();
+	//llvm::Type* function_type = target_func_type; // ptr_function_type->getPointerElementType();
+	assert(llvm::isa<llvm::FunctionType>(target_func_type));
+	llvm::FunctionCallee callee(llvm::cast<llvm::FunctionType>(target_func_type), target_llvm_func);
 	llvm::CallInst* call_inst = params.builder->CreateCall(callee, args);
 #else
 	llvm::CallInst* call_inst = params.builder->CreateCall(target_llvm_func, args);

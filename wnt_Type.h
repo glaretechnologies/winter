@@ -14,7 +14,7 @@ Copyright Glare Technologies Limited 2016 -
 #include <set>
 
 
-namespace llvm { class Type; class Constant; class LLVMContext; class Value; class Module; }
+namespace llvm { class Type; class Constant; class LLVMContext; class Value; class Module; class StructType; class FunctionType; }
 
 
 namespace Winter
@@ -62,6 +62,7 @@ public:
 	virtual bool lessThan(const Type& b) const = 0;
 	virtual bool matchTypes(const Type& b, std::vector<Reference<Type> >& type_mapping) const = 0;
 	virtual llvm::Type* LLVMType(llvm::Module& module) const = 0;
+	virtual llvm::Type* LLVMStructType(llvm::Module& module) const { return LLVMType(module); }
 	virtual const std::string OpenCLCType(EmitOpenCLCodeParams& params) const = 0;
 	virtual bool OpenCLPassByPointer() const { return false; }
 
@@ -213,6 +214,7 @@ public:
 	virtual bool lessThan(const Type& b) const { return getType() < b.getType(); }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 	virtual llvm::Type* LLVMType(llvm::Module& module) const;
+	virtual llvm::Type* LLVMStructType(llvm::Module& module) const;
 	virtual const std::string OpenCLCType(EmitOpenCLCodeParams& params) const { return "string"; }
 	virtual bool passByValue() const { return true; } // Pass the pointer 'by value'
 	virtual void emitIncrRefCount(EmitLLVMCodeParams& params, llvm::Value* ref_counted_value, const std::string& comment) const;
@@ -261,12 +263,17 @@ public:
 	static int destructorPtrIndex() { return 3; } // Index in closure struct of closure destructor ptr.
 	static int capturedVarStructIndex() { return 4; } // Index in closure struct of captured var structure.
 
+	llvm::FunctionType* destructorLLVMType(llvm::Module& module) const;
+	llvm::FunctionType* functionLLVMType(llvm::Module& module) const;
+	llvm::StructType* closureLLVMStructType(llvm::Module& module) const;
+
 	// Use for passing to ref counting functions etc..
 	static VRef<Function> dummyFunctionType() { return new Function(std::vector<TypeVRef>(), new Int(), true); }
 
 	virtual const std::string toString() const; // { return "function"; }
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 	virtual llvm::Type* LLVMType(llvm::Module& module) const;
+	virtual llvm::Type* LLVMStructType(llvm::Module& module) const;
 	virtual const std::string OpenCLCType(EmitOpenCLCodeParams& params) const;
 	// Pass by reference, because the actual value passed/returned is a closure structure.
 	virtual bool passByValue() const { return true; } // Pass the pointer 'by value'
@@ -407,6 +414,10 @@ class VArrayType : public Type
 {
 public:
 	VArrayType(const TypeVRef& elem_type_) : Type(VArrayTypeType), elem_type(elem_type_) {}
+
+
+	llvm::Type* LLVMDataArrayType(llvm::Module& module) const;
+
 	virtual const std::string toString() const;
 	virtual bool lessThan(const Type& b) const
 	{
@@ -424,6 +435,8 @@ public:
 	virtual bool matchTypes(const Type& b, std::vector<TypeRef>& type_mapping) const;
 
 	virtual llvm::Type* LLVMType(llvm::Module& module) const;
+	virtual llvm::Type* LLVMStructType(llvm::Module& module) const;
+	
 	virtual const std::string OpenCLCType(EmitOpenCLCodeParams& params) const;
 	virtual bool passByValue() const { return true; } // Pass the pointer 'by value'
 

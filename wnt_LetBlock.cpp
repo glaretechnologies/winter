@@ -403,7 +403,7 @@ static void emitTracePrintCall(EmitLLVMCodeParams& params, const string& var_nam
 	llvm::Value* string_global = params.builder->CreateGlobalString(var_name);
 
 	// Get a pointer to the zeroth elem
-	llvm::Value* elem_0 = LLVMUtils::createStructGEP(params.builder, string_global, 0);
+	llvm::Value* elem_0 = LLVMUtils::createStructGEP(params.builder, string_global, 0, llvm::Type::getInt8PtrTy(*params.context));
 
 	LLVMUtils::FunctionCalleeType f = getOrInsertTracePrintFloatCall(params.module);
 	llvm::Value* args[2] = { elem_0, float_value };

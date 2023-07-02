@@ -363,13 +363,20 @@ llvm::Value* ArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 		);
 	}
 
+	llvm::Type* array_llvm_type = this->type()->LLVMType(*params.module);
+
 	// For each element in the literal
 	if(has_int_suffix)
 	{
 		// NOTE: could optimise this more (share value etc..)
 		for(int i=0; i<int_suffix; ++i)
 		{
-			llvm::Value* element_ptr = LLVMUtils::createStructGEP(params.builder, array_addr, i);
+			llvm::Value* indices[] = {
+				llvm::ConstantInt::get(*params.context, llvm::APInt(64, 0)), // get the zero-th array
+				llvm::ConstantInt::get(*params.context, llvm::APInt(64, i)) // get the i-th element in the array
+			};
+
+			llvm::Value* element_ptr = LLVMUtils::createInBoundsGEP(*params.builder, array_addr, array_llvm_type, indices);
 
 			if(this->elements[0]->type()->passByValue())
 			{
@@ -393,7 +400,12 @@ llvm::Value* ArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 	{
 		for(unsigned int i=0; i<this->elements.size(); ++i)
 		{
-			llvm::Value* element_ptr = LLVMUtils::createStructGEP(params.builder, array_addr, i);
+			llvm::Value* indices[] = {
+				llvm::ConstantInt::get(*params.context, llvm::APInt(64, 0)), // get the zero-th array
+				llvm::ConstantInt::get(*params.context, llvm::APInt(64, i)) // get the i-th element in the array
+			};
+
+			llvm::Value* element_ptr = LLVMUtils::createInBoundsGEP(*params.builder, array_addr, array_llvm_type, indices);
 
 			if(this->elements[i]->type()->passByValue())
 			{

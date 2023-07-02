@@ -590,30 +590,33 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 			params.currently_building_func_def->getCapturedVarStructLLVMArgIndex()
 		);
 
-		llvm::Type* full_cap_var_type = LLVMTypeUtils::pointerType(
-			*params.currently_building_func_def->getCapturedVariablesStructType()->LLVMType(*params.module)
-		);
+		llvm::Type* full_cap_var_type = params.currently_building_func_def->getCapturedVariablesStructType()->LLVMType(*params.module);
+		llvm::Type* full_cap_var_ptr_type = LLVMTypeUtils::pointerType(full_cap_var_type);
 
 		llvm::Value* cap_var_structure = params.builder->CreateBitCast(
 			base_cap_var_structure,
-			full_cap_var_type, // destination type
+			full_cap_var_ptr_type, // destination type
 			"cap_var_structure" // name
 		);
 
 		// Load the value from the correct field.
 		const size_t free_index = enclosing_lambdas.back()->getFreeIndexForVar(this);
 
-		llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, cap_var_structure, (unsigned int)free_index);
+		TypeRef this_type = this->type();
+		llvm::Type* this_llvm_type = this_type->LLVMType(*params.module);
+
+		llvm::Value* field_ptr = LLVMUtils::createStructGEP(params.builder, cap_var_structure, (unsigned int)free_index, full_cap_var_type);
 
 		// For pass-by-pointer types like struct, all we need is the pointer to the value (which is stored in the captured var struct),
 		// so the GEP pointer is sufficient.
-		llvm::Value* field = this->type()->passByValue() ?
-			params.builder->CreateLoad(field_ptr) :
+		
+		llvm::Value* field = this_type->passByValue() ?
+			LLVMUtils::createLoad(params.builder, field_ptr, this_llvm_type) :
 			field_ptr;
 
 		// Increment reference count
 		if(params.emit_refcounting_code && shouldRefCount(params, *this))
-			this->type()->emitIncrRefCount(params, field, "Variable::emitLLVMCode for captured var " + this->name);
+			this_type->emitIncrRefCount(params, field, "Variable::emitLLVMCode for captured var " + this->name);
 
 		return field;
 	}
@@ -622,37 +625,43 @@ llvm::Value* Variable::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value* ret
 	{
 		assert(params.let_values.find(this->bound_let_node) != params.let_values.end());
 
+		TypeRef this_type = this->type();
+		llvm::Type* this_llvm_type = this_type->LLVMType(*params.module);
+
 		llvm::Value* value = params.let_values[this->bound_let_node];
 
 		if(this->bound_let_node->vars.size() == 1)
 		{
 			// Increment reference count
 			if(params.emit_refcounting_code)
-				this->type()->emitIncrRefCount(params, value, "Variable::emitLLVMCode for let var " + this->name);
+				this_type->emitIncrRefCount(params, value, "Variable::emitLLVMCode for let var " + this->name);
 
 			return value;
 		}
 		else
 		{
+			llvm::Type* tuple_llvm_type = this->bound_let_node->type()->LLVMType(*params.module);
+
 			// Destructuring assignment, we just want to return the individual tuple element.
 			// Value should be a pointer to a tuple struct.
-			if(type()->passByValue())
+			if(this_type->passByValue())
 			{
-				llvm::Value* tuple_elem = params.builder->CreateLoad(LLVMUtils::createStructGEP(params.builder, value, this->let_var_index, "tuple_elem_ptr"));
+				llvm::Value* tuple_elem_ptr = LLVMUtils::createStructGEP(params.builder, value, this->let_var_index, tuple_llvm_type, "tuple_elem_ptr");
+				llvm::Value* tuple_elem = LLVMUtils::createLoad(params.builder, tuple_elem_ptr, this_llvm_type);
 
 				// Increment reference count
 				if(params.emit_refcounting_code)
-					this->type()->emitIncrRefCount(params, tuple_elem, "Variable::emitLLVMCode for let var " + this->name);
+					this_type->emitIncrRefCount(params, tuple_elem, "Variable::emitLLVMCode for let var " + this->name);
 
 				return tuple_elem;
 			}
 			else
 			{
-				llvm::Value* tuple_elem = LLVMUtils::createStructGEP(params.builder, value, this->let_var_index, "tuple_elem_ptr");
+				llvm::Value* tuple_elem = LLVMUtils::createStructGEP(params.builder, value, this->let_var_index, tuple_llvm_type, "tuple_elem_ptr");
 
 				// Increment reference count
 				if(params.emit_refcounting_code)
-					this->type()->emitIncrRefCount(params, tuple_elem, "Variable::emitLLVMCode for let var " + this->name);
+					this_type->emitIncrRefCount(params, tuple_elem, "Variable::emitLLVMCode for let var " + this->name);
 
 				return tuple_elem;
 			}

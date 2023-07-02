@@ -303,9 +303,10 @@ llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 		params.cleanup_values.push_back(CleanUpInfo(this, varray_ptr));
 	}
 
+	llvm::Type* varray_llvm_struct_type = this->type()->LLVMStructType(*params.module);
 
 	// Set the reference count to 1
-	llvm::Value* ref_ptr = LLVMUtils::createStructGEP(params.builder, varray_ptr, 0, "varray_literal_ref_ptr");
+	llvm::Value* ref_ptr = LLVMUtils::createStructGEP(params.builder, varray_ptr, 0, varray_llvm_struct_type, "varray_literal_ref_ptr");
 	llvm::Value* one = llvm::ConstantInt::get(
 		*params.context,
 		llvm::APInt(64, 1, 
@@ -316,7 +317,7 @@ llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 	addMetaDataCommentToInstruction(params, store_inst, "VArray literal set initial ref count to 1");
 
 	// Set VArray length
-	llvm::Value* length_ptr = LLVMUtils::createStructGEP(params.builder, varray_ptr, 1, "varray_literal_length_ptr");
+	llvm::Value* length_ptr = LLVMUtils::createStructGEP(params.builder, varray_ptr, 1, varray_llvm_struct_type, "varray_literal_length_ptr");
 	llvm::Value* length_constant_int = llvm::ConstantInt::get(
 		*params.context,
 		llvm::APInt(64, num_elems, 
@@ -327,13 +328,17 @@ llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 	addMetaDataCommentToInstruction(params, store_length_inst, "VArray literal set initial length count to " + ::toString(num_elems));
 
 	// Set the flags
-	llvm::Value* flags_ptr = LLVMUtils::createStructGEP(params.builder, varray_ptr, 2, "varray_literal_flags_ptr");
+	llvm::Value* flags_ptr = LLVMUtils::createStructGEP(params.builder, varray_ptr, 2, varray_llvm_struct_type, "varray_literal_flags_ptr");
 	llvm::Value* flags_contant_val = llvm::ConstantInt::get(*params.context, llvm::APInt(64, initial_flags));
 	llvm::StoreInst* store_flags_inst = params.builder->CreateStore(flags_contant_val, flags_ptr);
 	addMetaDataCommentToInstruction(params, store_flags_inst, "VArray literal set initial flags to " + toString(initial_flags));
 
 
-	llvm::Value* data_ptr = LLVMUtils::createStructGEP(params.builder, varray_ptr, 3, "varray_literal_data_ptr");
+	llvm::Type* data_type = llvm::ArrayType::get(  // Variable-size array of element types
+		elem_type->LLVMType(*params.module),
+		0 // Num elements
+	);
+	llvm::Value* data_ptr = LLVMUtils::createStructGEP(params.builder, varray_ptr, /*field_index=*/3, varray_llvm_struct_type, "varray_literal_data_ptr");
 
 	//data_ptr->dump();
 	//data_ptr->getType()->dump();
@@ -350,7 +355,11 @@ llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 			for(int i=0; i<int_suffix; ++i)
 			{
 				// Store the element in the array
-				llvm::Value* element_ptr = LLVMUtils::createStructGEP(params.builder, data_ptr, i);
+				llvm::Value* indices[] = {
+					llvm::ConstantInt::get(*params.context, llvm::APInt(64, 0)), // get the zero-th array
+					llvm::ConstantInt::get(*params.context, llvm::APInt(64, i)) // get the i-th element in the array
+				};
+				llvm::Value* element_ptr = LLVMUtils::createInBoundsGEP(*params.builder, data_ptr, data_type, indices);
 				params.builder->CreateStore(/*value=*/elem_0_value, /*ptr=*/element_ptr);
 			}
 		}
@@ -360,7 +369,11 @@ llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 			// So just emit code that will store it directly in the array.
 			for(int i=0; i<int_suffix; ++i)
 			{
-				llvm::Value* element_ptr = LLVMUtils::createStructGEP(params.builder, data_ptr, i);
+				llvm::Value* indices[] = {
+					llvm::ConstantInt::get(*params.context, llvm::APInt(64, 0)), // get the zero-th array
+					llvm::ConstantInt::get(*params.context, llvm::APInt(64, i)) // get the i-th element in the array
+				};
+				llvm::Value* element_ptr = LLVMUtils::createInBoundsGEP(*params.builder, data_ptr, data_type, indices);
 				this->elements[0]->emitLLVMCode(params, element_ptr);
 			}
 		}
@@ -369,7 +382,11 @@ llvm::Value* VArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value
 	{
 		for(unsigned int i=0; i<this->elements.size(); ++i)
 		{
-			llvm::Value* element_ptr = params.builder->CreateConstInBoundsGEP2_64(data_ptr, 0, i, "varray_literal_element_ptr");
+			llvm::Value* element_ptr = params.builder->CreateConstInBoundsGEP2_64(
+#if TARGET_LLVM_VERSION >= 150
+				data_type, // LLVMTypeUtils::pointerType(this->elements[0]->type()->LLVMType(*params.module)), // type
+#endif
+				data_ptr, 0, i, "varray_literal_element_ptr");
 
 			if(this->elements[i]->type()->passByValue())
 			{

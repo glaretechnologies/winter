@@ -6688,7 +6688,7 @@ TEMP OPENCL
 			in, target_result);
 	}
 
-	conPrint("=================== All Winter tests passed.  Elapsed: " + timer.elapsedString() + " =============================");
+	conPrint("=================== All Winter tests passed.  Elapsed: " + timer.elapsedStringNPlaces(2) + " =============================");
 }
 
 

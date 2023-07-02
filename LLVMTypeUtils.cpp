@@ -63,7 +63,7 @@ llvm::Type* voidPtrType(llvm::LLVMContext& context)
 llvm::Type* getBaseCapturedVarStructType(llvm::Module& module)
 {
 	const std::string struct_name = "base_captured_var_struct";
-	llvm::StructType* existing_struct_type = module.getTypeByName(struct_name);
+	llvm::StructType* existing_struct_type = getStructureTypeForName(struct_name, module);
 	if(existing_struct_type)
 		return existing_struct_type;
 
@@ -81,6 +81,16 @@ llvm::Type* getBaseCapturedVarStructType(llvm::Module& module)
 llvm::Type* getPtrToBaseCapturedVarStructType(llvm::Module& module)
 {
 	return pointerType(*getBaseCapturedVarStructType(module));
+}
+
+
+llvm::StructType* getStructureTypeForName(const std::string& name, llvm::Module& module)
+{
+#if TARGET_LLVM_VERSION >= 150
+	return llvm::StructType::getTypeByName(module.getContext(), name);
+#else
+	return module.getTypeByName(name);
+#endif
 }
 
 
