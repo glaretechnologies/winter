@@ -1055,6 +1055,12 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 #endif
 	function_attr_builder.addAttribute(llvm::Attribute::NoUnwind); // Does not throw exceptions
 
+#if TARGET_LLVM_VERSION >= 150
+	function_attr_builder.addAttribute("warn-stack-size", "0");
+	// Enable warn-stack-size= attribute.  We use this to get the stack size for compiled functions.
+	// See also -warn-stack-size code in VirtualMachine::init().
+#endif
+
 	if(this->noinline)
 		function_attr_builder.addAttribute(llvm::Attribute::NoInline);
 	

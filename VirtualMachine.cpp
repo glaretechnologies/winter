@@ -973,14 +973,14 @@ void VirtualMachine::init()
 	llvm::InitializeNativeTarget();
 	llvm::InitializeNativeTargetAsmPrinter();
 
-#if TARGET_LLVM_VERSION >= 60
+	// In LLVM 15.0 + (and maybe earlier), -warn-stack-size was removed and made into a function attribute.
+#if TARGET_LLVM_VERSION >= 60 && TARGET_LLVM_VERSION < 150
 	// Clear any previously parsed options.  We need to do this because the results of a previous call to
 	// llvm::cl::ParseCommandLineOptions() might hang around, if this code is called in a .so that has dlclose() called on it,
 	// but is not actually unloaded.  When the dlopen() is called on the .so again, the global variables will still be around.
 	// See https://stackoverflow.com/questions/24467404/dlclose-doesnt-really-unload-shared-object-no-matter-how-many-times-it-is-call
 	llvm::cl::ResetAllOptionOccurrences();
 
-#if TARGET_LLVM_VERSION < 150 // TEMP
 	// Enable -warn-stack-size= option.
 	// We use this to get the stack size for compiled functions - 
 	// see use of llvm::DiagnosticInfoStackSize below.
@@ -991,7 +991,6 @@ void VirtualMachine::init()
 	const bool res = llvm::cl::ParseCommandLineOptions(2, argv, /*overview=*/"", &stream);
 	if(!res)
 		throw BaseException("VirtualMachine::init(): Failed to set command line options: " + stream.str());
-#endif
 #endif
 }
 
