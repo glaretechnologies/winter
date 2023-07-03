@@ -5,7 +5,7 @@ project("winter")
 
 set(CURRENT_TARGET winter)
 
-set(WINTER_USE_OPENCL TRUE)
+set(WINTER_USE_OPENCL OFF CACHE BOOL "Enable OpenCL support, currently just used for test execution.")
 set(WINTER_INCLUDE_TESTS TRUE)
 
 SET(GLARE_CORE_TRUNK_DIR "" CACHE PATH "Path to glare-core repo trunk dir.")
