@@ -24,7 +24,8 @@ endif()
 
 
 
-SET(WINTER_LLVM_VERSION "15.0.7")
+SET(WINTER_LLVM_VERSION "15.0.7" CACHE STRING "LLVM version to use")
+
 
 MESSAGE("Winter LLVM version: ${WINTER_LLVM_VERSION}")
 
