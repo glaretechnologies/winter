@@ -992,12 +992,7 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 
 static void setArgumentAttributes(llvm::LLVMContext* context, llvm::Function::arg_iterator it, unsigned int index, llvm::AttrBuilder& attr_builder)
 {
-#if TARGET_LLVM_VERSION >= 60
-		it->addAttrs(attr_builder);
-#else
-		llvm::AttributeSet set = llvm::AttributeSet::get(*context, index, attr_builder);
-		it->addAttr(set);
-#endif
+	it->addAttrs(attr_builder);
 }
 
 
@@ -1120,11 +1115,7 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 
 	llvm::Function* llvm_func = static_cast<llvm::Function*>(llvm_func_constant);
 
-#if TARGET_LLVM_VERSION >= 60
 	typedef	llvm::AttributeList UseAttributeList;
-#else
-	typedef llvm::AttributeSet UseAttributeList;
-#endif
 
 	UseAttributeList attributes = UseAttributeList::get(
 		module->getContext(),
@@ -1285,11 +1276,7 @@ llvm::Function* FunctionDefinition::buildLLVMFunction(
 	flags.setNoInfs();
 	flags.setNoSignedZeros();
 
-#if TARGET_LLVM_VERSION >= 60
 	builder.setFastMathFlags(flags);
-#else
-	builder.SetFastMathFlags(flags);
-#endif
 
 	// const bool nsz = builder.getFastMathFlags().noSignedZeros();
 
@@ -1597,7 +1584,6 @@ GetSpaceBoundResults FunctionDefinition::getSpaceBound(GetSpaceBoundParams& para
 
 	// We require LLVM 6.0 in order to use the diagnostic callback interface, which allows us to get the stack 
 	// size used by functions.  If we can't use this information, just use a large upper bound which should suffice.
-#if TARGET_LLVM_VERSION >= 60
 	// If llvm_used_stack_size == -1, then this information wasn't set by LLVM.  This probably means that this 
 	// function wasn't compiled, due it being inlined and then dead-code removed.
 	// It could also mean that it literally used zero stack size, for instance if it just gets compiled down to 
@@ -1615,10 +1601,6 @@ GetSpaceBoundResults FunctionDefinition::getSpaceBound(GetSpaceBoundParams& para
 	if(params.is_root_function)
 		use_stack_size += 128;
 #endif // defined(__linux__)
-
-#else
-	const size_t use_stack_size = 512;
-#endif
 
 	params.is_root_function = false;
 

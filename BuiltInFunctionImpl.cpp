@@ -25,10 +25,6 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Attributes.h"
-#if TARGET_LLVM_VERSION <= 34
-#include "llvm/Analysis/Verifier.h"
-#include "llvm/ExecutionEngine/JIT.h"
-#endif
 #include "llvm/ExecutionEngine/Interpreter.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
 #include "llvm/Support/raw_ostream.h"
@@ -700,12 +696,7 @@ public:
 
 static void setArgumentAttributes(llvm::LLVMContext* context, llvm::Function::arg_iterator it, unsigned int index, llvm::AttrBuilder& attr_builder)
 {
-#if TARGET_LLVM_VERSION >= 60
-		it->addAttrs(attr_builder);
-#else
-		llvm::AttributeSet set = llvm::AttributeSet::get(*context, index, attr_builder);
-		it->addAttr(set);
-#endif
+	it->addAttrs(attr_builder);
 }
 
 
@@ -2722,11 +2713,7 @@ llvm::Value* DotProductBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) con
 		const int upper_mask = (1 << use_num_components) - 1;
 		const int mask = (upper_mask << 4) | 15;
 
-#if TARGET_LLVM_VERSION <= 34
-		args.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(/*num bits=*/32, mask))); // SSE DPPS control bits
-#else
 		args.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(/*num bits=*/8, mask))); // SSE DPPS control bits
-#endif
 
 		llvm::Function* dot_func = llvm::Intrinsic::getDeclaration(params.module, llvm::Intrinsic::x86_sse41_dpps);
 
@@ -2754,11 +2741,7 @@ llvm::Value* DotProductBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) con
 		const int upper_mask = (1 << use_num_components) - 1;
 		const int mask = (upper_mask << 4) | 15;
 
-#if TARGET_LLVM_VERSION <= 34
-		args.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(/*num bits=*/32, mask))); // SSE DPPD control bits
-#else
 		args.push_back(llvm::ConstantInt::get(*params.context, llvm::APInt(/*num bits=*/8, mask))); // SSE DPPD control bits
-#endif
 
 		llvm::Function* dot_func = llvm::Intrinsic::getDeclaration(params.module, llvm::Intrinsic::x86_sse41_dppd);
 
@@ -4729,7 +4712,6 @@ llvm::Value* CompareEqualBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) c
 			params.builder->CreateFCmpOEQ(a_code, b_code);
 
 		// For later LLVMs, use experimental horizontal reduce here to do the reduction.
-#if TARGET_LLVM_VERSION >= 60
 #if TARGET_LLVM_VERSION >= 110
 		llvm::Type* types[] = { par_eq->getType() }; // vector type
 #else
@@ -4746,22 +4728,6 @@ llvm::Value* CompareEqualBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) c
 			types);
 
 		return params.builder->CreateCall(vec_reduce_and, par_eq);
-#else
-		const VectorType* a_vector_type = arg_type.downcastToPtr<VectorType>();
-
-		llvm::Value* elem_0 = params.builder->CreateExtractElement(par_eq, 
-			llvm::ConstantInt::get(*params.context, llvm::APInt(/*num bits=*/32, /*value=*/0)));
-
-		llvm::Value* conjunction = elem_0;
-		for(unsigned int i=1; i<a_vector_type->num; ++i)
-		{
-			llvm::Value* elem_i = params.builder->CreateExtractElement(par_eq, 
-				llvm::ConstantInt::get(*params.context, llvm::APInt(/*num bits=*/32, /*value=*/i)));
-
-			conjunction = params.builder->CreateBinOp(is_compare_not_equal ? llvm::Instruction::Or : llvm::Instruction::And, conjunction, elem_i);
-		}
-		return conjunction;
-#endif
 	}
 	case Type::StringType:
 		return emitCallToBinaryFunction(params.builder, params.module, is_compare_not_equal ? "compareNotEqualString" : "compareEqualString", arg_type, a_code, b_code);
@@ -5000,11 +4966,7 @@ llvm::Value* NaNBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 		return llvm::ConstantFP::get(
 			*params.context,
 			llvm::APFloat::getNaN(
-#if TARGET_LLVM_VERSION >= 60
 				llvm::APFloat::IEEEsingle()
-#else
-				llvm::APFloat::IEEEsingle
-#endif
 			)
 		);
 	}
@@ -5013,11 +4975,7 @@ llvm::Value* NaNBuiltInFunc::emitLLVMCode(EmitLLVMCodeParams& params) const
 		return llvm::ConstantFP::get(
 			*params.context,
 			llvm::APFloat::getNaN(
-#if TARGET_LLVM_VERSION >= 60
 				llvm::APFloat::IEEEdouble()
-#else
-				llvm::APFloat::IEEEdouble
-#endif
 			)
 		);
 	}

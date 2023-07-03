@@ -333,11 +333,7 @@ llvm::Value* ArrayLiteral::emitLLVMCode(EmitLLVMCodeParams& params, llvm::Value*
 				array_llvm_values
 			)
 		);
-#if TARGET_LLVM_VERSION >= 60
 		global->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global); // Mark as unnamed_addr - this means the address is not significant, so multiple arrays with the same contents can be combined.
-#else
-		global->setUnnamedAddr(true); // Mark as unnamed_addr - this means the address is not significant, so multiple arrays with the same contents can be combined.
-#endif
 
 		return global;
 	}

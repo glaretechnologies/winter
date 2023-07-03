@@ -38,13 +38,8 @@ llvm::Value* getNthArg(llvm::Function *func, int n);
 llvm::Value* getLastArg(llvm::Function *func);
 
 
-#if TARGET_LLVM_VERSION >= 60
 llvm::Value* createStructGEP(llvm::IRBuilder</*true, */llvm::ConstantFolder, llvm::IRBuilderDefaultInserter/*<true>*/ >* builder,
 	llvm::Value* struct_ptr, unsigned int field_index, llvm::Type* elem_type, const llvm::Twine& name = "");
-#else
-llvm::Value* createStructGEP(llvm::IRBuilder<true, llvm::ConstantFolder, llvm::IRBuilderDefaultInserter<true> >* builder,
-	llvm::Value* struct_ptr, unsigned int field_index, llvm::Type* elem_type, const llvm::Twine& name = "");
-#endif
 
 
 template <class BuilderClass>

@@ -30,13 +30,8 @@ namespace llvm { class TargetData; };
 namespace llvm { class Instruction; };
 namespace llvm { class ConstantFolder; };
 namespace llvm { class DataLayout; };
-#if TARGET_LLVM_VERSION >= 60
 namespace llvm { class IRBuilderDefaultInserter; };
 namespace llvm { template<typename T, typename Inserter > class IRBuilder; };
-#else
-namespace llvm { template<bool preserveNames> class IRBuilderDefaultInserter; };
-namespace llvm { template<bool preserveNames, typename T, typename Inserter > class IRBuilder; };
-#endif
 
 
 namespace Winter
@@ -219,11 +214,7 @@ public:
 	const WinterCPUInfo* cpu_info;
 	
 	// These template arguments are the defaults from IRBuilder.h.  Written explicitly here so we can forwards declare this type.
-#if TARGET_LLVM_VERSION >= 60
 	llvm::IRBuilder<llvm::ConstantFolder, llvm::IRBuilderDefaultInserter >* builder; 
-#else
-	llvm::IRBuilder<true, llvm::ConstantFolder, llvm::IRBuilderDefaultInserter<true> >* builder; 
-#endif
 
 	llvm::Module* module;
 	llvm::Function* currently_building_func;

@@ -45,21 +45,11 @@ llvm::Value* getLastArg(llvm::Function *func)
 }
 
 
-#if TARGET_LLVM_VERSION >= 60
 llvm::Value* createStructGEP(llvm::IRBuilder</*true, */llvm::ConstantFolder, llvm::IRBuilderDefaultInserter/*<true>*/ >* builder,
 		llvm::Value* struct_ptr, unsigned int field_index, llvm::Type* struct_llvm_type, const llvm::Twine& name)
-#else
-llvm::Value* createStructGEP(llvm::IRBuilder<true, llvm::ConstantFolder, llvm::IRBuilderDefaultInserter<true> >* builder,
-		llvm::Value* struct_ptr, unsigned int field_index, llvm::Type* struct_llvm_type, const llvm::Twine& name)
-#endif
 {
 	assert(llvm::isa<llvm::StructType>(struct_llvm_type));
-
-#if TARGET_LLVM_VERSION >= 60 // not sure the actual version the type arg was introduced.
 	return builder->CreateStructGEP(struct_llvm_type, struct_ptr, field_index);
-#else
-	return builder->CreateStructGEP(      struct_ptr, field_index);
-#endif
 }
 
 

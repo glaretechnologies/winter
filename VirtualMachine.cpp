@@ -29,18 +29,9 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #pragma warning(push, 0) // Disable warnings
 #endif
 #include "llvm/IR/Module.h"
-#if TARGET_LLVM_VERSION >= 36
 #include "llvm/IR/Verifier.h"
-#else
-#include "llvm/Analysis/Verifier.h"
-#include "llvm/ExecutionEngine/ObjectImage.h"
-#endif
 #include "llvm/IR/Module.h"
-#if TARGET_LLVM_VERSION >= 60
 #include "llvm/IR/LegacyPassManager.h"
-#else
-#include "llvm/PassManager.h"
-#endif
 #include "llvm/IR/DataLayout.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/IPO.h"
@@ -54,11 +45,7 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
-#if TARGET_LLVM_VERSION >= 60
 #include "llvm/Analysis/TargetLibraryInfo.h"
-#else
-#include "llvm/Target/TargetLibraryInfo.h"
-#endif
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/ExecutionEngine/MCJIT.h"
@@ -73,18 +60,13 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/SourceMgr.h"
-#if TARGET_LLVM_VERSION < 150
-#include "llvm/Support/TargetRegistry.h"
-#endif
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Analysis/Lint.h"
 #include "llvm/Support/ErrorHandling.h"
-#if TARGET_LLVM_VERSION >= 60
 #include "llvm/IR/DiagnosticHandler.h"
 #include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/IR/DiagnosticInfo.h"
-#endif
 #ifdef _MSC_VER
 #pragma warning(pop) // Re-enable warnings
 #endif
@@ -812,15 +794,8 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			this->llvm_context = new llvm::LLVMContext();
 			this->llvm_module = new llvm::Module("WinterModule", *this->llvm_context);
 
-#if TARGET_LLVM_VERSION >= 36
 			llvm::EngineBuilder engine_builder(std::unique_ptr<llvm::Module>(this->llvm_module));
-#else
-			llvm::EngineBuilder engine_builder(this->llvm_module);
-#endif
 			engine_builder.setEngineKind(llvm::EngineKind::JIT);
-#if TARGET_LLVM_VERSION <= 34
-			engine_builder.setUseMCJIT(true);
-#endif
 			if(args.small_code_model)
 				engine_builder.setCodeModel(llvm::CodeModel::Small);
 
@@ -828,11 +803,7 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			WinterMemoryManager* mem_manager = new WinterMemoryManager();
 			mem_manager->use_small_code_model = args.small_code_model;
 			mem_manager->func_map = &func_map;
-#if TARGET_LLVM_VERSION >= 36
 			engine_builder.setMCJITMemoryManager(std::unique_ptr<llvm::SectionMemoryManager>(mem_manager));
-#else
-			engine_builder.setMCJITMemoryManager(mem_manager);
-#endif
 
 			// OSX_DEPLOYMENT_TARGET should correspond to the version number in the -mmacosx-version-min
 			// flag passed to the compiler.
@@ -965,16 +936,11 @@ void VirtualMachine::init()
 {
 	llvm::install_fatal_error_handler(fatalErrorHandler, /*user data=*/NULL);
 
-	// Since we will be calling LLVM functions from multiple threads, we need to call this.
-#if TARGET_LLVM_VERSION < 36
-	llvm::llvm_start_multithreaded();
-#endif
-
 	llvm::InitializeNativeTarget();
 	llvm::InitializeNativeTargetAsmPrinter();
 
 	// In LLVM 15.0 + (and maybe earlier), -warn-stack-size was removed and made into a function attribute.
-#if TARGET_LLVM_VERSION >= 60 && TARGET_LLVM_VERSION < 150
+#if TARGET_LLVM_VERSION < 150
 	// Clear any previously parsed options.  We need to do this because the results of a previous call to
 	// llvm::cl::ParseCommandLineOptions() might hang around, if this code is called in a .so that has dlclose() called on it,
 	// but is not actually unloaded.  When the dlopen() is called on the .so again, the global variables will still be around.
@@ -1002,10 +968,6 @@ void VirtualMachine::shutdown() // Calls llvm_shutdown()
 
 	// llvm::llvm_shutdown(); // This calls llvm::llvm_stop_multithreaded() as well (on <= LLVM 3.4 at least).
 
-#if TARGET_LLVM_VERSION < 36
-	llvm::llvm_stop_multithreaded(); // Call this manually since we're not calling llvm::llvm_shutdown().
-#endif
-
 	llvm::remove_fatal_error_handler();
 }
 
@@ -1031,11 +993,7 @@ void VirtualMachine::addExternalFunction(const ExternalFunctionRef& f, llvm::LLV
 }
 
 
-#if TARGET_LLVM_VERSION >= 60
 #define PASS_MANANGER_NAMESPACE llvm::legacy
-#else
-#define PASS_MANANGER_NAMESPACE llvm
-#endif
 
 
 static void optimiseFunctions(PASS_MANANGER_NAMESPACE::FunctionPassManager& fpm, llvm::Module* module, bool verbose)
@@ -1531,7 +1489,6 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 }
 
 
-#if TARGET_LLVM_VERSION >= 60
 struct GlobalValueInternaliser
 {
 	bool operator() (const llvm::GlobalValue& global_val)
@@ -1544,21 +1501,15 @@ struct GlobalValueInternaliser
 
 	std::set<const llvm::Function*> entry_point_funcs;
 };
-#endif
 
 
 static const llvm::DataLayout* getDataLayout(llvm::ExecutionEngine* llvm_exec_engine)
 {
-#if TARGET_LLVM_VERSION >= 60
 	return &llvm_exec_engine->getDataLayout();
-#else
-	return  llvm_exec_engine->getDataLayout();
-#endif
 }
 
 
 // DiagnosticHandler does not seem to be present in earlier LLVMs (e.g. 3.4).
-#if TARGET_LLVM_VERSION >= 60
 struct WinterDiagHandler : public llvm::DiagnosticHandler
 {
 	virtual bool handleDiagnostics(const llvm::DiagnosticInfo& info)
@@ -1589,16 +1540,13 @@ struct WinterDiagHandler : public llvm::DiagnosticHandler
 
 	std::unordered_map<const llvm::Function*, uint64>* stack_sizes;
 };
-#endif
 
 
 void VirtualMachine::build(const VMConstructionArgs& args)
 {
-#if TARGET_LLVM_VERSION >= 60
 	WinterDiagHandler* handler = new WinterDiagHandler();
 	handler->stack_sizes = &this->stack_sizes;
 	this->llvm_context->setDiagnosticHandler(std::unique_ptr<WinterDiagHandler>(handler));
-#endif
 
 	this->llvm_module->setDataLayout(getDataLayout(llvm_exec_engine)->getStringRepresentation());
 
@@ -1691,7 +1639,6 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 	// Dump unoptimised module bitcode to 'unoptimised_module.txt'
 	if(DUMP_MODULE_IR_AND_ASSEMBLY)
 	{
-#if TARGET_LLVM_VERSION >= 36
 		std::error_code errorinfo;
 		llvm::raw_fd_ostream f(
 			"unoptimised_module_IR.txt",
@@ -1702,13 +1649,6 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 			llvm::sys::fs::F_Text
 #endif
 		);
-#else
-		std::string errorinfo;
-		llvm::raw_fd_ostream f(
-			"unoptimised_module_IR.txt",
-			errorinfo
-		);
-#endif
 		this->llvm_module->print(f, NULL);
 
 		conPrint("Dumped unoptimised module IR to '" + PlatformUtils::getCurrentWorkingDirPath() + "/unoptimised_module_IR.txt'.");
@@ -1736,33 +1676,9 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 
 		// Set up the optimizer pipeline.  Start with registering info about how the
 		// target lays out data structures.
-#if TARGET_LLVM_VERSION <= 34
-		fpm.add(new llvm::DataLayout(*this->llvm_exec_engine->getDataLayout()));
-#elif TARGET_LLVM_VERSION <= 36
-		fpm.add(new llvm::DataLayoutPass());
-#else
 		this->llvm_module->setDataLayout(this->target_machine->createDataLayout());
-#endif
 		
-#if TARGET_LLVM_VERSION <= 36
-		//std:: cout << ("Setting triple to " + this->triple) << std::endl;
-		fpm.add(new llvm::TargetLibraryInfo(llvm::Triple(this->triple)));
-#endif
-
 		PASS_MANANGER_NAMESPACE::PassManager pm;
-#if TARGET_LLVM_VERSION <= 34
-		pm.add(new llvm::DataLayout(*this->llvm_exec_engine->getDataLayout()));
-#elif TARGET_LLVM_VERSION <= 36
-		pm.add(new llvm::DataLayoutPass());
-#endif
-
-#if TARGET_LLVM_VERSION <= 36
-		pm.add(new llvm::TargetLibraryInfo(llvm::Triple(this->triple)));
-
-		// Required for loop vectorisation to work properly.
-		target_machine->addAnalysisPasses(fpm);
-		target_machine->addAnalysisPasses(pm);
-#endif
 
 		llvm::PassManagerBuilder builder;
 
@@ -1792,17 +1708,9 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 				}
 			}
 
-#if TARGET_LLVM_VERSION >= 60
 			GlobalValueInternaliser internaliser;
 			internaliser.entry_point_funcs = entry_point_funcs;
 			pm.add(llvm::createInternalizePass(internaliser));
-#else
-			std::vector<const char*> export_list;
-			for(unsigned int i=0; i<export_list_strings.size(); ++i)
-				export_list.push_back(export_list_strings[i].c_str());
-
-			pm.add(llvm::createInternalizePass(export_list));
-#endif
 		}
 		
 		builder.populateFunctionPassManager(fpm);
@@ -1830,7 +1738,6 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 	// Dump module bitcode to 'module.txt'
 	if(DUMP_MODULE_IR_AND_ASSEMBLY)
 	{
-#if TARGET_LLVM_VERSION >= 36
 		std::error_code errorinfo;
 		llvm::raw_fd_ostream f(
 			"optimised_module_IR.txt",
@@ -1841,13 +1748,6 @@ void VirtualMachine::build(const VMConstructionArgs& args)
 			llvm::sys::fs::F_Text
 #endif
 		);
-#else
-		std::string errorinfo;
-		llvm::raw_fd_ostream f(
-			"optimised_module_IR.txt",
-			errorinfo
-		);
-#endif
 		this->llvm_module->print(f, NULL);
 
 		conPrint("Dumped optimised module IR to 'optimised_module_IR.txt'.");
@@ -2268,20 +2168,12 @@ void VirtualMachine::verifyModule(llvm::Module* the_llvm_module)
 {
 	string error_str;
 
-#if TARGET_LLVM_VERSION >= 36
 	llvm::raw_string_ostream error_string_stream(error_str);
 
 	const bool ver_errors = llvm::verifyModule(
 		*the_llvm_module,
 		&error_string_stream
 	);
-#else
-	const bool ver_errors = llvm::verifyModule(
-		*the_llvm_module, 
-		llvm::ReturnStatusAction, // Action to take
-		&error_str
-	);
-#endif
 
 	if(ver_errors)
 	{
@@ -2302,12 +2194,7 @@ void VirtualMachine::verifyModule(llvm::Module* the_llvm_module)
 // Writes the assembly for the module to disk at filename.  Throws Winter::BaseException on failure.
 void VirtualMachine::compileToNativeAssembly(llvm::Module* mod, const std::string& filename) 
 {
-#if TARGET_LLVM_VERSION <= 36
-	target_machine->setAsmVerbosityDefault(true);
-#endif
-
 	std::string err;
-#if TARGET_LLVM_VERSION >= 36
 	std::error_code errcode;
 
 	llvm::raw_fd_ostream raw_out(filename.c_str(), errcode, 
@@ -2320,19 +2207,12 @@ void VirtualMachine::compileToNativeAssembly(llvm::Module* mod, const std::strin
 
 	if(errcode)
 		throw Winter::BaseException("Error when opening file to print assembly to: " + errcode.message());
-#else
-	llvm::raw_fd_ostream raw_out(filename.c_str(), err, llvm::sys::fs::F_None);
-#endif
 	if(!err.empty())
 		throw Winter::BaseException("Error when opening file to print assembly to: " + err);
 
 
 	PASS_MANANGER_NAMESPACE::PassManager pm;
-#if TARGET_LLVM_VERSION < 36
-	pm.add(new llvm::DataLayout(*this->llvm_exec_engine->getDataLayout()));
-#endif
 	
-#if TARGET_LLVM_VERSION >= 60
 	if (this->target_machine->addPassesToEmitFile(
 		pm, 
 		raw_out,
@@ -2346,18 +2226,6 @@ void VirtualMachine::compileToNativeAssembly(llvm::Module* mod, const std::strin
 #endif
 	))
 		throw Winter::BaseException("Unable to emit assembly file!");
-#else
-	pm.add(new llvm::TargetLibraryInfo(llvm::Triple(this->triple)));
-
-	llvm::formatted_raw_ostream out(raw_out, llvm::formatted_raw_ostream::PRESERVE_STREAM);
-
-	if (this->target_machine->addPassesToEmitFile(
-		pm, 
-		out,
-		llvm::TargetMachine::CGFT_AssemblyFile
-	))
-		throw Winter::BaseException("Unable to emit assembly file!");
-#endif
 
 	pm.run(*mod);
 
