@@ -61,7 +61,7 @@ int main(int argc, char** argv)
 		LanguageTests::run();
 		return 0;
 #else
-		std::cerr << "BUILD_TESTS not enabled, can't run tests." << std::endl;
+		stdErrPrint("BUILD_TESTS not enabled, can't run tests.");
 		return 1;
 #endif
 	}
