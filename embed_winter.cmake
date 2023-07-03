@@ -5,6 +5,7 @@ cmake_minimum_required (VERSION 3.0)
 #
 # WINTER_DIR				- Path to the directory this file is in.
 # WINTER_LLVM_VERSION		- LLVM version to use.  Should be one of 6.0.0, 8.0.0, 11.0.0, 15.0.7, 16.0.6.
+# WINTER_LLVM_DIR			- Directory where LLVM is built.  Used for executing llvm-config on Mac and Linux.
 # GLARE_CORE_TRUNK_DIR		- optional, used as a path prefix for utils files etc. from glare-core repo, whose paths are returned in WINTER_UTIL_FILES etc.
 # WINTER_USE_OPENCL			- set to TRUE or FALSE, depending on if you want runtime OpenCL execution support.
 # WINTER_INCLUDE_TESTS		- set to TRUE or FALSE, depending if you want to include unit testing code.
@@ -33,6 +34,10 @@ endif()
 
 if(NOT DEFINED WINTER_LLVM_VERSION)
 	MESSAGE(FATAL_ERROR "WINTER_LLVM_VERSION CMake variable must be defined before including embed_winter.cmake.")
+endif()
+
+if(NOT DEFINED WINTER_LLVM_DIR)
+	MESSAGE(FATAL_ERROR "WINTER_LLVM_DIR CMake variable must be defined before including embed_winter.cmake.")
 endif()
 
 if(NOT DEFINED WINTER_USE_OPENCL)
@@ -499,6 +504,11 @@ if(WIN32)
 		
 else()
 	# get the llvm libs
-	execute_process(COMMAND "${LLVM_DIR}/bin/llvm-config" "--ldflags" "--libs" "all" OUTPUT_VARIABLE LLVM_LIBS_OUT OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+	if(NOT EXISTS "${WINTER_LLVM_DIR}/bin/llvm-config")
+		message(FATAL_ERROR "Could not find file '${WINTER_LLVM_DIR}/bin/llvm-config'.  Does an LLVM build exist there?")
+	endif()
+
+	execute_process(COMMAND "${WINTER_LLVM_DIR}/bin/llvm-config" "--ldflags" "--libs" "all" OUTPUT_VARIABLE LLVM_LIBS_OUT OUTPUT_STRIP_TRAILING_WHITESPACE)
 	string(REPLACE "\n" " " WINTER_LLVM_LIBS ${LLVM_LIBS_OUT})
 endif()
