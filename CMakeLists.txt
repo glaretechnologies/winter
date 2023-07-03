@@ -87,6 +87,8 @@ set_target_properties(${CURRENT_TARGET} PROPERTIES
 	CXX_STANDARD 17 # Needed for LLVM 16.0.0
 )
 
+add_definitions("-DBUILD_TESTS=1")
+
 if(WIN32)
 	add_definitions(-DUNICODE -D_UNICODE)
 	add_definitions(/MP) # Build with multiple processes
@@ -102,15 +104,13 @@ if(WIN32)
 	add_definitions(-D__SSE__ -D__SSE2__ -D__SSE3__ -D__SSSE3__ -D__SSE4_1__)
 	
 	# Append optimisation flags.
-	SET(CMAKE_CXX_FLAGS_DEBUG			"${CMAKE_CXX_FLAGS_DEBUG}			-DBUILD_TESTS=1")	
-	SET(CMAKE_CXX_FLAGS_RELWITHDEBINFO	"${CMAKE_CXX_FLAGS_RELWITHDEBINFO}	/O2 -D_SECURE_SCL=0 -DNDEBUG -DBUILD_TESTS=1")
-	SET(CMAKE_CXX_FLAGS_RELEASE			"${CMAKE_CXX_FLAGS_RELEASE}			/O2 -D_SECURE_SCL=0 -DNDEBUG /Zi -DBUILD_TESTS=1") # /Zi to produce a PDB file
+	SET(CMAKE_CXX_FLAGS_DEBUG			"${CMAKE_CXX_FLAGS_DEBUG}			")	
+	SET(CMAKE_CXX_FLAGS_RELWITHDEBINFO	"${CMAKE_CXX_FLAGS_RELWITHDEBINFO}	/O2 -D_SECURE_SCL=0 -DNDEBUG")
+	SET(CMAKE_CXX_FLAGS_RELEASE			"${CMAKE_CXX_FLAGS_RELEASE}			/O2 -D_SECURE_SCL=0 -DNDEBUG /Zi") # /Zi to produce a PDB file
 	
 elseif(APPLE)
 	
-	get_target_property(OLD_TARGET_PROPERTIES ${CURRENT_TARGET} LINK_FLAGS)
-	set_target_properties(${CURRENT_TARGET} PROPERTIES LINK_FLAGS "${OLD_TARGET_PROPERTIES} -framework CoreFoundation")
- 
+
 
 else() # Linux
 	SET(LINUX_C_CXX_OPTIONS "-Wall -pthread -mmmx -msse -msse2 -mssse3 -msse4.1")
@@ -120,8 +120,8 @@ else() # Linux
 	SET(COMMON_C_CXX_OPTIONS_RELEASE			"${LINUX_C_CXX_OPTIONS} -O3 -DNDEBUG")
 
 	# Append flags.
-	SET(CMAKE_CXX_FLAGS_DEBUG			"${CMAKE_CXX_FLAGS_DEBUG}			${COMMON_C_CXX_OPTIONS_DEBUG}  -Wno-reorder -DBUILD_TESTS=1")
-	SET(CMAKE_CXX_FLAGS_RELWITHDEBINFO	"${CMAKE_CXX_FLAGS_RELWITHDEBINFO}	${COMMON_C_CXX_OPTIONS_RELWITHDEBINFO}  -Wno-reorder -DBUILD_TESTS=1")
+	SET(CMAKE_CXX_FLAGS_DEBUG			"${CMAKE_CXX_FLAGS_DEBUG}			${COMMON_C_CXX_OPTIONS_DEBUG}  -Wno-reorder")
+	SET(CMAKE_CXX_FLAGS_RELWITHDEBINFO	"${CMAKE_CXX_FLAGS_RELWITHDEBINFO}	${COMMON_C_CXX_OPTIONS_RELWITHDEBINFO}  -Wno-reorder")
 	SET(CMAKE_CXX_FLAGS_RELEASE			"${CMAKE_CXX_FLAGS_RELEASE}			${COMMON_C_CXX_OPTIONS_RELEASE}  -Wno-reorder")
 	
 	SET(CMAKE_C_FLAGS_DEBUG				"${CMAKE_C_FLAGS_DEBUG}				${COMMON_C_CXX_OPTIONS_DEBUG}")
@@ -165,12 +165,26 @@ if(WIN32)
 	
 	
 	target_link_libraries(${CURRENT_TARGET} 
-		${WINTER_LLVM_LIBS})
+		${WINTER_LLVM_LIBS}
+	)
+
+elseif(APPLE)
+
+	target_link_libraries(${CURRENT_TARGET} 
+		${WINTER_LLVM_LIBS}
+		dl
+		pthread
+		curses # used by LLVM
+		z # Used by llvm 
+		"-framework Foundation"
+		"-framework Carbon"
+	)
+
 else()
 	
 	target_link_libraries(${CURRENT_TARGET} 
 		${WINTER_LLVM_LIBS}
 		dl
 		pthread
-		)
+	)
 endif()
