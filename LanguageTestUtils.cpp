@@ -34,7 +34,9 @@
 #endif
 //#include "utils/Obfuscator.h"
 
+#if WINTER_OPENCL_SUPPORT
 #define WINTER_OPENCL_TESTS 1
+#endif
 static const bool DUMP_OPENCL_C_SOURCE = false; // Dumps to opencl_source.c
 
 static const bool PRINT_MEM_BOUNDS_AND_USAGE = false;
@@ -49,7 +51,7 @@ static const bool CHECK_STACK_USAGE = true;
 
 
 // OpenCL:
-#if WINTER_OPENCL_TESTS
+#if WINTER_OPENCL_SUPPORT && WINTER_OPENCL_TESTS
 #include <opencl/OpenCL.h>
 #include <opencl/OpenCLBuffer.h>
 #include <opencl/OpenCLKernel.h>
