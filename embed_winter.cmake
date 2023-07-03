@@ -1,6 +1,3 @@
-cmake_minimum_required (VERSION 3.0)
-
-
 # Cmake variables that should be set before including this file:
 #
 # WINTER_DIR				- Path to the directory this file is in.
