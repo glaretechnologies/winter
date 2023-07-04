@@ -8,7 +8,7 @@ set(CURRENT_TARGET winter)
 set(WINTER_USE_OPENCL OFF CACHE BOOL "Enable OpenCL support, currently just used for test execution.")
 set(WINTER_INCLUDE_TESTS TRUE)
 
-SET(GLARE_CORE_TRUNK_DIR "" CACHE PATH "Path to glare-core repo trunk dir.")
+SET(GLARE_CORE_TRUNK_DIR "../glare-core" CACHE PATH "Path to glare-core repo trunk dir.")
 
 if(GLARE_CORE_TRUNK_DIR STREQUAL "")
 	MESSAGE(FATAL_ERROR "ERROR: Please set GLARE_CORE_TRUNK_DIR to the path to glare-core repo trunk dir, e.g. -DGLARE_CORE_TRUNK_DIR=path/to/glare/core")
@@ -23,12 +23,13 @@ endif()
 
 
 
-
 SET(WINTER_LLVM_VERSION "15.0.7" CACHE STRING "LLVM version to use")
 
 
-MESSAGE("Winter LLVM version: ${WINTER_LLVM_VERSION}")
-
+MESSAGE("Building with OpenCL support: ${WINTER_USE_OPENCL} (-DWINTER_USE_OPENCL=OFF/ON))")
+MESSAGE("Libraries dir: ${LIBS_DIR} (-DLIBS_DIR)")
+MESSAGE("Glare-core trunk dir: ${GLARE_CORE_TRUNK_DIR} (-DGLARE_CORE_TRUNK_DIR)")
+MESSAGE("Winter LLVM version: ${WINTER_LLVM_VERSION} (-DWINTER_LLVM_VERSION)")
 
 
 
@@ -55,8 +56,7 @@ else() # Mac or Linux.
 
 endif()
 
-MESSAGE("WINTER_LLVM_DIR: ${WINTER_LLVM_DIR}")
-MESSAGE("Building with OpenCL support: ${WINTER_USE_OPENCL}")
+MESSAGE("LLVM dir: ${WINTER_LLVM_DIR}")
 
 SET(WINTER_DIR ".")
 
