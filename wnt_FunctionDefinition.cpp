@@ -1173,10 +1173,10 @@ llvm::Function* FunctionDefinition::getOrInsertFunction(
 			// Set SRET and NoAlias attributes.
 #if TARGET_LLVM_VERSION >= 150
 			llvm::AttrBuilder builder(module->getContext());
-			builder.addStructRetAttr(this->returnType()->LLVMType(*module));
+			//builder.addStructRetAttr(this->returnType()->LLVMType(*module)); // NOTE: Disable SRET for now, see https://discourse.llvm.org/t/crash-calling-back-into-a-c-function-on-a-mac-m1/71784/2
 #else
 			llvm::AttrBuilder builder;
-			builder.addAttribute(llvm::Attribute::StructRet);
+			//builder.addAttribute(llvm::Attribute::StructRet);
 #endif
 			builder.addAttribute(llvm::Attribute::NoAlias);
 			setArgumentAttributes(&module->getContext(), AI, 1, builder);
