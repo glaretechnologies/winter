@@ -73,6 +73,7 @@ Generated at Mon Sep 13 22:23:44 +1200 2010
 #include <cassert>
 #include <fstream>
 #include <unordered_map>
+#include "math.h"
 
 
 using std::vector;
@@ -530,6 +531,8 @@ public:
 #endif
 		else if(name == "logf")
 			return (uint64_t)logf;
+		else if(name == "___sincosf_stret")
+			return (uint64)__sincosf_stret;
 		
 		else if(name == "sin")
 			return (uint64_t)static_cast<double(*)(double)>(sin); // Use static_cast to pick the correct overload.
@@ -583,6 +586,8 @@ public:
 #endif
 		else if(name == "_log")
 			return (uint64_t)static_cast<double(*)(double)>(log);
+		else if(name == "___sincos_stret")
+			return (uint64)__sincos_stret;
 		else if(name == "_fmod")
 			return (uint64_t)static_cast<double(*)(double, double)>(fmod);
 #if defined(OSX)

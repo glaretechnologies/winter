@@ -2510,6 +2510,10 @@ static void stringTests()
 
 static void testMathsFunctions()
 {
+	// Test sin and cos together, which may generate a call to ___sincosf_stret. (On Mac)
+	testMainFloatArg("def main(float x) float : sin(x) + cos(x)", 9.0f, sin(9.0f) + cos(9.0f));
+	testMainDoubleArg("def main(double x) double : sin(x) + cos(x)", 9.0, sin(9.0) + cos(9.0));
+
 	// abs
 	testMainFloatArg("def main(float x) float : abs(x)", 9.0f, 9.0f);
 	testMainFloatArg("def main(float x) float : abs(x)", -9.0f, 9.0f);
