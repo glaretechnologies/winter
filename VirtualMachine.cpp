@@ -564,6 +564,8 @@ public:
 #endif
 		else if(name == "_logf")
 			return (uint64_t)logf;
+		else if(name == "_fmodf")
+			return (uint64_t)fmodf;
 		else if(name == "_memcpy")
 			return (uint64_t)memcpy;
 		// OS X double precision functions:
@@ -581,6 +583,8 @@ public:
 #endif
 		else if(name == "_log")
 			return (uint64_t)static_cast<double(*)(double)>(log);
+		else if(name == "_fmod")
+			return (uint64_t)static_cast<double(*)(double, double)>(fmod);
 #if defined(OSX)
 		else if(name == "_memset_pattern16")
 			return (uint64_t)memset_pattern16;
@@ -818,7 +822,11 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 #else // else if !defined(OSX_DEPLOYMENT_TARGET):
 			this->triple = llvm::sys::getProcessTriple();
 #endif
+
+#if defined(__x86_64__) || defined(_M_X64)
 			this->triple.append("-elf"); // MCJIT requires the -elf suffix currently, see https://groups.google.com/forum/#!topic/llvm-dev/DOmHEXhNNWw
+			// However -elf causes miscompilation on Apple M1: https://discourse.llvm.org/t/crash-calling-back-into-a-c-function-on-a-mac-m1/71784
+#endif
 
 
 			// PlatformUtils::CPUInfo cpu_info;
