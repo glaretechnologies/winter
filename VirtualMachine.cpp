@@ -531,8 +531,10 @@ public:
 #endif
 		else if(name == "logf")
 			return (uint64_t)logf;
+#if defined(__APPLE__)
 		else if(name == "___sincosf_stret")
 			return (uint64)__sincosf_stret;
+#endif
 		
 		else if(name == "sin")
 			return (uint64_t)static_cast<double(*)(double)>(sin); // Use static_cast to pick the correct overload.
@@ -586,11 +588,11 @@ public:
 #endif
 		else if(name == "_log")
 			return (uint64_t)static_cast<double(*)(double)>(log);
-		else if(name == "___sincos_stret")
-			return (uint64)__sincos_stret;
 		else if(name == "_fmod")
 			return (uint64_t)static_cast<double(*)(double, double)>(fmod);
-#if defined(OSX)
+#if defined(__APPLE__)
+		else if(name == "___sincos_stret")
+			return (uint64)__sincos_stret;
 		else if(name == "_memset_pattern16")
 			return (uint64_t)memset_pattern16;
 #endif

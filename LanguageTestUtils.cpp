@@ -43,7 +43,7 @@ static const bool PRINT_MEM_BOUNDS_AND_USAGE = false;
 
 
 // Checking stack size usage doesn't seem to be working properly on macOS yet.
-#if defined(OSX)
+#if defined(__APPLE__)
 static const bool CHECK_STACK_USAGE = false;
 #else
 static const bool CHECK_STACK_USAGE = true;
@@ -134,7 +134,7 @@ static GLARE_NO_INLINE void* getStackPointer()
 #endif
 }
 
-#endif // !defined(OSX)
+#endif
 
 
 static bool epsEqual(float x, float y)
