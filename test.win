@@ -1,3 +1,4 @@
+def main() : 123.f
 
 #has_binary_mult
 
@@ -7,9 +8,10 @@
 
 #def square<T>(T x) T : x * x
 
-def main() float : 
-	let z = [1.0, 2.0, 3.0, 4.0]v
-	(e0(z) + e1(z)) + (e2(z) + e3(z))
+#def main() float : 
+#	let z = [1.0, 2.0, 3.0, 4.0]v
+#	in
+#		(e0(z) + e1(z)) + (e2(z) + e3(z))
 
 
 #decl map<T1, T2>(function<T1, T2>, array<T1>) array<T2>
@@ -107,6 +109,3 @@ def main() float :
 #def square(int x) int : 
 #	let y = f(x)
 #	x*y
-
-
-

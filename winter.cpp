@@ -1,7 +1,7 @@
 /*=====================================================================
 winter.cpp
 ----------
-Copyright Glare Technologies Limited 2015 -
+Copyright Glare Technologies Limited 2023 -
 =====================================================================*/
 
 
@@ -24,10 +24,9 @@ Copyright Glare Technologies Limited 2015 -
 #include "utils/ArgumentParser.h"
 #include <cassert>
 #include <fstream>
-using namespace Winter;
 
 
-typedef float(*float_void_func)();
+typedef float(*floatVoidFuncType)();
 
 
 int main(int argc, char** argv)
@@ -40,7 +39,7 @@ int main(int argc, char** argv)
 		return 1;
 	}
 
-	VirtualMachine::init();
+	Winter::VirtualMachine::init();
 
 	std::vector<std::string> arg_vec;
 	for(int i=0; i<argc; ++i)
@@ -58,7 +57,7 @@ int main(int argc, char** argv)
 	{
 #if BUILD_TESTS
 		conPrint("Running Winter tests...");
-		LanguageTests::run();
+		Winter::LanguageTests::run();
 		return 0;
 #else
 		stdErrPrint("BUILD_TESTS not enabled, can't run tests.");
@@ -69,7 +68,7 @@ int main(int argc, char** argv)
 	{
 #if BUILD_TESTS
 		// e.g. --fuzz N:/winter/trunk d:/fuzz_output
-		fuzzTests(
+		Winter::fuzzTests(
 			args.getArgStringValue("--fuzz", 0), // fuzzer input dir
 			args.getArgStringValue("--fuzz", 1) // fuzzer output dir
 		);
@@ -79,7 +78,7 @@ int main(int argc, char** argv)
 	else if(args.isArgPresent("--astfuzz"))
 	{
 #if BUILD_TESTS
-		doASTFuzzTests(
+		Winter::doASTFuzzTests(
 			args.getArgStringValue("--astfuzz", 0), // fuzzer input dir
 			args.getArgStringValue("--astfuzz", 1) // fuzzer output dir
 		);
@@ -88,7 +87,7 @@ int main(int argc, char** argv)
 	}
 	else if(args.isArgPresent("--perftest"))
 	{
-		PerfTests::run();
+		Winter::PerfTests::run();
 		return 0;
 	}
 
@@ -97,59 +96,55 @@ int main(int argc, char** argv)
 		std::string filecontents;
 		FileUtils::readEntireFile(argv[1], filecontents);
 
-		VMConstructionArgs vm_args;
-		vm_args.source_buffers.push_back(SourceBufferRef(new SourceBuffer(argv[1], filecontents)));
+		const Winter::FunctionSignature main_sig(/*name=*/"main", /*param_types=*/std::vector<Winter::TypeVRef>());
 
-		MathsFuncs::appendExternalMathsFuncs(vm_args.external_functions);
+		Winter::VMConstructionArgs vm_args;
+		vm_args.source_buffers.push_back(new Winter::SourceBuffer(argv[1], filecontents));
+		vm_args.entry_point_sigs.push_back(main_sig); // It's important to set this, so main() is not optimised away as dead code.
+		Winter::MathsFuncs::appendExternalMathsFuncs(vm_args.external_functions);
 
-		VirtualMachine vm(vm_args);
-
+		Winter::VirtualMachine vm(vm_args);
 
 		// Get main function
-		FunctionSignature mainsig("main", std::vector<TypeVRef>());
-		Reference<FunctionDefinition> maindef = vm.findMatchingFunction(mainsig);
+		Reference<Winter::FunctionDefinition> maindef = vm.findMatchingFunction(main_sig);
+		if(maindef.isNull())
+			throw Winter::BaseException("Failed to find function with signature " + main_sig.toString());
 
+		// Check return type
+		Winter::TypeVRef float_type = new Winter::Float();
+		if(*maindef->returnType() != *float_type)
+			throw Winter::BaseException("main must return a float");
 
-		void* f = vm.getJittedFunction(mainsig);
+		void* f = vm.getJittedFunction(main_sig);
 
 		// cast to correct type
-		float_void_func mainf = (float_void_func)f;
+		floatVoidFuncType jitted_main = (floatVoidFuncType)f;
 
 		conPrint("Calling JIT'd function...");
 
 		// Call the JIT'd function
-		const float result = mainf();
+		const float result = jitted_main();
 
 		conPrint("JIT'd function returned " + toString(result));
 
 
-		VMState vmstate;
-		vmstate.func_args_start.push_back(0);
+		// Call the interpreted function
+		Winter::VMState vmstate;
+		vmstate.func_args_start.push_back(0); // Push index at which the function arguments start
 
-		assert(maindef->built_llvm_function);
-		ValueRef retval = maindef->invoke(vmstate);
+		Winter::ValueRef retval = maindef->invoke(vmstate);
 
 		vmstate.func_args_start.pop_back();
 
-		conPrint("Program returned " + retval->toString());
-
+		conPrint("Interpreted main returned " + retval->toString());
 
 		assert(vmstate.argument_stack.empty());
-		//assert(vmstate.let_stack.empty());
 		assert(vmstate.func_args_start.empty());
-		//assert(vmstate.let_stack_start.empty());
-		//assert(vmstate.working_stack.empty());
-		
-
-		/*for(unsigned int i=0; i<root->children.size(); ++i)
-		{
-			FunctionDefinition* def = dynamic_cast<FunctionDefinition*>(root->children[i].getPointer());
-
-			if(def->sig.name == "main")
-			{
-				def->exec(vmstate);
-			}
-		}*/
+	}
+	catch(Winter::ExceptionWithPosition& e)
+	{
+		stdErrPrint(e.messageWithPosition());
+		return 1;
 	}
 	catch(Winter::BaseException& e)
 	{
