@@ -867,11 +867,16 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			engine_builder.setErrorStr(&error_string);
 
 			// Select the host computer architecture as the target.
+
+			llvm::SmallVector<std::string, 4> mattr;
+			if(!vm_args.allow_AVX)
+				mattr.push_back("-avx"); // -avx disables AVX support
+
 			this->target_machine = engine_builder.selectTarget(
 				llvm::Triple(this->triple), // target triple
 				"",  // march
 				cpu_name, // mcpu - e.g. "corei7", "core-avx2"
-				llvm::SmallVector<std::string, 4>());
+				mattr);
 
 			if(this->target_machine == NULL)
 				throw BaseException("Winter::VirtualMachine(): Failed to select target: " + error_string);

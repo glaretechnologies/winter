@@ -59,7 +59,7 @@ class VMConstructionArgs
 public:
 	VMConstructionArgs() : allow_unsafe_operations(false), emit_trace_code(false), build_llvm_code(true), floating_point_literals_default_to_double(true), 
 		try_coerce_int_to_double_first(true), real_is_double(true), opencl_double_support(true), comments_in_opencl_output(true), emit_in_bound_asserts(false), emit_opencl_printf_calls(true),
-		small_code_model(false), do_constant_folding(true), optimise_for_opencl(false) {}
+		small_code_model(false), do_constant_folding(true), optimise_for_opencl(false), allow_AVX(true) {}
 
 	std::vector<ExternalFunctionRef> external_functions;
 	std::vector<SourceBufferRef> source_buffers;
@@ -99,6 +99,8 @@ public:
 	bool do_constant_folding; // A compiler optimisation.  True by default.  Can be disabled for testing purposed.
 
 	bool optimise_for_opencl; // False by default. Set to true if building for OpenCL.  NOTE: is this just !build_llvm_code in practice?
+
+	bool allow_AVX; // Allow AVX instructions in the emitted code.  True by default.
 };
 
 
