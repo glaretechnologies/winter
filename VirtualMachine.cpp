@@ -869,8 +869,11 @@ VirtualMachine::VirtualMachine(const VMConstructionArgs& args)
 			// Select the host computer architecture as the target.
 
 			llvm::SmallVector<std::string, 4> mattr;
+
+#if defined(__x86_64__) || defined(_M_X64) // If on x64 architecture:
 			if(!vm_args.allow_AVX)
 				mattr.push_back("-avx"); // -avx disables AVX support
+#endif
 
 			this->target_machine = engine_builder.selectTarget(
 				llvm::Triple(this->triple), // target triple
