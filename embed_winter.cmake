@@ -193,8 +193,8 @@ ${GLARE_CORE_TRUNK_DIR}/utils/Timer.h
 ${GLARE_CORE_TRUNK_DIR}/utils/VRef.h
 ${GLARE_CORE_TRUNK_DIR}/utils/UTF8Utils.cpp
 ${GLARE_CORE_TRUNK_DIR}/utils/UTF8Utils.h
-${GLARE_CORE_TRUNK_DIR}/utils/PoolAllocator.cpp
-${GLARE_CORE_TRUNK_DIR}/utils/PoolAllocator.h
+${GLARE_CORE_TRUNK_DIR}/utils/FastPoolAllocator.cpp
+${GLARE_CORE_TRUNK_DIR}/utils/FastPoolAllocator.h
 ${GLARE_CORE_TRUNK_DIR}/utils/RuntimeCheck.cpp
 ${GLARE_CORE_TRUNK_DIR}/utils/RuntimeCheck.h
 )

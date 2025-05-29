@@ -10,7 +10,7 @@ Copyright Glare Technologies Limited 2025 -
 #include "BaseException.h"
 #include <utils/RefCounted.h>
 #include <utils/Reference.h>
-#include <utils/PoolAllocator.h>
+#include <utils/FastPoolAllocator.h>
 #include <string>
 #include <vector>
 #include <map>
@@ -30,7 +30,7 @@ public:
 	FloatValue* allocFloatValue(float v);
 	void freeFloatValue(FloatValue* value);
 
-	glare::PoolAllocator float_allocator;
+	glare::FastPoolAllocator float_allocator;
 };
 
 }

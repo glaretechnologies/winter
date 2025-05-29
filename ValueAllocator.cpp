@@ -14,14 +14,14 @@ namespace Winter
 
 
 ValueAllocator::ValueAllocator()
-:	float_allocator(/*ob alloc size=*/sizeof(Winter::FloatValue), 16, /*block capacity=*/64, /*use basic free list=*/true)
+:	float_allocator(/*ob alloc size=*/sizeof(Winter::FloatValue), 16, /*block capacity=*/64)
 {
 }
 
 
 FloatValue* ValueAllocator::allocFloatValue(float v)
 {
-	glare::PoolAllocator::AllocResult alloc_res = float_allocator.alloc();
+	glare::FastPoolAllocator::AllocResult alloc_res = float_allocator.alloc();
 
 	Winter::FloatValue* val = new(alloc_res.ptr) FloatValue(v); // placement new
 	val->value_allocator = this;
