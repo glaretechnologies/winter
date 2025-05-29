@@ -8,6 +8,7 @@ Copyright Glare Technologies Limited 2016 -
 
 #include "wnt_ASTNode.h"
 #include "wnt_FunctionDefinition.h"
+#include "ValueAllocator.h"
 #include "utils/StringUtils.h"
 #ifdef _MSC_VER // If compiling with Visual C++
 #pragma warning(push, 0) // Disable warnings
@@ -142,6 +143,20 @@ const std::string TupleValue::toString() const
 const std::string VoidPtrValue::toString() const
 {
 	return "void* " + ::toString((uint64)this->value);
+}
+
+
+void doDestroyValue(Winter::Value* val)
+{
+	if(val->value_allocator)
+	{
+		if(val->valueType() == Value::ValueType_Float)
+			val->value_allocator->freeFloatValue(static_cast<FloatValue*>(val));
+		else
+			delete val;
+	}
+	else
+		delete val;
 }
 
 

@@ -11,7 +11,7 @@ namespace Winter
 {
 
 
-static const IntervalSetInt64 updateIndexBounds(const ComparisonExpression& comp_expr, const ASTNodeRef& index, const IntervalSetInt64& bounds)
+static const IntervalSetInt64 updateIndexBounds(const ComparisonExpression& comp_expr, const ASTNodeRef& index, const IntervalSetInt64& bounds, const Reference<ValueAllocator>& value_allocator)
 {
 	// We know comp_expr is of type 'i T x' where T is some comparison token
 
@@ -21,7 +21,7 @@ static const IntervalSetInt64 updateIndexBounds(const ComparisonExpression& comp
 		if(comp_expr.b->isConstant() && comp_expr.b->type()->getType() == Type::IntType) // if the x value is constant
 		{
 			// Evaluate the index expression
-			VMState vmstate;
+			VMState vmstate(value_allocator);
 			vmstate.func_args_start.push_back(0);
 
 			ValueRef retval = comp_expr.b->exec(vmstate);
@@ -88,7 +88,7 @@ static float myNextFloat(float x)
 
 
 
-static const IntervalSetFloat updateBounds(const ComparisonExpression& comp_expr, const ASTNodeRef& index, const IntervalSetFloat& bounds)
+static const IntervalSetFloat updateBounds(const ComparisonExpression& comp_expr, const ASTNodeRef& index, const IntervalSetFloat& bounds, const Reference<ValueAllocator>& value_allocator)
 {
 	// We know comp_expr is of type 'i T x' where T is some comparison token
 
@@ -98,7 +98,7 @@ static const IntervalSetFloat updateBounds(const ComparisonExpression& comp_expr
 		if(comp_expr.b->isConstant() && comp_expr.b->type()->getType() == Type::FloatType) // if the x value is constant
 		{
 			// Evaluate the index expression
-			VMState vmstate;
+			VMState vmstate(value_allocator);
 			vmstate.func_args_start.push_back(0);
 
 			ValueRef retval = comp_expr.b->exec(vmstate);
@@ -131,7 +131,7 @@ static const IntervalSetFloat updateBounds(const ComparisonExpression& comp_expr
 }
 
 
-IntervalSetInt64 ProofUtils::getInt64Range(std::vector<ASTNode*>& stack, const ASTNodeRef& integer_value)
+IntervalSetInt64 ProofUtils::getInt64Range(std::vector<ASTNode*>& stack, const ASTNodeRef& integer_value, const Reference<ValueAllocator>& value_allocator)
 {
 	// Lower and upper inclusive bounds
 	IntervalSetInt64 bounds;
@@ -220,21 +220,21 @@ IntervalSetInt64 ProofUtils::getInt64Range(std::vector<ASTNode*>& stack, const A
 						if(bin->a->nodeType() == ASTNode::ComparisonExpressionType)
 						{
 							ComparisonExpression* a = static_cast<ComparisonExpression*>(bin->a.getPointer());
-							bounds = updateIndexBounds(*a, integer_value, bounds);
+							bounds = updateIndexBounds(*a, integer_value, bounds, value_allocator);
 						}
 
 						// Process B
 						if(bin->b->nodeType() == ASTNode::ComparisonExpressionType)
 						{
 							ComparisonExpression* b = static_cast<ComparisonExpression*>(bin->b.getPointer());
-							bounds = updateIndexBounds(*b, integer_value, bounds);
+							bounds = updateIndexBounds(*b, integer_value, bounds, value_allocator);
 						}
 					}
 				}
 				else if(if_node->condition->nodeType() == ASTNode::ComparisonExpressionType)
 				{
 					ComparisonExpression* comp = static_cast<ComparisonExpression*>(if_node->condition.getPointer());
-					bounds = updateIndexBounds(*comp, integer_value, bounds);
+					bounds = updateIndexBounds(*comp, integer_value, bounds, value_allocator);
 				}
 			}
 		}
@@ -244,7 +244,7 @@ IntervalSetInt64 ProofUtils::getInt64Range(std::vector<ASTNode*>& stack, const A
 }
 
 
-IntervalSetFloat ProofUtils::getFloatRange(std::vector<ASTNode*>& stack, const ASTNodeRef& float_value)
+IntervalSetFloat ProofUtils::getFloatRange(std::vector<ASTNode*>& stack, const ASTNodeRef& float_value, const Reference<ValueAllocator>& value_allocator)
 {
 	// Lower and upper inclusive bounds
 	IntervalSetFloat bounds(-std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity());
@@ -284,21 +284,21 @@ IntervalSetFloat ProofUtils::getFloatRange(std::vector<ASTNode*>& stack, const A
 						if(bin->a->nodeType() == ASTNode::ComparisonExpressionType)
 						{
 							ComparisonExpression* a = static_cast<ComparisonExpression*>(bin->a.getPointer());
-							bounds = updateBounds(*a, float_value, bounds);
+							bounds = updateBounds(*a, float_value, bounds, value_allocator);
 						}
 
 						// Process B
 						if(bin->b->nodeType() == ASTNode::ComparisonExpressionType)
 						{
 							ComparisonExpression* b = static_cast<ComparisonExpression*>(bin->b.getPointer());
-							bounds = updateBounds(*b, float_value, bounds);
+							bounds = updateBounds(*b, float_value, bounds, value_allocator);
 						}
 					}
 				}
 				else if(if_node->condition->nodeType() == ASTNode::ComparisonExpressionType)
 				{
 					ComparisonExpression* comp = static_cast<ComparisonExpression*>(if_node->condition.getPointer());
-					bounds = updateBounds(*comp, float_value, bounds);
+					bounds = updateBounds(*comp, float_value, bounds, value_allocator);
 				}
 			}
 		}

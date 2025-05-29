@@ -118,7 +118,7 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 				if(this->argument_expressions.size() != 1) throw ExceptionWithPosition("Invalid num args.", errorContext(this));
 				ValueRef arg0 = this->argument_expressions[0]->exec(vmstate);
 				FLOAT1_TO_FLOAT_TYPE f = (FLOAT1_TO_FLOAT_TYPE)this->static_target_function->external_function->func;
-				return new FloatValue(f(checkedCast<FloatValue>(arg0)->value));
+				return vmstate.value_allocator->allocFloatValue(f(checkedCast<FloatValue>(arg0)->value));
 			}
 			else if(static_target_function->args.size() == 2 && 
 				(static_target_function->args[0].type->getType() == Type::FloatType) &&
@@ -128,7 +128,7 @@ ValueRef FunctionExpression::exec(VMState& vmstate)
 				ValueRef arg0 = this->argument_expressions[0]->exec(vmstate);
 				ValueRef arg1 = this->argument_expressions[1]->exec(vmstate);
 				FLOAT2_TO_FLOAT_TYPE f = (FLOAT2_TO_FLOAT_TYPE)this->static_target_function->external_function->func;
-				return new FloatValue(f(checkedCast<FloatValue>(arg0)->value, checkedCast<FloatValue>(arg1)->value));
+				return vmstate.value_allocator->allocFloatValue(f(checkedCast<FloatValue>(arg0)->value, checkedCast<FloatValue>(arg1)->value));
 			}
 		}
 
@@ -632,7 +632,7 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 
 			try
 			{
-				VMState vmstate;
+				VMState vmstate(payload.linker ? payload.linker->value_allocator : nullptr);
 				vmstate.func_args_start.push_back(0);
 
 				ValueRef res = this->argument_expressions[1]->exec(vmstate);
@@ -668,7 +668,7 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 			int64 index;
 			try
 			{
-				VMState vmstate;
+				VMState vmstate(payload.linker ? payload.linker->value_allocator : nullptr);
 				vmstate.func_args_start.push_back(0);
 
 				ValueRef res = this->argument_expressions[1]->exec(vmstate);
@@ -710,7 +710,7 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 				// Eval first arg (to get function 'f')
 				try
 				{
-					VMState vmstate;
+					VMState vmstate(payload.linker ? payload.linker->value_allocator : nullptr);
 					vmstate.func_args_start.push_back(0);
 					ValueRef res = this->argument_expressions[0]->exec(vmstate);
 
@@ -736,7 +736,7 @@ void FunctionExpression::traverse(TraversalPayload& payload, std::vector<ASTNode
 				// Eval first arg (to get function 'f')
 				try
 				{
-					VMState vmstate;
+					VMState vmstate(payload.linker ? payload.linker->value_allocator : nullptr);
 					vmstate.func_args_start.push_back(0);
 					ValueRef res = this->argument_expressions[0]->exec(vmstate);
 
@@ -1186,7 +1186,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 			if(this->argument_expressions[1]->isConstant())
 			{
 				// Evaluate the index expression
-				VMState vmstate;
+				VMState vmstate(payload.linker ? payload.linker->value_allocator : nullptr);
 				vmstate.func_args_start.push_back(0);
 
 				ValueRef retval = this->argument_expressions[1]->exec(vmstate);
@@ -1214,7 +1214,8 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 				//Vec2<int> i_bounds(std::numeric_limits<int32>::min(), std::numeric_limits<int32>::max());
 
 				const IntervalSetInt64 i_bounds = ProofUtils::getInt64Range(stack, 
-					this->argument_expressions[1] // integer value
+					this->argument_expressions[1], // integer value
+					payload.linker ? payload.linker->value_allocator : nullptr
 				);
 
 				// Now check our bounds against the array
@@ -1337,7 +1338,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 			if(this->argument_expressions[1]->isConstant())
 			{
 				// Evaluate the index expression
-				VMState vmstate;
+				VMState vmstate(payload.linker ? payload.linker->value_allocator : nullptr);
 				vmstate.func_args_start.push_back(0);
 
 				ValueRef retval = this->argument_expressions[1]->exec(vmstate);
@@ -1361,7 +1362,8 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 				// Else index is not known at compile time.
 
 				const IntervalSetInt64 i_bounds = ProofUtils::getInt64Range(stack, 
-					this->argument_expressions[1] // integer value
+					this->argument_expressions[1], // integer value
+					payload.linker ? payload.linker->value_allocator : nullptr
 				);
 
 				// Now check our bounds against the array
@@ -1488,7 +1490,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 				if(this->argument_expressions[1]->isConstant())
 				{
 					// Evaluate the index expression
-					VMState vmstate;
+					VMState vmstate(payload.linker ? payload.linker->value_allocator : nullptr);
 					vmstate.func_args_start.push_back(0);
 					ValueRef retval = this->argument_expressions[1]->exec(vmstate);
 					assert(retval->valueType() == Value::ValueType_Int);
@@ -1503,7 +1505,8 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 					// Else index is not known at compile time.
 				
 					const IntervalSetInt64 i_bounds = ProofUtils::getInt64Range(stack, 
-						this->argument_expressions[1] // integer value
+						this->argument_expressions[1], // integer value
+						payload.linker ? payload.linker->value_allocator : nullptr
 					);
 
 					// Now check our bounds against the array
@@ -1552,7 +1555,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 			if(this->argument_expressions[1]->isConstant())
 			{
 				// Evaluate the index expression
-				VMState vmstate;
+				VMState vmstate(payload.linker ? payload.linker->value_allocator : nullptr);
 				vmstate.func_args_start.push_back(0);
 
 				ValueRef retval = this->argument_expressions[1]->exec(vmstate);
@@ -1576,7 +1579,8 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 				// Else index is not known at compile time.
 				
 				const IntervalSetInt64 i_bounds = ProofUtils::getInt64Range(stack, 
-					this->argument_expressions[1] // integer value
+					this->argument_expressions[1], // integer value
+					payload.linker ? payload.linker->value_allocator : nullptr
 				);
 
 				// Now check our bounds against the array
@@ -1596,7 +1600,7 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 		if(this->argument_expressions[0]->isConstant())
 		{
 			// Evaluate the index expression
-			VMState vmstate;
+			VMState vmstate(payload.linker ? payload.linker->value_allocator : nullptr);
 			vmstate.func_args_start.push_back(0);
 			ValueRef retval = this->argument_expressions[0]->exec(vmstate);
 			assert(retval->valueType() == Value::ValueType_Int);
@@ -1612,7 +1616,8 @@ void FunctionExpression::checkInDomain(TraversalPayload& payload, std::vector<AS
 			// Else index is not known at compile time.
 			
 			const IntervalSetInt64 i_bounds = ProofUtils::getInt64Range(stack, 
-				this->argument_expressions[0] // integer value
+				this->argument_expressions[0], // integer value
+				payload.linker ? payload.linker->value_allocator : nullptr
 			);
 
 			// Now check our bounds against the array
@@ -2432,7 +2437,7 @@ size_t FunctionExpression::getTimeBound(GetTimeBoundParams& params) const
 			if(this->argument_expressions[1]->isConstant())
 			{
 				// Evaluate the index expression
-				VMState vmstate;
+				VMState vmstate(nullptr);
 				vmstate.func_args_start.push_back(0);
 
 				ValueRef retval = this->argument_expressions[1]->exec(vmstate);
@@ -2490,7 +2495,7 @@ GetSpaceBoundResults FunctionExpression::getSpaceBound(GetSpaceBoundParams& para
 			if(this->argument_expressions[1]->isConstant())
 			{
 				// Evaluate the num-values expression
-				VMState vmstate;
+				VMState vmstate(nullptr);
 				vmstate.func_args_start.push_back(0);
 				ValueRef retval = this->argument_expressions[1]->exec(vmstate);
 				const int64 num_elems = checkedCast<IntValue>(retval)->value;

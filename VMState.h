@@ -1,8 +1,14 @@
-//Copyright 2009 Nicholas Chapman
+/*=====================================================================
+VMState.h
+---------
+Copyright Glare Technologies Limited 2025 -
+=====================================================================*/
 #pragma once
 
 
 #include "Value.h"
+#include "ValueAllocator.h"
+#include <utils/SmallVector.h>
 #include <ostream>
 
 
@@ -16,12 +22,12 @@ class Value;
 class VMState
 {
 public:
-	VMState() : trace(false), ostream(NULL) {}
+	VMState(Reference<ValueAllocator> value_alloc) : trace(false), ostream(NULL), value_allocator(value_alloc ? value_alloc : new ValueAllocator()) {}
 
-	std::vector<ValueRef> argument_stack;
+	SmallVector<ValueRef, 16> argument_stack;
 
 	// Index at which the function arguments start.  Deepest function is latest on the stack.
-	std::vector<size_t> func_args_start;
+	SmallVector<size_t, 8> func_args_start;
 
 	//std::vector<Value*> working_stack;
 	//std::vector<ValueRef> let_stack;
@@ -39,6 +45,8 @@ public:
 
 	bool trace; // If true, do a verbose trace of the execution, printing out values etc..
 	std::ostream* ostream; // Stream to write the trace to.
+
+	Reference<ValueAllocator> value_allocator;
 };
 
 

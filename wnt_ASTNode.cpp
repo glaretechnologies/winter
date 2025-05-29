@@ -108,6 +108,7 @@ bool expressionIsWellTyped(ASTNode& e, TraversalPayload& payload_)
 	{
 		vector<ASTNode*> stack;
 		TraversalPayload payload(TraversalPayload::TypeCheck);
+		payload.linker = payload_.linker;
 		e.traverse(payload, stack);
 		assert(stack.size() == 0);
 
@@ -272,7 +273,7 @@ static ASTNodeRef makeLiteralASTNodeFromValue(const ValueRef& value, const SrcLo
 static ASTNodeRef foldExpression(ASTNodeRef& e, TraversalPayload& payload, std::vector<ASTNode*>& stack)
 {
 	// Compute value of expression
-	VMState vmstate;
+	VMState vmstate(payload.linker ? payload.linker->value_allocator : nullptr);
 	vmstate.func_args_start.push_back(0);
 
 	ValueRef retval = e->exec(vmstate);
@@ -819,7 +820,7 @@ bool isTargetDefinedBeforeAllInStack(const std::vector<FunctionDefinition*>& fun
 
 ValueRef FloatLiteral::exec(VMState& vmstate)
 {
-	return new FloatValue(value);
+	return vmstate.value_allocator->allocFloatValue(value);
 }
 
 
@@ -1489,7 +1490,7 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op, con
 
 				vector<ValueRef> elem_values(bval_vec->e.size());
 				for(unsigned int i=0; i<elem_values.size(); ++i)
-					elem_values[i] = new FloatValue(op(
+					elem_values[i] = vmstate.value_allocator->allocFloatValue(op(
 						checkedCast<FloatValue>(aval)->value,
 						checkedCast<FloatValue>(bval_vec->e[i])->value
 					));
@@ -1497,7 +1498,7 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op, con
 			}
 			else if(b->type()->getType() == Type::FloatType) // Else float * float
 			{
-				return new FloatValue(op(
+				return vmstate.value_allocator->allocFloatValue(op(
 					checkedCast<FloatValue>(aval)->value,
 					checkedCast<FloatValue>(bval)->value
 				));
@@ -1577,7 +1578,7 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op, con
 
 						const VectorValue* bval_vec = checkedCast<VectorValue>(bval);
 						for(unsigned int i=0; i<elem_values.size(); ++i)
-							elem_values[i] = new FloatValue(op(
+							elem_values[i] = vmstate.value_allocator->allocFloatValue(op(
 								checkedCast<FloatValue>(aval_vec->e[i])->value,
 								checkedCast<FloatValue>(bval_vec->e[i])->value
 							));
@@ -1585,7 +1586,7 @@ ValueRef execBinaryOp(VMState& vmstate, ASTNodeRef& a, ASTNodeRef& b, Op op, con
 					else if(b->type()->getType() == Type::FloatType) // Vector<float, N> * float
 					{
 						for(unsigned int i=0; i<elem_values.size(); ++i)
-							elem_values[i] = new FloatValue(op(
+							elem_values[i] = vmstate.value_allocator->allocFloatValue(op(
 								checkedCast<FloatValue>(aval_vec->e[i])->value,
 								checkedCast<FloatValue>(bval)->value
 							));
@@ -2425,7 +2426,7 @@ ValueRef DivExpression::exec(VMState& vmstate)
 	if(this->type()->getType() == Type::FloatType)
 	{
 		if(a->type()->getType() == Type::FloatType && b->type()->getType() == Type::FloatType)
-			return new FloatValue(checkedCast<FloatValue>(aval)->value / checkedCast<FloatValue>(bval)->value);
+			return vmstate.value_allocator->allocFloatValue(checkedCast<FloatValue>(aval)->value / checkedCast<FloatValue>(bval)->value);
 		else
 			throw ExceptionWithPosition("invalid types for div op.", errorContext(this));
 	}
@@ -2466,7 +2467,7 @@ ValueRef DivExpression::exec(VMState& vmstate)
 
 			vector<ValueRef> elem_values(aval_vec->e.size());
 			for(unsigned int i=0; i<elem_values.size(); ++i)
-				elem_values[i] = new FloatValue(checkedCast<FloatValue>(aval_vec->e[i])->value / bval_float);
+				elem_values[i] = vmstate.value_allocator->allocFloatValue(checkedCast<FloatValue>(aval_vec->e[i])->value / bval_float);
 			return new VectorValue(elem_values);
 		}
 		else if(vectype->elem_type->getType() == Type::DoubleType)
@@ -2683,11 +2684,11 @@ void DivExpression::checkNoOverflow(TraversalPayload& payload, std::vector<ASTNo
 {
 	if(this->type()->getType() == Type::IntType)
 	{
-		// See if the numerator is contant
+		// See if the numerator is constant
 		if(a->isConstant())
 		{
 			// Evaluate the numerator expression
-			VMState vmstate;
+			VMState vmstate(payload.linker ? payload.linker->value_allocator : nullptr);
 			vmstate.func_args_start.push_back(0);
 
 			ValueRef retval = a->exec(vmstate);
@@ -2700,11 +2701,11 @@ void DivExpression::checkNoOverflow(TraversalPayload& payload, std::vector<ASTNo
 				return; // Success
 		}
 
-		// See if the divisor is contant
+		// See if the divisor is constant
 		if(b->isConstant())
 		{
 			// Evaluate the divisor expression
-			VMState vmstate;
+			VMState vmstate(payload.linker ? payload.linker->value_allocator : nullptr);
 			vmstate.func_args_start.push_back(0);
 
 			ValueRef retval = b->exec(vmstate);
@@ -2719,7 +2720,8 @@ void DivExpression::checkNoOverflow(TraversalPayload& payload, std::vector<ASTNo
 
 		// See if we can bound the numerator or denominator ranges
 		const IntervalSetInt64 a_bounds = ProofUtils::getInt64Range(stack, 
-			a // integer value
+			a, // integer value
+			payload.linker ? payload.linker->value_allocator : nullptr
 		);
 
 		if(a_bounds.lower() > std::numeric_limits<int32>::min())
@@ -2729,7 +2731,8 @@ void DivExpression::checkNoOverflow(TraversalPayload& payload, std::vector<ASTNo
 		}
 
 		const IntervalSetInt64 b_bounds = ProofUtils::getInt64Range(stack, 
-			b // integer value
+			b, // integer value
+			payload.linker ? payload.linker->value_allocator : nullptr
 		);
 
 		/*if(b_bounds. > -1) // If denom lower bound is > -1
@@ -2804,11 +2807,11 @@ void DivExpression::checkNoZeroDivide(TraversalPayload& payload, std::vector<AST
 {
 	if(this->type()->getType() == Type::IntType)
 	{
-		// See if the divisor is contant
+		// See if the divisor is constant
 		if(b->isConstant())
 		{
 			// Evaluate the divisor expression
-			VMState vmstate;
+			VMState vmstate(payload.linker ? payload.linker->value_allocator : nullptr);
 			vmstate.func_args_start.push_back(0);
 
 			ValueRef retval = b->exec(vmstate);
@@ -2831,7 +2834,8 @@ void DivExpression::checkNoZeroDivide(TraversalPayload& payload, std::vector<AST
 			// b is not constant.
 
 			const IntervalSetInt64 b_bounds = ProofUtils::getInt64Range(stack, 
-				b // integer value
+				b, // integer value
+				payload.linker ? payload.linker->value_allocator : nullptr
 			);
 
 			/*if(b_bounds.x > 0) // If denom lower bound is > 0
@@ -3412,7 +3416,7 @@ ValueRef UnaryMinusExpression::exec(VMState& vmstate)
 
 	if(this->type()->getType() == Type::FloatType)
 	{
-		return new FloatValue(-checkedCast<FloatValue>(aval)->value);
+		return vmstate.value_allocator->allocFloatValue(-checkedCast<FloatValue>(aval)->value);
 	}
 	else if(this->type()->getType() == Type::DoubleType)
 	{
@@ -3435,7 +3439,7 @@ ValueRef UnaryMinusExpression::exec(VMState& vmstate)
 			case Type::FloatType:
 			{
 				for(unsigned int i=0; i<elem_values.size(); ++i)
-					elem_values[i] = new FloatValue(-checkedCast<FloatValue>(aval_vec->e[i])->value);
+					elem_values[i] = vmstate.value_allocator->allocFloatValue(-checkedCast<FloatValue>(aval_vec->e[i])->value);
 				break;
 			}
 			case Type::IntType:

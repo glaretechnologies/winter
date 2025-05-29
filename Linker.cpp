@@ -7,6 +7,7 @@ Copyright Glare Technologies Limited 2016 -
 
 
 #include "BuiltInFunctionImpl.h"
+#include "ValueAllocator.h"
 #include "utils/StringUtils.h"
 #include "utils/PlatformUtils.h"
 #include "wnt_ExternalFunction.h"
@@ -26,7 +27,8 @@ Linker::Linker(bool try_coerce_int_to_double_first_, bool emit_in_bound_asserts_
 :	try_coerce_int_to_double_first(try_coerce_int_to_double_first_),
 	emit_in_bound_asserts(emit_in_bound_asserts_),
 	real_is_double(real_is_double_),
-	optimise_for_opencl(optimise_for_opencl_)
+	optimise_for_opencl(optimise_for_opencl_),
+	value_allocator(new ValueAllocator())
 {}
 
 

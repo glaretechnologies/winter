@@ -19,6 +19,7 @@ namespace Winter
 
 
 class ExternalFunction;
+class ValueAllocator;
 
 
 class Linker
@@ -75,6 +76,8 @@ public:
 	bool emit_in_bound_asserts;
 	bool real_is_double;
 	bool optimise_for_opencl;
+
+	Reference<ValueAllocator> value_allocator;
 };
 
 

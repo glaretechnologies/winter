@@ -10,13 +10,15 @@
 namespace Winter
 {
 
+class ValueAllocator;
+
 
 class ProofUtils
 {
 public:
 
-	static IntervalSetInt64 getInt64Range(std::vector<ASTNode*>& stack, const ASTNodeRef& integer_value);
-	static IntervalSetFloat getFloatRange(std::vector<ASTNode*>& stack, const ASTNodeRef& integer_value);
+	static IntervalSetInt64 getInt64Range(std::vector<ASTNode*>& stack, const ASTNodeRef& integer_value, const Reference<ValueAllocator>& value_allocator);
+	static IntervalSetFloat getFloatRange(std::vector<ASTNode*>& stack, const ASTNodeRef& integer_value, const Reference<ValueAllocator>& value_allocator);
 };
 
 

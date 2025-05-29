@@ -1095,6 +1095,7 @@ bool VirtualMachine::doDeadCodeEliminationPass()
 
 	std::vector<ASTNode*> stack;
 	TraversalPayload payload(TraversalPayload::DeadCodeElimination_ComputeAlive);
+	payload.linker = &linker;
 	for(size_t i=0; i<linker.top_level_defs.size(); ++i)
 	{
 		//std::cout << "\n=====DCE pass before:======\n";
@@ -1218,6 +1219,7 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		{
 			std::vector<ASTNode*> stack;
 			TraversalPayload payload(TraversalPayload::TypeCoercion);
+			payload.linker = &linker;
 			for(size_t i=0; i<linker.top_level_defs.size(); ++i)
 				linker.top_level_defs[i]->traverse(payload, stack);
 
@@ -1309,6 +1311,7 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 	{
 		std::vector<ASTNode*> stack;
 		TraversalPayload payload(TraversalPayload::TypeCheck);
+		payload.linker = &linker;
 
 		for(size_t i=0; i<linker.top_level_defs.size(); ++i)
 			linker.top_level_defs[i]->traverse(payload, stack);
@@ -1323,6 +1326,7 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 	{
 		std::vector<ASTNode*> stack;
 		TraversalPayload payload(TraversalPayload::CheckInDomain);
+		payload.linker = &linker;
 		for(size_t i=0; i<linker.top_level_defs.size(); ++i)
 			linker.top_level_defs[i]->traverse(payload, stack);
 
@@ -1347,6 +1351,7 @@ void VirtualMachine::loadSource(const VMConstructionArgs& args, const std::vecto
 		{
 			std::vector<ASTNode*> stack;
 			TraversalPayload payload(TraversalPayload::SimplifyIfExpression);
+			payload.linker = &linker;
 			for(size_t i=0; i<linker.top_level_defs.size(); ++i)
 				linker.top_level_defs[i]->traverse(payload, stack);
 			simplify_if_change = payload.tree_changed;

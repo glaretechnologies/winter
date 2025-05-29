@@ -23,7 +23,6 @@
 #include <Platform.h>
 #include <FileUtils.h>
 #include <StringUtils.h>
-#include <FileUtils.h>
 #include <ContainerUtils.h>
 #include <PlatformUtils.h>
 #include <Timer.h>
@@ -201,7 +200,7 @@ TestResults testMainFloat(const std::string& src, float target_return_val)
 			failTest("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
 		}
 
-		VMState vmstate;
+		VMState vmstate(/*value allocator=*/nullptr);
 		vmstate.func_args_start.push_back(0);
 
 		ValueRef retval = maindef->invoke(vmstate);
@@ -389,7 +388,7 @@ static TestResults doTestMainFloatArg(const std::string& src, float argument, fl
 
 
 
-		VMState vmstate;
+		VMState vmstate(/*value allocator=*/nullptr);
 		vmstate.func_args_start.push_back(0);
 		vmstate.argument_stack.push_back(new FloatValue(argument));
 
@@ -679,7 +678,7 @@ static TestResults doTestMainDoubleArg(const std::string& src, double argument, 
 		if(!epsEqual(jitted_result, target_return_val))
 			failTest("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
 
-		VMState vmstate;
+		VMState vmstate(/*value allocator=*/nullptr);
 		vmstate.func_args_start.push_back(0);
 		vmstate.argument_stack.push_back(new DoubleValue(argument));
 
@@ -881,7 +880,7 @@ void testMainInteger(const std::string& src, int target_return_val)
 		if(jitted_result != target_return_val)
 			failTest("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
 
-		VMState vmstate;
+		VMState vmstate(/*value allocator=*/nullptr);
 		vmstate.func_args_start.push_back(0);
 
 		ValueRef retval = maindef->invoke(vmstate);
@@ -1001,7 +1000,7 @@ void testMainStringArg(const std::string& src, const std::string& arg, const std
 		}
 
 
-		VMState vmstate;
+		VMState vmstate(/*value allocator=*/nullptr);
 		vmstate.func_args_start.push_back(0);
 		vmstate.argument_stack.push_back(new StringValue(arg));
 
@@ -1064,7 +1063,7 @@ TestResults testMainIntegerArg(const std::string& src, int x, int target_return_
 		if(jitted_result != target_return_val)
 			failTest("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
 
-		VMState vmstate;
+		VMState vmstate(/*value allocator=*/nullptr);
 		vmstate.func_args_start.push_back(0);
 		vmstate.argument_stack.push_back(new IntValue(x, true));
 
@@ -1259,7 +1258,7 @@ void testMainInt64Arg(const std::string& src, int64 x, int64 target_return_val, 
 		}
 
 
-		VMState vmstate;
+		VMState vmstate(/*value allocator=*/nullptr);
 		vmstate.func_args_start.push_back(0);
 		vmstate.argument_stack.push_back(new IntValue(x, true));
 
@@ -1315,7 +1314,7 @@ void testMainInt16Arg(const std::string& src, int16 x, int16 target_return_val, 
 		if(jitted_result != target_return_val)
 			failTest("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
 
-		VMState vmstate;
+		VMState vmstate(/*value allocator=*/nullptr);
 		vmstate.func_args_start.push_back(0);
 		vmstate.argument_stack.push_back(new IntValue(x, true));
 
@@ -1371,7 +1370,7 @@ void testMainUInt32Arg(const std::string& src, uint32 x, uint32 target_return_va
 		if(jitted_result != target_return_val)
 			failTest("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
 
-		VMState vmstate;
+		VMState vmstate(/*value allocator=*/nullptr);
 		vmstate.func_args_start.push_back(0);
 		vmstate.argument_stack.push_back(new IntValue(x, false));
 
@@ -1423,7 +1422,7 @@ void testMainBoolArg(const std::string& src, bool x, bool target_return_val, uin
 		if(jitted_result != target_return_val)
 			failTest("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
 
-		VMState vmstate;
+		VMState vmstate(/*value allocator=*/nullptr);
 		vmstate.func_args_start.push_back(0);
 		vmstate.argument_stack.push_back(new BoolValue(x));
 
@@ -1578,7 +1577,7 @@ void testMainStruct(const std::string& src, const StructType& target_return_val)
 			failTest("Test failed: jitted_result != target_return_val");
 
 
-		/*VMState vmstate;
+		/*VMState vmstate(/*value allocator=/nullptr);
 		vmstate.func_args_start.push_back(0);
 
 		Value* retval = maindef->invoke(vmstate);
@@ -1658,7 +1657,7 @@ void testMainStructInputAndOutput(const std::string& src, const InStructType& st
 		if(!(jitted_result == target_return_val))
 			failTest("Test failed: jitted_result != target_return_val");
 
-		/*VMState vmstate;
+		/*VMState vmstate(nullptr);
 		vmstate.func_args_start.push_back(0);
 
 		Value* retval = maindef->invoke(vmstate);
@@ -1786,7 +1785,7 @@ void testFloat4StructPairRetFloat(const std::string& src, const Float4StructPair
 			failTest("Test failed: JIT'd main returned " + toString(jitted_result) + ", target was " + toString(target_return_val));
 		}
 
-		/*VMState vmstate;
+		/*VMState vmstate(nullptr);
 		vmstate.func_args_start.push_back(0);
 
 		Value* retval = maindef->invoke(vmstate);
@@ -1868,7 +1867,7 @@ void testVectorInStruct(const std::string& src, const StructWithVec& struct_in, 
 		if(!epsEqual(jitted_result, target_return_val))
 			failTest("Test failed: JIT'd main returned value != expected.");
 
-		/*VMState vmstate;
+		/*VMState vmstate(nullptr);
 		vmstate.func_args_start.push_back(0);
 
 		Value* retval = maindef->invoke(vmstate);

@@ -83,7 +83,7 @@ bool testFuzzProgram(const std::string& src)
 		const float argument = 1.0f;
 		const float jitted_result = f(argument, NULL);//&test_env);
 
-		VMState vmstate;
+		VMState vmstate(/*value allocator=*/nullptr);
 		vmstate.func_args_start.push_back(0);
 		vmstate.argument_stack.push_back(new FloatValue(argument));
 		//vmstate.argument_stack.push_back(new VoidPtrValue(&test_env));
@@ -283,7 +283,7 @@ static bool testFuzzASTProgram(Reference<BufferRoot>& root)//const std::vector<F
 		const float argument = 1.0f;
 		const float jitted_result = f(argument);
 
-		VMState vmstate;
+		VMState vmstate(/*value allocator=*/nullptr);
 		vmstate.func_args_start.push_back(0);
 		vmstate.argument_stack.push_back(new FloatValue(argument));
 

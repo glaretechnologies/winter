@@ -2673,7 +2673,7 @@ ValueRef DotProductBuiltInFunc::invoke(VMState& vmstate)
 
 	if(vector_type->elem_type->getType() == Type::FloatType)
 	{
-		FloatValueRef res = new FloatValue(0.0f);
+		FloatValueRef res = vmstate.value_allocator->allocFloatValue(0.0f);
 		for(int i=0; i<use_num_comp; ++i)
 			res->value += checkedCast<const FloatValue>(a->e[i].getPointer())->value * checkedCast<const FloatValue>(b->e[i].getPointer())->value;
 		return res;
@@ -2852,7 +2852,7 @@ ValueRef VectorMinBuiltInFunc::invoke(VMState& vmstate)
 		{
 			const float x = checkedCast<const FloatValue>(a->e[i].getPointer())->value;
 			const float y = checkedCast<const FloatValue>(b->e[i].getPointer())->value;
-			res_values[i] = new FloatValue(x < y ? x : y);
+			res_values[i] = vmstate.value_allocator->allocFloatValue(x < y ? x : y);
 		}
 	}
 	else if(this->vector_type->elem_type->getType() == Type::DoubleType)
@@ -3151,7 +3151,7 @@ ValueRef PowBuiltInFunc::invoke(VMState& vmstate)
 	{
 		const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 0].getPointer());
 		const FloatValue* b = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back() + 1].getPointer());
-		return new FloatValue(std::pow(a->value, b->value));
+		return vmstate.value_allocator->allocFloatValue(std::pow(a->value, b->value));
 	}
 	else
 	{
@@ -3226,7 +3226,7 @@ ValueRef SqrtBuiltInFunc::invoke(VMState& vmstate)
 	if(type->getType() == Type::FloatType)
 	{
 		const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
-		return new FloatValue(std::sqrt(a->value));
+		return vmstate.value_allocator->allocFloatValue(std::sqrt(a->value));
 	}
 	else if(type->getType() == Type::DoubleType)
 	{
@@ -3245,7 +3245,7 @@ ValueRef SqrtBuiltInFunc::invoke(VMState& vmstate)
 		for(unsigned int i=0; i<vector_type->num; ++i)
 		{
 			const float x = checkedCast<const FloatValue>(a->e[i].getPointer())->value;
-			res_values[i] = new FloatValue(std::sqrt(x));
+			res_values[i] = vmstate.value_allocator->allocFloatValue(std::sqrt(x));
 		}
 
 		return new VectorValue(res_values);
@@ -3287,7 +3287,7 @@ ValueRef ExpBuiltInFunc::invoke(VMState& vmstate)
 	if(type->getType() == Type::FloatType)
 	{
 		const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
-		return new FloatValue(std::exp(a->value));
+		return vmstate.value_allocator->allocFloatValue(std::exp(a->value));
 	}
 	else
 	{
@@ -3330,7 +3330,7 @@ ValueRef LogBuiltInFunc::invoke(VMState& vmstate)
 	if(type->getType() == Type::FloatType)
 	{
 		const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
-		return new FloatValue(std::log(a->value));
+		return vmstate.value_allocator->allocFloatValue(std::log(a->value));
 	}
 	else
 	{
@@ -3373,7 +3373,7 @@ ValueRef SinBuiltInFunc::invoke(VMState& vmstate)
 	if(type->getType() == Type::FloatType)
 	{
 		const FloatValue* a = checkedCast<const FloatValue>(vmstate.argument_stack[vmstate.func_args_start.back()].getPointer());
-		return new FloatValue(std::sin(a->value));
+		return vmstate.value_allocator->allocFloatValue(std::sin(a->value));
 	}
 	else
 	{

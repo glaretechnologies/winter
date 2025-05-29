@@ -129,7 +129,7 @@ int main(int argc, char** argv)
 
 
 		// Call the interpreted function
-		Winter::VMState vmstate;
+		Winter::VMState vmstate(/*value allocator=*/nullptr);
 		vmstate.func_args_start.push_back(0); // Push index at which the function arguments start
 
 		Winter::ValueRef retval = maindef->invoke(vmstate);

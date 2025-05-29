@@ -100,7 +100,7 @@ public:
 	};
 
 	TraversalPayload(Operation e) : 
-		operation(e), tree_changed(false), current_named_constant(NULL), check_bindings(false)
+		linker(nullptr), operation(e), tree_changed(false), current_named_constant(NULL), check_bindings(false)
 	{}
 
 	Linker* linker;
@@ -244,7 +244,7 @@ public:
 class EmitOpenCLCodeParams
 {
 public:
-	EmitOpenCLCodeParams() : emit_in_bound_asserts(false) {}
+	EmitOpenCLCodeParams() : uid(0), emit_comments(false), emit_in_bound_asserts(false) {}
 
 	std::string file_scope_code;
 
@@ -252,7 +252,7 @@ public:
 
 	/*
 	An expression in Winter, when transformed to OpenCL C, may not be expressible as just as an expression.
-	Rather, it may require one or more additional statements.  Such statements will be writted to blocks.back().
+	Rather, it may require one or more additional statements.  Such statements will be written to blocks.back().
 	
 	For example, let blocks are not easily (efficiently) expressible in C:  (we don't want to duplicate sin call)
 	let

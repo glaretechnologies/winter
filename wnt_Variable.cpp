@@ -183,7 +183,7 @@ static BindInfo doBind(const std::vector<ASTNode*>& stack, int s, const std::str
 			
 			for(unsigned int i=0; i<let_block->lets.size(); ++i) // For each let node in the block:
 			{
-				// If the variable we are tring to bind is in a let expression for the current Let Block, then
+				// If the variable we are trying to bind is in a let expression for the current Let Block, then
 				// we only want to bind to let variables from let expressions that are *before* the current let expression.
 				// In cases like
 				// let
@@ -461,8 +461,11 @@ ValueRef Variable::exec(VMState& vmstate)
 		return s->fields[free_index];
 	}
 
-
-	if(this->binding_type == BindingType_Argument)
+	if(this->binding_type == BindingType_Unbound)
+	{
+		throw ExceptionWithPosition("variable not bound", errorContext(this));
+	}
+	else if(this->binding_type == BindingType_Argument)
 	{
 		if(vmstate.func_args_start.empty() || (vmstate.func_args_start.back() + arg_index >= vmstate.argument_stack.size()))
 			throw ExceptionWithPosition("out of bounds", errorContext(this));
@@ -523,7 +526,10 @@ TypeRef Variable::type() const
 		}
 	}
 	else if(this->binding_type == BindingType_Argument)
+	{
+		runtimeCheck(this->arg_index >= 0 && this->arg_index < (int)this->bound_function->args.size());
 		return this->bound_function->args[this->arg_index].type;
+	}
 	else if(this->binding_type == BindingType_GlobalDef)
 		return this->bound_function->type();
 	else if(this->binding_type == BindingType_NamedConstant)

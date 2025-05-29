@@ -128,6 +128,8 @@ set(WINTER_FILES
 "${WINTER_DIR}/LLVMUtils.h"
 "${WINTER_DIR}/CompiledValue.cpp"
 "${WINTER_DIR}/CompiledValue.h"
+"${WINTER_DIR}/ValueAllocator.cpp"
+"${WINTER_DIR}/ValueAllocator.h"
 )
 
 if(WINTER_INCLUDE_TESTS)
@@ -191,6 +193,10 @@ ${GLARE_CORE_TRUNK_DIR}/utils/Timer.h
 ${GLARE_CORE_TRUNK_DIR}/utils/VRef.h
 ${GLARE_CORE_TRUNK_DIR}/utils/UTF8Utils.cpp
 ${GLARE_CORE_TRUNK_DIR}/utils/UTF8Utils.h
+${GLARE_CORE_TRUNK_DIR}/utils/PoolAllocator.cpp
+${GLARE_CORE_TRUNK_DIR}/utils/PoolAllocator.h
+${GLARE_CORE_TRUNK_DIR}/utils/RuntimeCheck.cpp
+${GLARE_CORE_TRUNK_DIR}/utils/RuntimeCheck.h
 )
 
 SET(WINTER_DOUBLE_CONVERSION_FILES
@@ -217,8 +223,8 @@ ${GLARE_CORE_TRUNK_DIR}/double-conversion/utils.h
 )
 
 SET(WINTER_XXHASH_FILES
-${GLARE_CORE_TRUNK_DIR}/zstd-1.5.2/lib/common/xxhash.c
-${GLARE_CORE_TRUNK_DIR}/zstd-1.5.2/lib/common/xxhash.h
+${GLARE_CORE_TRUNK_DIR}/zstd/lib/common/xxhash.c
+${GLARE_CORE_TRUNK_DIR}/zstd/lib/common/xxhash.h
 )
 
 
@@ -252,7 +258,7 @@ set(WINTER_INCLUDE_DIRECTORIES
 ${GLARE_CORE_TRUNK_DIR}
 ${GLARE_CORE_TRUNK_DIR}/utils
 ${GLARE_CORE_TRUNK_DIR}/maths
-${GLARE_CORE_TRUNK_DIR}/zstd-1.5.2/lib/common
+${GLARE_CORE_TRUNK_DIR}/zstd/lib/common
 ${GLARE_CORE_TRUNK_DIR}/opencl/khronos
 )
 

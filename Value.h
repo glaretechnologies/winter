@@ -1,14 +1,16 @@
 /*=====================================================================
 Value.h
 -------
-Copyright Glare Technologies Limited 2016 -
+Copyright Glare Technologies Limited 2025 -
 =====================================================================*/
 #pragma once
 
 
 #include "wnt_Type.h"
 #include "BaseException.h"
+#include "ValueAllocator.h"
 #include <utils/RefCounted.h>
+#include <utils/Reference.h>
 #include <string>
 #include <vector>
 #include <map>
@@ -41,7 +43,7 @@ public:
 		ValueType_VoidPtr
 	};
 
-	Value(ValueType value_type_) : value_type(value_type_) {}
+	Value(ValueType value_type_) : value_type(value_type_), value_allocator(nullptr) {}
 	virtual ~Value() {}
 	
 	virtual const std::string toString() const { return "Value"; }
@@ -50,6 +52,9 @@ public:
 
 protected:
 	ValueType value_type;
+public:
+	ValueAllocator* value_allocator; // non-null if this value was allocated from a ValueAllocator.
+	int allocation_index; // Used by the ValueAllocator for freeing the value.
 };
 
 
@@ -252,5 +257,28 @@ const T* checkedCast(const ValueRef& v)
 }
 
 
+
+void doDestroyValue(Winter::Value* val);
+
+
 } // end namespace Winter
 
+
+// Template specialisation of destroyAndFreeOb for FloatValue.  This is called when being freed by a Reference.
+// We will use this to free from our allocator if the object was allocated from there.
+template <>
+inline void destroyAndFreeOb<Winter::FloatValue>(Winter::FloatValue* val)
+{
+	if(val->value_allocator)
+		val->value_allocator->freeFloatValue(val);
+	else
+		delete val;
+}
+
+// Template specialisation of destroyAndFreeOb for Value.  This is called when being freed by a Reference.
+// We will use this to free from our allocator if the object was allocated from there.
+template <>
+inline void destroyAndFreeOb<Winter::Value>(Winter::Value* val)
+{
+	Winter::doDestroyValue(val);
+}
