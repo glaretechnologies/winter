@@ -1869,7 +1869,8 @@ bool AdditionExpression::isConstant() const
 
 size_t AdditionExpression::getTimeBound(GetTimeBoundParams& params) const
 {
-	const size_t scalar_cost = 1;
+	// https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=add_ss&ig_expand=4726,171
+	const size_t scalar_cost = 4;
 	const size_t op_cost = (type()->getType() == Type::VectorTypeType) ? (type().downcastToPtr<VectorType>()->num * scalar_cost) : scalar_cost;
 
 	return a->getTimeBound(params) + b->getTimeBound(params) + op_cost;
@@ -2073,7 +2074,8 @@ bool SubtractionExpression::isConstant() const
 
 size_t SubtractionExpression::getTimeBound(GetTimeBoundParams& params) const
 {
-	const size_t scalar_cost = 1;
+	// https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=sub_ss&ig_expand=4726,171,2659,6664
+	const size_t scalar_cost = 4;
 	const size_t op_cost = (type()->getType() == Type::VectorTypeType) ? (type().downcastToPtr<VectorType>()->num * scalar_cost) : scalar_cost;
 
 	return a->getTimeBound(params) + b->getTimeBound(params) + op_cost;
@@ -2396,7 +2398,8 @@ bool MulExpression::isConstant() const
 
 size_t MulExpression::getTimeBound(GetTimeBoundParams& params) const
 {
-	const size_t scalar_cost = 1;
+	// https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=mul_ss&ig_expand=4726
+	const size_t scalar_cost = 4;
 	const size_t op_cost = (type()->getType() == Type::VectorTypeType) ? (type().downcastToPtr<VectorType>()->num * scalar_cost) : scalar_cost;
 
 	return a->getTimeBound(params) + b->getTimeBound(params) + op_cost;
@@ -2981,7 +2984,8 @@ bool DivExpression::isConstant() const
 
 size_t DivExpression::getTimeBound(GetTimeBoundParams& params) const
 {
-	const size_t scalar_cost = 10;
+	// https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=div_ss&ig_expand=4726,171,2659
+	const size_t scalar_cost = 11;
 	const size_t op_cost = (type()->getType() == Type::VectorTypeType) ? (type().downcastToPtr<VectorType>()->num * scalar_cost) : scalar_cost;
 
 	return a->getTimeBound(params) + b->getTimeBound(params) + op_cost;
