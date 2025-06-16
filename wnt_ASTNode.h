@@ -382,6 +382,7 @@ public:
 
 
 	inline ASTNodeType nodeType() const { return node_type; }
+	inline bool isNodeType(ASTNodeType type) const { return node_type == type; }
 
 	virtual TypeRef type() const = 0;
 
